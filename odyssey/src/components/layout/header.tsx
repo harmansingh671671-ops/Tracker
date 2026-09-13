@@ -2,13 +2,18 @@
 
 import React from 'react';
 import { useUserStore } from '@/lib/stores/user-store';
-import { Flame, Gem, Shield, Award } from 'lucide-react';
+import { Flame, Gem, Award } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { calculateRank, getRankInfo } from '@/lib/utils/gamification';
 
 export function Header() {
   const { user } = useUserStore();
 
   if (!user) return null;
+
+  const dynamicRank = calculateRank(user.streak, 100);
+  const displayRank = user.militaryRank && user.militaryRank !== 'Civilian' ? user.militaryRank : dynamicRank;
+  const rankInfo = getRankInfo(displayRank);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3">
@@ -18,8 +23,8 @@ export function Header() {
             Odyssey
           </span>
           <Badge variant="outline" className="text-xs font-semibold gap-1 border-primary/20 bg-primary/5">
-            <Shield className="w-3 h-3 text-indigo-500" />
-            {user.militaryRank || 'Civilian'}
+            <span className="text-xs">{rankInfo.badge}</span>
+            <span>{displayRank}</span>
           </Badge>
         </div>
 
@@ -46,3 +51,4 @@ export function Header() {
     </header>
   );
 }
+
