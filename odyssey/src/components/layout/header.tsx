@@ -15,7 +15,7 @@ export function Header() {
       <div className="flex items-center justify-between max-w-md mx-auto">
         <div className="flex items-center gap-2">
           <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
-            odyssey
+            Odyssey
           </span>
           <Badge variant="outline" className="text-xs font-semibold gap-1 border-primary/20 bg-primary/5">
             <Shield className="w-3 h-3 text-indigo-500" />

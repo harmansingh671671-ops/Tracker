@@ -27,7 +27,7 @@ export const RANKS: RankInfo[] = [
   { name: 'Field Marshal', streak: 730, efficiency: 95, badge: '🏆', division: 'GOAT' }
 ];
 
-export function calculateRank(streak: number, efficiency: number): string {
+export function calculateRank(streak: number = 0, efficiency: number = 100): string {
   let eligibleRank = 'Civilian';
   for (const rank of RANKS) {
     if (streak >= rank.streak && efficiency >= rank.efficiency) {
@@ -36,3 +36,8 @@ export function calculateRank(streak: number, efficiency: number): string {
   }
   return eligibleRank;
 }
+
+export function getRankInfo(rankName: string): RankInfo {
+  return RANKS.find(r => r.name === rankName) || RANKS[0];
+}
+
