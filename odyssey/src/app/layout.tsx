@@ -14,8 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Odyssey - Mindfulness & Habit Tracker",
-  description: "Accountability scheduler, habit tracker, and performance analytics",
+  title: "Odyssey - Mindfulness & Gamified Habit Tracker",
+  description: "Accountability scheduler, habit tracker, journey map and performance analytics",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Odyssey",
+  },
 };
 
 export default function RootLayout({
