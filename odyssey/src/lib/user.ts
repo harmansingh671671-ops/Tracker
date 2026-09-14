@@ -1,26 +1,33 @@
 import { db, type Profile } from './db';
 import { v4 as uuidv4 } from 'uuid';
 import { RANKS, calculateRank } from './utils/gamification';
+import { seedInitialData, resetAllDataToZero } from './seed';
 
 export type { Profile };
-export { RANKS, calculateRank };
+export { RANKS, calculateRank, resetAllDataToZero };
 
 export async function getOrCreateUser(): Promise<Profile> {
   const users = await db.profiles.toArray();
   
   if (users.length > 0) {
-    return users[0];
+    const user = users[0];
+    // If the database has the old hardcoded demo values (240 diamonds, 14 streak), reset to zero start
+    if (user.diamonds === 240 && user.streak === 14 && user.militaryRank === 'Scholar') {
+      return await resetAllDataToZero();
+    }
+    await seedInitialData(user.id);
+    return user;
   }
   
   const newUser: Profile = {
     id: uuidv4(),
-    username: 'cadet',
-    displayName: 'Commander',
+    username: 'explorer',
+    displayName: 'Traveler',
     dateOfBirth: '',
     createdAt: new Date().toISOString(),
     xp: 0,
     level: 1,
-    diamonds: 10,
+    diamonds: 0,
     streak: 0,
     highestStreak: 0,
     militaryRank: 'Civilian',
@@ -28,7 +35,9 @@ export async function getOrCreateUser(): Promise<Profile> {
     lastReviewDate: '',
     lastPlanDate: '',
     streakFreezeActive: false,
+    streakFreezeCount: 0,
     unlockedBadges: ['Newbie Scribe'],
+    equippedItems: [],
     equippedTheme: 'default',
     equippedMascot: 'owl',
     equippedSound: 'default',
@@ -36,6 +45,7 @@ export async function getOrCreateUser(): Promise<Profile> {
   };
   
   await db.profiles.add(newUser);
+  await seedInitialData(newUser.id);
   return newUser;
 }
 
@@ -45,4 +55,3 @@ export async function updateUserProfile(updates: Partial<Profile>): Promise<Prof
   await db.profiles.update(user.id, updates);
   return updated;
 }
-

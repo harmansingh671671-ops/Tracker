@@ -1,44 +1,44 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, Map, CalendarPlus, Target, BarChart3, ShoppingBag, Settings } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Calendar, Compass, CheckCircle2, Store, BarChart3 } from "lucide-react";
+
+const navItems = [
+  { path: "/planner", label: "Today", icon: "calendar_today" },
+  { path: "/journey", label: "Journey", icon: "explore" },
+  { path: "/habits", label: "Habits", icon: "check_circle" },
+  { path: "/shop", label: "Shop", icon: "storefront" },
+  { path: "/stats", label: "Stats", icon: "bar_chart" },
+];
 
 export function BottomNav() {
   const pathname = usePathname();
 
-  const navItems = [
-    { href: '/home', label: 'Today', icon: Home },
-    { href: '/journey', label: 'Journey', icon: Map },
-    { href: '/planner', label: 'Plan', icon: CalendarPlus },
-    { href: '/habits', label: 'Habits', icon: Target },
-    { href: '/stats', label: 'Stats', icon: BarChart3 },
-    { href: '/shop', label: 'Shop', icon: ShoppingBag },
-    { href: '/settings', label: 'Settings', icon: Settings },
-  ];
-
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-2 py-2">
-      <div className="flex items-center justify-around max-w-md mx-auto">
+    <nav className="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/85 backdrop-blur-xl border-t border-outline/10">
+      <div className="h-20 px-space-xs flex items-center justify-around">
         {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href === '/home' && pathname === '/');
-          
+          const isActive = pathname === item.path;
           return (
             <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all duration-200 gap-1',
+              key={item.path}
+              href={item.path}
+              className={`flex flex-col items-center justify-center min-w-[44px] min-h-[44px] px-2 py-1 gap-0.5 transition-colors ${
                 isActive
-                  ? 'text-primary font-bold bg-primary/10 scale-105'
-                  : 'text-muted-foreground hover:text-foreground font-medium'
-              )}
+                  ? "text-primary"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`}
             >
-              <Icon className={cn('w-5 h-5', isActive && 'stroke-[2.5px]')} />
-              <span className="text-[10px]">{item.label}</span>
+              <span
+                className="material-symbols-outlined text-[22px]"
+                style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+              >
+                {item.icon}
+              </span>
+              <span className="font-label-sm text-label-sm font-medium">
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -46,3 +46,4 @@ export function BottomNav() {
     </nav>
   );
 }
+

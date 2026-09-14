@@ -101,6 +101,18 @@ export const useHabitStore = create<HabitState>((set, get) => ({
           longestStreak: newLongest
         } : h)
       }));
+
+      // Gamification award
+      if (isCompleted) {
+        import('./user-store').then(({ useUserStore }) => {
+          const uStore = useUserStore.getState();
+          uStore.addXp(15);
+          uStore.addDiamonds(1);
+          if (uStore.user && uStore.user.streak === 0) {
+            uStore.updateUser({ streak: 1, highestStreak: Math.max(1, uStore.user.highestStreak) });
+          }
+        });
+      }
     }
 
     return isCompleted;

@@ -10,6 +10,7 @@ interface ScheduleState {
   updateBlock: (id: string, updates: Partial<ScheduleBlock>) => Promise<void>;
   deleteBlock: (id: string) => Promise<void>;
   commitSchedule: (userId: string, date: string) => Promise<void>;
+  autoFillSleep: (userId: string, date: string) => Promise<void>;
 }
 
 export const useScheduleStore = create<ScheduleState>((set, get) => ({
@@ -61,5 +62,42 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
     set((state) => ({
       blocks: state.blocks.map(b => ({ ...b, isCommitted: true }))
     }));
+  },
+  autoFillSleep: async (userId, date) => {
+    const existing = get().blocks;
+    const sleepSlots = [
+      { startTime: '00:00', endTime: '01:00', title: 'Deep Circadian Slumber (H1)', tag: 'Restored' },
+      { startTime: '01:00', endTime: '02:00', title: 'REM Cycle Phase I', tag: 'SpO2 99%' },
+      { startTime: '02:00', endTime: '03:00', title: 'Deep Delta Sleep Wave', tag: 'Peak Recovery' },
+      { startTime: '03:00', endTime: '04:00', title: 'Cellular Repair Interval', tag: 'HRV 72ms' },
+      { startTime: '04:00', endTime: '05:00', title: 'REM Cycle Phase II', tag: 'Memory Consolidation' },
+      { startTime: '05:00', endTime: '06:00', title: 'Light Rest & Cortisol Rise', tag: 'Pre-Dawn Stage' },
+      { startTime: '06:00', endTime: '07:00', title: 'Circadian Slumber Completion', tag: '8.0h Done' },
+      { startTime: '21:00', endTime: '22:00', title: 'Digital Sunset & Fiction Reading', tag: 'Screen Sunset' },
+      { startTime: '22:00', endTime: '23:00', title: 'Melatonin Prep & Ambient Rest', tag: 'Melatonin Prep' },
+      { startTime: '23:00', endTime: '24:00', title: 'Circadian Slumber Inception', tag: 'Ready' },
+    ];
+
+    for (const slot of sleepSlots) {
+      const alreadyHas = existing.some(b => b.startTime === slot.startTime);
+      if (!alreadyHas) {
+        const newBlock: ScheduleBlock = {
+          id: uuidv4(),
+          userId,
+          date,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          title: slot.title,
+          description: slot.tag,
+          category: 'sleep',
+          tag: slot.tag,
+          status: 'completed',
+          isCommitted: true,
+          createdAt: new Date().toISOString(),
+        };
+        await db.scheduleBlocks.add(newBlock);
+      }
+    }
+    await get().fetchBlocksForDate(userId, date);
   }
 }));

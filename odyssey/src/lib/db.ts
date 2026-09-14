@@ -18,7 +18,9 @@ export interface Profile {
   lastReviewDate: string;
   lastPlanDate: string;
   streakFreezeActive: boolean;
+  streakFreezeCount?: number;
   unlockedBadges: string[];
+  equippedItems?: string[];
   
   // Customization
   equippedTheme: string;
@@ -35,8 +37,10 @@ export interface ScheduleBlock {
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   title: string;
-  category: 'Work' | 'Study' | 'Health' | 'Sleep' | 'Leisure' | 'Admin';
-  energyLevel: 'high' | 'medium' | 'low';
+  description?: string;
+  category: 'sleep' | 'work' | 'habits' | 'buffer' | 'Work' | 'Study' | 'Health' | 'Sleep' | 'Leisure' | 'Admin';
+  tag?: string;
+  energyLevel?: 'high' | 'medium' | 'low';
   status: 'pending' | 'completed' | 'missed' | 'pivoted';
   missReason?: string;
   completedAt?: string;
@@ -49,7 +53,9 @@ export interface Habit {
   userId: string;
   name: string;
   icon: string;
-  category: 'Health' | 'Mindfulness' | 'Learning' | 'Productivity' | 'Social';
+  category: 'Health' | 'Mindfulness' | 'Learning' | 'Productivity' | 'Social' | 'growth' | 'work' | 'health';
+  period?: 'morning' | 'afternoon' | 'evening';
+  timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
   targetDaysPerWeek?: number;
   currentStreak: number;
