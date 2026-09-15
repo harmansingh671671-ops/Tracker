@@ -81,6 +81,11 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
     for (const slot of sleepSlots) {
       const alreadyHas = existing.some(b => b.startTime === slot.startTime);
       if (!alreadyHas) {
+        const endHourNum = parseInt(slot.endTime.split(':')[0], 10);
+        const normEndH = endHourNum === 0 ? 24 : endHourNum;
+        const currentH = new Date().getHours();
+        const isAlreadyPast = currentH >= normEndH;
+        const isBuffer = slot.startTime === '21:00';
         const newBlock: ScheduleBlock = {
           id: uuidv4(),
           userId,
@@ -89,9 +94,9 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
           endTime: slot.endTime,
           title: slot.title,
           description: slot.tag,
-          category: 'sleep',
+          category: isBuffer ? 'buffer' : 'sleep',
           tag: slot.tag,
-          status: 'completed',
+          status: isAlreadyPast ? 'completed' : 'pending',
           isCommitted: true,
           createdAt: new Date().toISOString(),
         };
