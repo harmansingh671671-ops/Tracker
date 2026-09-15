@@ -65,15 +65,15 @@ function formatCleanHourRange(startTime: string, endTime: string): string {
     eH = 24;
   }
 
-  // If both start and end have 0 minutes, format as clean integer hour range "10 – 11"
+  // If both start and end have 0 minutes, format as clean integer hour range "10-11"
   if (sM === 0 && eM === 0) {
     const startFmt = sH.toString().padStart(2, '0');
     const endFmt = eH.toString().padStart(2, '0');
-    return `${startFmt} – ${endFmt}`;
+    return `${startFmt}-${endFmt}`;
   }
 
   // Fallback for non-zero minutes
-  return `${startTime} – ${endTime}`;
+  return `${startTime}-${endTime}`;
 }
 
 export default function PlannerPage() {
@@ -82,7 +82,9 @@ export default function PlannerPage() {
   
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [autoFillLocked, setAutoFillLocked] = useState<boolean>(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Dynamic real-time clock synchronization with zero device load (ticks every 5 seconds)
@@ -99,16 +101,41 @@ export default function PlannerPage() {
     return currentTime.getHours() + currentTime.getMinutes() / 60 + currentTime.getSeconds() / 3600;
   }, [currentTime]);
   
-  // New Block Form State
+  // Modal Form State
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newCategory, setNewCategory] = useState<'sleep' | 'work' | 'habits' | 'buffer'>('work');
   const [newStartTime, setNewStartTime] = useState("10:00");
   const [newEndTime, setNewEndTime] = useState("11:00");
 
+  const handleOpenAddModal = () => {
+    setModalMode('add');
+    setEditingBlockId(null);
+    setNewTitle("");
+    setNewDesc("");
+    setNewCategory('work');
+    setNewStartTime("10:00");
+    setNewEndTime("11:00");
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (block: ScheduleBlock, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const actualId = block.id.split('-h')[0];
+    const originalBlock = blocks.find((b) => b.id === actualId) || block;
+    setModalMode('edit');
+    setEditingBlockId(actualId);
+    setNewTitle(originalBlock.title);
+    setNewDesc(originalBlock.description || "");
+    setNewCategory(normalizeCategory(originalBlock.category, originalBlock.title));
+    setNewStartTime(originalBlock.startTime);
+    setNewEndTime(originalBlock.endTime);
+    setIsModalOpen(true);
+  };
+
   // Real-time conflict detection with existing blocks in the selected time range
   const conflictingBlocks = useMemo(() => {
-    if (!isAddModalOpen || !newStartTime || !newEndTime) return [];
+    if (!isModalOpen || !newStartTime || !newEndTime) return [];
 
     const startH = parseHour(newStartTime);
     let endH = parseHour(newEndTime);
@@ -118,6 +145,13 @@ export default function PlannerPage() {
     if (endH <= startH) return [];
 
     return blocks.filter((b) => {
+      // If editing, ignore the block currently being edited
+      if (modalMode === 'edit' && editingBlockId) {
+        if (b.id === editingBlockId || b.id.startsWith(`${editingBlockId}-`)) {
+          return false;
+        }
+      }
+
       const bStart = parseHour(b.startTime);
       let bEnd = parseHour(b.endTime);
       if (bEnd === 0 && bStart > 0) bEnd = 24;
@@ -126,16 +160,16 @@ export default function PlannerPage() {
       // Overlap condition: max(start1, start2) < min(end1, end2)
       return Math.max(startH, bStart) < Math.min(endH, bEnd);
     });
-  }, [isAddModalOpen, newStartTime, newEndTime, blocks]);
+  }, [isModalOpen, modalMode, editingBlockId, newStartTime, newEndTime, blocks]);
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const formattedDate = useMemo(() => {
+  const currentDayDate = useMemo(() => {
     const d = new Date();
     return d.toLocaleDateString("en-US", {
       weekday: "long",
       month: "short",
       day: "numeric",
-    }) + " • Balanced Flow";
+    });
   }, []);
 
   useEffect(() => {
@@ -337,13 +371,18 @@ export default function PlannerPage() {
     });
   };
 
-  const handleCreateBlock = async (e: React.FormEvent) => {
+  const handleSaveBlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newTitle.trim()) return;
 
     const startH = parseInt(newStartTime.split(':')[0], 10);
     const endH = parseInt(newEndTime.split(':')[0], 10);
     const normalizedEndH = (endH === 0 && startH > 0) ? 24 : (newEndTime === '24:00' ? 24 : endH);
+
+    // If editing, delete the old block first so it is replaced cleanly
+    if (modalMode === 'edit' && editingBlockId) {
+      await deleteBlock(editingBlockId);
+    }
 
     // If there are conflicting blocks, remove them so the new block(s) replace them
     if (conflictingBlocks.length > 0) {
@@ -389,7 +428,8 @@ export default function PlannerPage() {
 
     setNewTitle("");
     setNewDesc("");
-    setIsAddModalOpen(false);
+    setEditingBlockId(null);
+    setIsModalOpen(false);
   };
 
   // Color / Icon configuration per Category
@@ -493,12 +533,16 @@ export default function PlannerPage() {
         >
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-primary/15 blur-2xl pointer-events-none" />
           
-          {/* Subheading row: Time, Category, Live status — strictly single line, no folding */}
+          {/* Subheading row: Time, Category (only if standalone), Live status */}
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <div className="flex items-center gap-1.5 text-xs font-mono whitespace-nowrap overflow-hidden shrink-0">
               <span className="font-bold text-on-surface">{timeRangeStr}</span>
-              <span className="text-on-surface-variant/40">•</span>
-              <span className="text-primary font-semibold">{catBadgeText}</span>
+              {!isInsideGroup && (
+                <>
+                  <span className="text-on-surface-variant/40">•</span>
+                  <span className="text-primary font-semibold">{catBadgeText}</span>
+                </>
+              )}
               <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold border border-primary/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
                 <span>LIVE</span>
@@ -507,11 +551,11 @@ export default function PlannerPage() {
 
             <div className="flex items-center gap-1 shrink-0">
               <button
-                onClick={(e) => handleDeleteBlock(block.id, e)}
-                className="w-6 h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/40 hover:text-rose-400 flex items-center justify-center transition-colors"
-                title="Delete Hour"
+                onClick={(e) => handleOpenEditModal(block, e)}
+                className="w-6 h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors"
+                title="Edit Hour Block"
               >
-                <span className="material-symbols-outlined text-[15px]">delete</span>
+                <span className="material-symbols-outlined text-[18px]">more_vert</span>
               </button>
             </div>
           </div>
@@ -566,70 +610,60 @@ export default function PlannerPage() {
             : "p-3 rounded-xl bg-surface-container-low border border-outline/15 hover:border-primary/30 shadow-xs"
         }`}
       >
-        {/* Top Subheading Row: Time • Category • Status Badge ───── [✓] [✕]  (trash) */}
+        {/* Top Subheading Row: Time [• Category] • Status Badge ───── [✓] [✕]  (⋮) */}
         <div className="flex items-center justify-between gap-1.5 mb-1">
           <div className="flex items-center gap-1.5 text-xs font-mono whitespace-nowrap overflow-hidden min-w-0">
             <span className="font-bold text-on-surface text-[12px]">{timeRangeStr}</span>
-            <span className="text-on-surface-variant/40">•</span>
-            <span className={`font-semibold text-[11px] ${cfg.headerIconColor}`}>
-              {catBadgeText}
-            </span>
-
-            {/* Status Chips for passed hours */}
-            {isPast && isFollowed && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                <span className="material-symbols-outlined text-[11px]">check</span>
-                DONE
-              </span>
-            )}
-            {isPast && isMissed && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
-                <span className="material-symbols-outlined text-[11px]">close</span>
-                MISSED
-              </span>
-            )}
-            {isPast && !isFollowed && !isMissed && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-mono font-medium bg-surface-variant/40 text-on-surface-variant shrink-0">
-                REVIEW
-              </span>
+            
+            {/* Display category ONLY if this hour is NOT part of a group block */}
+            {!isInsideGroup && (
+              <>
+                <span className="text-on-surface-variant/40">•</span>
+                <span className={`font-semibold text-[11px] ${cfg.headerIconColor}`}>
+                  {catBadgeText}
+                </span>
+              </>
             )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {/* Post-Hour Reflection: Tick and Cross buttons ONLY on passed-out hours */}
+            {/* Post-Hour Reflection: Tick & Cross buttons dynamically indicate Done / Missed */}
             {isPast && (
               <div className="flex items-center gap-0.5 bg-surface-container-high/90 p-0.5 rounded-lg border border-outline/15 shadow-xs">
                 <button
                   onClick={(e) => handleMarkFollowed(block, e)}
-                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded flex items-center justify-center transition-all ${
+                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all ${
                     isFollowed
-                      ? "bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 shadow-xs font-bold"
-                      : "hover:bg-emerald-500/15 text-on-surface-variant/70 hover:text-emerald-400"
+                      ? "bg-emerald-500 text-black shadow-xs"
+                      : "text-on-surface-variant/70 hover:text-emerald-400 hover:bg-emerald-500/15"
                   }`}
-                  title={isFollowed ? "Marked as Followed (+25 XP, tap to undo)" : "I followed this hour (+25 XP)"}
+                  title={isFollowed ? "Done (tap to undo)" : "Mark as Done (+25 XP)"}
                 >
-                  <span className="material-symbols-outlined text-[14px] sm:text-[15px] font-bold">check</span>
+                  <span className="material-symbols-outlined text-[13px] sm:text-[14px] font-bold">check</span>
+                  {isFollowed && <span>Done</span>}
                 </button>
                 <button
                   onClick={(e) => handleMarkMissed(block, e)}
-                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded flex items-center justify-center transition-all ${
+                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all ${
                     isMissed
-                      ? "bg-rose-500/30 text-rose-400 border border-rose-500/50 shadow-xs font-bold"
-                      : "hover:bg-rose-500/15 text-on-surface-variant/70 hover:text-rose-400"
+                      ? "bg-rose-500 text-white shadow-xs"
+                      : "text-on-surface-variant/70 hover:text-rose-400 hover:bg-rose-500/15"
                   }`}
-                  title={isMissed ? "Marked as Missed (tap to undo)" : "I missed this hour"}
+                  title={isMissed ? "Missed (tap to undo)" : "Mark as Missed"}
                 >
-                  <span className="material-symbols-outlined text-[14px] sm:text-[15px] font-bold">close</span>
+                  <span className="material-symbols-outlined text-[13px] sm:text-[14px] font-bold">close</span>
+                  {isMissed && <span>Missed</span>}
                 </button>
               </div>
             )}
 
+            {/* 3 Vertical Dots to edit that time block */}
             <button
-              onClick={(e) => handleDeleteBlock(block.id, e)}
-              className="w-5 h-5 sm:w-6 sm:h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/30 hover:text-rose-400 flex items-center justify-center transition-colors"
-              title="Delete Hour"
+              onClick={(e) => handleOpenEditModal(block, e)}
+              className="w-5 h-5 sm:w-6 sm:h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors"
+              title="Edit Hour Block"
             >
-              <span className="material-symbols-outlined text-[14px] sm:text-[15px]">delete</span>
+              <span className="material-symbols-outlined text-[16px] sm:text-[18px]">more_vert</span>
             </button>
           </div>
         </div>
@@ -665,31 +699,41 @@ export default function PlannerPage() {
                 Today's Cadence
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl text-on-surface font-bold tracking-tight mt-0.5">
-              24-Hour Planner
+            <h1 className="text-lg sm:text-xl text-on-surface font-bold tracking-tight mt-0.5">
+              {currentDayDate}
             </h1>
             <span className="text-xs text-on-surface-variant truncate">
-              {formattedDate}
+              Balanced Flow • 24h Schedule
             </span>
           </div>
 
-          {/* Auto-Fill Sleep Action */}
-          <button
-            onClick={handleAutoFillSleep}
-            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-surface-container-high text-secondary hover:bg-surface-bright active:scale-95 transition-all shadow-sm border border-secondary/20 shrink-0 text-xs font-semibold"
-          >
-            {autoFillLocked ? (
-              <>
-                <span className="material-symbols-outlined text-[16px] text-primary">done_all</span>
-                <span className="text-primary font-semibold">Locked</span>
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-[16px]">bedtime</span>
-                <span>Auto-fill Sleep</span>
-              </>
-            )}
-          </button>
+          {/* Header Action Buttons: Auto-fill Sleep & Add Hourly Block */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <button
+              onClick={handleAutoFillSleep}
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-surface-container-high text-secondary hover:bg-surface-bright active:scale-95 transition-all shadow-sm border border-secondary/20 shrink-0 text-xs font-semibold"
+            >
+              {autoFillLocked ? (
+                <>
+                  <span className="material-symbols-outlined text-[16px] text-primary">done_all</span>
+                  <span className="text-primary font-semibold">Locked</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[16px]">bedtime</span>
+                  <span>Auto-fill Sleep</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-primary text-on-primary hover:bg-primary-fixed active:scale-95 transition-all shadow-sm border border-primary/30 shrink-0 text-xs font-semibold"
+            >
+              <span className="material-symbols-outlined text-[16px] font-bold">add</span>
+              <span>Add Hourly Block</span>
+            </button>
+          </div>
         </div>
 
         {/* Planned Hours Gauge & Category Matrix */}
@@ -851,7 +895,7 @@ export default function PlannerPage() {
                   <span>Auto-fill Sleep (8h)</span>
                 </button>
                 <button
-                  onClick={() => setIsAddModalOpen(true)}
+                  onClick={handleOpenAddModal}
                   className="px-3.5 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-sm flex items-center gap-1.5 active:scale-95 transition-transform"
                 >
                   <span className="material-symbols-outlined text-[15px]">add</span>
@@ -934,25 +978,13 @@ export default function PlannerPage() {
           )}
         </div>
 
-        {/* Floating Add Hourly Block Button */}
-        <div className="fixed bottom-24 left-0 right-0 px-3 sm:px-4 max-w-xl sm:max-w-2xl mx-auto flex justify-center z-40 pointer-events-none">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="pointer-events-auto flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-primary text-on-primary shadow-xl shadow-primary/20 active:scale-95 transition-all hover:bg-primary-fixed"
-          >
-            <span className="material-symbols-outlined text-[19px] font-bold">add</span>
-            <span className="text-xs sm:text-sm font-bold tracking-tight">
-              Add Hourly Block
-            </span>
-          </button>
-        </div>
       </div>
 
-      {/* Add Block Modal */}
-      {isAddModalOpen && (
+      {/* Add / Edit Block Modal */}
+      {isModalOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
-          onClick={() => setIsAddModalOpen(false)}
+          onClick={() => setIsModalOpen(false)}
         >
           <div
             className="w-full max-w-sm rounded-2xl bg-surface-container p-6 shadow-2xl border border-outline/20 space-y-4"
@@ -960,17 +992,17 @@ export default function PlannerPage() {
           >
             <div className="flex items-center justify-between">
               <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                Add Hourly Block
+                {modalMode === 'edit' ? 'Edit Time Block' : 'Add Hourly Block'}
               </h3>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => setIsModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-on-surface"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateBlock} className="space-y-3">
+            <form onSubmit={handleSaveBlock} className="space-y-3">
               <div>
                 <label className="font-label-sm text-[11px] text-on-surface-variant uppercase font-semibold block mb-1">
                   Block Title
@@ -1072,12 +1104,34 @@ export default function PlannerPage() {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">
-                  {conflictingBlocks.length > 0 ? "published_with_changes" : "add"}
+                  {conflictingBlocks.length > 0
+                    ? "published_with_changes"
+                    : modalMode === "edit"
+                    ? "check"
+                    : "add"}
                 </span>
                 <span>
-                  {conflictingBlocks.length > 0 ? "Update Schedule" : "Schedule Block"}
+                  {conflictingBlocks.length > 0
+                    ? "Update Schedule"
+                    : modalMode === "edit"
+                    ? "Save Changes"
+                    : "Schedule Block"}
                 </span>
               </button>
+
+              {modalMode === 'edit' && editingBlockId && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleDeleteBlock(editingBlockId);
+                    setIsModalOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl font-label-md font-semibold text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 mt-1"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                  <span>Delete Block</span>
+                </button>
+              )}
             </form>
           </div>
         </div>

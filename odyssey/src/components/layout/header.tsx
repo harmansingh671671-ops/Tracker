@@ -14,64 +14,50 @@ export function Header() {
   return (
     <>
       <header className="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl border-b border-outline/10">
-        <div className="h-16 px-gutter flex items-center justify-between gap-space-sm">
-          {/* Logo */}
-          <div className="flex items-center gap-space-xs">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-primary to-secondary flex items-center justify-center p-0.5 shadow-md shadow-primary/20">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-5 h-5 text-surface"
-              >
-                <path d="M2 12c3-4 6-4 9 0s6 4 9 0" />
-                <path d="M2 12c3 4 6 4 9 0s6-4 9 0" />
-              </svg>
-            </div>
-            <span className="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">
+        <div className="h-14 sm:h-16 px-3 sm:px-4 max-w-xl sm:max-w-2xl mx-auto flex items-center justify-between gap-2">
+          {/* Logo Title (icon removed) */}
+          <div className="flex items-center">
+            <span className="text-lg sm:text-xl text-on-surface font-bold tracking-tight">
               Odyssey
             </span>
           </div>
 
-          {/* Status Chips */}
-          <div className="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-1">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-secondary transition-all">
-              <span className="material-symbols-outlined text-[15px]">shield</span>
-              <span className="font-label-sm text-label-sm font-semibold">
+          {/* Status Chips - Small, adjusted, sleek */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-secondary">
+              <span className="material-symbols-outlined text-[13px] leading-none">shield</span>
+              <span className="text-[11px] font-bold font-mono leading-none">
                 Lvl {user?.level ?? 1}
               </span>
             </div>
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-tertiary-container transition-all">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-tertiary-container">
               <span
-                className="material-symbols-outlined text-[15px]"
+                className="material-symbols-outlined text-[13px] text-amber-400 leading-none"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 local_fire_department
               </span>
-              <span className="font-label-sm text-label-sm font-semibold">
+              <span className="text-[11px] font-bold font-mono text-amber-400 leading-none">
                 {user?.streak ?? 0}
               </span>
             </div>
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-primary-container transition-all">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-primary-container">
               <span
-                className="material-symbols-outlined text-[15px]"
+                className="material-symbols-outlined text-[13px] text-primary leading-none"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 diamond
               </span>
-              <span className="font-label-sm text-label-sm font-semibold">
+              <span className="text-[11px] font-bold font-mono text-primary leading-none">
                 {user?.diamonds ?? 0}
               </span>
             </div>
             <button
               onClick={() => setShowProfile(!showProfile)}
-              className="w-8 h-8 rounded-full bg-surface-container-high hover:bg-surface-bright flex items-center justify-center shrink-0 transition-opacity border border-outline/20"
+              className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-bright flex items-center justify-center shrink-0 transition-colors border border-outline/20 text-primary"
               title="Profile & Badges"
             >
-              <span className="material-symbols-outlined text-[18px] text-primary">person</span>
+              <span className="material-symbols-outlined text-[15px]">person</span>
             </button>
           </div>
         </div>
