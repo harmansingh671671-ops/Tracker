@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Header />
-      <main className="flex-1 pt-16 pb-24 overflow-y-auto overflow-x-hidden w-full max-w-full">
+      <main className="flex-1 pt-16 pb-24 w-full max-w-full touch-pan-y">
         {children}
       </main>
       <BottomNav />

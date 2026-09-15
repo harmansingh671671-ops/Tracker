@@ -655,7 +655,7 @@ export default function PlannerPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <div className="flex flex-col w-full max-w-xl sm:max-w-2xl mx-auto px-3 sm:px-4 pb-24 space-y-3 select-none">
+      <div className="flex flex-col w-full max-w-xl sm:max-w-2xl mx-auto px-3 sm:px-4 pb-24 space-y-3 touch-pan-y">
         {/* Day Planner Header Block */}
         <div className="flex items-start sm:items-end justify-between gap-2 pt-1">
           <div className="flex flex-col min-w-0">
