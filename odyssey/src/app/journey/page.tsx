@@ -617,7 +617,7 @@ export default function JourneyPage() {
                           ? "Mindful Intention & Hydration Anchor"
                           : `Day ${day} Deep Cadence & Focus Anchor`}
                       </h3>
-                      <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                      <p suppressHydrationWarning className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
                         {todayChallenge.started
                           ? "Challenge initiated. Complete your daily cadence; your +50 XP & +5 Gems reward will be available to claim tomorrow."
                           : day === 1
@@ -638,12 +638,13 @@ export default function JourneyPage() {
 
                       {/* Begin challenge button with persistence & no infinite exploitation */}
                       {todayChallenge.started ? (
-                        <div className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        <div suppressHydrationWarning className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Active Today</span>
                         </div>
                       ) : (
                         <button
+                          suppressHydrationWarning
                           onClick={handleBeginTodayChallenge}
                           className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md bg-primary text-on-primary hover:bg-primary-fixed shadow-primary/20 cursor-pointer"
                         >

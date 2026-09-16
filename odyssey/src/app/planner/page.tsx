@@ -351,8 +351,37 @@ function PlannerContent() {
     }
   };
 
-  // Save an inline unassigned hour directly without generating anything
-  const handleSaveInlineHour = async (h: number) => {
+  // Focus the next available unwritten hour input
+  const focusNextHourInput = (currentH: number) => {
+    // Look forward from currentH + 1 up to 23
+    let nextTargetH = -1;
+    for (let h = currentH + 1; h < 24; h++) {
+      if (document.getElementById(`hour-input-${h}`)) {
+        nextTargetH = h;
+        break;
+      }
+    }
+    // If none found ahead, wrap around from 0 to currentH - 1
+    if (nextTargetH === -1) {
+      for (let h = 0; h < currentH; h++) {
+        if (document.getElementById(`hour-input-${h}`)) {
+          nextTargetH = h;
+          break;
+        }
+      }
+    }
+
+    if (nextTargetH !== -1) {
+      const el = document.getElementById(`hour-input-${nextTargetH}`) as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  };
+
+  // Save an inline unassigned hour directly and advance focus to the next hour
+  const handleSaveInlineHour = async (h: number, focusNext: boolean = true) => {
     const title = (inlineTaskTitles[h] || "").trim();
     if (!title || !user) return;
 
@@ -360,6 +389,13 @@ function PlannerContent() {
     const startStr = `${h.toString().padStart(2, "0")}:00`;
     const nextH = h + 1;
     const endStr = nextH === 24 ? "24:00" : `${nextH.toString().padStart(2, "0")}:00`;
+
+    // Immediately advance focus to the next hour so user can keep typing without interruption!
+    if (focusNext) {
+      setTimeout(() => {
+        focusNextHourInput(h);
+      }, 50);
+    }
 
     await addBlock({
       userId: user.id,
@@ -387,6 +423,13 @@ function PlannerContent() {
     });
 
     await fetchBlocksForDate(user.id, selectedDate);
+
+    // Re-confirm focus on next hour input after React finishes re-render
+    if (focusNext) {
+      setTimeout(() => {
+        focusNextHourInput(h);
+      }, 120);
+    }
   };
 
   // Open Edit Modal for a block
@@ -834,17 +877,6 @@ function PlannerContent() {
           ))}
         </div>
 
-        {/* Live Now Card for Today */}
-        {liveBlock && (
-          <div className="space-y-1.5">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-primary font-mono flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
-              Currently Active Block
-            </span>
-            {renderHourlyCard(liveBlock, false)}
-          </div>
-        )}
-
         {/* Full 24-Hour Already-Generated Chronological Timeline */}
         <div className="space-y-2 pt-1">
           {timelineItems.map((item) => {
@@ -911,61 +943,89 @@ function PlannerContent() {
               return renderHourlyCard(item.block, false);
             }
 
-            // Pre-Generated Empty Hour Slot (User just comes and writes!)
+            // Pre-Generated Empty Hour Slot (Full, handsome card matching the top cards)
             const h = item.hour;
             const currentTitle = inlineTaskTitles[h] || "";
             const currentCat = inlineCategories[h] || "work";
+            const cfg = categoryConfig[currentCat];
+
+            let catLabel = "Deep Work";
+            if (currentCat === "sleep") catLabel = "Sleep";
+            else if (currentCat === "habits") catLabel = "Vitality";
+            else if (currentCat === "buffer") catLabel = "Buffer";
 
             return (
               <div
                 key={item.id}
-                className="p-2 sm:p-2.5 rounded-xl bg-surface-container/50 border border-outline/15 hover:border-primary/30 transition-all flex items-center justify-between gap-2"
+                className="p-3 sm:p-3.5 rounded-2xl bg-surface-container-low/80 border border-outline/15 hover:border-outline/35 transition-all shadow-xs space-y-2"
               >
-                <span className="font-mono text-xs font-bold text-on-surface-variant/70 shrink-0 w-12 sm:w-14">
-                  {item.timeRangeStr}
-                </span>
+                {/* Header Row: Time Range, Category Tag & Category Dropdown */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-mono whitespace-nowrap min-w-0">
+                    <span className="font-bold text-on-surface text-[12px]">
+                      {item.timeRangeStr}
+                    </span>
+                    <span className="text-on-surface-variant/40">•</span>
+                    <span className={`font-semibold text-[11px] ${cfg.headerIconColor}`}>
+                      {catLabel}
+                    </span>
+                  </div>
 
-                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  {/* Sleek Category Dropdown */}
+                  <div className="relative flex items-center shrink-0">
+                    <select
+                      value={currentCat}
+                      onChange={(e) =>
+                        setInlineCategories((prev) => ({
+                          ...prev,
+                          [h]: e.target.value as NormalizedCategory,
+                        }))
+                      }
+                      className="appearance-none bg-surface-container border border-outline/25 hover:border-primary/40 rounded-xl pl-2.5 pr-6 py-1 text-[11px] font-mono font-medium text-on-surface focus:outline-none focus:border-primary cursor-pointer transition-colors shadow-xs"
+                    >
+                      <option value="work">💼 Work / Study</option>
+                      <option value="habits">⚡ Habits / Health</option>
+                      <option value="sleep">🌙 Sleep & Rest</option>
+                      <option value="buffer">☕ Buffer / Break</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 text-on-surface-variant pointer-events-none absolute right-1.5" />
+                  </div>
+                </div>
+
+                {/* Main Task Input Box — Full width, comfortable typing */}
+                <div className="relative w-full">
                   <input
+                    id={`hour-input-${h}`}
                     type="text"
-                    placeholder="Write schedule for this hour..."
+                    placeholder={`Enter task for ${item.timeRangeStr}...`}
                     value={currentTitle}
                     onChange={(e) =>
                       setInlineTaskTitles((prev) => ({ ...prev, [h]: e.target.value }))
                     }
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
-                        handleSaveInlineHour(h);
+                        e.preventDefault();
+                        handleSaveInlineHour(h, true);
                       }
                     }}
-                    className="flex-1 bg-surface-container-high border border-outline/20 rounded-lg px-2.5 py-1.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary transition-colors"
+                    className="w-full bg-surface-container-high/70 border border-outline/20 focus:border-primary focus:bg-surface-container-high rounded-xl px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none transition-all"
                   />
+                </div>
 
-                  <select
-                    value={currentCat}
-                    onChange={(e) =>
-                      setInlineCategories((prev) => ({
-                        ...prev,
-                        [h]: e.target.value as NormalizedCategory,
-                      }))
-                    }
-                    className="bg-surface-container-high border border-outline/20 rounded-lg px-2 py-1.5 text-[11px] font-mono font-semibold text-on-surface focus:outline-none focus:border-primary shrink-0 cursor-pointer"
-                  >
-                    <option value="work">Work/Study</option>
-                    <option value="habits">Habits/Health</option>
-                    <option value="buffer">Buffer/Break</option>
-                    <option value="sleep">Sleep</option>
-                  </select>
+                {/* Footer Row: Status hint & Save Hour Button */}
+                <div className="flex items-center justify-between pt-1 border-t border-outline/10 text-[11px]">
+                  <span className="font-mono text-on-surface-variant/60">
+                    1h unassigned slot
+                  </span>
 
                   <button
                     type="button"
-                    onClick={() => handleSaveInlineHour(h)}
+                    onClick={() => handleSaveInlineHour(h, true)}
                     disabled={!currentTitle.trim()}
-                    className="px-2.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold disabled:opacity-30 disabled:pointer-events-none hover:bg-primary-fixed active:scale-95 transition-all shrink-0 cursor-pointer flex items-center gap-1"
-                    title="Save block"
+                    className="px-3 py-1 rounded-xl bg-primary text-on-primary text-xs font-mono font-bold hover:bg-primary-fixed active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                   >
-                    <Check className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Save</span>
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Save Hour</span>
                   </button>
                 </div>
               </div>
