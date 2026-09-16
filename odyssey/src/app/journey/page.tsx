@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
-import { DayScheduleModal } from "@/components/planner/day-schedule-modal";
 import {
   Check,
   Zap,
@@ -76,19 +76,13 @@ function getNodeOffset(index: number): number {
 }
 
 export default function JourneyPage() {
+  const router = useRouter();
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isChallengeStarted, setIsChallengeStarted] = useState(false);
 
   // Endless chain window: loads initial 7 days (Today + next 7 days = 8 days total)
   const [windowDaysCount, setWindowDaysCount] = useState<number>(8);
-
-  // Schedule modal state for writing any day's schedule
-  const [selectedDaySchedule, setSelectedDaySchedule] = useState<{
-    date: string;
-    dayNumber: number;
-    dayLabel: string;
-  } | null>(null);
 
   // Map of scheduled hours for each date string
   const [scheduledHoursMap, setScheduledHoursMap] = useState<Record<string, number>>({});
@@ -193,13 +187,14 @@ export default function JourneyPage() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
+  // Directly navigate to full schedule page in front of user (no popup!)
   const handleOpenScheduler = (dayNum: number) => {
     const meta = getDayMeta(dayNum);
-    setSelectedDaySchedule({
-      date: meta.dateStr,
-      dayNumber: dayNum,
-      dayLabel: meta.dayLabel,
-    });
+    if (meta.isToday) {
+      router.push("/planner");
+    } else {
+      router.push(`/planner?date=${meta.dateStr}&day=${dayNum}`);
+    }
   };
 
   const handleLoadMoreDays = () => {
@@ -366,7 +361,7 @@ export default function JourneyPage() {
                     </div>
                   )}
 
-                  {/* Upcoming Future Step (Clickable to write schedule in sequence!) */}
+                  {/* Upcoming Future Step (Clickable to open schedule page directly in front of user!) */}
                   {!isCompleted && !isCurrent && (
                     <div className="flex flex-col items-center gap-1.5">
                       <button
@@ -422,7 +417,7 @@ export default function JourneyPage() {
                   )}
                 </div>
 
-                {/* Today's Focus Card (Placed right under Today's node) */}
+                {/* Today's Focus Card */}
                 {isCurrent && (
                   <div className="w-full max-w-sm my-3 p-3.5 sm:p-4 rounded-2xl bg-surface-container-high/95 border border-primary/35 shadow-xl space-y-2.5 text-left z-20">
                     <div className="flex items-center justify-between gap-2">
@@ -483,7 +478,7 @@ export default function JourneyPage() {
                   </div>
                 )}
 
-                {/* Duolingo S-Curved Bezier Connector Path to the Next Node */}
+                {/* Duolingo S-Curved Connector Ribbon to Next Node */}
                 {nextDay !== null && (
                   <div className="w-full flex items-center justify-center my-1 pointer-events-none">
                     <svg
@@ -556,21 +551,6 @@ export default function JourneyPage() {
             </span>
           </div>
         </div>
-
-        {/* Day Schedule Modal */}
-        {selectedDaySchedule && user && (
-          <DayScheduleModal
-            isOpen={!!selectedDaySchedule}
-            onClose={() => {
-              setSelectedDaySchedule(null);
-              loadScheduledHours();
-            }}
-            date={selectedDaySchedule.date}
-            dayNumber={selectedDaySchedule.dayNumber}
-            userId={user.id}
-            onSaved={loadScheduledHours}
-          />
-        )}
 
         {/* Toast Notification */}
         {toastMsg && (
