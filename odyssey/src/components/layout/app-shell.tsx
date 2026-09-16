@@ -2,6 +2,7 @@
 
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
+import { EveningReminderModal } from "@/components/notifications/evening-reminder-modal";
 import { usePathname } from "next/navigation";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 pt-14 sm:pt-16 pb-24 w-full max-w-full touch-pan-y">
         {children}
       </main>
+      <EveningReminderModal />
       <BottomNav />
     </>
   );

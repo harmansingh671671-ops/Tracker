@@ -162,7 +162,13 @@ export default function PlannerPage() {
     });
   }, [isModalOpen, modalMode, editingBlockId, newStartTime, newEndTime, blocks]);
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const today = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
   const currentDayDate = useMemo(() => {
     const d = new Date();
     return d.toLocaleDateString("en-US", {
