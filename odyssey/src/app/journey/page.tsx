@@ -75,11 +75,106 @@ function getNodeOffset(index: number): number {
   return DUO_OFFSETS[index % DUO_OFFSETS.length];
 }
 
+interface ChallengeRecord {
+  started: boolean;
+  startedAt?: string;
+  claimed?: boolean;
+  claimedAt?: string;
+}
+
+function getChallengeRecord(userId?: string, dateStr?: string): ChallengeRecord {
+  if (typeof window === "undefined" || !dateStr) {
+    return { started: false, claimed: false };
+  }
+  try {
+    if (userId) {
+      const rawUser = localStorage.getItem(`odyssey_challenge_${userId}_${dateStr}`);
+      if (rawUser) return JSON.parse(rawUser);
+    }
+    const rawGeneric = localStorage.getItem(`odyssey_challenge_${dateStr}`);
+    if (rawGeneric) return JSON.parse(rawGeneric);
+  } catch {}
+  return { started: false, claimed: false };
+}
+
+function setChallengeRecord(userId: string | undefined, dateStr: string, record: ChallengeRecord) {
+  if (typeof window === "undefined" || !dateStr) return;
+  try {
+    const json = JSON.stringify(record);
+    localStorage.setItem(`odyssey_challenge_${dateStr}`, json);
+    if (userId) {
+      localStorage.setItem(`odyssey_challenge_${userId}_${dateStr}`, json);
+    }
+  } catch {}
+}
+
+interface UnclaimedReward {
+  dayNum: number;
+  dateStr: string;
+}
+
+function findUnclaimedPastChallenges(userId?: string, activeDay: number = 1): UnclaimedReward[] {
+  if (typeof window === "undefined") return [];
+  const results: UnclaimedReward[] = [];
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  try {
+    // 1. Check past days in current journey window (day 1 to activeDay - 1)
+    for (let d = 1; d < activeDay; d++) {
+      const dateObj = new Date();
+      dateObj.setDate(dateObj.getDate() - (activeDay - d));
+      const dStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
+      const rec = getChallengeRecord(userId, dStr);
+      if (rec.started && !rec.claimed) {
+        results.push({ dayNum: d, dateStr: dStr });
+      }
+    }
+
+    // 2. Check yesterday's calendar date
+    const yObj = new Date();
+    yObj.setDate(yObj.getDate() - 1);
+    const yStr = `${yObj.getFullYear()}-${String(yObj.getMonth() + 1).padStart(2, "0")}-${String(yObj.getDate()).padStart(2, "0")}`;
+    if (!results.some((r) => r.dateStr === yStr)) {
+      const yRec = getChallengeRecord(userId, yStr);
+      if (yRec.started && !yRec.claimed) {
+        results.push({ dayNum: Math.max(1, activeDay - 1), dateStr: yStr });
+      }
+    }
+
+    // 3. Scan all localStorage keys for past dates
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("odyssey_challenge_")) {
+        const parts = key.split("_");
+        const datePart = parts[parts.length - 1];
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart) && datePart < todayStr) {
+          if (!results.some((r) => r.dateStr === datePart)) {
+            try {
+              const rec = JSON.parse(localStorage.getItem(key) || "{}");
+              if (rec.started && !rec.claimed) {
+                results.push({ dayNum: Math.max(1, activeDay - 1), dateStr: datePart });
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+  } catch {}
+
+  return results;
+}
+
 export default function JourneyPage() {
   const router = useRouter();
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [isChallengeStarted, setIsChallengeStarted] = useState(false);
+
+  // Trigger to re-read localStorage challenge records
+  const [challengeSyncCount, setChallengeSyncCount] = useState(0);
 
   // Endless chain window: loads initial 7 days (Today + next 7 days = 8 days total)
   const [windowDaysCount, setWindowDaysCount] = useState<number>(8);
@@ -172,19 +267,57 @@ export default function JourneyPage() {
     loadScheduledHours();
   }, [loadScheduledHours]);
 
-  const handleStartChallenge = async () => {
-    if (isChallengeStarted) return;
-    setIsChallengeStarted(true);
+  // Today's challenge record
+  const todayMeta = useMemo(() => getDayMeta(activeDay), [getDayMeta, activeDay]);
+  const todayChallenge = useMemo(() => {
+    return getChallengeRecord(user?.id, todayMeta.dateStr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, todayMeta.dateStr, challengeSyncCount]);
+
+  // Unclaimed past challenge rewards (shows whenever a completed day has reward pending!)
+  const unclaimedRewards = useMemo(() => {
+    return findUnclaimedPastChallenges(user?.id, activeDay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, activeDay, challengeSyncCount]);
+
+  // Begin Today's challenge (Persisted, zero instant reward, prevents endless farming!)
+  const handleBeginTodayChallenge = () => {
+    if (!user) return;
+    if (todayChallenge.started) return;
+
+    setChallengeRecord(user.id, todayMeta.dateStr, {
+      started: true,
+      startedAt: new Date().toISOString(),
+      claimed: false,
+    });
+    setChallengeSyncCount((c) => c + 1);
+
+    setToastMsg(
+      `Day ${activeDay} Challenge Active! Maintain focus today; your +50 XP & +5 Gems reward will be available to claim tomorrow.`
+    );
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  // Claim reward for a completed day (awards XP & Gems once only!)
+  const handleClaimReward = async (dayNum: number, dateStr?: string) => {
+    if (!user) return;
+    const targetDateStr = dateStr || getDayMeta(dayNum).dateStr;
+    const rec = getChallengeRecord(user.id, targetDateStr);
+    if (rec.claimed) return;
+
+    setChallengeRecord(user.id, targetDateStr, {
+      ...rec,
+      started: true,
+      claimed: true,
+      claimedAt: new Date().toISOString(),
+    });
+
     await addXp(50);
     await addDiamonds(5);
-    if (user && user.streak === 0) {
-      await useUserStore.getState().updateUser({
-        streak: 1,
-        highestStreak: Math.max(1, user.highestStreak),
-      });
-    }
-    setToastMsg(`Day ${activeDay} Challenge Complete! +50 XP & +5 Gems awarded.`);
-    setTimeout(() => setToastMsg(null), 3000);
+    setChallengeSyncCount((c) => c + 1);
+
+    setToastMsg(`Day ${dayNum} Reward Claimed! +50 XP & +5 Gems awarded.`);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   // Directly navigate to full schedule page in front of user (no popup!)
@@ -203,37 +336,40 @@ export default function JourneyPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <div className="w-full max-w-md sm:max-w-lg mx-auto px-3 sm:px-4 pb-28 pt-2 space-y-4">
-        {/* Top Header Progress Card */}
-        <section className="rounded-2xl bg-surface-container-high/90 border border-outline/15 p-3.5 sm:p-4 shadow-sm space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5 text-primary">
-                <Compass className="w-4 h-4" />
-                <span className="text-[11px] uppercase tracking-wider font-semibold">
-                  Endless Odyssey Trail
-                </span>
-              </div>
-              <h1 className="text-lg sm:text-xl text-on-surface font-bold tracking-tight mt-0.5">
-                Chapter {activeChapter}: {chapterTitle}
-              </h1>
-              <span className="text-xs text-on-surface-variant mt-0.5">
-                Day {activeDay} Active • 7-Day Rolling Path
+      <div className="w-full max-w-md sm:max-w-lg mx-auto px-3 sm:px-4 pb-28 pt-2 space-y-3">
+        {/* Top Header Progress Card — Formatted with full width, zero unnatural text wrapping */}
+        <section className="rounded-2xl bg-surface-container-high/90 border border-outline/15 p-3.5 sm:p-4 shadow-sm space-y-2.5">
+          {/* Row 1: Tag & Today Badge */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-primary">
+              <Compass className="w-4 h-4 shrink-0" />
+              <span className="text-[11px] uppercase tracking-wider font-bold">
+                Endless Odyssey Trail
               </span>
             </div>
 
-            <div className="px-2.5 py-1 rounded-full bg-primary/10 border border-primary/25 text-primary font-mono text-xs font-bold shrink-0">
+            <div className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/25 text-primary font-mono text-xs font-bold shrink-0">
               Day {activeDay} Today
             </div>
           </div>
 
-          {/* XP Progress Bar */}
-          <div className="space-y-1.5 pt-1 border-t border-outline/10">
+          {/* Row 2: Chapter Title & Subtitle — Spans 100% full card width */}
+          <div className="space-y-0.5">
+            <h1 className="text-base sm:text-lg text-on-surface font-bold tracking-tight leading-snug">
+              Chapter {activeChapter}: {chapterTitle}
+            </h1>
+            <p className="text-xs text-on-surface-variant font-medium">
+              Day {activeDay} Active • 7-Day Rolling Path
+            </p>
+          </div>
+
+          {/* Row 3: Division Rank & XP Progress Bar */}
+          <div className="space-y-1.5 pt-2 border-t border-outline/10">
             <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-on-surface-variant font-medium">
-                Division Rank: <span className="text-on-surface font-bold">{user?.militaryRank || "Civilian"} Div I</span>
+              <span className="text-on-surface-variant font-medium truncate">
+                Rank: <span className="text-on-surface font-bold">{user?.militaryRank || "Civilian"} Div I</span>
               </span>
-              <span className="text-secondary font-bold">
+              <span className="text-secondary font-bold shrink-0 ml-2">
                 {xpCurrent} / 500 XP
               </span>
             </div>
@@ -246,6 +382,36 @@ export default function JourneyPage() {
           </div>
         </section>
 
+        {/* Unclaimed Past Day Reward Banner (Shows when yesterday or any past day has ended and reward is waiting!) */}
+        {unclaimedRewards.length > 0 && (
+          <div className="w-full p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-surface-container border border-amber-400/35 shadow-lg flex items-center justify-between gap-3 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Gift className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-amber-400">
+                  Day {unclaimedRewards[0].dayNum} Cadence Completed!
+                </span>
+                <h4 className="text-xs sm:text-sm font-bold text-on-surface truncate">
+                  Claim Day {unclaimedRewards[0].dayNum} Reward
+                </h4>
+                <span className="text-[10.5px] font-mono text-on-surface-variant">
+                  +50 XP • +5 Gems
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleClaimReward(unclaimedRewards[0].dayNum, unclaimedRewards[0].dateStr)}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-black font-bold text-xs font-mono shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Claim</span>
+            </button>
+          </div>
+        )}
+
         {/* Duolingo Winding Curved Trail */}
         <div className="relative flex flex-col items-center py-4 select-none">
           {visibleDays.map((day, idx) => {
@@ -254,6 +420,8 @@ export default function JourneyPage() {
             const isCurrent = day === activeDay;
             const milestone = getMilestoneForDay(day);
             const plannedHours = scheduledHoursMap[meta.dateStr] || 0;
+
+            const dayRecord = getChallengeRecord(user?.id, meta.dateStr);
 
             const offsetX = getNodeOffset(idx);
             const nextDay = idx < visibleDays.length - 1 ? visibleDays[idx + 1] : null;
@@ -314,6 +482,18 @@ export default function JourneyPage() {
                           </span>
                         )}
                       </div>
+
+                      {/* Claim reward button on completed node if unclaimed */}
+                      {dayRecord.started && !dayRecord.claimed && (
+                        <button
+                          type="button"
+                          onClick={() => handleClaimReward(day, meta.dateStr)}
+                          className="px-2.5 py-0.5 rounded-full bg-amber-400 text-black text-[10px] font-mono font-bold shadow-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          <Gift className="w-2.5 h-2.5" />
+                          <span>Claim Reward</span>
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -361,7 +541,7 @@ export default function JourneyPage() {
                     </div>
                   )}
 
-                  {/* Upcoming Future Step (Clickable to open schedule page directly in front of user!) */}
+                  {/* Upcoming Future Step */}
                   {!isCompleted && !isCurrent && (
                     <div className="flex flex-col items-center gap-1.5">
                       <button
@@ -438,7 +618,9 @@ export default function JourneyPage() {
                           : `Day ${day} Deep Cadence & Focus Anchor`}
                       </h3>
                       <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-                        {day === 1
+                        {todayChallenge.started
+                          ? "Challenge initiated. Complete your daily cadence; your +50 XP & +5 Gems reward will be available to claim tomorrow."
+                          : day === 1
                           ? "Initiate your mindful journey with an intentional deep focus block and hydration check."
                           : "Complete your core deep work block without distractions and maintain steady daily rhythm."}
                       </p>
@@ -454,26 +636,21 @@ export default function JourneyPage() {
                         </span>
                       </div>
 
-                      <button
-                        onClick={handleStartChallenge}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md ${
-                          isChallengeStarted
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                            : "bg-primary text-on-primary hover:bg-primary-fixed shadow-primary/20"
-                        }`}
-                      >
-                        {isChallengeStarted ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Completed</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Begin Challenge</span>
-                          </>
-                        )}
-                      </button>
+                      {/* Begin challenge button with persistence & no infinite exploitation */}
+                      {todayChallenge.started ? (
+                        <div className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Active Today</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleBeginTodayChallenge}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md bg-primary text-on-primary hover:bg-primary-fixed shadow-primary/20 cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Begin Challenge</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
