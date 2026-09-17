@@ -1,13 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { type ScheduleBlock } from "@/lib/db";
 import {
   ArrowLeft,
-  Compass,
   Calendar,
   Moon,
   Sparkles,
@@ -16,13 +14,10 @@ import {
   MoreVertical,
   Plus,
   Trash2,
-  Edit3,
-  Clock,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
 
-// Normalized category types
 type NormalizedCategory = "sleep" | "work" | "habits" | "buffer";
 
 interface TimelineGroup {
@@ -61,51 +56,38 @@ function normalizeCategory(category: string, title?: string): NormalizedCategory
   return "buffer";
 }
 
-function parseHour(timeStr: string): number {
-  if (!timeStr) return 0;
-  const parts = timeStr.split(":");
-  const h = parseInt(parts[0], 10);
-  const m = parseInt(parts[1] || "0", 10);
-  return h + m / 60;
-}
-
-function getBlockEndHour(block: ScheduleBlock): number {
-  const startH = parseHour(block.startTime);
-  const endH = parseHour(block.endTime);
-  if (endH === 0 && startH >= 20) return 24;
-  if (block.endTime === "24:00") return 24;
-  return endH;
-}
-
 function formatCleanHourRange(startTime: string, endTime: string): string {
   if (!startTime || !endTime) return "";
-  const [sHStr, sMStr] = startTime.split(":");
-  const [eHStr, eMStr] = endTime.split(":");
+  const [sHStr] = startTime.split(":");
+  const [eHStr] = endTime.split(":");
   const sH = parseInt(sHStr, 10);
-  const sM = parseInt(sMStr || "0", 10);
   let eH = parseInt(eHStr, 10);
-  const eM = parseInt(eMStr || "0", 10);
 
   if (endTime === "24:00" || (eH === 0 && sH > 0)) {
     eH = 24;
   }
 
-  if (sM === 0 && eM === 0) {
-    const startFmt = sH.toString().padStart(2, "0");
-    const endFmt = eH.toString().padStart(2, "0");
-    return `${startFmt}-${endFmt}`;
-  }
-
-  return `${startTime}-${endTime}`;
+  const startFmt = sH.toString().padStart(2, "0");
+  const endFmt = eH.toString().padStart(2, "0");
+  return `${startFmt}-${endFmt}`;
 }
 
-function PlannerContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date");
-  const dayParam = searchParams.get("day");
+interface JourneyDayScheduleProps {
+  dateStr: string;
+  dayNum: number;
+  isToday: boolean;
+  onBack: () => void;
+  onScheduleUpdated: () => void;
+}
 
-  const { user, fetchUser, addXp } = useUserStore();
+export function JourneyDaySchedule({
+  dateStr,
+  dayNum,
+  isToday,
+  onBack,
+  onScheduleUpdated,
+}: JourneyDayScheduleProps) {
+  const { user } = useUserStore();
   const {
     blocks,
     fetchBlocksForDate,
@@ -118,53 +100,24 @@ function PlannerContent() {
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [autoFillLocked, setAutoFillLocked] = useState<boolean>(false);
 
-  // Edit Modal State (when editing a block via 3-dots)
+  // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editCategory, setEditCategory] = useState<NormalizedCategory>("work");
 
-  // Inline Task Writer State for empty hours (hour -> title / category)
+  // Inline Task Writer State for empty hours
   const [inlineTaskTitles, setInlineTaskTitles] = useState<Record<number, string>>({});
   const [inlineCategories, setInlineCategories] = useState<Record<number, NormalizedCategory>>({});
 
   // Group Collapses (Sleep collapsed by default)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  // System clock ticker for live hour calculations
-  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const currentHourFloat = useMemo(() => {
-    return (
-      currentTime.getHours() +
-      currentTime.getMinutes() / 60 +
-      currentTime.getSeconds() / 3600
-    );
-  }, [currentTime]);
-
-  // Local today string YYYY-MM-DD
-  const today = useMemo(() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  }, []);
-
-  const selectedDate = dateParam || today;
-  const isSelectedToday = selectedDate === today;
-
   // Formatted date string
-  const formattedSelectedDate = useMemo(() => {
-    const [y, m, d] = selectedDate.split("-").map(Number);
+  const formattedDate = useMemo(() => {
+    if (!dateStr) return "";
+    const [y, m, d] = dateStr.split("-").map(Number);
     const dateObj = new Date(y, m - 1, d);
     return dateObj.toLocaleDateString("en-US", {
       weekday: "long",
@@ -172,74 +125,57 @@ function PlannerContent() {
       day: "numeric",
       year: "numeric",
     });
-  }, [selectedDate]);
+  }, [dateStr]);
 
-  // Load schedule blocks for selectedDate
-  const loadSchedule = useCallback(() => {
-    fetchUser().then((u) => {
-      if (u) {
-        fetchBlocksForDate(u.id, selectedDate);
-      }
-    });
-  }, [fetchUser, fetchBlocksForDate, selectedDate]);
-
+  // Load blocks on mount & when date changes
   useEffect(() => {
-    loadSchedule();
-  }, [loadSchedule]);
+    if (user?.id) {
+      fetchBlocksForDate(user.id, dateStr);
+    }
+  }, [user?.id, dateStr, fetchBlocksForDate]);
 
-  // Hourly map: 0 to 23
+  // Map of hours occupied by blocks
   const hourBlockMap = useMemo(() => {
-    const map: (ScheduleBlock | null)[] = Array(24).fill(null);
+    const map: Record<number, ScheduleBlock> = {};
     for (const b of blocks) {
-      const sH = parseHour(b.startTime);
-      let eH = parseHour(b.endTime);
-      if (eH === 0 && sH > 0) eH = 24;
-      if (b.endTime === "24:00") eH = 24;
-      const startIdx = Math.max(0, Math.floor(sH));
-      const endIdx = Math.min(24, Math.ceil(eH));
-      for (let h = startIdx; h < endIdx; h++) {
-        const sStr = `${h.toString().padStart(2, "0")}:00`;
-        const nextH = h + 1;
-        const eStr = nextH === 24 ? "24:00" : `${nextH.toString().padStart(2, "0")}:00`;
-        map[h] = {
-          ...b,
-          id: `${b.id}-h${h}`,
-          startTime: sStr,
-          endTime: eStr,
-        };
+      const sH = parseInt(b.startTime.split(":")[0], 10);
+      let eH = parseInt(b.endTime.split(":")[0], 10);
+      if (b.endTime === "24:00" || (eH === 0 && sH > 0)) eH = 24;
+
+      for (let h = sH; h < eH; h++) {
+        map[h] = { ...b, id: `${b.id}-h${h}` };
       }
     }
     return map;
   }, [blocks]);
 
-  // Compute category hours strictly from 24h allocation
-  const { sleepHours, workHours, habitHours, bufferHours, totalHours } = useMemo(() => {
-    let sleep = 0,
-      work = 0,
-      habit = 0,
-      buffer = 0;
-    for (let h = 0; h < 24; h++) {
-      const b = hourBlockMap[h];
-      if (b) {
-        const cat = normalizeCategory(b.category, b.title);
-        if (cat === "sleep") sleep++;
-        else if (cat === "work") work++;
-        else if (cat === "habits") habit++;
-        else buffer++;
-      }
-    }
-    return {
-      sleepHours: sleep,
-      workHours: work,
-      habitHours: habit,
-      bufferHours: buffer,
-      totalHours: sleep + work + habit + buffer,
-    };
+  // Total scheduled hours
+  const scheduledHours = useMemo(() => {
+    return Object.keys(hourBlockMap).length;
   }, [hourBlockMap]);
 
-  const percentage = Math.round((totalHours / 24) * 100);
+  // Calculate category distribution
+  const { sleepHours, workHours, habitHours, bufferHours } = useMemo(() => {
+    let s = 0,
+      w = 0,
+      h = 0,
+      b = 0;
+    for (let hr = 0; hr < 24; hr++) {
+      const blk = hourBlockMap[hr];
+      if (blk) {
+        const cat = normalizeCategory(blk.category, blk.title);
+        if (cat === "sleep") s++;
+        else if (cat === "work") w++;
+        else if (cat === "habits") h++;
+        else b++;
+      }
+    }
+    return { sleepHours: s, workHours: w, habitHours: h, bufferHours: b };
+  }, [hourBlockMap]);
 
-  // Group consecutive hours of the same category, and pre-generate empty hours
+  const percentage = Math.round((scheduledHours / 24) * 100);
+
+  // Group consecutive hours and pre-generate empty hours
   const timelineItems = useMemo<TimelineItem[]>(() => {
     const items: TimelineItem[] = [];
     let currentGroup: ScheduleBlock[] = [];
@@ -293,7 +229,6 @@ function PlannerContent() {
           currentCat = cat;
         }
       } else {
-        // Hour h is unoccupied / empty — keep it already generated!
         flushGroup();
 
         if (activeFilter === "all") {
@@ -316,41 +251,25 @@ function PlannerContent() {
     return items;
   }, [hourBlockMap, activeFilter]);
 
-  // Live block calculation for today
-  const liveBlock = useMemo(() => {
-    if (!isSelectedToday) return null;
-    return (
-      blocks.find((b) => {
-        const startH = parseHour(b.startTime);
-        const endH = getBlockEndHour(b);
-        return currentHourFloat >= startH && currentHourFloat < endH;
-      }) || null
-    );
-  }, [blocks, currentHourFloat, isSelectedToday]);
-
-  // Auto-fill Sleep for the selected date
-  const handleAutoFillSleep = async () => {
-    if (!user) return;
-    await autoFillSleep(user.id, selectedDate);
-    setAutoFillLocked(true);
-    setTimeout(() => setAutoFillLocked(false), 2500);
-    await fetchBlocksForDate(user.id, selectedDate);
+  const toggleGroupCollapse = (groupId: string, defaultCollapsed: boolean) => {
+    setCollapsedGroups((prev) => {
+      const current = prev[groupId] !== undefined ? prev[groupId] : defaultCollapsed;
+      return { ...prev, [groupId]: !current };
+    });
   };
 
-  // Focus the next available unwritten hour input
+  // Focus next available unwritten hour input
   const focusNextHourInput = (currentH: number) => {
-    // Look forward from currentH + 1 up to 23
     let nextTargetH = -1;
     for (let h = currentH + 1; h < 24; h++) {
-      if (document.getElementById(`hour-input-${h}`)) {
+      if (document.getElementById(`journey-hour-input-${h}`)) {
         nextTargetH = h;
         break;
       }
     }
-    // If none found ahead, wrap around from 0 to currentH - 1
     if (nextTargetH === -1) {
       for (let h = 0; h < currentH; h++) {
-        if (document.getElementById(`hour-input-${h}`)) {
+        if (document.getElementById(`journey-hour-input-${h}`)) {
           nextTargetH = h;
           break;
         }
@@ -358,7 +277,7 @@ function PlannerContent() {
     }
 
     if (nextTargetH !== -1) {
-      const el = document.getElementById(`hour-input-${nextTargetH}`) as HTMLInputElement | null;
+      const el = document.getElementById(`journey-hour-input-${nextTargetH}`) as HTMLInputElement | null;
       if (el) {
         el.focus();
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -366,7 +285,7 @@ function PlannerContent() {
     }
   };
 
-  // Save an inline unassigned hour directly and advance focus to the next hour
+  // Save an inline unassigned hour directly & advance to next hour
   const handleSaveInlineHour = async (h: number, focusNext: boolean = true) => {
     const title = (inlineTaskTitles[h] || "").trim();
     if (!title || !user) return;
@@ -376,16 +295,13 @@ function PlannerContent() {
     const nextH = h + 1;
     const endStr = nextH === 24 ? "24:00" : `${nextH.toString().padStart(2, "0")}:00`;
 
-    // Immediately advance focus to the next hour so user can keep typing without interruption!
     if (focusNext) {
-      setTimeout(() => {
-        focusNextHourInput(h);
-      }, 50);
+      setTimeout(() => focusNextHourInput(h), 50);
     }
 
     await addBlock({
       userId: user.id,
-      date: selectedDate,
+      date: dateStr,
       startTime: startStr,
       endTime: endStr,
       title,
@@ -408,17 +324,37 @@ function PlannerContent() {
       return copy;
     });
 
-    await fetchBlocksForDate(user.id, selectedDate);
+    await fetchBlocksForDate(user.id, dateStr);
+    onScheduleUpdated();
 
-    // Re-confirm focus on next hour input after React finishes re-render
     if (focusNext) {
-      setTimeout(() => {
-        focusNextHourInput(h);
-      }, 120);
+      setTimeout(() => focusNextHourInput(h), 120);
     }
   };
 
-  // Open Edit Modal for a block
+  // Autofill sleep
+  const handleAutoFillSleep = async () => {
+    if (!user) return;
+    await autoFillSleep(user.id, dateStr);
+    setAutoFillLocked(true);
+    await fetchBlocksForDate(user.id, dateStr);
+    onScheduleUpdated();
+    setTimeout(() => setAutoFillLocked(false), 2000);
+  };
+
+  // Clear day
+  const handleClearDay = async () => {
+    if (!user || blocks.length === 0) return;
+    if (!confirm(`Are you sure you want to clear all scheduled hours for ${formattedDate}?`)) return;
+    const uniqueIds = Array.from(new Set(blocks.map((b) => b.id.split("-h")[0])));
+    for (const id of uniqueIds) {
+      await deleteBlock(id);
+    }
+    await fetchBlocksForDate(user.id, dateStr);
+    onScheduleUpdated();
+  };
+
+  // Edit modal handlers
   const handleOpenEditModal = (block: ScheduleBlock, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const actualId = block.id.split("-h")[0];
@@ -430,10 +366,9 @@ function PlannerContent() {
     setIsEditModalOpen(true);
   };
 
-  // Save changes from Edit Modal
   const handleSaveEditModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingBlockId || !editTitle.trim()) return;
+    if (!editingBlockId || !editTitle.trim() || !user) return;
 
     await updateBlock(editingBlockId, {
       title: editTitle.trim(),
@@ -451,80 +386,33 @@ function PlannerContent() {
 
     setIsEditModalOpen(false);
     setEditingBlockId(null);
-    if (user) {
-      await fetchBlocksForDate(user.id, selectedDate);
-    }
+    await fetchBlocksForDate(user.id, dateStr);
+    onScheduleUpdated();
   };
 
-  // Delete block from Edit Modal
   const handleDeleteFromEditModal = async () => {
-    if (!editingBlockId) return;
+    if (!editingBlockId || !user) return;
     await deleteBlock(editingBlockId);
     setIsEditModalOpen(false);
     setEditingBlockId(null);
-    if (user) {
-      await fetchBlocksForDate(user.id, selectedDate);
-    }
+    await fetchBlocksForDate(user.id, dateStr);
+    onScheduleUpdated();
   };
 
-  // Mark Followed / Missed
-  const handleMarkFollowed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const actualId = block.id.split("-h")[0];
-    const newStatus = block.status === "completed" ? "pending" : "completed";
-    await updateBlock(actualId, {
-      status: newStatus,
-      completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
-    });
-    if (newStatus === "completed") {
-      addXp(25);
-    }
-  };
-
-  const handleMarkMissed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const actualId = block.id.split("-h")[0];
-    const newStatus = block.status === "missed" ? "pending" : "missed";
-    await updateBlock(actualId, {
-      status: newStatus,
-      missReason: newStatus === "missed" ? "Did not follow" : undefined,
-    });
-  };
-
-  const toggleGroupCollapse = (groupId: string, defaultCollapsed: boolean) => {
-    setCollapsedGroups((prev) => {
-      const current = prev[groupId] !== undefined ? prev[groupId] : defaultCollapsed;
-      return {
-        ...prev,
-        [groupId]: !current,
-      };
-    });
-  };
-
-  // Category Configuration
-  const categoryConfig: Record<
-    NormalizedCategory,
-    {
-      label: string;
-      headerIconColor: string;
-      borderColor: string;
-      cardBorder: string;
-      cardHoverBorder: string;
-    }
-  > = {
-    sleep: {
-      label: "Sleep & Recovery",
-      headerIconColor: "text-secondary",
-      borderColor: "border-secondary/40 hover:border-secondary/60",
-      cardBorder: "border-secondary/15",
-      cardHoverBorder: "hover:border-secondary/40",
-    },
+  const categoryConfig = {
     work: {
       label: "Deep Work & Study",
       headerIconColor: "text-primary",
       borderColor: "border-primary/40 hover:border-primary/60",
-      cardBorder: "border-primary/15",
+      cardBorder: "border-primary/20",
       cardHoverBorder: "hover:border-primary/40",
+    },
+    sleep: {
+      label: "Sleep & Recovery",
+      headerIconColor: "text-emerald-400",
+      borderColor: "border-emerald-500/40 hover:border-emerald-500/60",
+      cardBorder: "border-emerald-500/20",
+      cardHoverBorder: "hover:border-emerald-500/40",
     },
     habits: {
       label: "Habits & Vitality",
@@ -548,13 +436,7 @@ function PlannerContent() {
     isInsideGroup: boolean,
     categoryKey?: NormalizedCategory
   ) => {
-    const startH = parseHour(block.startTime);
-    const endH = getBlockEndHour(block);
-    const isLive = isSelectedToday && currentHourFloat >= startH && currentHourFloat < endH;
-    const isPast = isSelectedToday && currentHourFloat >= endH;
     const cat = categoryKey || normalizeCategory(block.category, block.title);
-    const isFollowed = block.status === "completed";
-    const isMissed = block.status === "missed";
     const timeRangeStr = formatCleanHourRange(block.startTime, block.endTime);
     const cfg = categoryConfig[cat];
 
@@ -563,74 +445,13 @@ function PlannerContent() {
     else if (cat === "habits") catBadgeText = "Vitality";
     else if (cat === "work") catBadgeText = "Deep Work";
 
-    if (isLive) {
-      const totalMinutes = Math.max(1, (endH - startH) * 60);
-      const elapsedMinutes = Math.max(
-        0,
-        Math.min(totalMinutes, (currentHourFloat - startH) * 60)
-      );
-      const remainingMinutes = Math.max(0, Math.round(totalMinutes - elapsedMinutes));
-
-      return (
-        <div
-          key={block.id}
-          className={`relative p-3 sm:p-3.5 rounded-xl bg-surface-container-high transition-all duration-300 overflow-hidden shadow-lg border border-primary/50 ${
-            isInsideGroup ? "my-1" : ""
-          }`}
-        >
-          <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-primary/15 blur-2xl pointer-events-none" />
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-mono whitespace-nowrap overflow-hidden shrink-0">
-              <span className="font-bold text-on-surface">{timeRangeStr}</span>
-              {!isInsideGroup && (
-                <>
-                  <span className="text-on-surface-variant/40">•</span>
-                  <span className="text-primary font-semibold">{catBadgeText}</span>
-                </>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex items-center gap-1 bg-primary/20 px-2 py-0.5 rounded-md border border-primary/30">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
-                </span>
-                <span className="text-[10px] font-mono text-primary font-bold tracking-wider">
-                  LIVE NOW
-                </span>
-              </div>
-              <button
-                onClick={(e) => handleOpenEditModal(block, e)}
-                className="w-5 h-5 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <h3 className="font-bold text-sm sm:text-base text-on-surface">{block.title}</h3>
-          {block.description && (
-            <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed line-clamp-2">
-              {block.description}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between pt-1.5 mt-2 border-t border-primary/15 text-[11px] text-on-surface-variant">
-            <span className="text-primary/90">Completes at {block.endTime}</span>
-            <span className="font-mono text-primary font-bold">{remainingMinutes}m left</span>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div
         key={block.id}
         className={`transition-all duration-200 ${
           isInsideGroup
             ? `p-2.5 sm:p-3 rounded-xl bg-surface-container/80 border ${cfg.cardBorder} ${cfg.cardHoverBorder} hover:bg-surface-container shadow-xs`
-            : "p-3 rounded-xl bg-surface-container-low border border-outline/15 hover:border-primary/30 shadow-xs"
+            : "p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border border-outline/15 hover:border-primary/30 shadow-xs"
         }`}
       >
         <div className="flex items-center justify-between gap-1.5 mb-1">
@@ -646,52 +467,17 @@ function PlannerContent() {
             )}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {isPast && (
-              <div className="flex items-center gap-0.5 bg-surface-container-high/90 p-0.5 rounded-lg border border-outline/15 shadow-xs">
-                <button
-                  onClick={(e) => handleMarkFollowed(block, e)}
-                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all ${
-                    isFollowed
-                      ? "bg-emerald-500 text-black shadow-xs"
-                      : "text-on-surface-variant/70 hover:text-emerald-400 hover:bg-emerald-500/15"
-                  }`}
-                  title={isFollowed ? "Done (tap to undo)" : "Mark as Done (+25 XP)"}
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  {isFollowed && <span>Done</span>}
-                </button>
-                <button
-                  onClick={(e) => handleMarkMissed(block, e)}
-                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all ${
-                    isMissed
-                      ? "bg-rose-500 text-white shadow-xs"
-                      : "text-on-surface-variant/70 hover:text-rose-400 hover:bg-rose-500/15"
-                  }`}
-                  title={isMissed ? "Missed (tap to undo)" : "Mark as Missed"}
-                >
-                  <X className="w-3.5 h-3.5" />
-                  {isMissed && <span>Missed</span>}
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={(e) => handleOpenEditModal(block, e)}
-              className="w-5 h-5 sm:w-6 sm:h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
-              title="Edit Hour Block"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={(e) => handleOpenEditModal(block, e)}
+            className="w-5 h-5 sm:w-6 sm:h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+            title="Edit Hour Block"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
         </div>
 
         <div>
-          <h4
-            className={`font-semibold text-xs sm:text-sm leading-snug break-words ${
-              isMissed ? "line-through text-on-surface-variant/60" : "text-on-surface"
-            }`}
-          >
+          <h4 className="font-semibold text-xs sm:text-sm leading-snug break-words text-on-surface">
             {block.title}
           </h4>
           {block.description && (
@@ -707,111 +493,86 @@ function PlannerContent() {
   return (
     <div className="view-transition min-h-screen bg-surface">
       <div className="flex flex-col w-full max-w-xl sm:max-w-2xl mx-auto px-3 sm:px-4 pb-28 space-y-3 touch-pan-y">
-        {/* Navigation / Header Bar */}
+        {/* Navigation & Header Bar */}
         <div className="flex items-start justify-between gap-2 pt-2">
           <div className="flex flex-col min-w-0">
-            {!isSelectedToday && (
-              <button
-                type="button"
-                onClick={() => router.push("/journey")}
-                className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-fixed mb-1 cursor-pointer transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Journey Trail</span>
-              </button>
-            )}
+            {/* Back button returning smoothly to the trail */}
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-bright text-primary text-xs font-mono font-bold mb-2 cursor-pointer transition-all active:scale-95 self-start border border-outline/15 shadow-xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Journey Trail</span>
+            </button>
 
             <div className="flex items-center gap-1.5 text-primary">
               <Calendar className="w-4 h-4" />
-              <span className="text-[11px] uppercase tracking-wider font-semibold">
-                {isSelectedToday
-                  ? "Today's Cadence"
-                  : dayParam
-                  ? `Day ${dayParam} Cadence Plan`
-                  : "Daily Cadence Plan"}
+              <span className="text-[11px] uppercase tracking-wider font-semibold font-mono">
+                {isToday ? "Day 1 Today • Cadence Plan" : `Day ${dayNum} Cadence Plan`}
               </span>
             </div>
 
             <h1 className="text-lg sm:text-xl text-on-surface font-bold tracking-tight mt-0.5">
-              {formattedSelectedDate}
+              {formattedDate}
             </h1>
-            {!isSelectedToday && (
-              <span className="text-xs text-on-surface-variant truncate">
-                Advance Schedule • Pre-generated 24h Timeline
-              </span>
-            )}
+            <span className="text-xs text-on-surface-variant truncate">
+              Endless Journey Map • Pre-generated 24h Timeline
+            </span>
           </div>
 
-          {/* Quick Header Actions: Auto-fill Sleep */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* Quick Header Actions: Auto-fill Sleep & Clear Day */}
+          <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 pt-1">
             <button
+              type="button"
               onClick={handleAutoFillSleep}
               className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-surface-container-high text-secondary hover:bg-surface-bright active:scale-95 transition-all shadow-sm border border-secondary/20 shrink-0 text-xs font-semibold cursor-pointer"
               title="Auto-fill Sleep hours (23:00 - 07:00)"
             >
               {autoFillLocked ? (
                 <>
-                  <Check className="w-4 h-4 text-primary" />
+                  <Check className="w-3.5 h-3.5 text-primary" />
                   <span className="text-primary font-semibold">Locked</span>
                 </>
               ) : (
                 <>
-                  <Moon className="w-4 h-4" />
+                  <Moon className="w-3.5 h-3.5" />
                   <span>Auto-fill Sleep</span>
                 </>
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={handleClearDay}
+              disabled={blocks.length === 0}
+              className="flex items-center gap-1 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 disabled:opacity-35 disabled:pointer-events-none border border-rose-500/25 text-xs font-mono font-semibold transition-all shadow-xs cursor-pointer shrink-0"
+              title="Clear all scheduled blocks for this day"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Day</span>
+            </button>
           </div>
         </div>
 
-        {/* Planned Hours Gauge & Category Distribution Matrix */}
-        <div className="flex flex-col p-3.5 sm:p-4 rounded-xl bg-surface-container-low shadow-sm gap-2.5 border border-outline/10">
+        {/* Planned Hours Gauge & Distribution Matrix */}
+        <div className="flex flex-col p-3.5 sm:p-4 rounded-2xl bg-surface-container-low shadow-sm gap-2.5 border border-outline/10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              <span className="font-bold text-sm text-on-surface tracking-tight">
-                Total Planned Hours
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface">
+                Cadence Completion
               </span>
             </div>
-            <div className="flex items-baseline gap-1.5 font-mono">
-              <span
-                className={`text-lg sm:text-xl font-black ${
-                  totalHours === 24
-                    ? "text-emerald-400"
-                    : totalHours >= 16
-                    ? "text-primary"
-                    : "text-amber-400"
-                }`}
-              >
-                {totalHours}
-              </span>
-              <span className="text-on-surface-variant font-medium text-xs">/ 24 hrs</span>
-              <span className="text-xs text-on-surface-variant font-bold ml-1">
-                ({percentage}%)
-              </span>
-            </div>
+            <span className="text-xs font-mono font-bold text-primary">
+              {scheduledHours} / 24 hrs ({percentage}%)
+            </span>
           </div>
 
-          <div className="w-full h-2.5 rounded-full bg-surface-container overflow-hidden flex">
+          <div className="w-full h-2 rounded-full bg-surface-container overflow-hidden p-0.5">
             <div
-              style={{ width: `${(sleepHours / 24) * 100}%` }}
-              className="h-full bg-emerald-500 transition-all duration-300"
-              title={`Sleep: ${sleepHours}h`}
-            />
-            <div
-              style={{ width: `${(workHours / 24) * 100}%` }}
-              className="h-full bg-primary transition-all duration-300"
-              title={`Work/Study: ${workHours}h`}
-            />
-            <div
-              style={{ width: `${(habitHours / 24) * 100}%` }}
-              className="h-full bg-purple-500 transition-all duration-300"
-              title={`Habits: ${habitHours}h`}
-            />
-            <div
-              style={{ width: `${(bufferHours / 24) * 100}%` }}
-              className="h-full bg-amber-500 transition-all duration-300"
-              title={`Buffer: ${bufferHours}h`}
+              className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
+              style={{ width: `${percentage}%` }}
             />
           </div>
 
@@ -918,7 +679,7 @@ function PlannerContent() {
               return renderHourlyCard(item.block, false);
             }
 
-            // Pre-Generated Empty Hour Slot (Full, handsome card matching the top cards)
+            // Pre-Generated Empty Hour Slot (Full handsome card matching top cards)
             const h = item.hour;
             const currentTitle = inlineTaskTitles[h] || "";
             const currentCat = inlineCategories[h] || "work";
@@ -970,7 +731,7 @@ function PlannerContent() {
                 {/* Main Task Input Box — Full width, comfortable typing */}
                 <div className="relative w-full">
                   <input
-                    id={`hour-input-${h}`}
+                    id={`journey-hour-input-${h}`}
                     type="text"
                     placeholder={`Enter task for ${item.timeRangeStr}...`}
                     value={currentTitle}
@@ -1009,7 +770,7 @@ function PlannerContent() {
         </div>
       </div>
 
-      {/* Edit Modal (Only opened when user explicitly clicks 3-dots on an existing block to edit/delete) */}
+      {/* Edit Modal for Blocks */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-surface-container-high border border-outline/30 rounded-2xl p-4 shadow-2xl space-y-3 text-left">
@@ -1055,38 +816,37 @@ function PlannerContent() {
 
               <div>
                 <label className="text-[11px] font-mono text-on-surface-variant block mb-1">
-                  Description / Tag (Optional)
+                  Notes (Optional)
                 </label>
-                <input
-                  type="text"
+                <textarea
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
-                  placeholder="Notes or tag..."
-                  className="w-full bg-surface-container-highest border border-outline/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
+                  className="w-full bg-surface-container-highest border border-outline/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary resize-none h-16"
+                  placeholder="Additional context or sub-tasks..."
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-outline/10">
+              <div className="flex items-center justify-between pt-2 border-t border-outline/15">
                 <button
                   type="button"
                   onClick={handleDeleteFromEditModal}
-                  className="px-3 py-1.5 rounded-xl text-rose-400 hover:bg-rose-500/15 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete</span>
                 </button>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(false)}
-                    className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface-variant text-xs font-semibold cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface-variant text-xs font-bold hover:bg-surface-bright transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-3.5 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-md hover:bg-primary-fixed cursor-pointer"
+                    className="px-4 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-fixed transition-all cursor-pointer shadow-sm"
                   >
                     Save Changes
                   </button>
@@ -1097,19 +857,5 @@ function PlannerContent() {
         </div>
       )}
     </div>
-  );
-}
-
-export default function PlannerPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-surface p-4 text-center text-xs font-mono text-on-surface-variant">
-          Loading schedule...
-        </div>
-      }
-    >
-      <PlannerContent />
-    </Suspense>
   );
 }

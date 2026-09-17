@@ -25,14 +25,27 @@ export function BottomNav() {
             <Link
               key={item.path}
               href={item.path}
-              className={`flex flex-col items-center justify-center min-w-[48px] px-2 py-1 gap-1 transition-colors ${
+              className={`relative flex flex-col items-center justify-center min-w-[48px] px-2 py-1 gap-1 transition-all duration-200 active:scale-90 ${
                 isActive
                   ? "text-primary"
                   : "text-on-surface-variant/70 hover:text-on-surface"
               }`}
             >
-              <IconComponent className={`w-5 h-5 ${isActive ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              <span className={`font-label-sm text-[10.5px] ${isActive ? "font-bold text-primary" : "font-medium"}`}>
+              <div className="relative">
+                <IconComponent
+                  className={`w-5 h-5 transition-transform duration-200 ${
+                    isActive ? "stroke-[2.5] scale-110" : "stroke-[1.75]"
+                  }`}
+                />
+                {isActive && (
+                  <span className="absolute -inset-1 rounded-full bg-primary/20 blur-xs -z-10 animate-in fade-in zoom-in duration-300" />
+                )}
+              </div>
+              <span
+                className={`font-label-sm text-[10.5px] transition-all duration-200 ${
+                  isActive ? "font-bold text-primary" : "font-medium"
+                }`}
+              >
                 {item.label}
               </span>
             </Link>

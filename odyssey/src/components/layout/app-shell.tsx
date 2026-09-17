@@ -17,7 +17,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <Header />
       <main className="flex-1 pt-14 sm:pt-16 pb-24 w-full max-w-full touch-pan-y">
-        {children}
+        <div key={pathname} className="page-transition min-h-full">
+          {children}
+        </div>
       </main>
       <EveningReminderModal />
       <BottomNav />

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import {
@@ -20,6 +19,7 @@ import {
   Plus,
   ChevronDown,
 } from "lucide-react";
+import { JourneyDaySchedule } from "@/components/journey/journey-day-schedule";
 
 interface MilestoneInfo {
   title: string;
@@ -169,7 +169,6 @@ function findUnclaimedPastChallenges(userId?: string, activeDay: number = 1): Un
 }
 
 export default function JourneyPage() {
-  const router = useRouter();
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -181,6 +180,13 @@ export default function JourneyPage() {
 
   // Map of scheduled hours for each date string
   const [scheduledHoursMap, setScheduledHoursMap] = useState<Record<string, number>>({});
+
+  // In-journey day schedule editor state (keeps Today page and Journey day planning completely separate)
+  const [selectedDayMeta, setSelectedDayMeta] = useState<{
+    dayNum: number;
+    dateStr: string;
+    isToday: boolean;
+  } | null>(null);
 
   useEffect(() => {
     fetchUser();
@@ -320,22 +326,38 @@ export default function JourneyPage() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Directly navigate to full schedule page in front of user (no popup!)
+  // Open full day schedule editor directly inside the Journey page (completely separate from Today)
   const handleOpenScheduler = (dayNum: number) => {
     const meta = getDayMeta(dayNum);
-    if (meta.isToday) {
-      router.push("/planner");
-    } else {
-      router.push(`/planner?date=${meta.dateStr}&day=${dayNum}`);
-    }
+    setSelectedDayMeta({
+      dayNum,
+      dateStr: meta.dateStr,
+      isToday: meta.isToday,
+    });
   };
 
   const handleLoadMoreDays = () => {
     setWindowDaysCount((prev) => prev + 7);
   };
 
+  // Render full day schedule directly inside Journey view
+  if (selectedDayMeta) {
+    return (
+      <JourneyDaySchedule
+        dateStr={selectedDayMeta.dateStr}
+        dayNum={selectedDayMeta.dayNum}
+        isToday={selectedDayMeta.isToday}
+        onBack={() => {
+          setSelectedDayMeta(null);
+          loadScheduledHours();
+        }}
+        onScheduleUpdated={loadScheduledHours}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="view-transition min-h-screen bg-surface">
       <div className="w-full max-w-md sm:max-w-lg mx-auto px-3 sm:px-4 pb-28 pt-2 space-y-3">
         {/* Top Header Progress Card — Formatted with full width, zero unnatural text wrapping */}
         <section className="rounded-2xl bg-surface-container-high/90 border border-outline/15 p-3.5 sm:p-4 shadow-sm space-y-2.5">
