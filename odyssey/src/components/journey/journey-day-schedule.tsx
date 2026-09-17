@@ -493,36 +493,35 @@ export function JourneyDaySchedule({
   return (
     <div className="view-transition min-h-screen bg-surface">
       <div className="flex flex-col w-full max-w-xl sm:max-w-2xl mx-auto px-3 sm:px-4 pb-28 space-y-3 touch-pan-y">
-        {/* Navigation & Header Bar */}
-        <div className="flex items-start justify-between gap-2 pt-2">
-          <div className="flex flex-col min-w-0">
-            {/* Back button returning smoothly to the trail */}
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-bright text-primary text-xs font-mono font-bold mb-2 cursor-pointer transition-all active:scale-95 self-start border border-outline/15 shadow-xs"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Journey Trail</span>
-            </button>
+        {/* Top Back Navigation Bar */}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-bright text-primary text-xs font-mono font-bold cursor-pointer transition-all active:scale-95 border border-outline/15 shadow-xs"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Journey Trail</span>
+          </button>
+        </div>
 
+        {/* Header Bar: Date Title & Actions */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5 text-primary">
-              <Calendar className="w-4 h-4" />
-              <span className="text-[11px] uppercase tracking-wider font-semibold font-mono">
-                {isToday ? "Day 1 Today • Cadence Plan" : `Day ${dayNum} Cadence Plan`}
+              <Calendar className="w-4 h-4 shrink-0" />
+              <span className="text-[11px] uppercase tracking-wider font-semibold">
+                {isToday ? "Today's Cadence" : `Day ${dayNum} Cadence Plan`}
               </span>
             </div>
 
             <h1 className="text-lg sm:text-xl text-on-surface font-bold tracking-tight mt-0.5">
               {formattedDate}
             </h1>
-            <span className="text-xs text-on-surface-variant truncate">
-              Endless Journey Map • Pre-generated 24h Timeline
-            </span>
           </div>
 
-          {/* Quick Header Actions: Auto-fill Sleep & Clear Day */}
-          <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 pt-1">
+          {/* Quick Header Actions: Auto-fill Sleep on top, Clear Day stacked below */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleAutoFillSleep}
@@ -546,10 +545,10 @@ export function JourneyDaySchedule({
               type="button"
               onClick={handleClearDay}
               disabled={blocks.length === 0}
-              className="flex items-center gap-1 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 disabled:opacity-35 disabled:pointer-events-none border border-rose-500/25 text-xs font-mono font-semibold transition-all shadow-xs cursor-pointer shrink-0"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 disabled:opacity-30 disabled:pointer-events-none border border-rose-500/20 text-[11px] font-mono font-semibold transition-all shadow-xs cursor-pointer shrink-0"
               title="Clear all scheduled blocks for this day"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3 h-3" />
               <span>Clear Day</span>
             </button>
           </div>
