@@ -186,15 +186,14 @@ export function DayScheduleModal({
   const handleAutoFillSleep = async () => {
     if (!userId || !date) return;
     const sleepSlots = [
-      { start: "00:00", end: "01:00", title: "Deep Circadian Slumber", tag: "Restored", cat: "sleep" },
-      { start: "01:00", end: "02:00", title: "REM Cycle Phase I", tag: "SpO2 99%", cat: "sleep" },
-      { start: "02:00", end: "03:00", title: "Deep Delta Sleep Wave", tag: "Peak Recovery", cat: "sleep" },
-      { start: "03:00", end: "04:00", title: "Cellular Repair Interval", tag: "HRV 72ms", cat: "sleep" },
-      { start: "04:00", end: "05:00", title: "REM Cycle Phase II", tag: "Memory Consolidation", cat: "sleep" },
-      { start: "05:00", end: "06:00", title: "Light Rest & Cortisol Rise", tag: "Pre-Dawn Stage", cat: "sleep" },
-      { start: "06:00", end: "07:00", title: "Circadian Slumber Completion", tag: "8.0h Done", cat: "sleep" },
-      { start: "22:00", end: "23:00", title: "Melatonin Prep & Rest", tag: "Melatonin Prep", cat: "buffer" },
-      { start: "23:00", end: "24:00", title: "Circadian Slumber Inception", tag: "Night Cadence", cat: "sleep" },
+      { start: "00:00", end: "01:00" },
+      { start: "01:00", end: "02:00" },
+      { start: "02:00", end: "03:00" },
+      { start: "03:00", end: "04:00" },
+      { start: "04:00", end: "05:00" },
+      { start: "05:00", end: "06:00" },
+      { start: "06:00", end: "07:00" },
+      { start: "23:00", end: "24:00" },
     ];
 
     for (const slot of sleepSlots) {
@@ -206,10 +205,10 @@ export function DayScheduleModal({
           date,
           startTime: slot.start,
           endTime: slot.end,
-          title: slot.title,
-          description: slot.tag,
-          category: slot.cat as any,
-          tag: slot.tag,
+          title: "Sleep",
+          description: "",
+          category: "sleep",
+          tag: "Rest",
           status: "pending",
           isCommitted: true,
           createdAt: new Date().toISOString(),

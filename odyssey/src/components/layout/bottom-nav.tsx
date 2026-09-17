@@ -7,7 +7,7 @@ import { Calendar, Compass, CheckCircle2, Store, BarChart3 } from "lucide-react"
 const navItems = [
   { path: "/planner", label: "Today", Icon: Calendar },
   { path: "/journey", label: "Journey", Icon: Compass },
-  { path: "/habits", label: "Habits", Icon: CheckCircle2 },
+  { path: "/habits", label: "Hobbies", Icon: CheckCircle2 },
   { path: "/shop", label: "Shop", Icon: Store },
   { path: "/stats", label: "Stats", Icon: BarChart3 },
 ];

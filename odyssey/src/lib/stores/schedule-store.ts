@@ -66,16 +66,14 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
   autoFillSleep: async (userId, date) => {
     const existing = get().blocks;
     const sleepSlots = [
-      { startTime: '00:00', endTime: '01:00', title: 'Deep Circadian Slumber (H1)', tag: 'Restored' },
-      { startTime: '01:00', endTime: '02:00', title: 'REM Cycle Phase I', tag: 'SpO2 99%' },
-      { startTime: '02:00', endTime: '03:00', title: 'Deep Delta Sleep Wave', tag: 'Peak Recovery' },
-      { startTime: '03:00', endTime: '04:00', title: 'Cellular Repair Interval', tag: 'HRV 72ms' },
-      { startTime: '04:00', endTime: '05:00', title: 'REM Cycle Phase II', tag: 'Memory Consolidation' },
-      { startTime: '05:00', endTime: '06:00', title: 'Light Rest & Cortisol Rise', tag: 'Pre-Dawn Stage' },
-      { startTime: '06:00', endTime: '07:00', title: 'Circadian Slumber Completion', tag: '8.0h Done' },
-      { startTime: '21:00', endTime: '22:00', title: 'Digital Sunset & Fiction Reading', tag: 'Screen Sunset' },
-      { startTime: '22:00', endTime: '23:00', title: 'Melatonin Prep & Ambient Rest', tag: 'Melatonin Prep' },
-      { startTime: '23:00', endTime: '24:00', title: 'Circadian Slumber Inception', tag: 'Ready' },
+      { startTime: '00:00', endTime: '01:00' },
+      { startTime: '01:00', endTime: '02:00' },
+      { startTime: '02:00', endTime: '03:00' },
+      { startTime: '03:00', endTime: '04:00' },
+      { startTime: '04:00', endTime: '05:00' },
+      { startTime: '05:00', endTime: '06:00' },
+      { startTime: '06:00', endTime: '07:00' },
+      { startTime: '23:00', endTime: '24:00' },
     ];
 
     for (const slot of sleepSlots) {
@@ -85,17 +83,16 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
         const normEndH = endHourNum === 0 ? 24 : endHourNum;
         const currentH = new Date().getHours();
         const isAlreadyPast = currentH >= normEndH;
-        const isBuffer = slot.startTime === '21:00';
         const newBlock: ScheduleBlock = {
           id: uuidv4(),
           userId,
           date,
           startTime: slot.startTime,
           endTime: slot.endTime,
-          title: slot.title,
-          description: slot.tag,
-          category: isBuffer ? 'buffer' : 'sleep',
-          tag: slot.tag,
+          title: 'Sleep',
+          description: '',
+          category: 'sleep',
+          tag: 'Rest',
           status: isAlreadyPast ? 'completed' : 'pending',
           isCommitted: true,
           createdAt: new Date().toISOString(),

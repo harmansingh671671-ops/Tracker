@@ -124,6 +124,7 @@ function PlannerContent() {
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editCategory, setEditCategory] = useState<NormalizedCategory>("work");
+  const [editStatus, setEditStatus] = useState<"pending" | "completed" | "missed">("pending");
 
   // Inline Task Writer State for empty hours (hour -> title / category)
   const [inlineTaskTitles, setInlineTaskTitles] = useState<Record<number, string>>({});
@@ -427,6 +428,7 @@ function PlannerContent() {
     setEditTitle(originalBlock.title);
     setEditDesc(originalBlock.description || "");
     setEditCategory(normalizeCategory(originalBlock.category, originalBlock.title));
+    setEditStatus((originalBlock.status as "pending" | "completed" | "missed") || "pending");
     setIsEditModalOpen(true);
   };
 
@@ -439,6 +441,9 @@ function PlannerContent() {
       title: editTitle.trim(),
       description: editDesc.trim() || undefined,
       category: editCategory,
+      status: editStatus,
+      completedAt: editStatus === "completed" ? new Date().toISOString() : undefined,
+      missReason: editStatus === "missed" ? "Did not follow" : undefined,
       tag:
         editCategory === "work"
           ? "Deep Work"
@@ -550,8 +555,9 @@ function PlannerContent() {
   ) => {
     const startH = parseHour(block.startTime);
     const endH = getBlockEndHour(block);
+    const isDayPast = selectedDate < today;
     const isLive = isSelectedToday && currentHourFloat >= startH && currentHourFloat < endH;
-    const isPast = isSelectedToday && currentHourFloat >= endH;
+    const isPast = isDayPast || (isSelectedToday && currentHourFloat >= endH);
     const cat = categoryKey || normalizeCategory(block.category, block.title);
     const isFollowed = block.status === "completed";
     const isMissed = block.status === "missed";
@@ -624,13 +630,19 @@ function PlannerContent() {
       );
     }
 
+    const followBorderClass = isFollowed
+      ? "border-emerald-500/40 bg-emerald-500/5 shadow-emerald-500/5"
+      : isMissed
+      ? "border-rose-500/40 bg-rose-500/5 shadow-rose-500/5"
+      : "";
+
     return (
       <div
         key={block.id}
-        className={`transition-all duration-200 ${
+        className={`transition-all duration-200 ${followBorderClass} ${
           isInsideGroup
-            ? `p-2.5 sm:p-3 rounded-xl bg-surface-container/80 border ${cfg.cardBorder} ${cfg.cardHoverBorder} hover:bg-surface-container shadow-xs`
-            : "p-3 rounded-xl bg-surface-container-low border border-outline/15 hover:border-primary/30 shadow-xs"
+            ? `p-2.5 sm:p-3 rounded-xl bg-surface-container/80 border ${followBorderClass || cfg.cardBorder} ${cfg.cardHoverBorder} hover:bg-surface-container shadow-xs`
+            : `p-3 rounded-xl bg-surface-container-low border ${followBorderClass || "border-outline/15 hover:border-primary/30"} shadow-xs`
         }`}
       >
         <div className="flex items-center justify-between gap-1.5 mb-1">
@@ -1064,6 +1076,47 @@ function PlannerContent() {
                   placeholder="Notes or tag..."
                   className="w-full bg-surface-container-highest border border-outline/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono text-on-surface-variant block mb-1">
+                  Follow Status
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 font-mono text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus("pending")}
+                    className={`py-1.5 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      editStatus === "pending"
+                        ? "bg-surface-bright border-primary text-primary font-bold shadow-xs"
+                        : "bg-surface-container-highest border-outline/20 text-on-surface-variant/70 hover:text-on-surface"
+                    }`}
+                  >
+                    Unmarked
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus("completed")}
+                    className={`py-1.5 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      editStatus === "completed"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold shadow-xs"
+                        : "bg-surface-container-highest border-outline/20 text-on-surface-variant/70 hover:text-emerald-400"
+                    }`}
+                  >
+                    Done
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus("missed")}
+                    className={`py-1.5 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      editStatus === "missed"
+                        ? "bg-rose-500/20 border-rose-500 text-rose-400 font-bold shadow-xs"
+                        : "bg-surface-container-highest border-outline/20 text-on-surface-variant/70 hover:text-rose-400"
+                    }`}
+                  >
+                    Missed
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-outline/10">

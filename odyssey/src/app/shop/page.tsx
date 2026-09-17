@@ -12,8 +12,6 @@ import {
   Headphones,
   Gift,
   Check,
-  Play,
-  Pause,
 } from "lucide-react";
 
 interface ShopItem {
@@ -31,7 +29,6 @@ export default function ShopPage() {
   const { user, fetchUser, buyItem, addDiamonds } = useUserStore();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [toastMsg, setToastMsg] = useState<{ text: string; isError?: boolean } | null>(null);
-  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [chestClaimed, setChestClaimed] = useState<boolean>(false);
 
   useEffect(() => {
@@ -260,44 +257,6 @@ export default function ShopPage() {
             );
           })}
         </div>
-
-        {/* Spatial Audio Soundscape Player Card */}
-        <section className="rounded-2xl bg-surface-container-low border border-outline/15 p-3.5 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-secondary">
-              <Headphones className="w-4 h-4" />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider">
-                Binaural Sanctuary
-              </span>
-            </div>
-            <span className="text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-full bg-secondary/15 text-secondary">
-              432Hz Flow
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container border border-outline/10">
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-on-surface truncate">
-                Emerald Flow State (Spatial Audio)
-              </span>
-              <span className="text-[10px] font-mono text-on-surface-variant">
-                {isPlayingAudio ? "Streaming ambient soundscape..." : "Tap play to preview frequency"}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-              className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 active:scale-90 transition-all shadow-sm cursor-pointer"
-            >
-              {isPlayingAudio ? (
-                <Pause className="w-4 h-4 fill-current" />
-              ) : (
-                <Play className="w-4 h-4 fill-current ml-0.5" />
-              )}
-            </button>
-          </div>
-        </section>
 
         {/* Toast Notification */}
         {toastMsg && (

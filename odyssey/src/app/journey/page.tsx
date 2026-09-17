@@ -20,6 +20,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { JourneyDaySchedule } from "@/components/journey/journey-day-schedule";
+import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 
 interface MilestoneInfo {
   title: string;
@@ -113,7 +114,7 @@ interface UnclaimedReward {
   dateStr: string;
 }
 
-function findUnclaimedPastChallenges(userId?: string, activeDay: number = 1): UnclaimedReward[] {
+function findUnclaimedPastChallenges(userId?: string, activeDay: number = 1, createdAt?: string): UnclaimedReward[] {
   if (typeof window === "undefined") return [];
   const results: UnclaimedReward[] = [];
   const today = new Date();
@@ -125,9 +126,7 @@ function findUnclaimedPastChallenges(userId?: string, activeDay: number = 1): Un
   try {
     // 1. Check past days in current journey window (day 1 to activeDay - 1)
     for (let d = 1; d < activeDay; d++) {
-      const dateObj = new Date();
-      dateObj.setDate(dateObj.getDate() - (activeDay - d));
-      const dStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
+      const dStr = getDateForJourneyDay(d, createdAt);
       const rec = getChallengeRecord(userId, dStr);
       if (rec.started && !rec.claimed) {
         results.push({ dayNum: d, dateStr: dStr });
@@ -188,11 +187,31 @@ export default function JourneyPage() {
     isToday: boolean;
   } | null>(null);
 
+  // Live midnight ticker so activeDay immediately advances when a new day officially begins
+  const [currentDateStr, setCurrentDateStr] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const d = new Date();
+      const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (s !== currentDateStr) {
+        setCurrentDateStr(s);
+      }
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [currentDateStr]);
+
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
 
-  const activeDay = Math.max(1, (user?.streak ?? 0) + 1);
+  const activeDay = useMemo(() => {
+    return getJourneyDayNumber(user?.createdAt);
+  }, [user?.createdAt, currentDateStr]);
+
   const activeChapter = Math.ceil(activeDay / 7);
   const chapterTitle =
     activeChapter === 1
@@ -206,16 +225,13 @@ export default function JourneyPage() {
   const xpCurrent = user ? user.xp % 500 : 0;
   const xpPercent = Math.min(100, Math.round((xpCurrent / 500) * 100));
 
-  // Generate date information relative to activeDay
+  // Generate date information for any dayNum in the journey
   const getDayMeta = useCallback(
     (dayNum: number) => {
-      const d = new Date();
-      d.setDate(d.getDate() + (dayNum - activeDay));
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      const dateStr = `${yyyy}-${mm}-${dd}`;
-      const dayLabel = d.toLocaleDateString("en-US", {
+      const dateStr = getDateForJourneyDay(dayNum, user?.createdAt);
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const targetDate = new Date(y, m - 1, d);
+      const dayLabel = targetDate.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -228,14 +244,16 @@ export default function JourneyPage() {
         isTomorrow: dayNum === activeDay + 1,
       };
     },
-    [activeDay]
+    [activeDay, user?.createdAt]
   );
 
-  // Array of days currently rendered in the window
+  // Array of days currently rendered in the window (shows chapter start up through active day and future)
   const visibleDays = useMemo(() => {
     const days: number[] = [];
-    if (activeDay > 1) {
-      days.push(activeDay - 1);
+    const chapter = Math.ceil(activeDay / 7);
+    const startPastDay = Math.max(1, (chapter - 1) * 7 + 1);
+    for (let d = startPastDay; d < activeDay; d++) {
+      days.push(d);
     }
     for (let i = 0; i < windowDaysCount; i++) {
       days.push(activeDay + i);
@@ -282,9 +300,9 @@ export default function JourneyPage() {
 
   // Unclaimed past challenge rewards (shows whenever a completed day has reward pending!)
   const unclaimedRewards = useMemo(() => {
-    return findUnclaimedPastChallenges(user?.id, activeDay);
+    return findUnclaimedPastChallenges(user?.id, activeDay, user?.createdAt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, activeDay, challengeSyncCount]);
+  }, [user?.id, activeDay, challengeSyncCount, user?.createdAt]);
 
   // Begin Today's challenge (Persisted, zero instant reward, prevents endless farming!)
   const handleBeginTodayChallenge = () => {
@@ -489,7 +507,7 @@ export default function JourneyPage() {
                         type="button"
                         onClick={() => handleOpenScheduler(day)}
                         className="w-14 h-14 rounded-full bg-emerald-500 border-b-4 border-emerald-700 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:translate-y-1 active:border-b-0 cursor-pointer"
-                        title="View Day schedule"
+                        title={`View Day ${day} schedule`}
                       >
                         <Check className="w-6 h-6 stroke-[3]" />
                       </button>

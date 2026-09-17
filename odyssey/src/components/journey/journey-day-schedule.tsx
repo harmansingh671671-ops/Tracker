@@ -72,6 +72,18 @@ function formatCleanHourRange(startTime: string, endTime: string): string {
   return `${startFmt}-${endFmt}`;
 }
 
+function parseHour(time: string): number {
+  if (!time) return 0;
+  return parseInt(time.split(":")[0], 10);
+}
+
+function getBlockEndHour(block: ScheduleBlock): number {
+  if (!block.endTime) return 0;
+  const h = parseInt(block.endTime.split(":")[0], 10);
+  if (block.endTime === "24:00" || (h === 0 && parseHour(block.startTime) > 0)) return 24;
+  return h;
+}
+
 interface JourneyDayScheduleProps {
   dateStr: string;
   dayNum: number;
@@ -87,7 +99,7 @@ export function JourneyDaySchedule({
   onBack,
   onScheduleUpdated,
 }: JourneyDayScheduleProps) {
-  const { user } = useUserStore();
+  const { user, addXp } = useUserStore();
   const {
     blocks,
     fetchBlocksForDate,
@@ -106,6 +118,7 @@ export function JourneyDaySchedule({
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editCategory, setEditCategory] = useState<NormalizedCategory>("work");
+  const [editStatus, setEditStatus] = useState<"pending" | "completed" | "missed">("pending");
 
   // Inline Task Writer State for empty hours
   const [inlineTaskTitles, setInlineTaskTitles] = useState<Record<number, string>>({});
@@ -113,6 +126,25 @@ export function JourneyDaySchedule({
 
   // Group Collapses (Sleep collapsed by default)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // Clock ticker for live and past hour evaluations
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentHourFloat = useMemo(() => {
+    return (
+      currentTime.getHours() +
+      currentTime.getMinutes() / 60 +
+      currentTime.getSeconds() / 3600
+    );
+  }, [currentTime]);
+
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const isDayPast = dateStr < todayStr;
 
   // Formatted date string
   const formattedDate = useMemo(() => {
@@ -354,6 +386,34 @@ export function JourneyDaySchedule({
     onScheduleUpdated();
   };
 
+  // Mark Followed / Missed
+  const handleMarkFollowed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const actualId = block.id.split("-h")[0];
+    const newStatus = block.status === "completed" ? "pending" : "completed";
+    await updateBlock(actualId, {
+      status: newStatus,
+      completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
+    });
+    if (newStatus === "completed") {
+      addXp(25);
+    }
+    await fetchBlocksForDate(user!.id, dateStr);
+    onScheduleUpdated();
+  };
+
+  const handleMarkMissed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const actualId = block.id.split("-h")[0];
+    const newStatus = block.status === "missed" ? "pending" : "missed";
+    await updateBlock(actualId, {
+      status: newStatus,
+      missReason: newStatus === "missed" ? "Did not follow" : undefined,
+    });
+    await fetchBlocksForDate(user!.id, dateStr);
+    onScheduleUpdated();
+  };
+
   // Edit modal handlers
   const handleOpenEditModal = (block: ScheduleBlock, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -363,6 +423,7 @@ export function JourneyDaySchedule({
     setEditTitle(originalBlock.title);
     setEditDesc(originalBlock.description || "");
     setEditCategory(normalizeCategory(originalBlock.category, originalBlock.title));
+    setEditStatus((originalBlock.status as "pending" | "completed" | "missed") || "pending");
     setIsEditModalOpen(true);
   };
 
@@ -374,6 +435,9 @@ export function JourneyDaySchedule({
       title: editTitle.trim(),
       description: editDesc.trim() || undefined,
       category: editCategory,
+      status: editStatus,
+      completedAt: editStatus === "completed" ? new Date().toISOString() : undefined,
+      missReason: editStatus === "missed" ? "Did not follow" : undefined,
       tag:
         editCategory === "work"
           ? "Deep Work"
@@ -437,6 +501,12 @@ export function JourneyDaySchedule({
     categoryKey?: NormalizedCategory
   ) => {
     const cat = categoryKey || normalizeCategory(block.category, block.title);
+    const startH = parseHour(block.startTime);
+    const endH = getBlockEndHour(block);
+    const isLive = isToday && currentHourFloat >= startH && currentHourFloat < endH;
+    const isPast = isDayPast || (isToday && currentHourFloat >= endH);
+    const isFollowed = block.status === "completed";
+    const isMissed = block.status === "missed";
     const timeRangeStr = formatCleanHourRange(block.startTime, block.endTime);
     const cfg = categoryConfig[cat];
 
@@ -445,13 +515,80 @@ export function JourneyDaySchedule({
     else if (cat === "habits") catBadgeText = "Vitality";
     else if (cat === "work") catBadgeText = "Deep Work";
 
+    const followBorderClass = isFollowed
+      ? "border-emerald-500/40 bg-emerald-500/5 shadow-emerald-500/5"
+      : isMissed
+      ? "border-rose-500/40 bg-rose-500/5 shadow-rose-500/5"
+      : "";
+
+    if (isLive) {
+      const totalMinutes = Math.max(1, (endH - startH) * 60);
+      const elapsedMinutes = Math.max(
+        0,
+        Math.min(totalMinutes, (currentHourFloat - startH) * 60)
+      );
+      const remainingMinutes = Math.max(0, Math.round(totalMinutes - elapsedMinutes));
+
+      return (
+        <div
+          key={block.id}
+          className={`relative p-3 sm:p-3.5 rounded-xl bg-surface-container-high transition-all duration-300 overflow-hidden shadow-lg border border-primary/50 ${
+            isInsideGroup ? "my-1" : ""
+          }`}
+        >
+          <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-primary/15 blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-mono whitespace-nowrap overflow-hidden shrink-0">
+              <span className="font-bold text-on-surface">{timeRangeStr}</span>
+              {!isInsideGroup && (
+                <>
+                  <span className="text-on-surface-variant/40">•</span>
+                  <span className="text-primary font-semibold">{catBadgeText}</span>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 bg-primary/20 px-2 py-0.5 rounded-md border border-primary/30">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+                </span>
+                <span className="text-[10px] font-mono text-primary font-bold tracking-wider">
+                  LIVE NOW
+                </span>
+              </div>
+              <button
+                onClick={(e) => handleOpenEditModal(block, e)}
+                className="w-5 h-5 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <h3 className="font-bold text-sm sm:text-base text-on-surface">{block.title}</h3>
+          {block.description && (
+            <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed line-clamp-2">
+              {block.description}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between pt-1.5 mt-2 border-t border-primary/15 text-[11px] text-on-surface-variant">
+            <span className="text-primary/90">Completes at {block.endTime}</span>
+            <span className="font-mono text-primary font-bold">{remainingMinutes}m left</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         key={block.id}
-        className={`transition-all duration-200 ${
+        className={`transition-all duration-200 ${followBorderClass} ${
           isInsideGroup
-            ? `p-2.5 sm:p-3 rounded-xl bg-surface-container/80 border ${cfg.cardBorder} ${cfg.cardHoverBorder} hover:bg-surface-container shadow-xs`
-            : "p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border border-outline/15 hover:border-primary/30 shadow-xs"
+            ? `p-2.5 sm:p-3 rounded-xl bg-surface-container/80 border ${followBorderClass || cfg.cardBorder} ${cfg.cardHoverBorder} hover:bg-surface-container shadow-xs`
+            : `p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border ${followBorderClass || "border-outline/15 hover:border-primary/30"} shadow-xs`
         }`}
       >
         <div className="flex items-center justify-between gap-1.5 mb-1">
@@ -467,13 +604,47 @@ export function JourneyDaySchedule({
             )}
           </div>
 
-          <button
-            onClick={(e) => handleOpenEditModal(block, e)}
-            className="w-5 h-5 sm:w-6 sm:h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
-            title="Edit Hour Block"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {isPast && (
+              <div className="flex items-center gap-0.5 bg-surface-container-high/90 p-0.5 rounded-lg border border-outline/15 shadow-xs">
+                <button
+                  type="button"
+                  onClick={(e) => handleMarkFollowed(block, e)}
+                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                    isFollowed
+                      ? "bg-emerald-500 text-black shadow-xs"
+                      : "text-on-surface-variant/70 hover:text-emerald-400 hover:bg-emerald-500/15"
+                  }`}
+                  title={isFollowed ? "Done (tap to undo)" : "Mark as Done (+25 XP)"}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  {isFollowed && <span>Done</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleMarkMissed(block, e)}
+                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                    isMissed
+                      ? "bg-rose-500 text-white shadow-xs"
+                      : "text-on-surface-variant/70 hover:text-rose-400 hover:bg-rose-500/15"
+                  }`}
+                  title={isMissed ? "Missed (tap to undo)" : "Mark as Missed"}
+                >
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  {isMissed && <span>Missed</span>}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={(e) => handleOpenEditModal(block, e)}
+              className="w-5 h-5 sm:w-6 sm:h-6 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+              title="Edit Hour Block"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div>
@@ -823,6 +994,47 @@ export function JourneyDaySchedule({
                   className="w-full bg-surface-container-highest border border-outline/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary resize-none h-16"
                   placeholder="Additional context or sub-tasks..."
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono text-on-surface-variant block mb-1">
+                  Follow Status
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 font-mono text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus("pending")}
+                    className={`py-1.5 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      editStatus === "pending"
+                        ? "bg-surface-bright border-primary text-primary font-bold shadow-xs"
+                        : "bg-surface-container-highest border-outline/20 text-on-surface-variant/70 hover:text-on-surface"
+                    }`}
+                  >
+                    Unmarked
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus("completed")}
+                    className={`py-1.5 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      editStatus === "completed"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold shadow-xs"
+                        : "bg-surface-container-highest border-outline/20 text-on-surface-variant/70 hover:text-emerald-400"
+                    }`}
+                  >
+                    Done
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus("missed")}
+                    className={`py-1.5 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      editStatus === "missed"
+                        ? "bg-rose-500/20 border-rose-500 text-rose-400 font-bold shadow-xs"
+                        : "bg-surface-container-highest border-outline/20 text-on-surface-variant/70 hover:text-rose-400"
+                    }`}
+                  >
+                    Missed
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-outline/15">

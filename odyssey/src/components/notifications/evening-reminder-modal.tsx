@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import { Moon, Sparkles, X, ChevronRight } from "lucide-react";
+import { getJourneyDayNumber } from "@/lib/utils/journey";
 
 export function EveningReminderModal() {
   const router = useRouter();
@@ -105,7 +106,7 @@ export function EveningReminderModal() {
 
   const handleOpenSchedulePage = () => {
     handleDismiss();
-    const tomorrowDayNum = Math.max(1, (user?.streak ?? 0) + 2);
+    const tomorrowDayNum = getJourneyDayNumber(user?.createdAt) + 1;
     router.push(`/planner?date=${tomorrowDateStr}&day=${tomorrowDayNum}`);
   };
 
@@ -122,7 +123,7 @@ export function EveningReminderModal() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-xs font-bold">
             <Moon className="w-3.5 h-3.5" />
-            <span>20:00 Cadence Ritual</span>
+            <span>20:00 Cadence Hobby</span>
           </div>
 
           <button
