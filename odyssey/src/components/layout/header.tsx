@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
+import { getRankInfo, calculateRank } from "@/lib/utils/gamification";
 
 export function Header() {
   const { user, fetchUser } = useUserStore();
   const [showProfile, setShowProfile] = useState(false);
+  const rankInfo = getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0, user?.integrityScore ?? 100));
 
   useEffect(() => {
     fetchUser();
@@ -89,14 +91,14 @@ export function Header() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                  <span className="material-symbols-outlined text-[20px]">military_tech</span>
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg">
+                  <span>{rankInfo.badge}</span>
                 </div>
                 <div>
                   <h4 className="font-headline-sm text-[15px] font-bold text-on-surface">
-                    {user?.militaryRank || 'Civilian'}
+                    {rankInfo.name}
                   </h4>
-                  <span className="text-[12px] text-on-surface-variant">Level {user?.level ?? 1} Cadet</span>
+                  <span className="text-[12px] text-on-surface-variant">Level {user?.level ?? 1} • {rankInfo.division} Tier</span>
                 </div>
               </div>
               <button

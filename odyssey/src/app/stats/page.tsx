@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
+import { getRankInfo, calculateRank } from "@/lib/utils/gamification";
 import {
   BarChart3,
   Flame,
@@ -28,6 +29,11 @@ export default function StatsPage() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  const rankInfo = useMemo(
+    () => getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0, user?.integrityScore ?? 100)),
+    [user?.militaryRank, user?.streak, user?.integrityScore]
+  );
 
   useEffect(() => {
     fetchUser().then((u) => {
@@ -145,11 +151,12 @@ export default function StatsPage() {
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-base">{rankInfo.badge}</span>
                   <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">
-                    {user?.militaryRank || "Civilian"}
+                    {rankInfo.name}
                   </h3>
                   <span className="px-2 py-0.2 rounded-full bg-secondary/15 border border-secondary/25 text-secondary text-[10px] font-mono font-bold">
-                    {(user?.level ?? 1) > 1 ? "Division II" : "Division I"}
+                    {rankInfo.division} Division
                   </span>
                 </div>
                 <span className="text-[11px] font-mono text-on-surface-variant">
@@ -335,10 +342,10 @@ export default function StatsPage() {
 
           <div className="grid grid-cols-4 gap-1.5 pt-1 text-center font-mono">
             {[
-              { name: "Civilian", req: "Lvl 1", unlocked: (user?.level ?? 1) >= 1 },
-              { name: "Scholar", req: "Lvl 2", unlocked: (user?.level ?? 1) >= 2 },
-              { name: "Ascendant", req: "21 Days", unlocked: (user?.streak ?? 0) >= 21 },
-              { name: "Titan", req: "60 Days", unlocked: (user?.streak ?? 0) >= 60 },
+              { name: "Beginner", req: "Starter", badge: "🌱", unlocked: (user?.streak ?? 0) >= 0 },
+              { name: "Builder", req: "14 Days", badge: "🔨", unlocked: (user?.streak ?? 0) >= 14 },
+              { name: "Expert", req: "90 Days", badge: "⚔️", unlocked: (user?.streak ?? 0) >= 90 },
+              { name: "Legend", req: "365 Days", badge: "👑", unlocked: (user?.streak ?? 0) >= 365 },
             ].map((tier, i) => (
               <div
                 key={i}
@@ -348,6 +355,7 @@ export default function StatsPage() {
                     : "bg-surface-container border-outline/10 text-on-surface-variant/50"
                 }`}
               >
+                <span className="text-sm block">{tier.badge}</span>
                 <span className="text-[11px] font-bold block truncate">{tier.name}</span>
                 <span className="text-[9.5px] opacity-75 block mt-0.5">{tier.req}</span>
               </div>

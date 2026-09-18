@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { JourneyDaySchedule } from "@/components/journey/journey-day-schedule";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
+import { getRankInfo, calculateRank } from "@/lib/utils/gamification";
 
 interface MilestoneInfo {
   title: string;
@@ -211,6 +212,11 @@ export default function JourneyPage() {
   const activeDay = useMemo(() => {
     return getJourneyDayNumber(user?.createdAt);
   }, [user?.createdAt, currentDateStr]);
+
+  const rankInfo = useMemo(
+    () => getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0, user?.integrityScore ?? 100)),
+    [user?.militaryRank, user?.streak, user?.integrityScore]
+  );
 
   const activeChapter = Math.ceil(activeDay / 7);
   const chapterTitle =
@@ -407,7 +413,7 @@ export default function JourneyPage() {
           <div className="space-y-1.5 pt-2 border-t border-outline/10">
             <div className="flex justify-between items-center text-xs font-mono">
               <span className="text-on-surface-variant font-medium truncate">
-                Rank: <span className="text-on-surface font-bold">{user?.militaryRank || "Civilian"} Div I</span>
+                Rank: <span className="text-on-surface font-bold">{rankInfo.badge} {rankInfo.name} • {rankInfo.division}</span>
               </span>
               <span className="text-secondary font-bold shrink-0 ml-2">
                 {xpCurrent} / 500 XP

@@ -21,6 +21,13 @@ export const useUserStore = create<UserState>((set, get) => ({
     return user;
   },
   updateUser: async (updates) => {
+    const current = get().user;
+    if (!updates.militaryRank && (updates.streak !== undefined || updates.integrityScore !== undefined)) {
+      const streak = updates.streak !== undefined ? updates.streak : (current?.streak ?? 0);
+      const integrity = updates.integrityScore !== undefined ? updates.integrityScore : (current?.integrityScore ?? 100);
+      const { calculateRank } = await import('../utils/gamification');
+      updates.militaryRank = calculateRank(streak, integrity);
+    }
     const updated = await updateUserProfile(updates);
     set({ user: updated });
   },

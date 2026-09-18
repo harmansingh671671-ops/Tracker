@@ -4,31 +4,23 @@ export interface RankInfo {
   efficiency: number;
   badge: string;
   division: string;
+  description: string;
 }
 
 export const RANKS: RankInfo[] = [
-  { name: 'Civilian', streak: 0, efficiency: 0, badge: '🍃', division: 'Starter' },
-  { name: 'Sepoy', streak: 7, efficiency: 50, badge: '🎖️', division: 'Bronze' },
-  { name: 'Lance Naik', streak: 14, efficiency: 60, badge: '🎖️', division: 'Bronze' },
-  { name: 'Naik', streak: 21, efficiency: 65, badge: '🎖️', division: 'Bronze' },
-  { name: 'Havaldar', streak: 30, efficiency: 70, badge: '🎖️', division: 'Bronze' },
-  { name: 'Naib Subedar', streak: 45, efficiency: 75, badge: '💂', division: 'Silver' },
-  { name: 'Subedar', streak: 60, efficiency: 75, badge: '💂', division: 'Silver' },
-  { name: 'Subedar Major', streak: 75, efficiency: 80, badge: '💂', division: 'Silver' },
-  { name: 'Lieutenant', streak: 90, efficiency: 80, badge: '⚔️', division: 'Gold' },
-  { name: 'Captain', streak: 120, efficiency: 82, badge: '⚔️', division: 'Gold' },
-  { name: 'Major', streak: 150, efficiency: 85, badge: '⚔️', division: 'Gold' },
-  { name: 'Lt. Colonel', streak: 180, efficiency: 85, badge: '⚔️', division: 'Gold' },
-  { name: 'Colonel', streak: 210, efficiency: 85, badge: '⚔️', division: 'Gold' },
-  { name: 'Brigadier', streak: 250, efficiency: 88, badge: '⭐', division: 'Platinum' },
-  { name: 'Maj. General', streak: 300, efficiency: 90, badge: '⭐⭐', division: 'Platinum' },
-  { name: 'Lt. General', streak: 365, efficiency: 90, badge: '⭐⭐⭐', division: 'Platinum' },
-  { name: 'General', streak: 500, efficiency: 92, badge: '👑', division: 'Platinum' },
-  { name: 'Field Marshal', streak: 730, efficiency: 95, badge: '🏆', division: 'GOAT' }
+  { name: 'Beginner', streak: 0, efficiency: 0, badge: '🌱', division: 'Starter', description: 'Taking the first steps on your daily journey' },
+  { name: 'Novice', streak: 7, efficiency: 50, badge: '🧭', division: 'Bronze', description: '1 week completed: finding your daily rhythm' },
+  { name: 'Builder', streak: 14, efficiency: 60, badge: '🔨', division: 'Bronze', description: '2 weeks completed: actively building strong habits' },
+  { name: 'Consistent', streak: 30, efficiency: 70, badge: '⚡', division: 'Silver', description: '1 full month of reliable daily routine' },
+  { name: 'Specialist', streak: 60, efficiency: 75, badge: '🎯', division: 'Silver', description: '2 months: steady focus and proven discipline' },
+  { name: 'Expert', streak: 90, efficiency: 80, badge: '⚔️', division: 'Gold', description: '3 months (1 quarter) of high consistency' },
+  { name: 'Pro', streak: 180, efficiency: 85, badge: '🌟', division: 'Gold', description: 'Half a year of continuous dedication' },
+  { name: 'Master', streak: 270, efficiency: 85, badge: '💎', division: 'Platinum', description: '9 months of self-mastery and excellence' },
+  { name: 'Legend', streak: 365, efficiency: 90, badge: '👑', division: 'Diamond', description: '1 full year of unbroken discipline' }
 ];
 
 export function calculateRank(streak: number = 0, efficiency: number = 100): string {
-  let eligibleRank = 'Civilian';
+  let eligibleRank = RANKS[0].name;
   for (const rank of RANKS) {
     if (streak >= rank.streak && efficiency >= rank.efficiency) {
       eligibleRank = rank.name;
@@ -37,7 +29,16 @@ export function calculateRank(streak: number = 0, efficiency: number = 100): str
   return eligibleRank;
 }
 
-export function getRankInfo(rankName: string): RankInfo {
-  return RANKS.find(r => r.name === rankName) || RANKS[0];
+export function getRankInfo(rankName?: string): RankInfo {
+  if (!rankName || rankName === 'Civilian' || rankName === 'Explorer') return RANKS[0];
+  const found = RANKS.find(r => r.name.toLowerCase() === rankName.toLowerCase());
+  return found || RANKS[0];
 }
 
+export function getNextRank(currentRankName: string): RankInfo | null {
+  const currentIndex = RANKS.findIndex(r => r.name.toLowerCase() === currentRankName.toLowerCase());
+  if (currentIndex >= 0 && currentIndex < RANKS.length - 1) {
+    return RANKS[currentIndex + 1];
+  }
+  return null;
+}

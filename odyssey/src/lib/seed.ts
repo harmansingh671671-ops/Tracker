@@ -32,7 +32,7 @@ export async function resetAllDataToZero(): Promise<Profile> {
     diamonds: 0,
     streak: 0,
     highestStreak: 0,
-    militaryRank: 'Civilian',
+    militaryRank: 'Beginner',
     integrityScore: 100,
     lastReviewDate: '',
     lastPlanDate: '',

@@ -15,6 +15,12 @@ export async function getOrCreateUser(): Promise<Profile> {
     if (user.diamonds === 240 && user.streak === 14 && user.militaryRank === 'Scholar') {
       return await resetAllDataToZero();
     }
+    // Automatically migrate legacy/military rank to the new practical rank
+    const modernRank = calculateRank(user.streak, user.integrityScore);
+    if (!user.militaryRank || user.militaryRank === 'Civilian' || user.militaryRank === 'Sepoy' || user.militaryRank === 'Explorer') {
+      user.militaryRank = modernRank;
+      await db.profiles.update(user.id, { militaryRank: modernRank });
+    }
     await seedInitialData(user.id);
     return user;
   }
@@ -30,7 +36,7 @@ export async function getOrCreateUser(): Promise<Profile> {
     diamonds: 0,
     streak: 0,
     highestStreak: 0,
-    militaryRank: 'Civilian',
+    militaryRank: 'Beginner',
     integrityScore: 100,
     lastReviewDate: '',
     lastPlanDate: '',
