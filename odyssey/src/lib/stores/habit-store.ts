@@ -45,11 +45,18 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   fetchHabits: async (userId, date) => {
     set({ loading: true });
-    const habits = await db.habits
+    let habits = await db.habits
       .where('userId')
       .equals(userId)
       .filter(h => !h.archivedAt)
       .toArray();
+
+    // Fallback: If no habits found for specific userId, load all unarchived habits
+    if (habits.length === 0) {
+      habits = await db.habits
+        .filter(h => !h.archivedAt)
+        .toArray();
+    }
 
     const logs = await db.habitLogs
       .where('[userId+date]')

@@ -20,6 +20,7 @@ import {
   Camera,
   Flashlight,
   CheckCircle2,
+  Fingerprint,
 } from "lucide-react";
 
 interface WallpaperPreviewProps {
@@ -70,9 +71,8 @@ export function WallpaperPreview({
     return build24HourlyBlocks(data.blocks);
   }, [data.blocks]);
 
-  // Adaptive count: show 7 blocks if 0 or 1 hobby, 6 blocks if 2+ hobbies
-  const hobbyCount = data.includeHobbies !== false ? (data.habits || []).slice(0, 4).length : 0;
-  const blockCount = hobbyCount <= 1 ? 7 : 6;
+  // 5 strictly hourly blocks with active hour dead-center
+  const blockCount = 5;
 
   // Centered rolling window with active hour dead center
   const centeredWindow = useMemo(() => {
@@ -162,8 +162,8 @@ export function WallpaperPreview({
       <div className="absolute top-[40%] -right-20 w-64 h-64 bg-emerald-950/20 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-slate-900/40 rounded-full blur-[90px] pointer-events-none" />
 
-      {/* 1. TOP SAFE ZONE (~22% height for OS Clock & Notifications) */}
-      <div className="relative w-full pt-3 px-6 flex flex-col items-center justify-between z-10" style={{ minHeight: "175px" }}>
+      {/* 1. TOP SAFE ZONE (~36% height for OS Clock & Notifications) */}
+      <div className="relative w-full pt-3 px-6 flex flex-col items-center justify-between z-10" style={{ minHeight: "220px" }}>
         {/* Status Bar */}
         <div className="w-full flex items-center justify-between text-xs text-white/35 font-mono pt-1">
           <span className="text-[11px] font-semibold text-white/45 tracking-tight">{timeStr}</span>
@@ -181,22 +181,26 @@ export function WallpaperPreview({
           </div>
         </div>
 
-        {/* Lockscreen Clock Simulation (Optional Guide) */}
+        {/* Lockscreen Clock Simulation (Matches real Android lockscreen) */}
         {showClockGuide ? (
-          <div className="flex flex-col items-center text-center my-auto pt-1 animate-in fade-in duration-300">
-            <span className="text-[10px] font-semibold tracking-[0.25em] uppercase text-white/30 font-mono">
+          <div className="flex flex-col items-center text-center my-auto pt-2 animate-in fade-in duration-300 w-full">
+            <span className="text-[11px] font-semibold tracking-[0.25em] uppercase text-white/40 font-mono">
               {data.formattedDate}
             </span>
-            <span className="text-5xl sm:text-6xl font-extralight tracking-tight text-white/30 my-0.5 font-mono">
+            <span className="text-5xl sm:text-6xl font-light tracking-tight text-white/50 my-1 font-mono">
               {timeStr}
             </span>
-            <span className="text-[9.5px] font-mono tracking-widest text-emerald-400/50 uppercase flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 inline-block animate-pulse" />
-              Focus Session Active
-            </span>
-            <span className="text-[8px] font-mono uppercase tracking-widest text-white/20 border border-white/5 px-2 py-0.5 rounded-full mt-1">
-              Preview Simulation Guide
-            </span>
+
+            {/* Simulated notification pill guide */}
+            <div className="w-[85%] max-w-[280px] p-2 rounded-2xl bg-slate-800/40 border border-white/10 flex items-center justify-between gap-2 mt-1">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 text-xs">
+                  ⚡
+                </div>
+                <span className="text-[10px] text-white/50 font-sans font-medium">Android System • 1 notif</span>
+              </div>
+              <span className="text-[9px] text-white/30 font-mono">Just now</span>
+            </div>
           </div>
         ) : (
           <div className="my-auto flex flex-col items-center justify-center py-6 text-center">
@@ -205,66 +209,6 @@ export function WallpaperPreview({
             </span>
           </div>
         )}
-      </div>
-
-      {/* 2. HEADER ANCHOR CARD */}
-      <div className="px-4.5 w-full z-10 mt-1">
-        <div className="rounded-2xl p-3 bg-[#13151D]/80 border border-white/10 backdrop-blur-md flex items-center justify-between shadow-lg">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9.5px] tracking-[0.2em] font-mono uppercase text-slate-400 font-bold">
-                ODYSSEY • CH. 0{data.chapter}
-              </span>
-              <span className="w-1 h-1 rounded-full bg-slate-600" />
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-bold">
-                DAY {data.activeDay} OF 365
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-xs font-bold text-white tracking-tight flex items-center gap-1">
-                <span>{data.rankBadge}</span>
-                <span>{data.rankName}</span>
-              </span>
-              <span className="text-[10.5px] text-slate-400 font-medium">
-                • Level {String(data.userLevel).padStart(2, "0")} Cadence
-              </span>
-            </div>
-          </div>
-
-          {/* Radial Planned Hours Gauge */}
-          <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-            <div className="relative w-9 h-9 flex items-center justify-center">
-              <svg className="w-9 h-9 transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-800 stroke-current"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  strokeWidth="3"
-                />
-                <path
-                  className="text-emerald-400 stroke-current"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  strokeDasharray={`${plannedPercent}, 100`}
-                  strokeLinecap="round"
-                  strokeWidth="3.2"
-                />
-              </svg>
-              <span className="absolute text-[8.5px] font-mono font-bold text-slate-200">
-                {plannedPercent}%
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[8.5px] font-mono uppercase tracking-wider text-slate-400 font-medium">
-                Planned
-              </span>
-              <span className="text-[11px] font-mono font-bold text-emerald-400">
-                {effectivePlannedHours}/24<span className="text-[9px] text-slate-400 font-normal">h</span>
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* 3. CORE 24-HOUR SPECTRUM BAR */}
@@ -396,61 +340,62 @@ export function WallpaperPreview({
         })}
       </div>
 
-      {/* 5. CADENCE HOBBIES (Adjusted for 1, 2, 3, or 4 user-added hobbies; hidden completely if 0) */}
-      {data.includeHobbies !== false && data.habits && data.habits.length > 0 && (() => {
-        const userHobbies = data.habits.slice(0, 4);
-        const count = userHobbies.length;
-
-        return (
-          <div className="px-4.5 pt-1 flex flex-col gap-1.5 z-10 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between px-0.5">
-              <span className="text-[9.5px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                CADENCE • HOBBIES &amp; PASSIONS
+      {/* 5. HEADER ANCHOR CARD (Positioned in comfortable mid-lower screen, below schedule) */}
+      <div className="px-4.5 pt-1.5 z-10 animate-in fade-in duration-300">
+        <div className="rounded-2xl p-3 bg-[#13151D]/75 border border-white/10 backdrop-blur-md flex items-center justify-between shadow-lg">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[9.5px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold">
+                ODYSSEY • CH. 0{data.chapter}
               </span>
-              <span className="text-[8.5px] font-mono text-slate-500 font-medium">
-                {count} ACTIVE {count === 1 ? "TRACK" : "TRACKS"}
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
+                DAY {data.activeDay} OF 365
               </span>
             </div>
+            <div className="text-[14px] font-bold text-slate-100 flex items-center gap-1.5">
+              <span>{data.rankBadge}</span>
+              <span>{data.rankName}</span>
+            </div>
+            <span className="text-[9.5px] text-slate-400 font-medium">
+              Level {String(data.userLevel).padStart(2, "0")} Cadence
+            </span>
+          </div>
 
-            <div
-              className={`grid gap-1.5 ${
-                count === 1 ? "grid-cols-1" : "grid-cols-2"
-              }`}
-            >
-              {userHobbies.map((h, hIdx) => {
-                const isThirdWide = count === 3 && hIdx === 2;
-                return (
-                  <div
-                    key={h.id || hIdx}
-                    className={`rounded-xl p-2 bg-[#13151D]/60 border border-white/10 flex flex-col justify-between gap-1 transition-all ${
-                      isThirdWide ? "col-span-2" : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <span className="text-base">{resolveHobbyEmoji(h.icon, h.name)}</span>
-                      <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold">
-                        {h.currentStreak || 0}d 🔥
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-[10.5px] font-bold text-slate-100 truncate">
-                        {h.name}
-                      </div>
-                      <div className="text-[8.5px] text-slate-400 truncate">
-                        {h.category || "Passion Track"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* 24H Planned Radial Gauge */}
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <div className="text-[8px] font-mono text-slate-400 font-semibold uppercase">PLANNED</div>
+              <div className="text-[11px] font-mono font-bold text-emerald-400">{effectivePlannedHours}/24h</div>
+            </div>
+            <div className="relative w-12 h-12 flex items-center justify-center">
+              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-slate-800"
+                  strokeWidth="3.5"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-emerald-500 transition-all duration-500"
+                  strokeDasharray={`${plannedPercent}, 100`}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <span className="absolute text-[9.5px] font-mono font-bold text-slate-200">
+                {plannedPercent}%
+              </span>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      </div>
 
-      {/* 6. DAILY CADENCE DIRECTIVE & INTEGRITY CARD (Fills the screen like the App!) */}
-      <div className="px-4.5 pt-2 z-10 animate-in fade-in duration-300">
+      {/* 6. DAILY CADENCE DIRECTIVE & INTEGRITY CARD */}
+      <div className="px-4.5 pt-1.5 z-10 animate-in fade-in duration-300">
         <div className="rounded-2xl p-2.5 sm:p-3 bg-[#13151D]/80 border border-white/10 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
           <div className="flex items-center justify-between">
             <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-amber-400 font-bold flex items-center gap-1">
@@ -462,7 +407,7 @@ export function WallpaperPreview({
             </span>
           </div>
 
-          <p className="text-[10.5px] text-slate-300 font-medium leading-relaxed">
+          <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
             {activeHour >= 21 || activeHour < 6
               ? "Honor your circadian recovery. Deep rest fuels tomorrow's uninterrupted focus."
               : activeHour >= 12 && activeHour < 14
@@ -487,29 +432,31 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 7. BOTTOM SAFE ZONE (~18% height for Flashlight, Camera & Home Bar) */}
-      <div className="w-full px-7 pb-3 pt-3 mt-auto flex flex-col justify-end z-10">
-        <div className="w-full flex items-center justify-between text-white/20 select-none pointer-events-none mb-3">
-          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+      {/* 7. BOTTOM SAFE ZONE (Matches Real Android Fingerprint & Shortcuts) */}
+      <div className="w-full px-7 pb-4 pt-3 mt-auto flex flex-col items-center justify-end z-10">
+        <div className="w-full flex items-center justify-between text-white/30 select-none pointer-events-none mb-2">
+          {/* Flashlight button */}
+          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shadow-sm">
             <Flashlight className="w-4 h-4" />
           </div>
 
-          <div className="flex flex-col items-center text-center">
-            <span className="text-[8px] font-mono tracking-[0.2em] text-white/30 uppercase font-bold">
-              ODYSSEY LOCKSCREEN
-            </span>
-            <span className="text-[8.5px] text-white/25 font-light">Swipe up to unlock</span>
+          {/* Real Android in-display fingerprint sensor guide */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-12 h-12 rounded-full border border-white/15 flex items-center justify-center text-white/35 bg-white/[0.02]">
+              <Fingerprint className="w-7 h-7" />
+            </div>
           </div>
 
-          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+          {/* Camera button */}
+          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shadow-sm">
             <Camera className="w-4 h-4" />
           </div>
         </div>
 
-        {/* iOS Home Bar Indicator */}
-        <div className="w-full flex justify-center items-center">
-          <div className="w-28 h-1 bg-white/25 rounded-full" />
-        </div>
+        {/* Subtle Brand Tag */}
+        <span className="text-[7.5px] font-mono tracking-[0.25em] text-white/20 uppercase font-semibold">
+          ODYSSEY CADENCE LOCKSCREEN
+        </span>
       </div>
     </div>
   );

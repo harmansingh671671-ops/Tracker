@@ -1,4 +1,10 @@
-import { type WallpaperData, generateWallpaperCanvas, shareWallpaper, downloadWallpaper } from "./wallpaper-generator";
+import { type WallpaperData, generateWallpaperCanvas } from "./wallpaper-generator";
+
+export interface NativeWallpaperResult {
+  success: boolean;
+  method: "native_bridge" | "native_share" | "web_browser_unsupported" | "error";
+  message: string;
+}
 
 declare global {
   interface Window {
@@ -19,13 +25,10 @@ declare global {
       disableHourlyAutoUpdate?: () => boolean;
       isHourlyAutoUpdateEnabled?: () => boolean;
     };
-    Capacitor?: {
-      Plugins?: {
-        Wallpaper?: {
-          setWallpaper?: (options: { image: string; target?: string }) => Promise<{ success: boolean }>;
-        };
-      };
+    AndroidWallpaper?: {
+      setWallpaper?: (base64Image: string, target?: string) => boolean;
     };
+    Capacitor?: any;
   }
 }
 
@@ -50,53 +53,48 @@ export function isAndroidApp(): boolean {
 }
 
 /**
- * Directly sets the lockscreen wallpaper via Android native APIs if running in an APK,
- * or smoothly falls back to the native OS share sheet.
+ * Sends wallpaper directly to native Android lockscreen via JavaScript interface.
+ * If running inside the Odyssey Native Android APK, this sets the lockscreen automatically with 0 clicks.
+ * If running in a standard web browser/PWA, web security prevents silent lockscreen alteration.
  */
-export async function setNativeLockscreen(
-  data: WallpaperData
-): Promise<{ success: boolean; method: "native_bridge" | "native_share"; message: string }> {
-  if (typeof window === "undefined") {
-    return { success: false, method: "native_bridge", message: "Window not available" };
-  }
-
-  // Generate the clean OLED wallpaper canvas without baked-in clock
+export async function setNativeLockscreen(data: WallpaperData): Promise<NativeWallpaperResult> {
   const canvas = await generateWallpaperCanvas({ ...data, showClockGuide: false });
   const dataUrl = canvas.toDataURL("image/png");
-  const base64Clean = dataUrl.replace(/^data:image\/png;base64,/, "");
 
-  // 1. Direct OdysseyAndroid Native Bridge
-  if (window.OdysseyAndroid && typeof window.OdysseyAndroid.setLockscreenWallpaper === "function") {
+  // 1. Check for Odyssey Native Android Bridge (WebView addJavascriptInterface)
+  if (typeof window !== "undefined" && window.OdysseyAndroid?.setLockscreenWallpaper) {
     try {
-      const res = window.OdysseyAndroid.setLockscreenWallpaper(base64Clean);
+      const ok = window.OdysseyAndroid.setLockscreenWallpaper(dataUrl);
       await syncScheduleDataToNative(data);
       return {
-        success: res !== false,
+        success: Boolean(ok),
         method: "native_bridge",
-        message: "Lockscreen wallpaper applied directly via native Android WallpaperManager!",
+        message: ok
+          ? "Lockscreen updated directly via Native Odyssey Bridge!"
+          : "Native bridge reported an issue applying wallpaper.",
       };
     } catch (e: any) {
-      console.warn("OdysseyAndroid native bridge error:", e);
+      console.warn("OdysseyAndroid bridge error:", e);
     }
   }
 
-  // 2. Standard Android JavascriptInterface
-  if (window.Android && typeof window.Android.setWallpaper === "function") {
+  // 2. Check for generic Android wallpaper interface
+  if (typeof window !== "undefined" && window.Android?.setWallpaper) {
     try {
-      window.Android.setWallpaper(base64Clean);
+      window.Android.setWallpaper(dataUrl);
       await syncScheduleDataToNative(data);
       return {
         success: true,
         method: "native_bridge",
-        message: "Lockscreen wallpaper updated directly!",
+        message: "Lockscreen updated directly via Android bridge!",
       };
     } catch (e: any) {
-      console.warn("Android JavascriptInterface error:", e);
+      console.warn("Android bridge error:", e);
     }
   }
 
-  // 3. Capacitor Wallpaper Plugin
-  if (window.Capacitor?.Plugins?.Wallpaper?.setWallpaper) {
+  // 3. Check for Capacitor native bridge
+  if (typeof window !== "undefined" && window.Capacitor?.Plugins?.Wallpaper?.setWallpaper) {
     try {
       const res = await window.Capacitor.Plugins.Wallpaper.setWallpaper({
         image: dataUrl,
@@ -113,18 +111,12 @@ export async function setNativeLockscreen(
     }
   }
 
-  // 4. Fallback for Web/PWA: Save directly to gallery (no confusing messenger share sheets)
-  try {
-    const filename = `odyssey-day-${data.activeDay}-lockscreen.png`;
-    await downloadWallpaper(data, filename);
-    return {
-      success: true,
-      method: "native_share",
-      message: "Wallpaper saved to your Gallery! Open Photos → 3 Dots (⋮) → 'Set as Lock Screen'.",
-    };
-  } catch (err: any) {
-    return { success: false, method: "native_share", message: err.message || "Failed to save wallpaper" };
-  }
+  // 4. Web Browser / PWA Sandbox Notice (NO PNG downloading)
+  return {
+    success: false,
+    method: "web_browser_unsupported",
+    message: "Web browsers cannot modify your phone's lockscreen due to Android OS security sandboxing. This requires the compiled Native APK.",
+  };
 }
 
 /**

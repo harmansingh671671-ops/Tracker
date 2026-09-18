@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Odyssey</string>
+    <string name="default_vercel_url">https://odyssey-dun-rho.vercel.app</string>
+    <string name="wallpaper_description">Dynamic hourly habit and cadence lockscreen wallpaper that centers the active hour.</string>
+    <style name="Theme.Odyssey" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+    </style>
+</resources>
