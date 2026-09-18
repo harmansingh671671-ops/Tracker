@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Smartphone } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getRankInfo, calculateRank } from "@/lib/utils/gamification";
 
@@ -137,7 +139,19 @@ export function Header() {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-outline/10">
+            <div className="pt-2 border-t border-outline/10 space-y-2">
+              <Link
+                href="/wallpaper"
+                onClick={() => setShowProfile(false)}
+                className="w-full py-2 px-3 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-[12px] font-medium flex items-center justify-between transition-colors border border-outline/15 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-primary" />
+                  <span>Lockscreen Wallpaper</span>
+                </div>
+                <span className="text-[10px] font-mono text-primary font-bold">Open →</span>
+              </Link>
+
               <button
                 onClick={async () => {
                   if (window.confirm('Reset all progress to zero (Level 1, 0 XP, 0 Diamonds, 0 Streak)?')) {

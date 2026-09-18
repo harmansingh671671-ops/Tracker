@@ -1,9 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
+import { useWallpaperStore } from "@/lib/stores/wallpaper-store";
 import { type ScheduleBlock } from "@/lib/db";
 import {
   ArrowLeft,
@@ -20,6 +22,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Smartphone,
 } from "lucide-react";
 
 // Normalized category types
@@ -114,6 +117,7 @@ function PlannerContent() {
     deleteBlock,
     autoFillSleep,
   } = useScheduleStore();
+  const wallpaperEnabled = useWallpaperStore((s) => s.enabled);
 
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [autoFillLocked, setAutoFillLocked] = useState<boolean>(false);
@@ -754,8 +758,17 @@ function PlannerContent() {
             )}
           </div>
 
-          {/* Quick Header Actions: Auto-fill Sleep */}
+          {/* Quick Header Actions: Wallpaper & Auto-fill Sleep */}
           <div className="flex items-center gap-1.5 shrink-0">
+            <Link
+              href="/wallpaper"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-surface-container-high text-primary hover:bg-surface-bright active:scale-95 transition-all shadow-sm border border-primary/20 shrink-0 text-xs font-semibold cursor-pointer"
+              title="Lockscreen Schedule Wallpaper"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-primary" />
+              <span className="hidden xs:inline">Wallpaper</span>
+            </Link>
+
             <button
               onClick={handleAutoFillSleep}
               className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-surface-container-high text-secondary hover:bg-surface-bright active:scale-95 transition-all shadow-sm border border-secondary/20 shrink-0 text-xs font-semibold cursor-pointer"
@@ -846,6 +859,32 @@ function PlannerContent() {
             </div>
           </div>
         </div>
+
+        {/* Lockscreen Wallpaper Prompt Banner (Shown when enabled) */}
+        {wallpaperEnabled && isSelectedToday && (
+          <Link
+            href="/wallpaper"
+            className="w-full p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-primary/10 via-surface-container-low to-surface-container border border-primary/25 hover:border-primary/45 shadow-xs flex items-center justify-between gap-2.5 transition-all group cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0 group-hover:scale-105 transition-transform">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-primary truncate">
+                  Lockscreen Cadence Ready
+                </span>
+                <span className="text-xs font-semibold text-on-surface truncate">
+                  Set today's schedule &amp; hobbies on your phone wallpaper
+                </span>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono text-primary font-bold shrink-0 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>Export</span>
+              <span>→</span>
+            </span>
+          </Link>
+        )}
 
         {/* Category Filters */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-medium">
