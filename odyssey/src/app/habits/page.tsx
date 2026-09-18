@@ -31,7 +31,6 @@ export default function HabitsPage() {
     deleteHabit,
     clearAllHabits,
     claimTemporaryWallet,
-    simulateYesterdayRewards,
   } = useHabitStore();
 
   const [activeFilter, setActiveFilter] = useState<string>("all");
@@ -143,13 +142,6 @@ export default function HabitsPage() {
       setToastMsg(`🎉 Claimed +${claimedXp} XP & +${claimedDiamonds} 💎 to your main balance!`);
       setTimeout(() => setToastMsg(null), 3500);
     }
-  };
-
-  const handleSimulateYesterday = async () => {
-    if (!user) return;
-    await simulateYesterdayRewards(user.id, today);
-    setToastMsg("Simulated yesterday check-ins! Temporary wallet ready to claim.");
-    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const renderHabitCard = (habit: Habit) => {
@@ -323,20 +315,12 @@ export default function HabitsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant/80 pt-1 border-t border-outline/10">
+            <div className="text-[11px] font-mono text-on-surface-variant/80 pt-1 border-t border-outline/10">
               <span>
                 {completed > 0
                   ? `${completed} hobbies checked in today. Moves to your wallet at midnight!`
                   : "Check in hobbies today to build tomorrow's rewards."}
               </span>
-              <button
-                type="button"
-                onClick={handleSimulateYesterday}
-                title="Simulate yesterday check-ins to test claiming"
-                className="text-[10px] text-zinc-500 hover:text-primary transition-colors underline cursor-pointer shrink-0 ml-2"
-              >
-                Simulate Day End
-              </button>
             </div>
           </section>
         )}

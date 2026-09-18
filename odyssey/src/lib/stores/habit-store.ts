@@ -23,7 +23,6 @@ interface HabitState {
   fetchHabits: (userId: string, date: string) => Promise<void>;
   fetchTemporaryWallet: (userId: string, today: string) => Promise<void>;
   claimTemporaryWallet: (userId: string, today: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
-  simulateYesterdayRewards: (userId: string, today: string) => Promise<void>;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'currentStreak' | 'longestStreak' | 'totalCompletions'>) => Promise<Habit>;
   toggleHabitLog: (userId: string, habitId: string, date: string) => Promise<boolean>;
   deleteHabit: (id: string) => Promise<void>;
@@ -148,56 +147,6 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
     await get().fetchTemporaryWallet(userId, today);
     return { claimedXp: totalXp, claimedDiamonds: totalDiamonds };
-  },
-
-  simulateYesterdayRewards: async (userId, today) => {
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    let habits = get().habits;
-
-    if (habits.length === 0) {
-      const sampleHabit = await get().addHabit({
-        userId,
-        name: 'Creative Project & Flow',
-        icon: 'sparkles',
-        category: 'growth',
-        period: 'morning',
-        timeOfDay: '08:00 AM',
-        frequency: 'daily',
-      });
-      habits = [sampleHabit];
-    }
-
-    // Add completed logs for yesterday for up to 2 habits
-    for (const h of habits.slice(0, 2)) {
-      const existing = await db.habitLogs
-        .where('[userId+date]')
-        .equals([userId, yesterday])
-        .filter(l => l.habitId === h.id)
-        .first();
-
-      if (!existing) {
-        await db.habitLogs.add({
-          id: uuidv4(),
-          habitId: h.id,
-          userId,
-          date: yesterday,
-          completed: true,
-          loggedAt: new Date().toISOString(),
-        });
-      } else if (!existing.completed) {
-        await db.habitLogs.update(existing.id, { completed: true });
-      }
-    }
-
-    // Ensure yesterday is unclaimed in localStorage
-    const key = `odyssey_claimed_habit_rewards_${userId}`;
-    try {
-      let claimed: string[] = JSON.parse(localStorage.getItem(key) || '[]');
-      claimed = claimed.filter(d => d !== yesterday);
-      localStorage.setItem(key, JSON.stringify(claimed));
-    } catch {}
-
-    await get().fetchTemporaryWallet(userId, today);
   },
 
   addHabit: async (habitData) => {
