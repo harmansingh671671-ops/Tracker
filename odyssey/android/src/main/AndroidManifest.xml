@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.odyssey.tracker">
+
+    <!-- Normal install-time permission: ZERO runtime popup dialogs (100% user trust & safety) -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="true"
+        android:label="Odyssey"
+        android:supportsRtl="true">
+
+        <!-- Odyssey Real-Time Dynamic Lockscreen Wallpaper Service -->
+        <service
+            android:name=".OdysseyLiveWallpaperService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Odyssey Live Cadence"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
+
+        <!-- Odyssey Hourly Background Auto-Update Receiver -->
+        <receiver
+            android:name=".OdysseyHourlyWallpaperWorker"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.odyssey.tracker.ACTION_HOURLY_WALLPAPER_UPDATE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

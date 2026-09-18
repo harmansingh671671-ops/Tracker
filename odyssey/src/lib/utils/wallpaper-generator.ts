@@ -422,8 +422,14 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     curLegX += legSpacing;
   }
 
-  // 6. CORE SCHEDULE TIMELINE CARDS (Centered on Active Hour)
-  const timelineHeaderY = 765;
+  // 6. ADAPTIVE SCHEDULE TIMELINE CARDS (Centered on Active Hour)
+  const userHobbies = data.includeHobbies !== false ? getDisplayHobbies(data.habits) : [];
+  const hobbyCount = userHobbies.length;
+  // Adaptive count: show 7 blocks if 0 or 1 hobby, 6 blocks if 2+ hobbies
+  const blockCount = hobbyCount <= 1 ? 7 : 6;
+  const displayBlocks = getCenteredHourlyWindow(allHourlyBlocks, currentHour, blockCount);
+
+  const timelineHeaderY = 675;
   ctx.font = "700 19px 'JetBrains Mono', monospace";
   ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
   ctx.fillText("SCHEDULE • ACTIVE HOUR CENTERED", cardPad + 10, timelineHeaderY);
@@ -434,12 +440,9 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillText(`● ${String(currentHour).padStart(2, "0")}:00 ACTIVE`, cardPad + cardW - 10, timelineHeaderY);
   ctx.textAlign = "left";
 
-  const timelineStartY = 790;
-  const cardHeight = 86;
-  const cardGap = 14;
-
-  // 5 hourly blocks centered on currentHour (offset: -2, -1, 0[ACTIVE], +1, +2)
-  const displayBlocks = getCenteredHourlyWindow(allHourlyBlocks, currentHour, 5);
+  const timelineStartY = 700;
+  const cardHeight = 94;
+  const cardGap = 12;
 
   displayBlocks.forEach((block, idx) => {
     const cardY = timelineStartY + idx * (cardHeight + cardGap);
@@ -450,9 +453,19 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
 
     // Card background
     if (isActive) {
+      // Amber ambient outer glow
+      const activeGlow = ctx.createRadialGradient(
+        cardPad + cardW / 2, cardY + cardHeight / 2, 50,
+        cardPad + cardW / 2, cardY + cardHeight / 2, cardW / 2
+      );
+      activeGlow.addColorStop(0, "rgba(245, 158, 11, 0.12)");
+      activeGlow.addColorStop(1, "rgba(245, 158, 11, 0)");
+      ctx.fillStyle = activeGlow;
+      ctx.fillRect(cardPad - 15, cardY - 10, cardW + 30, cardHeight + 20);
+
       ctx.fillStyle = "#161924";
-      ctx.strokeStyle = "rgba(245, 158, 11, 0.85)";
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.9)";
+      ctx.lineWidth = 2.5;
     } else {
       ctx.fillStyle = isPast ? "rgba(19, 21, 29, 0.45)" : "rgba(19, 21, 29, 0.72)";
       ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
@@ -460,7 +473,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     }
 
     ctx.beginPath();
-    ctx.roundRect(cardPad, cardY, cardW, cardHeight, 20);
+    ctx.roundRect(cardPad, cardY, cardW, cardHeight, 18);
     ctx.fill();
     ctx.stroke();
 
@@ -468,20 +481,19 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     if (isActive) {
       ctx.fillStyle = "#f59e0b";
       ctx.beginPath();
-      ctx.roundRect(cardPad, cardY, 7, cardHeight, [20, 0, 0, 20]);
+      ctx.roundRect(cardPad, cardY, 7, cardHeight, [18, 0, 0, 18]);
       ctx.fill();
     }
 
     // Left Status Dot / Beacon
-    const dotX = cardPad + 32;
+    const dotX = cardPad + 30;
     const dotY = cardY + cardHeight / 2;
     if (isActive) {
-      // Pulsing outer beacon
-      ctx.fillStyle = "rgba(245, 158, 11, 0.3)";
+      ctx.fillStyle = "rgba(245, 158, 11, 0.35)";
       ctx.beginPath();
       ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
       ctx.fill();
-      // Solid inner core
+
       ctx.fillStyle = "#f59e0b";
       ctx.beginPath();
       ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
@@ -497,9 +509,9 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     const cleanTime = `${block.startTime} → ${block.endTime}`;
     ctx.font = isActive ? "700 21px 'JetBrains Mono', monospace" : "600 19px 'JetBrains Mono', monospace";
     ctx.fillStyle = isActive ? "#fef08a" : isPast ? "rgba(203, 213, 225, 0.7)" : "#94a3b8";
-    ctx.fillText(cleanTime, cardPad + 56, cardY + 52);
+    ctx.fillText(cleanTime, cardPad + 52, cardY + 55);
 
-    // Category Chip (Pill at cardPad + 265)
+    // Category Chip (Pill)
     const cat = (block.category || "work").toLowerCase();
     const catLabel = cat.includes("sleep") ? "Rest" : cat.includes("habit") || cat.includes("vitality") ? "Vitality" : cat.includes("sync") ? "Sync" : "Deep Focus";
     const chipX = cardPad + 265;
@@ -510,52 +522,48 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     ctx.strokeStyle = isActive ? "rgba(245, 158, 11, 0.45)" : "rgba(255, 255, 255, 0.1)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(chipX, cardY + 27, chipW, 32, 10);
+    ctx.roundRect(chipX, cardY + 30, chipW, 32, 10);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = isActive ? "#fde047" : "#e2e8f0";
-    ctx.fillText(catLabel, chipX + 12, cardY + 49);
+    ctx.fillText(catLabel, chipX + 12, cardY + 52);
 
     // RIGHT SIDE: Block Title & Status Indicators (Right-aligned to PREVENT ANY OVERLAP)
     ctx.textAlign = "right";
 
     if (isActive) {
-      // Golden 'NOW' badge on top right
-      ctx.font = "700 15px 'JetBrains Mono', monospace";
+      ctx.font = "700 14px 'JetBrains Mono', monospace";
       ctx.fillStyle = "#f59e0b";
-      ctx.fillText("● ACTIVE NOW", cardPad + cardW - 30, cardY + 38);
+      ctx.fillText("● ACTIVE NOW", cardPad + cardW - 26, cardY + 40);
 
-      // Title below
       ctx.font = "700 22px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(truncateText(ctx, block.title || "Scheduled Focus", 360), cardPad + cardW - 30, cardY + 66);
+      ctx.fillText(truncateText(ctx, block.title || "Scheduled Focus", 360), cardPad + cardW - 26, cardY + 69);
     } else if (isPast) {
-      // Green checkmark
       ctx.fillStyle = "#10b981";
       ctx.font = "700 20px sans-serif";
-      ctx.fillText("✓", cardPad + cardW - 30, cardY + 52);
+      ctx.fillText("✓", cardPad + cardW - 26, cardY + 55);
 
-      // Title right-aligned ending before checkmark
       ctx.font = "600 20px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "rgba(203, 213, 225, 0.85)";
-      ctx.fillText(truncateText(ctx, block.title || "Focus", 380), cardPad + cardW - 65, cardY + 52);
+      ctx.fillText(truncateText(ctx, block.title || "Focus", 380), cardPad + cardW - 60, cardY + 55);
     } else {
-      // Upcoming title right-aligned
       ctx.font = "600 20px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "#cbd5e1";
-      ctx.fillText(truncateText(ctx, block.title || "Scheduled", 420), cardPad + cardW - 30, cardY + 52);
+      ctx.fillText(truncateText(ctx, block.title || "Scheduled", 420), cardPad + cardW - 26, cardY + 55);
     }
 
     ctx.textAlign = "left";
   });
 
-  // 7. CADENCE HOBBIES (Adjust dynamically for 1, 2, 3, or 4 user hobbies; omit completely if 0)
-  const userHobbies = getDisplayHobbies(data.habits);
-  if (data.includeHobbies !== false && userHobbies.length > 0) {
-    const hobbiesY = 1350;
-    const count = userHobbies.length;
+  const timelineEndHeight = timelineStartY + blockCount * (cardHeight + cardGap);
 
+  // 7. CADENCE HOBBIES (Adjust dynamically for 0, 1, 2, 3, or 4 user hobbies)
+  let currentYAfterHobbies = timelineEndHeight + 15;
+
+  if (hobbyCount > 0) {
+    const hobbiesY = currentYAfterHobbies + 10;
     ctx.font = "700 19px 'JetBrains Mono', monospace";
     ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
     ctx.fillText("CADENCE • HOBBIES & PASSIONS", cardPad + 10, hobbiesY);
@@ -563,28 +571,28 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     ctx.textAlign = "right";
     ctx.font = "600 17px 'JetBrains Mono', monospace";
     ctx.fillStyle = "rgba(100, 116, 139, 0.8)";
-    ctx.fillText(`${count} ACTIVE ${count === 1 ? "TRACK" : "TRACKS"}`, cardPad + cardW - 10, hobbiesY);
+    ctx.fillText(`${hobbyCount} ACTIVE ${hobbyCount === 1 ? "TRACK" : "TRACKS"}`, cardPad + cardW - 10, hobbiesY);
     ctx.textAlign = "left";
 
-    const gridY = hobbiesY + 20;
-    const gridGap = 16;
+    const gridY = hobbiesY + 16;
+    const gridGap = 14;
     const halfColW = (cardW - gridGap) / 2;
-    const cellH = 130;
+    const cellH = hobbyCount <= 2 ? 115 : 108;
 
     userHobbies.forEach((hob, hIdx) => {
       let hX = cardPad;
       let hY = gridY;
       let cellW = cardW;
 
-      if (count === 1) {
+      if (hobbyCount === 1) {
         cellW = cardW;
         hX = cardPad;
         hY = gridY;
-      } else if (count === 2) {
+      } else if (hobbyCount === 2) {
         cellW = halfColW;
         hX = cardPad + hIdx * (halfColW + gridGap);
         hY = gridY;
-      } else if (count === 3) {
+      } else if (hobbyCount === 3) {
         if (hIdx < 2) {
           cellW = halfColW;
           hX = cardPad + hIdx * (halfColW + gridGap);
@@ -602,64 +610,170 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
         hY = gridY + row * (cellH + gridGap);
       }
 
-      // Card Box (Matches screen.png)
+      // Card Box
       ctx.fillStyle = "rgba(19, 21, 29, 0.65)";
       ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(hX, hY, cellW, cellH, 20);
+      ctx.roundRect(hX, hY, cellW, cellH, 18);
       ctx.fill();
       ctx.stroke();
 
-      // Top Icon Box (38x38 rounded container)
-      const iconBoxSize = 38;
+      // Top Icon Box (34x34 rounded container)
+      const iconBoxSize = 34;
       ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
       ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(hX + 18, hY + 16, iconBoxSize, iconBoxSize, 10);
+      ctx.roundRect(hX + 16, hY + 14, iconBoxSize, iconBoxSize, 8);
       ctx.fill();
       ctx.stroke();
 
       // Emoji drawn centered inside icon box
-      ctx.font = "20px 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
+      ctx.font = "18px 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(hob.icon, hX + 18 + iconBoxSize / 2, hY + 16 + 27);
+      ctx.fillText(hob.icon, hX + 16 + iconBoxSize / 2, hY + 14 + 24);
       ctx.textAlign = "left";
 
       // Streak Pill on top-right
       ctx.textAlign = "right";
-      ctx.font = "700 17px 'JetBrains Mono', monospace";
+      ctx.font = "700 16px 'JetBrains Mono', monospace";
       ctx.fillStyle = "#f59e0b";
-      ctx.fillText(`${hob.streak}d 🔥`, hX + cellW - 20, hY + 38);
+      ctx.fillText(`${hob.streak}d 🔥`, hX + cellW - 18, hY + 36);
       ctx.textAlign = "left";
 
       // Title & Subtitle
-      ctx.font = "700 21px 'Plus Jakarta Sans', sans-serif";
+      ctx.font = "700 20px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "#f8fafc";
-      ctx.fillText(truncateText(ctx, hob.title, cellW - 40), hX + 20, hY + 84);
+      ctx.fillText(truncateText(ctx, hob.title, cellW - 36), hX + 18, hY + 74);
 
-      ctx.font = "500 16px 'Plus Jakarta Sans', sans-serif";
+      ctx.font = "500 15px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
-      ctx.fillText(truncateText(ctx, hob.sub, cellW - 40), hX + 20, hY + 112);
+      ctx.fillText(truncateText(ctx, hob.sub, cellW - 36), hX + 18, hY + 100);
     });
+
+    const hobbyRows = hobbyCount <= 2 ? 1 : 2;
+    currentYAfterHobbies = gridY + hobbyRows * (cellH + gridGap);
   }
 
-  // 8. BOTTOM SAFE ZONE (y: 2050 to 2340)
-  // Clean area for OS flashlight & camera lockscreen buttons
+  // 8. DAILY CADENCE DIRECTIVE & INTEGRITY CARD (Fills the screen like the App!)
+  // Eliminates the empty void and connects directly into the bottom safe zone
+  const directiveStartY = currentYAfterHobbies + 18;
+  const directiveMaxY = 2080;
+  const directiveHeight = Math.max(220, Math.min(360, directiveMaxY - directiveStartY));
+
+  if (directiveHeight >= 180) {
+    ctx.fillStyle = "rgba(19, 21, 29, 0.75)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(cardPad, directiveStartY, cardW, directiveHeight, 22);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top subtle gradient highlight in directive card
+    const cardGrad = ctx.createLinearGradient(cardPad, directiveStartY, cardPad + cardW, directiveStartY);
+    cardGrad.addColorStop(0, "rgba(99, 102, 241, 0.12)");
+    cardGrad.addColorStop(0.5, "rgba(245, 158, 11, 0.08)");
+    cardGrad.addColorStop(1, "rgba(16, 185, 129, 0.08)");
+    ctx.fillStyle = cardGrad;
+    ctx.beginPath();
+    ctx.roundRect(cardPad, directiveStartY, cardW, 40, [22, 22, 0, 0]);
+    ctx.fill();
+
+    // Card Header
+    ctx.font = "700 18px 'JetBrains Mono', monospace";
+    ctx.fillStyle = "rgba(245, 158, 11, 0.9)";
+    ctx.fillText("✦ DAILY CADENCE DIRECTIVE", cardPad + 25, directiveStartY + 45);
+
+    ctx.textAlign = "right";
+    ctx.font = "600 16px 'JetBrains Mono', monospace";
+    ctx.fillStyle = "#34d399";
+    ctx.fillText("DAY 06 / ACTIVE CADENCE", cardPad + cardW - 25, directiveStartY + 45);
+    ctx.textAlign = "left";
+
+    // Inspiring Cadence Mantra (Philosophy of Odyssey)
+    const mantra = currentHour >= 21 || currentHour < 6
+      ? "Honor your circadian recovery. Deep rest fuels tomorrow's uninterrupted focus."
+      : currentHour >= 12 && currentHour < 14
+      ? "Step back for mindful recovery. Mental clarity is renewed in deliberate pauses."
+      : "Protect your active focus blocks with absolute integrity. Momentum is built hour by hour.";
+
+    ctx.font = "500 20px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillText(truncateText(ctx, mantra, cardW - 50), cardPad + 25, directiveStartY + 90);
+
+    // 3 Metric Pills across the lower section of the card
+    const pillY = directiveStartY + 125;
+    const pillH = directiveHeight - 145;
+
+    if (pillH >= 50) {
+      const pillGap = 16;
+      const pillW = (cardW - 50 - pillGap * 2) / 3;
+
+      // Metric 1: Integrity
+      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.strokeStyle = "rgba(16, 185, 129, 0.25)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(cardPad + 25, pillY, pillW, pillH, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = "600 14px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+      ctx.fillText("INTEGRITY", cardPad + 40, pillY + 28);
+      ctx.font = "700 22px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "#34d399";
+      ctx.fillText("100% 🛡️", cardPad + 40, pillY + pillH - 16);
+
+      // Metric 2: Cadence Streak
+      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.25)";
+      ctx.beginPath();
+      ctx.roundRect(cardPad + 25 + pillW + pillGap, pillY, pillW, pillH, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = "600 14px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+      ctx.fillText("STREAK", cardPad + 40 + pillW + pillGap, pillY + 28);
+      ctx.font = "700 22px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillText("6 Days 🔥", cardPad + 40 + pillW + pillGap, pillY + pillH - 16);
+
+      // Metric 3: Cadence Sprint Target
+      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.25)";
+      ctx.beginPath();
+      ctx.roundRect(cardPad + 25 + (pillW + pillGap) * 2, pillY, pillW, pillH, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = "600 14px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+      ctx.fillText("CHAPTER GOAL", cardPad + 40 + (pillW + pillGap) * 2, pillY + 28);
+      ctx.font = "700 22px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "#a5b4fc";
+      ctx.fillText("Sprint 1 ⚔️", cardPad + 40 + (pillW + pillGap) * 2, pillY + pillH - 16);
+    }
+  }
+
+  // 9. BOTTOM SAFE ZONE (y: 2100 to 2340)
+  // Clean area for OS flashlight, camera & swipe up lockscreen bar
   ctx.textAlign = "center";
   ctx.font = "600 18px 'JetBrains Mono', monospace";
   ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
-  ctx.fillText("ODYSSEY CADENCE LOCKSCREEN", width / 2, 2200);
+  ctx.fillText("ODYSSEY CADENCE LOCKSCREEN", width / 2, 2220);
 
   ctx.font = "400 17px 'Plus Jakarta Sans', sans-serif";
   ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
-  ctx.fillText("Swipe up to unlock", width / 2, 2235);
+  ctx.fillText("Swipe up to unlock", width / 2, 2255);
 
   // iOS Home Bar clearance silhouette
   ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
   ctx.beginPath();
-  ctx.roundRect((width - 340) / 2, 2280, 340, 8, 4);
+  ctx.roundRect((width - 340) / 2, 2295, 340, 8, 4);
   ctx.fill();
 
   return canvas;

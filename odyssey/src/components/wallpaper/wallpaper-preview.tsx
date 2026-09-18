@@ -70,10 +70,14 @@ export function WallpaperPreview({
     return build24HourlyBlocks(data.blocks);
   }, [data.blocks]);
 
-  // Centered 5-hour rolling window with active hour dead center
+  // Adaptive count: show 7 blocks if 0 or 1 hobby, 6 blocks if 2+ hobbies
+  const hobbyCount = data.includeHobbies !== false ? (data.habits || []).slice(0, 4).length : 0;
+  const blockCount = hobbyCount <= 1 ? 7 : 6;
+
+  // Centered rolling window with active hour dead center
   const centeredWindow = useMemo(() => {
-    return getCenteredHourlyWindow(all24HourlyBlocks, activeHour, 5);
-  }, [all24HourlyBlocks, activeHour]);
+    return getCenteredHourlyWindow(all24HourlyBlocks, activeHour, blockCount);
+  }, [all24HourlyBlocks, activeHour, blockCount]);
 
   // Planned hours calculation
   const effectivePlannedHours = useMemo(() => {
@@ -445,8 +449,46 @@ export function WallpaperPreview({
         );
       })()}
 
-      {/* 6. BOTTOM SAFE ZONE (~18% height for Flashlight, Camera & Home Bar) */}
-      <div className="w-full px-7 pb-4 pt-4 mt-auto flex flex-col justify-end z-10">
+      {/* 6. DAILY CADENCE DIRECTIVE & INTEGRITY CARD (Fills the screen like the App!) */}
+      <div className="px-4.5 pt-2 z-10 animate-in fade-in duration-300">
+        <div className="rounded-2xl p-2.5 sm:p-3 bg-[#13151D]/80 border border-white/10 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-amber-400 font-bold flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              DAILY CADENCE DIRECTIVE
+            </span>
+            <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-bold">
+              ACTIVE CADENCE
+            </span>
+          </div>
+
+          <p className="text-[10.5px] text-slate-300 font-medium leading-relaxed">
+            {activeHour >= 21 || activeHour < 6
+              ? "Honor your circadian recovery. Deep rest fuels tomorrow's uninterrupted focus."
+              : activeHour >= 12 && activeHour < 14
+              ? "Step back for mindful recovery. Mental clarity is renewed in deliberate pauses."
+              : "Protect your active focus blocks with absolute integrity. Momentum is built hour by hour."}
+          </p>
+
+          <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
+              <span className="text-[7.5px] font-mono text-slate-400 uppercase">Integrity</span>
+              <span className="text-[10px] font-mono font-bold text-emerald-400">100% 🛡️</span>
+            </div>
+            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
+              <span className="text-[7.5px] font-mono text-slate-400 uppercase">Streak</span>
+              <span className="text-[10px] font-mono font-bold text-amber-300">{data.activeDay}d 🔥</span>
+            </div>
+            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
+              <span className="text-[7.5px] font-mono text-slate-400 uppercase">Milestone</span>
+              <span className="text-[10px] font-mono font-bold text-indigo-300">Sprint 1 ⚔️</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. BOTTOM SAFE ZONE (~18% height for Flashlight, Camera & Home Bar) */}
+      <div className="w-full px-7 pb-3 pt-3 mt-auto flex flex-col justify-end z-10">
         <div className="w-full flex items-center justify-between text-white/20 select-none pointer-events-none mb-3">
           <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
             <Flashlight className="w-4 h-4" />

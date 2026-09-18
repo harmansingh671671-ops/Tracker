@@ -18,6 +18,14 @@ import {
   type WallpaperData,
 } from "@/lib/utils/wallpaper-generator";
 import {
+  setNativeLockscreen,
+  launchLiveWallpaperPicker,
+  enableNativeHourlyAutoUpdate,
+  disableNativeHourlyAutoUpdate,
+  checkNativeAutoUpdateStatus,
+  isAndroidApp,
+} from "@/lib/utils/android-bridge";
+import {
   ArrowLeft,
   Sparkles,
   Download,
@@ -54,6 +62,12 @@ export default function WallpaperPage() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [ambientActive, setAmbientActive] = useState<boolean>(false);
+  const [hourlyAutoUpdateActive, setHourlyAutoUpdateActive] = useState<boolean>(false);
+  const [showPermissionDetails, setShowPermissionDetails] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHourlyAutoUpdateActive(checkNativeAutoUpdateStatus());
+  }, []);
 
   const activeDay = useMemo(() => {
     return getJourneyDayNumber(user?.createdAt);
@@ -184,6 +198,61 @@ export default function WallpaperPage() {
       setTimeout(() => setStatusNotice(null), 3000);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Handler: Direct APK / 1-Tap Lockscreen Setting
+  const handleSetNativeDirect = async () => {
+    setIsGenerating(true);
+    setStatusNotice("Applying to lockscreen...");
+    try {
+      const result = await setNativeLockscreen(wallpaperData);
+      setStatusNotice(result.message);
+      setTimeout(() => setStatusNotice(null), 4000);
+    } catch {
+      setStatusNotice("Could not apply directly. Please use System Share.");
+      setTimeout(() => setStatusNotice(null), 3500);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handler: Launch Native Live Wallpaper Service
+  const handleLaunchLiveWallpaper = () => {
+    const launched = launchLiveWallpaperPicker();
+    if (launched) {
+      setStatusNotice("Opening Live Wallpaper picker. Choose 'Set Wallpaper' → 'Lock Screen'.");
+    } else {
+      setStatusNotice("Live Wallpaper engine is ready in the APK. Open Device Guides for instructions.");
+    }
+    setTimeout(() => setStatusNotice(null), 4500);
+  };
+
+  // Handler: Toggle Background Hourly Auto-Update
+  const handleToggleHourlyAutoUpdate = async () => {
+    if (!hourlyAutoUpdateActive) {
+      setIsGenerating(true);
+      setStatusNotice("Activating hourly background auto-update...");
+      try {
+        const ok = await enableNativeHourlyAutoUpdate(wallpaperData);
+        if (ok) {
+          setHourlyAutoUpdateActive(true);
+          setStatusNotice("⚡ Hourly background updater active! Refreshes at every :00 mark.");
+        } else {
+          setStatusNotice("Auto-updater is ready in the APK. Open Device Guides for instructions.");
+        }
+        setTimeout(() => setStatusNotice(null), 4500);
+      } catch {
+        setStatusNotice("Could not start background updater.");
+        setTimeout(() => setStatusNotice(null), 3000);
+      } finally {
+        setIsGenerating(false);
+      }
+    } else {
+      disableNativeHourlyAutoUpdate();
+      setHourlyAutoUpdateActive(false);
+      setStatusNotice("Hourly background auto-update paused.");
+      setTimeout(() => setStatusNotice(null), 3500);
     }
   };
 
@@ -558,44 +627,115 @@ export default function WallpaperPage() {
 
                   {/* Action Buttons Toolbar */}
                   <div className="space-y-2 pt-1">
-                    {/* Primary Button: Download Wallpaper (OLED Clean, NO BAKED-IN CLOCK) */}
+                    {/* Primary Action 1: 1-Tap Direct Lockscreen Setter */}
                     <button
                       type="button"
-                      onClick={handleDownload}
+                      onClick={handleSetNativeDirect}
                       disabled={isGenerating}
-                      className="w-full py-3 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-primary hover:bg-primary-fixed text-on-primary shadow-primary/20 active:scale-95"
+                      className="w-full py-3 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20 active:scale-95"
                     >
-                      <Download className="w-4 h-4" />
-                      <span>{isGenerating ? "Rendering HD Wallpaper..." : `Download Lockscreen Wallpaper`}</span>
+                      <Zap className="w-4 h-4 text-black" />
+                      <span>{isGenerating ? "Applying to Lockscreen..." : "⚡ Set on Lockscreen (1-Tap Direct)"}</span>
                     </button>
 
+                    {/* Automatic / Dynamic Modes (No PNGs Needed!) */}
                     <div className="grid grid-cols-2 gap-2">
-                      {/* Secondary 1: Native Share ("Set as Wallpaper" directly) */}
+                      {/* Live Wallpaper Auto-Hourly Picker */}
                       <button
                         type="button"
-                        onClick={handleShare}
-                        disabled={isGenerating}
+                        onClick={handleLaunchLiveWallpaper}
                         className="py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-surface-container-high hover:bg-surface-bright text-on-surface border-outline/20 active:scale-95"
-                        title="Opens system share sheet directly with 'Set as Wallpaper'"
+                        title="Set real-time live wallpaper that shifts hourly"
                       >
-                        <Share2 className="w-3.5 h-3.5 text-secondary" />
-                        <span>Share / Set</span>
+                        <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                        <span>📱 Live Hourly Mode</span>
                       </button>
 
-                      {/* Secondary 2: Always-On Ambient Display */}
+                      {/* Background Hourly Auto-Updater */}
+                      <button
+                        type="button"
+                        onClick={handleToggleHourlyAutoUpdate}
+                        disabled={isGenerating}
+                        className={`py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                          hourlyAutoUpdateActive
+                            ? "bg-amber-400/20 text-amber-300 border-amber-400/40"
+                            : "bg-surface-container-high hover:bg-surface-bright text-on-surface border-outline/20"
+                        }`}
+                        title="Automatically refresh the lockscreen every hour in the background"
+                      >
+                        <Clock className={`w-3.5 h-3.5 ${hourlyAutoUpdateActive ? "text-amber-400" : "text-on-surface-variant"}`} />
+                        <span>{hourlyAutoUpdateActive ? "Auto :00 [ON]" : "Auto :00 [OFF]"}</span>
+                      </button>
+                    </div>
+
+                    {/* Secondary Actions: Ambient Mode & Save PNG File */}
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
                       <button
                         type="button"
                         onClick={handleToggleAmbient}
-                        className={`py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                        className={`py-2 px-3 rounded-xl font-semibold font-mono text-[11px] border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
                           ambientActive
-                            ? "bg-amber-400 text-black border-amber-300"
-                            : "bg-surface-container-high hover:bg-surface-bright text-on-surface border-outline/20"
+                            ? "bg-amber-400 text-black border-amber-300 font-bold"
+                            : "bg-surface-container border-outline/15 text-on-surface-variant hover:text-on-surface"
                         }`}
                         title="Always-on live desk clock mode"
                       >
                         <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
                         <span>{ambientActive ? "Exit Ambient" : "Ambient Mode"}</span>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDownload}
+                        disabled={isGenerating}
+                        className="py-2 px-3 rounded-xl font-semibold font-mono text-[11px] border border-outline/15 text-on-surface-variant hover:text-on-surface bg-surface-container flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Save PNG File</span>
+                      </button>
+                    </div>
+
+                    {/* Transparent Permission & Trust Guarantee */}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPermissionDetails(!showPermissionDetails)}
+                        className="w-full py-1.5 px-3 rounded-xl bg-surface-container/70 hover:bg-surface-container border border-outline/10 text-[11px] font-mono text-on-surface-variant flex items-center justify-between transition-all cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Permission Safety: 100% On-Device</span>
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant/70">
+                          {showPermissionDetails ? "Hide Info ▲" : "View Details ▼"}
+                        </span>
+                      </button>
+
+                      {showPermissionDetails && (
+                        <div className="p-3 rounded-xl bg-surface-container-high border border-outline/15 text-[10.5px] font-mono space-y-1.5 mt-1.5 text-on-surface-variant animate-in fade-in duration-200">
+                          <div className="font-bold text-on-surface text-xs flex items-center gap-1 text-emerald-400">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Safe System Utility Permissions Only</span>
+                          </div>
+                          <p className="leading-relaxed">
+                            Odyssey only uses standard Android system permissions for wallpaper updates:
+                          </p>
+                          <div className="space-y-1 pl-1 text-[10px]">
+                            <div className="flex items-center gap-1.5 text-emerald-400">
+                              <span>✓</span>
+                              <span><strong>SET_WALLPAPER:</strong> Applies your lockscreen schedule.</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-emerald-400">
+                              <span>✓</span>
+                              <span><strong>SCHEDULE_EXACT_ALARM:</strong> Triggers refresh at :00:00.</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-rose-400">
+                              <span>✕</span>
+                              <span><strong>NO Camera, Mic, Contacts, or Photos:</strong> Zero access.</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
