@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import {
@@ -18,6 +18,7 @@ import {
   Calendar,
   Plus,
   ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { JourneyDaySchedule } from "@/components/journey/journey-day-schedule";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
@@ -253,19 +254,40 @@ export default function JourneyPage() {
     [activeDay, user?.createdAt]
   );
 
-  // Array of days currently rendered in the window (shows chapter start up through active day and future)
+  // Upper curve collapsible past days (only Yesterday shown by default, earlier days can be expanded/collapsed)
+  const [showEarlierDays, setShowEarlierDays] = useState<boolean>(false);
+
+  const earlierPastDays = useMemo(() => {
+    if (activeDay <= 2) return [];
+    return Array.from({ length: activeDay - 2 }, (_, i) => i + 1);
+  }, [activeDay]);
+
+  const hasEarlierDays = earlierPastDays.length > 0;
+
+  // Array of days currently rendered in the window
   const visibleDays = useMemo(() => {
     const days: number[] = [];
-    const chapter = Math.ceil(activeDay / 7);
-    const startPastDay = Math.max(1, (chapter - 1) * 7 + 1);
-    for (let d = startPastDay; d < activeDay; d++) {
-      days.push(d);
+
+    // Prepend earlier past days only if user has opened minimization to upward side
+    if (hasEarlierDays && showEarlierDays) {
+      days.push(...earlierPastDays);
     }
-    for (let i = 0; i < windowDaysCount; i++) {
+
+    // Always keep Yesterday directly above Today if activeDay > 1
+    if (activeDay > 1) {
+      days.push(activeDay - 1);
+    }
+
+    // Today
+    days.push(activeDay);
+
+    // Future rolling chain
+    for (let i = 1; i < windowDaysCount; i++) {
       days.push(activeDay + i);
     }
+
     return days;
-  }, [activeDay, windowDaysCount]);
+  }, [activeDay, windowDaysCount, hasEarlierDays, showEarlierDays, earlierPastDays]);
 
   // Query planned hours for all visible days from Dexie DB
   const loadScheduledHours = useCallback(async () => {
@@ -295,6 +317,85 @@ export default function JourneyPage() {
 
   useEffect(() => {
     loadScheduledHours();
+  }, [loadScheduledHours]);
+
+  // Ref to Today's node container for auto-scroll and intersection detection
+  const todayRef = useRef<HTMLDivElement>(null);
+  const [isTodayInView, setIsTodayInView] = useState<boolean>(true);
+
+  // Smoothly center Today in viewport
+  const scrollToToday = useCallback((smooth: boolean = true) => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "center",
+      });
+    }
+  }, []);
+
+  // Today always appears in front of the user when landing on Journey or returning from schedule
+  useEffect(() => {
+    if (!selectedDayMeta) {
+      const timer = setTimeout(() => {
+        scrollToToday(true);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDayMeta, scrollToToday]);
+
+  // Detect when Today is off-screen to display floating quick-return button
+  useEffect(() => {
+    if (selectedDayMeta) return;
+    const target = todayRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsTodayInView(entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0.15,
+      }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [selectedDayMeta, visibleDays, showEarlierDays]);
+
+  // Direct URL support (?day=X)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const dayParam = params.get("day");
+    if (dayParam) {
+      const dNum = parseInt(dayParam, 10);
+      if (!isNaN(dNum) && dNum >= 1) {
+        const meta = getDayMeta(dNum);
+        setSelectedDayMeta({
+          dayNum: dNum,
+          dateStr: meta.dateStr,
+          isToday: meta.isToday,
+        });
+      }
+    }
+  }, [getDayMeta]);
+
+  // Track latest selectedDayMeta in ref to prevent stale closures in popstate listener
+  const selectedDayMetaRef = useRef(selectedDayMeta);
+  selectedDayMetaRef.current = selectedDayMeta;
+
+  // Native mobile swipe-back & browser back button handler:
+  // When swiping back inside a day's schedule, it closes the scheduler and stays on /journey
+  useEffect(() => {
+    const onPopState = () => {
+      if (selectedDayMetaRef.current) {
+        setSelectedDayMeta(null);
+        loadScheduledHours();
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, [loadScheduledHours]);
 
   // Today's challenge record
@@ -350,7 +451,7 @@ export default function JourneyPage() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Open full day schedule editor directly inside the Journey page (completely separate from Today)
+  // Open full day schedule editor directly inside Journey (pushes state so mobile swipe-back stays on /journey)
   const handleOpenScheduler = (dayNum: number) => {
     const meta = getDayMeta(dayNum);
     setSelectedDayMeta({
@@ -358,7 +459,27 @@ export default function JourneyPage() {
       dateStr: meta.dateStr,
       isToday: meta.isToday,
     });
+    if (typeof window !== "undefined") {
+      window.history.pushState(
+        { journeyDaySchedule: true, dayNum },
+        "",
+        `${window.location.pathname}?day=${dayNum}`
+      );
+    }
   };
+
+  // Close schedule editor safely syncing browser history
+  const handleCloseScheduler = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.state?.journeyDaySchedule) {
+      window.history.back();
+    } else {
+      setSelectedDayMeta(null);
+      loadScheduledHours();
+      if (typeof window !== "undefined" && window.location.search.includes("day=")) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, [loadScheduledHours]);
 
   const handleLoadMoreDays = () => {
     setWindowDaysCount((prev) => prev + 7);
@@ -371,10 +492,7 @@ export default function JourneyPage() {
         dateStr={selectedDayMeta.dateStr}
         dayNum={selectedDayMeta.dayNum}
         isToday={selectedDayMeta.isToday}
-        onBack={() => {
-          setSelectedDayMeta(null);
-          loadScheduledHours();
-        }}
+        onBack={handleCloseScheduler}
         onScheduleUpdated={loadScheduledHours}
       />
     );
@@ -460,6 +578,44 @@ export default function JourneyPage() {
 
         {/* Duolingo Winding Curved Trail */}
         <div className="relative flex flex-col items-center py-4 select-none">
+          {/* Upper Side of Curve: Minimization & Expansion for Earlier Past Days */}
+          {hasEarlierDays && (
+            <div className="relative z-10 pb-4 pt-1 flex flex-col items-center">
+              {!showEarlierDays ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowEarlierDays(true)}
+                    className="px-4 py-2 rounded-full bg-surface-container-high border border-outline/25 hover:border-primary/50 text-xs font-mono font-semibold text-on-surface hover:text-primary shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer group"
+                    title="View earlier past days"
+                  >
+                    <ChevronUp className="w-4 h-4 text-primary group-hover:-translate-y-0.5 transition-transform" />
+                    <span>View Earlier Past Days (1 – {activeDay - 2})</span>
+                    <Sparkles className="w-3.5 h-3.5 text-primary/70" />
+                  </button>
+                  <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1">
+                    {earlierPastDays.length} past {earlierPastDays.length === 1 ? "day" : "days"} minimized • Yesterday is shown below
+                  </span>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowEarlierDays(false)}
+                    className="px-4 py-2 rounded-full bg-surface-container-high border border-outline/25 hover:border-amber-400/50 text-xs font-mono font-semibold text-on-surface hover:text-amber-400 shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer group"
+                    title="Collapse earlier past days"
+                  >
+                    <ChevronDown className="w-4 h-4 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+                    <span>Collapse Earlier Days</span>
+                  </button>
+                  <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1">
+                    Showing all {earlierPastDays.length} earlier days
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
           {visibleDays.map((day, idx) => {
             const meta = getDayMeta(day);
             const isCompleted = day < activeDay;
@@ -469,9 +625,9 @@ export default function JourneyPage() {
 
             const dayRecord = getChallengeRecord(user?.id, meta.dateStr);
 
-            const offsetX = getNodeOffset(idx);
+            const offsetX = getNodeOffset(day - 1);
             const nextDay = idx < visibleDays.length - 1 ? visibleDays[idx + 1] : null;
-            const nextOffsetX = nextDay !== null ? getNodeOffset(idx + 1) : 0;
+            const nextOffsetX = nextDay !== null ? getNodeOffset(nextDay - 1) : 0;
             const isNextCompleted = nextDay !== null && nextDay < activeDay;
             const isNextCurrent = nextDay !== null && nextDay === activeDay;
 
@@ -503,8 +659,10 @@ export default function JourneyPage() {
 
                 {/* Node Container with Duolingo Winding Horizontal Offset */}
                 <div
+                  ref={isCurrent ? todayRef : undefined}
+                  id={isCurrent ? "journey-today-node" : undefined}
                   style={{ transform: `translateX(${offsetX}px)` }}
-                  className="relative z-10 flex flex-col items-center transition-transform duration-300 my-1"
+                  className="relative z-10 flex flex-col items-center transition-transform duration-300 my-1 scroll-mt-32"
                 >
                   {/* Completed Step */}
                   {isCompleted && (
@@ -775,6 +933,25 @@ export default function JourneyPage() {
             </span>
           </div>
         </div>
+
+        {/* Floating Quick Return to Today Button (Visible when scrolled away from Today) */}
+        {!isTodayInView && !selectedDayMeta && (
+          <button
+            type="button"
+            onClick={() => scrollToToday(true)}
+            className="fixed bottom-22 sm:bottom-24 right-4 sm:right-6 z-40 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-highest/95 border border-primary/40 shadow-2xl text-primary font-mono text-xs font-bold backdrop-blur-md hover:scale-105 active:scale-95 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 group cursor-pointer"
+            title="Scroll back to Today"
+          >
+            <div className="relative flex items-center justify-center">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary/40 animate-ping absolute" />
+              <Zap className="w-4 h-4 fill-primary shrink-0" />
+            </div>
+            <span className="tracking-wide">Today</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-bold">
+              D{activeDay}
+            </span>
+          </button>
+        )}
 
         {/* Toast Notification */}
         {toastMsg && (
