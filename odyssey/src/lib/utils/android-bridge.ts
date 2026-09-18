@@ -1,4 +1,4 @@
-import { type WallpaperData, generateWallpaperCanvas, shareWallpaper } from "./wallpaper-generator";
+import { type WallpaperData, generateWallpaperCanvas, shareWallpaper, downloadWallpaper } from "./wallpaper-generator";
 
 declare global {
   interface Window {
@@ -113,19 +113,30 @@ export async function setNativeLockscreen(
     }
   }
 
-  // 4. Fallback: Native Web Share with file (triggers Android's system 'Set as Wallpaper' picker)
+  // 4. Fallback for Web/PWA: Save directly to gallery (no confusing messenger share sheets)
   try {
-    const shared = await shareWallpaper(data);
+    const filename = `odyssey-day-${data.activeDay}-lockscreen.png`;
+    await downloadWallpaper(data, filename);
     return {
-      success: shared,
+      success: true,
       method: "native_share",
-      message: shared
-        ? "Choose 'Set as Wallpaper' from the system menu."
-        : "Image saved to downloads.",
+      message: "Wallpaper saved to your Gallery! Open Photos → 3 Dots (⋮) → 'Set as Lock Screen'.",
     };
   } catch (err: any) {
-    return { success: false, method: "native_share", message: err.message || "Failed to set wallpaper" };
+    return { success: false, method: "native_share", message: err.message || "Failed to save wallpaper" };
   }
+}
+
+/**
+ * Checks whether a native APK JavaScript bridge is actively connected.
+ */
+export function isNativeBridgeAvailable(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    window.OdysseyAndroid?.setLockscreenWallpaper ||
+    window.Android?.setWallpaper ||
+    window.Capacitor?.Plugins?.Wallpaper?.setWallpaper
+  );
 }
 
 /**

@@ -23,6 +23,7 @@ import {
   enableNativeHourlyAutoUpdate,
   disableNativeHourlyAutoUpdate,
   checkNativeAutoUpdateStatus,
+  isNativeBridgeAvailable,
   isAndroidApp,
 } from "@/lib/utils/android-bridge";
 import {
@@ -64,8 +65,10 @@ export default function WallpaperPage() {
   const [ambientActive, setAmbientActive] = useState<boolean>(false);
   const [hourlyAutoUpdateActive, setHourlyAutoUpdateActive] = useState<boolean>(false);
   const [showPermissionDetails, setShowPermissionDetails] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
+    setMounted(true);
     setHourlyAutoUpdateActive(checkNativeAutoUpdateStatus());
   }, []);
 
@@ -136,7 +139,7 @@ export default function WallpaperPage() {
         }
       }
       setPlannedHours(occupied.size);
-    } catch {}
+    } catch { }
   }, [user?.id, selectedDateStr]);
 
   useEffect(() => {
@@ -313,7 +316,7 @@ export default function WallpaperPage() {
         if (document.exitFullscreen && document.fullscreenElement) {
           await document.exitFullscreen();
         }
-      } catch {}
+      } catch { }
       setAmbientActive(false);
     }
   };
@@ -330,6 +333,17 @@ export default function WallpaperPage() {
 
   const hasCustomBlocks = selectedBlocks.length > 0;
   const effectiveHoursCount = hasCustomBlocks ? plannedHours : 20;
+
+  if (!mounted) {
+    return (
+      <div className="view-transition min-h-screen bg-surface flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <span className="text-xs font-mono text-on-surface-variant">Loading Odyssey Wallpaper Studio...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="view-transition min-h-screen bg-surface">
@@ -348,11 +362,10 @@ export default function WallpaperPage() {
           <button
             type="button"
             onClick={toggleEnabled}
-            className={`px-3 py-1.5 rounded-full font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border shadow-xs ${
-              enabled
+            className={`px-3 py-1.5 rounded-full font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border shadow-xs ${enabled
                 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
                 : "bg-surface-container-high text-on-surface-variant border-outline/25 hover:text-on-surface hover:bg-surface-bright"
-            }`}
+              }`}
             title={enabled ? "Click to pause wallpaper generation" : "Click to activate wallpaper engine"}
           >
             <Power className={`w-3.5 h-3.5 ${enabled ? "text-emerald-400" : "text-on-surface-variant"}`} />
@@ -396,11 +409,10 @@ export default function WallpaperPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("preview")}
-                className={`flex-1 py-2 rounded-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeTab === "preview"
+                className={`flex-1 py-2 rounded-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${activeTab === "preview"
                     ? "bg-surface text-primary shadow-xs font-bold"
                     : "text-on-surface-variant hover:text-on-surface"
-                }`}
+                  }`}
               >
                 <Smartphone className="w-3.5 h-3.5" />
                 <span>Live Wallpaper</span>
@@ -409,11 +421,10 @@ export default function WallpaperPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("features")}
-                className={`flex-1 py-2 rounded-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeTab === "features"
+                className={`flex-1 py-2 rounded-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${activeTab === "features"
                     ? "bg-surface text-primary shadow-xs font-bold"
                     : "text-on-surface-variant hover:text-on-surface"
-                }`}
+                  }`}
               >
                 <Zap className="w-3.5 h-3.5" />
                 <span>What is It?</span>
@@ -422,11 +433,10 @@ export default function WallpaperPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("guides")}
-                className={`flex-1 py-2 rounded-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeTab === "guides"
+                className={`flex-1 py-2 rounded-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${activeTab === "guides"
                     ? "bg-surface text-primary shadow-xs font-bold"
                     : "text-on-surface-variant hover:text-on-surface"
-                }`}
+                  }`}
               >
                 <Layers className="w-3.5 h-3.5" />
                 <span>Device &amp; Automation Guides</span>
@@ -458,6 +468,7 @@ export default function WallpaperPage() {
                           <button
                             key={dayNum}
                             type="button"
+                            suppressHydrationWarning
                             onClick={() => setSelectedDayNumber(dayNum)}
                             className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold shrink-0 transition-all cursor-pointer ${
                               isSelected
@@ -573,11 +584,10 @@ export default function WallpaperPage() {
                       <button
                         type="button"
                         onClick={() => setIncludeHobbies(!includeHobbies)}
-                        className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-                          includeHobbies
+                        className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${includeHobbies
                             ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
                             : "bg-surface-container-high text-on-surface-variant border-outline/20"
-                        }`}
+                          }`}
                       >
                         {includeHobbies ? "Visible (ON)" : "Hidden (OFF)"}
                       </button>
@@ -614,11 +624,10 @@ export default function WallpaperPage() {
                     <button
                       type="button"
                       onClick={() => setShowClockGuide(!showClockGuide)}
-                      className={`px-3 py-1 rounded-full border text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        showClockGuide
+                      className={`px-3 py-1 rounded-full border text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${showClockGuide
                           ? "bg-primary/15 border-primary/30 text-primary"
                           : "bg-surface-container-high border-outline/15 text-on-surface-variant"
-                      }`}
+                        }`}
                     >
                       {showClockGuide ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       <span>{showClockGuide ? "Preview Guide ON" : "Clean Background"}</span>
@@ -627,7 +636,7 @@ export default function WallpaperPage() {
 
                   {/* Action Buttons Toolbar */}
                   <div className="space-y-2 pt-1">
-                    {/* Primary Action 1: 1-Tap Direct Lockscreen Setter */}
+                    {/* Primary Action: Direct APK Lockscreen or 1-Tap Gallery Save */}
                     <button
                       type="button"
                       onClick={handleSetNativeDirect}
@@ -635,7 +644,13 @@ export default function WallpaperPage() {
                       className="w-full py-3 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20 active:scale-95"
                     >
                       <Zap className="w-4 h-4 text-black" />
-                      <span>{isGenerating ? "Applying to Lockscreen..." : "⚡ Set on Lockscreen (1-Tap Direct)"}</span>
+                      <span>
+                        {isGenerating
+                          ? "Processing Wallpaper..."
+                          : isNativeBridgeAvailable()
+                          ? "⚡ Set on Lockscreen (1-Tap Direct)"
+                          : "⚡ Save Wallpaper to Gallery (HD)"}
+                      </span>
                     </button>
 
                     {/* Automatic / Dynamic Modes (No PNGs Needed!) */}
@@ -656,11 +671,10 @@ export default function WallpaperPage() {
                         type="button"
                         onClick={handleToggleHourlyAutoUpdate}
                         disabled={isGenerating}
-                        className={`py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
-                          hourlyAutoUpdateActive
+                        className={`py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${hourlyAutoUpdateActive
                             ? "bg-amber-400/20 text-amber-300 border-amber-400/40"
                             : "bg-surface-container-high hover:bg-surface-bright text-on-surface border-outline/20"
-                        }`}
+                          }`}
                         title="Automatically refresh the lockscreen every hour in the background"
                       >
                         <Clock className={`w-3.5 h-3.5 ${hourlyAutoUpdateActive ? "text-amber-400" : "text-on-surface-variant"}`} />
@@ -673,11 +687,10 @@ export default function WallpaperPage() {
                       <button
                         type="button"
                         onClick={handleToggleAmbient}
-                        className={`py-2 px-3 rounded-xl font-semibold font-mono text-[11px] border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
-                          ambientActive
+                        className={`py-2 px-3 rounded-xl font-semibold font-mono text-[11px] border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${ambientActive
                             ? "bg-amber-400 text-black border-amber-300 font-bold"
                             : "bg-surface-container border-outline/15 text-on-surface-variant hover:text-on-surface"
-                        }`}
+                          }`}
                         title="Always-on live desk clock mode"
                       >
                         <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
@@ -799,44 +812,40 @@ export default function WallpaperPage() {
                   <button
                     type="button"
                     onClick={() => setDeviceGuideTab("automatic")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${
-                      deviceGuideTab === "automatic"
+                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${deviceGuideTab === "automatic"
                         ? "bg-surface text-primary shadow-xs"
                         : "text-on-surface-variant hover:text-on-surface"
-                    }`}
+                      }`}
                   >
                     ⚡ Automatic Setup
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeviceGuideTab("ios")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${
-                      deviceGuideTab === "ios"
+                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${deviceGuideTab === "ios"
                         ? "bg-surface text-primary shadow-xs"
                         : "text-on-surface-variant hover:text-on-surface"
-                    }`}
+                      }`}
                   >
                     Apple iOS
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeviceGuideTab("android")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${
-                      deviceGuideTab === "android"
+                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${deviceGuideTab === "android"
                         ? "bg-surface text-primary shadow-xs"
                         : "text-on-surface-variant hover:text-on-surface"
-                    }`}
+                      }`}
                   >
                     Android
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeviceGuideTab("tablet")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${
-                      deviceGuideTab === "tablet"
+                    className={`flex-1 py-1.5 rounded-lg transition-all text-center cursor-pointer font-bold ${deviceGuideTab === "tablet"
                         ? "bg-surface text-primary shadow-xs"
                         : "text-on-surface-variant hover:text-on-surface"
-                    }`}
+                      }`}
                   >
                     Ambient Display
                   </button>
@@ -856,23 +865,23 @@ export default function WallpaperPage() {
 
                     <div className="space-y-2 pt-1 text-xs">
                       <div className="p-3 rounded-xl bg-surface-container-high border border-outline/15 space-y-1">
-                        <span className="font-bold text-primary font-mono block">1. One-Tap Share / Set (No Gallery Searching)</span>
+                        <span className="font-bold text-primary font-mono block">1. One-Tap Save to Gallery (PWA &amp; Web)</span>
                         <p className="text-on-surface-variant">
-                          Tap <strong>"Share / Set"</strong> on the Live Wallpaper tab. This directly opens your device's system share sheet where you can tap <strong>"Use as Wallpaper"</strong> in 1 click without manually digging through your gallery.
+                          Tap <strong>&quot;Save Wallpaper to Gallery (HD)&quot;</strong> on the Live Wallpaper tab. Odyssey downloads your customized OLED wallpaper instantly. Open <strong>Photos → 3 Dots (⋮) → Set as Lock Screen</strong>.
                         </p>
                       </div>
 
                       <div className="p-3 rounded-xl bg-surface-container-high border border-outline/15 space-y-1">
                         <span className="font-bold text-amber-300 font-mono block">2. Live Ambient Mode (Zero Downloads)</span>
                         <p className="text-on-surface-variant">
-                          Tap <strong>"Ambient Mode"</strong> on your phone or desk stand. Odyssey stays awake in fullscreen as a live, dynamic desk clock with your centered schedule updating every minute in real time.
+                          Tap <strong>&quot;Ambient Mode&quot;</strong> on your phone or desk stand. Odyssey stays awake in fullscreen as a live, dynamic desk clock with your centered schedule updating every minute in real time.
                         </p>
                       </div>
 
                       <div className="p-3 rounded-xl bg-surface-container-high border border-outline/15 space-y-1">
-                        <span className="font-bold text-emerald-400 font-mono block">3. iOS Shortcuts Daily Automation</span>
+                        <span className="font-bold text-emerald-400 font-mono block">3. True Native Android APK (Automated Live Lockscreen)</span>
                         <p className="text-on-surface-variant">
-                          On iPhone, open the built-in <strong>Shortcuts</strong> app → <strong>Automation</strong> → <strong>Daily at 06:00 AM</strong> → <strong>Set Lock Screen Wallpaper</strong> to automatically sync your wallpaper every morning.
+                          Apps installed via Vercel / Chrome are sandboxed PWAs. For 100% hands-free hourly lockscreen updates, Odyssey includes a built-in native Android Live Wallpaper service in the codebase.
                         </p>
                       </div>
                     </div>
@@ -884,10 +893,11 @@ export default function WallpaperPage() {
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-2 text-xs text-on-surface-variant">
                     <h3 className="text-sm font-bold text-on-surface">iPhone Lockscreen Setup</h3>
                     <ol className="list-decimal list-inside space-y-1.5 leading-relaxed">
-                      <li>Tap <strong>Share / Set</strong> or <strong>Download Wallpaper</strong>.</li>
-                      <li>On the share sheet, tap <strong>"Use as Wallpaper"</strong>.</li>
+                      <li>Tap <strong>&quot;Save Wallpaper to Gallery (HD)&quot;</strong>.</li>
+                      <li>Open the <strong>Photos</strong> app and select the image.</li>
+                      <li>Tap the <strong>Share</strong> button → <strong>&quot;Use as Wallpaper&quot;</strong>.</li>
                       <li>Pinch to fit: the top 22% safe space leaves your clock and widgets unobstructed.</li>
-                      <li>Tap <strong>"Set as Wallpaper Pair"</strong> or <strong>"Customize Lock Screen"</strong>.</li>
+                      <li>Tap <strong>&quot;Set as Wallpaper Pair&quot;</strong> or <strong>&quot;Customize Lock Screen&quot;</strong>.</li>
                     </ol>
                   </div>
                 )}
@@ -895,11 +905,13 @@ export default function WallpaperPage() {
                 {/* Android Guide */}
                 {deviceGuideTab === "android" && (
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-2 text-xs text-on-surface-variant">
-                    <h3 className="text-sm font-bold text-on-surface">Android Lockscreen Setup</h3>
+                    <h3 className="text-sm font-bold text-on-surface">Android Lockscreen Setup (Vercel PWA &amp; Web)</h3>
                     <ol className="list-decimal list-inside space-y-1.5 leading-relaxed">
-                      <li>Tap <strong>Share / Set</strong> or <strong>Download Wallpaper</strong>.</li>
-                      <li>Choose <strong>"Set as wallpaper"</strong> → <strong>"Lock screen"</strong>.</li>
-                      <li>The clean safe margins prevent any overlap with status icons or fingerprint sensors.</li>
+                      <li>Tap <strong>&quot;Save Wallpaper to Gallery (HD)&quot;</strong>.</li>
+                      <li>Open your phone&apos;s <strong>Gallery</strong> or <strong>Photos</strong> app.</li>
+                      <li>Select the downloaded wallpaper image.</li>
+                      <li>Tap the <strong>3 Dots (⋮) or More</strong> menu → <strong>&quot;Set as wallpaper&quot;</strong> → <strong>&quot;Lock screen&quot;</strong>.</li>
+                      <li>The wallpaper is automatically calibrated with safe top/bottom margins so your phone&apos;s native clock and fingerprint scanner remain unobstructed!</li>
                     </ol>
                   </div>
                 )}
