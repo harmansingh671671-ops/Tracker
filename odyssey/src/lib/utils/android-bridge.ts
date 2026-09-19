@@ -494,14 +494,19 @@ export function downloadAndInstallNativeApk(apkUrl: string): boolean {
   if (typeof window === "undefined") return false;
 
   try {
+    const fullUrl =
+      apkUrl.startsWith("http://") || apkUrl.startsWith("https://")
+        ? apkUrl
+        : `${window.location.origin}${apkUrl.startsWith("/") ? "" : "/"}${apkUrl}`;
+
     if (window.OdysseyAndroid?.downloadAndInstallApk) {
-      return window.OdysseyAndroid.downloadAndInstallApk(apkUrl);
+      return window.OdysseyAndroid.downloadAndInstallApk(fullUrl);
     }
     if (window.Android?.downloadAndInstallApk) {
-      return window.Android.downloadAndInstallApk(apkUrl);
+      return window.Android.downloadAndInstallApk(fullUrl);
     }
     // Browser fallback: direct navigation to APK download
-    window.open(apkUrl, "_blank");
+    window.open(fullUrl, "_blank");
     return true;
   } catch {
     return false;

@@ -9,11 +9,19 @@ export interface AppVersionInfo {
   changelog: string[];
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  let origin = "https://odyssey-dun-rho.vercel.app";
+  try {
+    const url = new URL(request.url);
+    if (url.origin && !url.origin.includes("localhost") && !url.origin.includes("127.0.0.1")) {
+      origin = url.origin;
+    }
+  } catch {}
+
   const versionData: AppVersionInfo = {
     versionCode: 2,
     versionName: "1.1.0",
-    apkUrl: "/downloads/odyssey-latest.apk",
+    apkUrl: `${origin}/downloads/odyssey-latest.apk`,
     releaseDate: "2026-09-19",
     mandatory: false,
     changelog: [

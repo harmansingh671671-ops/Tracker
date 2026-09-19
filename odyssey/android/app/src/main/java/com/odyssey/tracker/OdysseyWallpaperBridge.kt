@@ -12,6 +12,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.Settings
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
@@ -268,10 +269,17 @@ class OdysseyWallpaperBridge(private val context: Context) {
      */
     @JavascriptInterface
     fun downloadAndInstallApk(apkUrl: String): Boolean {
+        val resolvedUrl = if (apkUrl.startsWith("http://") || apkUrl.startsWith("https://")) {
+            apkUrl
+        } else {
+            val cleanPath = if (apkUrl.startsWith("/")) apkUrl.substring(1) else apkUrl
+            "https://odyssey-dun-rho.vercel.app/$cleanPath"
+        }
+
         return try {
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
             if (downloadManager == null) {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(browserIntent)
@@ -284,7 +292,7 @@ class OdysseyWallpaperBridge(private val context: Context) {
                 destFile.delete()
             }
 
-            val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
+            val request = DownloadManager.Request(Uri.parse(resolvedUrl)).apply {
                 setTitle("Odyssey Update")
                 setDescription("Downloading latest Odyssey APK...")
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -302,7 +310,17 @@ class OdysseyWallpaperBridge(private val context: Context) {
                             context.unregisterReceiver(this)
                         } catch (e: Exception) {}
 
-                        if (destFile.exists()) {
+                        if (destFile.exists() && destFile.length() > 0) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                if (!context.packageManager.canRequestPackageInstalls()) {
+                                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(settingsIntent)
+                                }
+                            }
+
                             val contentUri = FileProvider.getUriForFile(
                                 context,
                                 "${context.packageName}.fileprovider",
@@ -314,6 +332,11 @@ class OdysseyWallpaperBridge(private val context: Context) {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             context.startActivity(installIntent)
+                        } else {
+                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(browserIntent)
                         }
                     }
                 }
@@ -329,7 +352,7 @@ class OdysseyWallpaperBridge(private val context: Context) {
         } catch (e: Exception) {
             Log.e("OdysseyWallpaper", "downloadAndInstallApk failed: ${e.message}", e)
             try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(browserIntent)

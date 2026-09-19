@@ -44,9 +44,12 @@ export function AppUpdateModal() {
     setIsDownloading(true);
     const initiated = downloadAndInstallNativeApk(updateInfo.apkUrl);
     if (!initiated) {
-      // Fallback
       window.open(updateInfo.apkUrl, "_blank");
     }
+    // Release spinner after 10s so user can re-try or open directly
+    setTimeout(() => {
+      setIsDownloading(false);
+    }, 10000);
   };
 
   return (
@@ -103,21 +106,36 @@ export function AppUpdateModal() {
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <span className="text-[9.5px] text-on-surface-variant/60 flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-            <span>Keeps your habits &amp; streaks</span>
-          </span>
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9.5px] text-on-surface-variant/60 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              <span>Keeps your habits &amp; streaks</span>
+            </span>
 
-          <button
-            type="button"
-            onClick={handleUpdate}
-            disabled={isDownloading}
-            className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-bold text-xs flex items-center gap-1.5 shadow-md shadow-primary/25 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Download className={`w-3.5 h-3.5 ${isDownloading ? "animate-bounce" : ""}`} />
-            <span>{isDownloading ? "Downloading..." : "⚡ Update Now"}</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleUpdate}
+              disabled={isDownloading}
+              className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-bold text-xs flex items-center gap-1.5 shadow-md shadow-primary/25 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Download className={`w-3.5 h-3.5 ${isDownloading ? "animate-bounce" : ""}`} />
+              <span>{isDownloading ? "Downloading..." : "⚡ Update Now"}</span>
+            </button>
+          </div>
+
+          {/* Fallback direct download link */}
+          <div className="flex justify-between items-center text-[9.5px] text-on-surface-variant/70 px-0.5">
+            <span>Check top notification bar for progress</span>
+            <a
+              href={updateInfo.apkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline text-primary hover:text-primary-container"
+            >
+              Direct APK link
+            </a>
+          </div>
         </div>
       </div>
     </aside>
