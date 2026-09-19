@@ -54,6 +54,28 @@ class OdysseyWallpaperBridge(private val context: Context) {
     }
 
     /**
+     * Clears custom lockscreen wallpaper and restores the system default.
+     * Also cancels the background hourly auto-update worker.
+     */
+    @JavascriptInterface
+    fun clearLockscreenWallpaper(): Boolean {
+        return try {
+            val wallpaperManager = WallpaperManager.getInstance(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                wallpaperManager.clear(WallpaperManager.FLAG_LOCK)
+            } else {
+                wallpaperManager.clear()
+            }
+            OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
+            Log.d("OdysseyWallpaper", "Successfully cleared lockscreen wallpaper and restored system default")
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to clear lockscreen wallpaper: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
      * Saves today's schedule JSON into SharedPreferences so the
      * OdysseyLiveWallpaperService can draw and center the active hour
      * dynamically in real time whenever the phone screen turns on.

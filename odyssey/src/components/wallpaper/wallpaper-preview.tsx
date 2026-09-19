@@ -211,6 +211,40 @@ export function WallpaperPreview({
         )}
       </div>
 
+      {/* 2. HEADER ANCHOR CARD (Positioned right below clock safe zone) */}
+      <div className="px-4.5 pt-1.5 z-10 animate-in fade-in duration-300">
+        <div className="rounded-2xl p-3 bg-[#13151D]/75 border border-white/10 backdrop-blur-md flex items-center justify-between shadow-lg">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[9.5px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold">
+                ODYSSEY • CH. 0{data.chapter}
+              </span>
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
+                DAY {data.activeDay} OF 365
+              </span>
+            </div>
+            <div className="text-[14px] font-bold text-slate-100 flex items-center gap-1.5">
+              <span>{data.rankBadge}</span>
+              <span>{data.rankName}</span>
+            </div>
+            <span className="text-[9.5px] text-slate-400 font-medium">
+              Level {String(data.userLevel).padStart(2, "0")} Cadence
+            </span>
+          </div>
+
+          {/* Minimal Streak Count (Replacing the circular progress gauge) */}
+          <div className="flex flex-col items-end justify-center pl-2">
+            <div className="flex items-center gap-1 text-amber-300 font-mono font-bold text-base sm:text-lg">
+              <span>{data.userStreak ?? data.activeDay}</span>
+              <span>🔥</span>
+            </div>
+            <span className="text-[8px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
+              DAYS STREAK
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* 3. CORE 24-HOUR SPECTRUM BAR */}
       <div className="px-4.5 w-full z-10 mt-2">
         <div className="rounded-xl p-2 px-2.5 bg-[#13151D]/60 border border-white/10 backdrop-blur-md flex flex-col gap-1.5">
@@ -340,97 +374,49 @@ export function WallpaperPreview({
         })}
       </div>
 
-      {/* 5. HEADER ANCHOR CARD (Positioned in comfortable mid-lower screen, below schedule) */}
-      <div className="px-4.5 pt-1.5 z-10 animate-in fade-in duration-300">
-        <div className="rounded-2xl p-3 bg-[#13151D]/75 border border-white/10 backdrop-blur-md flex items-center justify-between shadow-lg">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[9.5px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold">
-                ODYSSEY • CH. 0{data.chapter}
-              </span>
-              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
-                DAY {data.activeDay} OF 365
-              </span>
-            </div>
-            <div className="text-[14px] font-bold text-slate-100 flex items-center gap-1.5">
-              <span>{data.rankBadge}</span>
-              <span>{data.rankName}</span>
-            </div>
-            <span className="text-[9.5px] text-slate-400 font-medium">
-              Level {String(data.userLevel).padStart(2, "0")} Cadence
-            </span>
-          </div>
+      {/* 5. CADENCE HOBBIES & PASSIONS (Full Width if single, 2x2 Grid if multiple) */}
+      {data.includeHobbies !== false && data.habits && data.habits.length > 0 && (() => {
+        const userHobbies = data.habits.slice(0, 4);
+        const count = userHobbies.length;
 
-          {/* 24H Planned Radial Gauge */}
-          <div className="flex items-center gap-2">
-            <div className="text-right">
-              <div className="text-[8px] font-mono text-slate-400 font-semibold uppercase">PLANNED</div>
-              <div className="text-[11px] font-mono font-bold text-emerald-400">{effectivePlannedHours}/24h</div>
-            </div>
-            <div className="relative w-12 h-12 flex items-center justify-center">
-              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-800"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-emerald-500 transition-all duration-500"
-                  strokeDasharray={`${plannedPercent}, 100`}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <span className="absolute text-[9.5px] font-mono font-bold text-slate-200">
-                {plannedPercent}%
+        return (
+          <div className="px-4.5 pt-1.5 flex flex-col gap-1 z-10 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                CADENCE • HOBBIES &amp; PASSIONS
+              </span>
+              <span className="text-[8px] font-mono text-slate-500 font-medium">
+                {count} {count === 1 ? "ACTIVE TRACK" : "ACTIVE TRACKS"}
               </span>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* 6. DAILY CADENCE DIRECTIVE & INTEGRITY CARD */}
-      <div className="px-4.5 pt-1.5 z-10 animate-in fade-in duration-300">
-        <div className="rounded-2xl p-2.5 sm:p-3 bg-[#13151D]/80 border border-white/10 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-amber-400 font-bold flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              DAILY CADENCE DIRECTIVE
-            </span>
-            <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-bold">
-              ACTIVE CADENCE
-            </span>
-          </div>
-
-          <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
-            {activeHour >= 21 || activeHour < 6
-              ? "Honor your circadian recovery. Deep rest fuels tomorrow's uninterrupted focus."
-              : activeHour >= 12 && activeHour < 14
-              ? "Step back for mindful recovery. Mental clarity is renewed in deliberate pauses."
-              : "Protect your active focus blocks with absolute integrity. Momentum is built hour by hour."}
-          </p>
-
-          <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
-              <span className="text-[7.5px] font-mono text-slate-400 uppercase">Integrity</span>
-              <span className="text-[10px] font-mono font-bold text-emerald-400">100% 🛡️</span>
-            </div>
-            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
-              <span className="text-[7.5px] font-mono text-slate-400 uppercase">Streak</span>
-              <span className="text-[10px] font-mono font-bold text-amber-300">{data.activeDay}d 🔥</span>
-            </div>
-            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
-              <span className="text-[7.5px] font-mono text-slate-400 uppercase">Milestone</span>
-              <span className="text-[10px] font-mono font-bold text-indigo-300">Sprint 1 ⚔️</span>
+            <div className={count === 1 ? "grid grid-cols-1" : "grid grid-cols-2 gap-1.5"}>
+              {userHobbies.map((h, hIdx) => (
+                <div
+                  key={h.id || hIdx}
+                  className="rounded-xl p-2.5 bg-[#13151D]/75 border border-white/10 flex items-center justify-between gap-2 transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold text-slate-100 truncate">
+                        {h.name}
+                      </div>
+                      <div className="text-[8.5px] text-slate-400 truncate">
+                        {h.category || "Cadence Track"}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[8.5px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold shrink-0">
+                    {h.currentStreak || 0}d 🔥
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 7. BOTTOM SAFE ZONE (Matches Real Android Fingerprint & Shortcuts) */}
       <div className="w-full px-7 pb-4 pt-3 mt-auto flex flex-col items-center justify-end z-10">

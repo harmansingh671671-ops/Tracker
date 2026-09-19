@@ -10,6 +10,7 @@ declare global {
   interface Window {
     OdysseyAndroid?: {
       setLockscreenWallpaper?: (base64Image: string) => boolean;
+      clearLockscreenWallpaper?: () => boolean;
       syncSchedule?: (scheduleJson: string) => void;
       launchLiveWallpaperPicker?: () => void;
       enableHourlyAutoUpdate?: () => boolean;
@@ -255,6 +256,21 @@ export function checkNativeAutoUpdateStatus(): boolean {
   } else if (window.Android?.isHourlyAutoUpdateEnabled) {
     try {
       return Boolean(window.Android.isHourlyAutoUpdateEnabled());
+    } catch {}
+  }
+
+  return false;
+}
+
+/**
+ * Clears custom lockscreen wallpaper on Android and restores system default.
+ */
+export function clearNativeLockscreen(): boolean {
+  if (typeof window === "undefined") return false;
+
+  if (window.OdysseyAndroid?.clearLockscreenWallpaper) {
+    try {
+      return Boolean(window.OdysseyAndroid.clearLockscreenWallpaper());
     } catch {}
   }
 

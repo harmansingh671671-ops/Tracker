@@ -7,7 +7,7 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useWallpaperStore } from "@/lib/stores/wallpaper-store";
-import { db, type ScheduleBlock } from "@/lib/db";
+import { db, type ScheduleBlock, type Habit } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { getRankInfo, calculateRank } from "@/lib/utils/gamification";
 import { WallpaperPreview } from "@/components/wallpaper/wallpaper-preview";
@@ -18,12 +18,14 @@ import {
 } from "@/lib/utils/wallpaper-generator";
 import {
   setNativeLockscreen,
+  clearNativeLockscreen,
   launchLiveWallpaperPicker,
   enableNativeHourlyAutoUpdate,
   disableNativeHourlyAutoUpdate,
   checkNativeAutoUpdateStatus,
   isNativeBridgeAvailable,
   isAndroidApp,
+  syncScheduleDataToNative,
 } from "@/lib/utils/android-bridge";
 import {
   ArrowLeft,
@@ -41,6 +43,7 @@ import {
   Copy,
   Check,
   X,
+  Trash2,
   ExternalLink,
 } from "lucide-react";
 
@@ -101,10 +104,26 @@ export default function WallpaperPage() {
   const [selectedBlocks, setSelectedBlocks] = useState<ScheduleBlock[]>([]);
   const [plannedHours, setPlannedHours] = useState<number>(0);
 
-  // Active hour preview override (null = follow live clock)
-  const [previewHour, setPreviewHour] = useState<number | null>(null);
-  const currentActualHour = useMemo(() => new Date().getHours(), []);
-  const effectiveHour = previewHour !== null ? previewHour : currentActualHour;
+  // Direct load of user habits from IndexedDB ensuring any single hobby added is always loaded
+  const [directHabits, setDirectHabits] = useState<Habit[]>([]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const loadHabitsDirectly = async () => {
+      try {
+        const list = await db.habits.filter((h) => !h.archivedAt).toArray();
+        if (!isCancelled && list.length > 0) {
+          setDirectHabits(list);
+        }
+      } catch (err) {
+        console.error("Failed to load habits directly from db:", err);
+      }
+    };
+    loadHabitsDirectly();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     fetchUser();
@@ -115,6 +134,11 @@ export default function WallpaperPage() {
       fetchHabits(user.id, selectedDateStr);
     }
   }, [user?.id, selectedDateStr, fetchHabits]);
+
+  const effectiveHabits = useMemo(() => {
+    if (habits && habits.length > 0) return habits;
+    return directHabits;
+  }, [habits, directHabits]);
 
   // Load selected day's blocks from Dexie
   const loadDayBlocks = useCallback(async () => {
@@ -133,6 +157,26 @@ export default function WallpaperPage() {
           .where("date")
           .equals(selectedDateStr)
           .sortBy("startTime");
+      }
+
+      // Fallback 2: If this journey day has no blocks planned yet, fall back to the most recent planned day's blocks
+      if (blocks.length === 0) {
+        const allBlocks = await db.scheduleBlocks.toArray();
+        if (allBlocks.length > 0) {
+          const byDate: Record<string, ScheduleBlock[]> = {};
+          for (const b of allBlocks) {
+            if (!byDate[b.date]) byDate[b.date] = [];
+            byDate[b.date].push(b);
+          }
+          const datesWithBlocks = Object.keys(byDate).sort().reverse();
+          if (datesWithBlocks.length > 0) {
+            const fallbackDate = datesWithBlocks[0];
+            const candidate = byDate[fallbackDate];
+            if (candidate && candidate.length > 0) {
+              blocks = candidate;
+            }
+          }
+        }
       }
 
       setSelectedBlocks(blocks);
@@ -253,29 +297,36 @@ export default function WallpaperPage() {
       rankBadge: rankInfo.badge,
       rankName: rankInfo.name,
       userLevel: user?.level ?? 1,
+      userStreak: user?.streak ?? selectedDayNumber,
       plannedHours,
       dateStr: selectedDateStr,
       formattedDate: selectedFormattedDate,
       blocks: selectedBlocks,
-      habits,
+      habits: effectiveHabits,
       showClockGuide,
       includeHobbies,
-      activeHour: previewHour !== null ? previewHour : undefined,
     };
   }, [
     activeChapter,
     selectedDayNumber,
     rankInfo,
     user?.level,
+    user?.streak,
     plannedHours,
     selectedDateStr,
     selectedFormattedDate,
     selectedBlocks,
-    habits,
+    effectiveHabits,
     showClockGuide,
     includeHobbies,
-    previewHour,
   ]);
+
+  // Automatically sync updated schedule to native Android bridge whenever wallpaperData changes
+  useEffect(() => {
+    if (wallpaperData.blocks.length > 0 || (wallpaperData.habits && wallpaperData.habits.length > 0)) {
+      syncScheduleDataToNative(wallpaperData).catch(() => {});
+    }
+  }, [wallpaperData]);
 
   // Handler: 1-click Auto Fill Sleep
   const handleAutoFillSleep = async () => {
@@ -353,6 +404,31 @@ export default function WallpaperPage() {
       setHourlyAutoUpdateActive(false);
       setStatusNotice("Hourly background auto-update paused.");
       setTimeout(() => setStatusNotice(null), 3500);
+    }
+  };
+
+  // Handler: Turn Off Lockscreen Wallpaper (Reset to default)
+  const handleTurnOffWallpaper = async () => {
+    setIsGenerating(true);
+    setStatusNotice("Turning off lockscreen wallpaper...");
+    try {
+      if (isNativeBridgeAvailable()) {
+        const ok = clearNativeLockscreen();
+        setHourlyAutoUpdateActive(false);
+        if (ok) {
+          setStatusNotice("Lockscreen wallpaper turned off. Android system default restored.");
+        } else {
+          setStatusNotice("Lockscreen reset to default.");
+        }
+      } else {
+        setStatusNotice("Wallpaper turned off in Odyssey. Default system wallpaper restored.");
+      }
+      setTimeout(() => setStatusNotice(null), 4000);
+    } catch {
+      setStatusNotice("Failed to turn off lockscreen wallpaper.");
+      setTimeout(() => setStatusNotice(null), 3000);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -556,64 +632,6 @@ export default function WallpaperPage() {
                 )}
               </div>
 
-                  {/* Dynamic Live Hour Centering & Time Scrubber */}
-                  <div className="p-3.5 rounded-2xl bg-surface-container border border-outline/10 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-mono font-bold text-on-surface">
-                          Active Center Hour:
-                        </span>
-                      </div>
-
-                      {previewHour === null ? (
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                          LIVE CLOCK
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewHour(null)}
-                          className="text-[10px] font-mono font-bold text-amber-300 bg-amber-400/20 hover:bg-amber-400/30 px-2 py-0.5 rounded-full border border-amber-400/30 flex items-center gap-1 transition-all cursor-pointer"
-                          title="Snap back to current live clock"
-                        >
-                          <Zap className="w-2.5 h-2.5 text-amber-300" />
-                          <span>Sync Live ({String(currentActualHour).padStart(2, "0")}:00)</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-surface-container-high border border-outline/15 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="text-on-surface-variant text-[11px]">Center Block:</span>
-                        <span className="font-bold text-amber-300 bg-black/60 px-2.5 py-0.5 rounded-md border border-amber-400/30 shadow-inner">
-                          {String(effectiveHour).padStart(2, "0")}:00 → {String((effectiveHour + 1) % 24).padStart(2, "0")}:00
-                        </span>
-                      </div>
-
-                      {/* 24-Hour Slider */}
-                      <div className="space-y-1">
-                        <input
-                          type="range"
-                          min={0}
-                          max={23}
-                          step={1}
-                          value={effectiveHour}
-                          onChange={(e) => setPreviewHour(parseInt(e.target.value, 10))}
-                          className="w-full accent-amber-400 cursor-pointer h-2 bg-surface-container-highest rounded-lg appearance-none"
-                        />
-                        <div className="flex justify-between text-[9px] font-mono text-on-surface-variant/60">
-                          <span>00:00</span>
-                          <span>06:00</span>
-                          <span>12:00</span>
-                          <span>18:00</span>
-                          <span>23:00</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Schedule Coverage Overview */}
                   <div className="p-3.5 rounded-2xl bg-surface-container border border-outline/10 space-y-2">
                     <div className="flex items-center justify-between">
@@ -665,15 +683,23 @@ export default function WallpaperPage() {
                     </div>
 
                     {includeHobbies && (
-                      habits.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-1.5 pt-1">
-                          {habits.slice(0, 4).map((h, idx) => (
+                      effectiveHabits.length > 0 ? (
+                        <div className={effectiveHabits.length === 1 ? "grid grid-cols-1 pt-1" : "grid grid-cols-2 gap-1.5 pt-1"}>
+                          {effectiveHabits.slice(0, 4).map((h, idx) => (
                             <div
                               key={h.id || idx}
-                              className="flex items-center gap-2 p-2 rounded-xl bg-surface-container-high border border-outline/10 text-xs font-mono"
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-high border border-outline/10 text-xs font-mono"
                             >
-                              <span className="text-base shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
-                              <span className="font-bold text-on-surface truncate">{h.name}</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-base shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
+                                <div className="min-w-0">
+                                  <span className="font-bold text-on-surface truncate block">{h.name}</span>
+                                  <span className="text-[9px] text-on-surface-variant/70 truncate block">{h.category || "Cadence Track"}</span>
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold shrink-0">
+                                {h.currentStreak || 0}d 🔥
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -767,6 +793,18 @@ export default function WallpaperPage() {
                       </button>
                     </div>
 
+                    {/* Turn Off Lockscreen Wallpaper Feature */}
+                    <button
+                      type="button"
+                      onClick={handleTurnOffWallpaper}
+                      disabled={isGenerating}
+                      className="w-full py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-2 transition-all cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30 active:scale-95"
+                      title="Reset phone's lockscreen wallpaper back to Android default"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      <span>Turn Off Lockscreen Wallpaper (Reset Default)</span>
+                    </button>
+
                     {/* Direct Explanation for Web / PWA users */}
                     {!isNativeBridgeAvailable() && (
                       <div className="p-3 rounded-xl bg-surface-container-high border border-outline/15 text-xs font-mono space-y-1 text-on-surface-variant">
@@ -834,7 +872,6 @@ export default function WallpaperPage() {
                     <WallpaperPreview
                       data={wallpaperData}
                       showClockGuide={showClockGuide}
-                      activeHourOverride={previewHour}
                       className="scale-[0.92] sm:scale-100 origin-top shadow-2xl"
                     />
                   </div>

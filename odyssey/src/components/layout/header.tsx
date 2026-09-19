@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Smartphone } from "lucide-react";
+import { Smartphone, Shield, Flame, Gem, User } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getRankInfo, calculateRank } from "@/lib/utils/gamification";
 
@@ -33,9 +33,7 @@ export function Header() {
               className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-secondary"
               title={`Level ${user?.level ?? 1}`}
             >
-              <svg className="w-3 h-3 text-secondary shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
-              </svg>
+              <Shield className="w-3 h-3 text-secondary shrink-0" />
               <span className="text-[10px] font-bold font-mono leading-none">
                 L{user?.level ?? 1}
               </span>
@@ -46,9 +44,7 @@ export function Header() {
               className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-amber-400"
               title={`Streak: ${user?.streak ?? 0} days`}
             >
-              <svg className="w-3 h-3 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.61 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM12 20c-3.31 0-6-2.69-6-6 0-1.53.58-2.93 1.53-3.99.19.46.47.88.85 1.22 1.43 1.28 3.62 1.37 5.15.22 1.25-.94 1.77-2.55 1.41-4.05 1.95 1.68 3.06 4.14 3.06 6.6 0 3.31-2.69 6-6 6z"/>
-              </svg>
+              <Flame className="w-3 h-3 text-amber-400 shrink-0" />
               <span className="text-[10px] font-bold font-mono leading-none">
                 {user?.streak ?? 0}
               </span>
@@ -59,9 +55,7 @@ export function Header() {
               className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-primary"
               title={`Diamonds: ${user?.diamonds ?? 0}`}
             >
-              <svg className="w-3 h-3 text-primary shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5L2 9l10 12L22 9l-3-6zM9 5h6v3H9V5zm-4.47 4l1.5-3h2.38L6.8 9H4.53zm3.17 2h8.6l-4.3 8.6L7.7 11zm8.77-2l-1.61-3h2.38l1.5 3h-2.27z"/>
-              </svg>
+              <Gem className="w-3 h-3 text-primary shrink-0" />
               <span className="text-[10px] font-bold font-mono leading-none">
                 {user?.diamonds ?? 0}
               </span>
@@ -73,9 +67,7 @@ export function Header() {
               className="w-6 h-6 rounded-full bg-surface-container-high hover:bg-surface-bright flex items-center justify-center shrink-0 transition-colors border border-outline/20 text-primary"
               title="Profile & Badges"
             >
-              <svg className="w-3.5 h-3.5 text-primary shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
+              <User className="w-3.5 h-3.5 text-primary shrink-0" />
             </button>
           </div>
         </div>
