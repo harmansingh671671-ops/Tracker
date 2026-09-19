@@ -505,8 +505,13 @@ export function downloadAndInstallNativeApk(apkUrl: string): boolean {
     if (window.Android?.downloadAndInstallApk) {
       return window.Android.downloadAndInstallApk(fullUrl);
     }
-    // Browser fallback: direct navigation to APK download
-    window.open(fullUrl, "_blank");
+    // Browser fallback: trigger immediate direct file download without opening empty tabs
+    const a = document.createElement("a");
+    a.href = fullUrl;
+    a.download = "odyssey-latest.apk";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     return true;
   } catch {
     return false;

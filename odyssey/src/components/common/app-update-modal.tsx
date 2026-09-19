@@ -15,8 +15,8 @@ export function AppUpdateModal() {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   useEffect(() => {
-    // Only run update check if on client
-    if (typeof window === "undefined") return;
+    // Only run update check if on client AND running inside the native Android APK
+    if (typeof window === "undefined" || !isAndroidApp()) return;
 
     let mounted = true;
     const check = async () => {
@@ -44,7 +44,12 @@ export function AppUpdateModal() {
     setIsDownloading(true);
     const initiated = downloadAndInstallNativeApk(updateInfo.apkUrl);
     if (!initiated) {
-      window.open(updateInfo.apkUrl, "_blank");
+      const a = document.createElement("a");
+      a.href = updateInfo.apkUrl;
+      a.download = "odyssey-latest.apk";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
     // Release spinner after 10s so user can re-try or open directly
     setTimeout(() => {
@@ -129,8 +134,7 @@ export function AppUpdateModal() {
             <span>Check top notification bar for progress</span>
             <a
               href={updateInfo.apkUrl}
-              target="_blank"
-              rel="noreferrer"
+              download="odyssey-latest.apk"
               className="underline text-primary hover:text-primary-container"
             >
               Direct APK link
