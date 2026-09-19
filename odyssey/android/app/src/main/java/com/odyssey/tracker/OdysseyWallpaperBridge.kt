@@ -1,16 +1,23 @@
 package com.odyssey.tracker
 
+import android.app.DownloadManager
 import android.app.WallpaperManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import java.io.File
 
 /**
  * OdysseyWallpaperBridge
@@ -77,17 +84,83 @@ class OdysseyWallpaperBridge(private val context: Context) {
     }
 
     /**
-     * Saves today's schedule JSON into SharedPreferences so the
-     * OdysseyLiveWallpaperService can draw and center the active hour
-     * dynamically in real time whenever the phone screen turns on.
+     * Saves today's schedule JSON into SharedPreferences with synchronous disk commit.
+     * Broadcasts ACTION_WALLPAPER_DATA_UPDATED so OdysseyLiveWallpaperService refreshes
+     * immediately in real time with zero delay.
      */
     @JavascriptInterface
-    fun syncSchedule(scheduleJson: String) {
-        try {
-            prefs.edit().putString("latest_schedule_json", scheduleJson).apply()
-            Log.d("OdysseyWallpaper", "Synced schedule data to native preferences for Live Wallpaper")
+    fun syncSchedule(scheduleJson: String): Boolean {
+        return try {
+            val success = prefs.edit().putString("latest_schedule_json", scheduleJson).commit()
+            if (success) {
+                val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
+                    setPackage(context.packageName)
+                }
+                context.sendBroadcast(intent)
+                Log.d("OdysseyWallpaper", "Synced schedule data to native preferences & broadcasted update to Live Wallpaper Service")
+            }
+            success
         } catch (e: Exception) {
-            Log.e("OdysseyWallpaper", "Error saving schedule: ${e.message}")
+            Log.e("OdysseyWallpaper", "Error saving schedule: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Detailed verification method that validates the JSON payload, commits to disk,
+     * broadcasts update, and returns a verified JSON summary to JavaScript.
+     */
+    @JavascriptInterface
+    fun syncScheduleWithResult(scheduleJson: String): String {
+        return try {
+            if (scheduleJson.isBlank()) {
+                return "{\"success\":false,\"error\":\"Empty payload\"}"
+            }
+            val obj = org.json.JSONObject(scheduleJson)
+            val blocksCount = obj.optJSONArray("blocks")?.length() ?: 0
+            val habitsCount = obj.optJSONArray("habits")?.length() ?: 0
+            val streak = obj.optInt("userStreak", obj.optInt("activeDay", 1))
+
+            val success = prefs.edit().putString("latest_schedule_json", scheduleJson).commit()
+            if (success) {
+                val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
+                    setPackage(context.packageName)
+                }
+                context.sendBroadcast(intent)
+                Log.d("OdysseyWallpaper", "Verified & synced $blocksCount blocks and $habitsCount habits to native preferences")
+                "{\"success\":true,\"blockCount\":$blocksCount,\"habitCount\":$habitsCount,\"streak\":$streak,\"message\":\"Verified: $blocksCount tasks & $habitsCount hobbies saved to Android Live Wallpaper\"}"
+            } else {
+                "{\"success\":false,\"error\":\"SharedPreferences commit failed\"}"
+            }
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "syncScheduleWithResult error: ${e.message}", e)
+            "{\"success\":false,\"error\":\"${e.message}\"}"
+        }
+    }
+
+    /**
+     * Reads back the stored schedule JSON from SharedPreferences so JavaScript can verify.
+     */
+    @JavascriptInterface
+    fun getSyncedSchedule(): String {
+        return prefs.getString("latest_schedule_json", "") ?: ""
+    }
+
+    /**
+     * Quick verification check for native Android storage.
+     */
+    @JavascriptInterface
+    fun verifySync(): String {
+        val raw = prefs.getString("latest_schedule_json", null)
+        if (raw.isNullOrEmpty()) return "EMPTY"
+        return try {
+            val obj = org.json.JSONObject(raw)
+            val bCount = obj.optJSONArray("blocks")?.length() ?: 0
+            val hCount = obj.optJSONArray("habits")?.length() ?: 0
+            val streak = obj.optInt("userStreak", 1)
+            "OK:blocks=$bCount,habits=$hCount,streak=$streak"
+        } catch (e: Exception) {
+            "ERROR:${e.message}"
         }
     }
 
@@ -156,6 +229,115 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun isHourlyAutoUpdateEnabled(): Boolean {
         return OdysseyHourlyWallpaperWorker.isScheduled(context)
+    }
+
+    /**
+     * Returns the currently installed APK versionCode (e.g. 1, 2)
+     */
+    @JavascriptInterface
+    fun getAppVersionCode(): Int {
+        return try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pInfo.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                pInfo.versionCode
+            }
+        } catch (e: Exception) {
+            1
+        }
+    }
+
+    /**
+     * Returns the currently installed APK versionName (e.g. "1.0", "1.1.0")
+     */
+    @JavascriptInterface
+    fun getAppVersionName(): String {
+        return try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName ?: "1.0"
+        } catch (e: Exception) {
+            "1.0"
+        }
+    }
+
+    /**
+     * Downloads an updated APK and launches Android's native in-place installer
+     * preserving all existing user habits and database entries.
+     */
+    @JavascriptInterface
+    fun downloadAndInstallApk(apkUrl: String): Boolean {
+        return try {
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+            if (downloadManager == null) {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(browserIntent)
+                return true
+            }
+
+            // Clean up previous update file if it exists
+            val destFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "odyssey-update.apk")
+            if (destFile.exists()) {
+                destFile.delete()
+            }
+
+            val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
+                setTitle("Odyssey Update")
+                setDescription("Downloading latest Odyssey APK...")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "odyssey-update.apk")
+                setMimeType("application/vnd.android.package-archive")
+            }
+
+            val downloadId = downloadManager.enqueue(request)
+
+            val onComplete = object : BroadcastReceiver() {
+                override fun onReceive(ctxt: Context?, intent: Intent?) {
+                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) ?: -1
+                    if (id == downloadId) {
+                        try {
+                            context.unregisterReceiver(this)
+                        } catch (e: Exception) {}
+
+                        if (destFile.exists()) {
+                            val contentUri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                destFile
+                            )
+                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(contentUri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(installIntent)
+                        }
+                    }
+                }
+            }
+
+            val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(onComplete, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(onComplete, filter)
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "downloadAndInstallApk failed: ${e.message}", e)
+            try {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(browserIntent)
+                true
+            } catch (err: Exception) {
+                false
+            }
+        }
     }
 
     @JavascriptInterface

@@ -164,11 +164,14 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         glowPaint.shader = midGrad
         canvas.drawRect(width * 0.35f, height * 0.35f, width.toFloat(), height * 0.70f, glowPaint)
 
-        val cardPad = width * 0.045f
+        val cardPad = width * 0.036f
         val cardW = width - cardPad * 2f
 
-        // 3. TOP SAFE ZONE (Optimized to ~11.5% so content uses full top space while clearing camera notch)
-        val topSafeZone = height * 0.115f
+        // FULL WALLPAPER SPACE ENGINE:
+        // Proportional layout utilizing 100% of the screen height without empty voids or squeezing!
+        val topMargin = height * 0.038f
+        val bottomMargin = height * 0.028f
+        val usableH = height - topMargin - bottomMargin
 
         val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#C413151D")
@@ -194,30 +197,30 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
 
         val streak = json.optInt("userStreak", json.optInt("activeDay", 1))
 
-        // 4. Header Card (Positioned right below top clock/notch safe zone)
-        val headerY = topSafeZone
-        val headerH = height * 0.082f
+        // 4. Header Card (Positioned near top with generous height)
+        val headerY = topMargin
+        val headerH = usableH * 0.102f
         val headerRect = RectF(cardPad, headerY, cardPad + cardW, headerY + headerH)
-        canvas.drawRoundRect(headerRect, 22f, 22f, cardBgPaint)
-        canvas.drawRoundRect(headerRect, 22f, 22f, cardBorderPaint)
+        canvas.drawRoundRect(headerRect, 54f, 54f, cardBgPaint)
+        canvas.drawRoundRect(headerRect, 54f, 54f, cardBorderPaint)
 
         val headTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            textSize = width * 0.029f
+            textSize = width * 0.030f
             color = Color.parseColor("#94A3B8")
         }
         val chapterStr = "ODYSSEY • CH. 0$chapter"
-        canvas.drawText(chapterStr, cardPad + 24f, headerY + headerH * 0.38f, headTitlePaint)
+        canvas.drawText(chapterStr, cardPad + 28f, headerY + headerH * 0.38f, headTitlePaint)
 
-        // Day Badge Pill
+        // Day Badge Pill (Smooth 20f rounded)
         val dayBadgeText = "DAY $activeDay OF 365"
         val dayBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             textSize = width * 0.024f
             color = Color.parseColor("#34D399")
         }
-        val dayBadgeW = dayBadgePaint.measureText(dayBadgeText) + 20f
-        val dayBadgeX = cardPad + 24f + headTitlePaint.measureText(chapterStr) + 16f
+        val dayBadgeW = dayBadgePaint.measureText(dayBadgeText) + 24f
+        val dayBadgeX = cardPad + 28f + headTitlePaint.measureText(chapterStr) + 16f
         val dayBadgeH = headerH * 0.28f
         val dayBadgeY = headerY + headerH * 0.16f
         val dayBadgeRect = RectF(dayBadgeX, dayBadgeY, dayBadgeX + dayBadgeW, dayBadgeY + dayBadgeH)
@@ -227,33 +230,33 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
             style = Paint.Style.STROKE
             strokeWidth = 1.2f
         }
-        canvas.drawRoundRect(dayBadgeRect, 12f, 12f, dayBadgeBg)
-        canvas.drawRoundRect(dayBadgeRect, 12f, 12f, dayBadgeBorder)
-        canvas.drawText(dayBadgeText, dayBadgeX + 10f, dayBadgeY + dayBadgeH * 0.72f, dayBadgePaint)
+        canvas.drawRoundRect(dayBadgeRect, 20f, 20f, dayBadgeBg)
+        canvas.drawRoundRect(dayBadgeRect, 20f, 20f, dayBadgeBorder)
+        canvas.drawText(dayBadgeText, dayBadgeX + 12f, dayBadgeY + dayBadgeH * 0.72f, dayBadgePaint)
 
         val rankPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-            textSize = width * 0.040f
+            textSize = width * 0.042f
             color = Color.WHITE
         }
         val rankStr = "$rankBadge $rankName"
-        canvas.drawText(rankStr, cardPad + 24f, headerY + headerH * 0.80f, rankPaint)
+        canvas.drawText(rankStr, cardPad + 28f, headerY + headerH * 0.80f, rankPaint)
 
         val subRankPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.DEFAULT
             textSize = width * 0.026f
             color = Color.parseColor("#94A3B8")
         }
-        canvas.drawText("Level ${String.format("%02d", userLevel)} Cadence", cardPad + 24f + rankPaint.measureText("$rankStr ") + 8f, headerY + headerH * 0.80f, subRankPaint)
+        canvas.drawText("Level ${String.format("%02d", userLevel)} Cadence", cardPad + 28f + rankPaint.measureText("$rankStr ") + 8f, headerY + headerH * 0.80f, subRankPaint)
 
         // Minimal Streak Count (Replaces the circular progress gauge on the right)
         val streakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.RIGHT
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             textSize = width * 0.048f
-            color = Color.parseColor("#FBBF24")
+            color = Color.parseColor("#F59E0B")
         }
-        canvas.drawText("$streak 🔥", cardPad + cardW - 24f, headerY + headerH * 0.48f, streakPaint)
+        canvas.drawText("$streak 🔥", cardPad + cardW - 28f, headerY + headerH * 0.48f, streakPaint)
 
         val streakLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.RIGHT
@@ -261,16 +264,17 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
             textSize = width * 0.022f
             color = Color.parseColor("#94A3B8")
         }
-        canvas.drawText("DAYS STREAK", cardPad + cardW - 24f, headerY + headerH * 0.80f, streakLabelPaint)
+        canvas.drawText("DAYS STREAK", cardPad + cardW - 28f, headerY + headerH * 0.80f, streakLabelPaint)
 
         // 5. Spectrum Bar & Header
-        val specHeaderY = headerY + headerH + height * 0.012f
+        val gap1 = usableH * 0.014f
+        val specHeaderY = headerY + headerH + gap1
         val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             textSize = width * 0.028f
             color = Color.parseColor("#94A3B8")
         }
-        canvas.drawText("SCHEDULE • ACTIVE HOUR CENTERED", cardPad + 10f, specHeaderY, headPaint)
+        canvas.drawText("SCHEDULE • ACTIVE HOUR CENTERED", cardPad + 12f, specHeaderY, headPaint)
 
         val activeTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.RIGHT
@@ -278,18 +282,18 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
             textSize = width * 0.028f
             color = Color.parseColor("#F59E0B")
         }
-        canvas.drawText("● $timeStr ACTIVE", cardPad + cardW - 10f, specHeaderY, activeTimePaint)
+        canvas.drawText("● $timeStr ACTIVE", cardPad + cardW - 12f, specHeaderY, activeTimePaint)
 
-        val specY = specHeaderY + height * 0.007f
-        val specH = height * 0.040f
+        val specY = specHeaderY + usableH * 0.008f
+        val specH = usableH * 0.058f
         val specRect = RectF(cardPad, specY, cardPad + cardW, specY + specH)
-        canvas.drawRoundRect(specRect, 16f, 16f, cardBgPaint)
-        canvas.drawRoundRect(specRect, 16f, 16f, cardBorderPaint)
+        canvas.drawRoundRect(specRect, 34f, 34f, cardBgPaint)
+        canvas.drawRoundRect(specRect, 34f, 34f, cardBorderPaint)
 
-        val stripX = cardPad + 20f
+        val stripX = cardPad + 22f
         val stripY = specY + specH * 0.22f
-        val stripW = cardW - 40f
-        val stripH = specH * 0.28f
+        val stripW = cardW - 44f
+        val stripH = specH * 0.28f // ~26px height
         val slotW = stripW / 24f
 
         val segPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -302,12 +306,34 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
             canvas.drawRect(stripX + h * slotW, stripY, stripX + (h + 1) * slotW, stripY + stripH, segPaint)
         }
 
-        // Needle Pin
+        // =========================================================================
+        // RADIANT GLOWING TIMELINE NEEDLE (Noticeably larger than the bar!)
+        // =========================================================================
         val pinX = stripX + (currentHourFloat / 24f) * stripW
-        val pinGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#55F59E0B") }
-        canvas.drawCircle(pinX, stripY + stripH / 2f, 14f, pinGlowPaint)
+        val pinCenterY = stripY + stripH / 2f
+
+        // Soft ambient aura
+        val auraPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#45F59E0B") }
+        canvas.drawCircle(pinX, pinCenterY, 46f, auraPaint)
+
+        // Bright halo ring
+        val pinGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#75F59E0B") }
+        canvas.drawCircle(pinX, pinCenterY, 28f, pinGlowPaint)
+
+        // Solid amber body (diameter 38px > 26px bar!)
         val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F59E0B") }
-        canvas.drawCircle(pinX, stripY + stripH / 2f, 8.5f, pinPaint)
+        canvas.drawCircle(pinX, pinCenterY, 19f, pinPaint)
+
+        // Specular stroke & white core
+        val pinStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FEF08A")
+            style = Paint.Style.STROKE
+            strokeWidth = 2.4f
+        }
+        canvas.drawCircle(pinX, pinCenterY, 19f, pinStrokePaint)
+
+        val pinWhiteCore = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+        canvas.drawCircle(pinX, pinCenterY, 7f, pinWhiteCore)
 
         val specLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.MONOSPACE
@@ -326,11 +352,13 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         val endSpecPaint = Paint(specLabelPaint).apply { textAlign = Paint.Align.RIGHT }
         canvas.drawText("24:00", stripX + stripW, specY + specH * 0.84f, endSpecPaint)
 
-        // 6. Adaptive Schedule Timeline (Spacious 2-Row Design, Large Text, Never Clips!)
+        // 6. Adaptive Schedule Timeline (High-Curvature 54f Rounded Cards, NO Left Bar!)
         val blockCount = 5
-        val timelineStartY = specY + specH + height * 0.010f
-        val cardHeight = height * 0.076f
-        val cardGap = height * 0.009f
+        val gap2 = usableH * 0.014f
+        val timelineStartY = specY + specH + gap2
+        val scheduleTotalH = usableH * 0.530f
+        val cardGap = usableH * 0.011f
+        val cardHeight = (scheduleTotalH - 4f * cardGap) / 5f
 
         val half = blockCount / 2
         for (i in 0 until blockCount) {
@@ -342,7 +370,10 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
 
             val cardRect = RectF(cardPad, cardY, cardPad + cardW, cardY + cardHeight)
 
-            val matching = userBlocks.find { b -> targetHour >= b.startHour && targetHour < b.endHour }
+            val matching = userBlocks.find { b -> 
+                (targetHour >= b.startHour && targetHour < b.endHour) ||
+                b.startTime.startsWith(String.format("%02d", targetHour))
+            }
             val title = matching?.title ?: when {
                 targetHour >= 23 || targetHour < 6 -> if (targetHour == 23) "Wind Down & Rest" else "Obsidian Rest & Sleep"
                 targetHour in 6..7 -> "Morning Vitality & Priming"
@@ -359,20 +390,17 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
                 val activeBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.parseColor("#FFF59E0B")
                     style = Paint.Style.STROKE
-                    strokeWidth = 3.0f
+                    strokeWidth = 2.8f
                 }
-                canvas.drawRoundRect(cardRect, 20f, 20f, activeBg)
-                canvas.drawRoundRect(cardRect, 20f, 20f, activeBorder)
-
-                // Left amber accent bar
-                val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F59E0B") }
-                canvas.drawRoundRect(RectF(cardPad, cardY, cardPad + 8f, cardY + cardHeight), 20f, 20f, accentPaint)
+                // Clean symmetrical 54f rounded corners (left accent bar REMOVED!)
+                canvas.drawRoundRect(cardRect, 54f, 54f, activeBg)
+                canvas.drawRoundRect(cardRect, 54f, 54f, activeBorder)
             } else {
                 val normalBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.parseColor(if (isPast) "#8013151D" else "#BF13151D")
                 }
-                canvas.drawRoundRect(cardRect, 20f, 20f, normalBg)
-                canvas.drawRoundRect(cardRect, 20f, 20f, cardBorderPaint)
+                canvas.drawRoundRect(cardRect, 54f, 54f, normalBg)
+                canvas.drawRoundRect(cardRect, 54f, 54f, cardBorderPaint)
             }
 
             // ==========================================
@@ -380,38 +408,38 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
             // ==========================================
             val row1Y = cardY + cardHeight * 0.36f
 
-            // Left Dot
+            // Left Dot (Glowing with halo on active dot, NO blinking!)
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.parseColor(if (isActive) "#F59E0B" else if (isPast) "#10B981" else "#475569")
             }
-            val dotX = cardPad + 28f
+            val dotX = cardPad + 30f
             val dotY = row1Y - 6f
             if (isActive) {
-                val dotGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#66F59E0B") }
-                canvas.drawCircle(dotX, dotY, 11f, dotGlow)
+                val dotGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#55F59E0B") }
+                canvas.drawCircle(dotX, dotY, 13f, dotGlow)
             }
-            canvas.drawCircle(dotX, dotY, if (isActive) 6.5f else 5f, dotPaint)
+            canvas.drawCircle(dotX, dotY, if (isActive) 7f else 5.5f, dotPaint)
 
             // Time Range (Large & Bold)
             val timeRangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                textSize = width * 0.032f
+                textSize = width * 0.034f
                 color = Color.parseColor(if (isActive) "#FEF08A" else if (isPast) "#94A3B8" else "#E2E8F0")
             }
             val sTime = String.format("%02d:00", targetHour)
             val eTime = String.format("%02d:00", (targetHour + 1) % 24)
             val timeText = "$sTime → $eTime"
-            canvas.drawText(timeText, cardPad + 48f, row1Y, timeRangePaint)
+            canvas.drawText(timeText, cardPad + 50f, row1Y, timeRangePaint)
 
-            // Category Pill Badge (Positioned on the right of Row 1)
+            // Category Pill Badge (Smooth 18f rounded pill)
             val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.parseColor(catColor)
-                textSize = width * 0.024f
+                textSize = width * 0.025f
                 typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             }
             val pillTextW = pillPaint.measureText(catLabel)
             val pillH = cardHeight * 0.30f
-            val pillW = pillTextW + 22f
+            val pillW = pillTextW + 24f
             val pillX = cardPad + cardW - pillW - 20f
             val pillY = cardY + cardHeight * 0.12f
             val pillRect = RectF(pillX, pillY, pillX + pillW, pillY + pillH)
@@ -423,9 +451,9 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
                 style = Paint.Style.STROKE
                 strokeWidth = 1.4f
             }
-            canvas.drawRoundRect(pillRect, 10f, 10f, pillBg)
-            canvas.drawRoundRect(pillRect, 10f, 10f, pillBorder)
-            canvas.drawText(catLabel, pillX + 11f, pillY + pillH * 0.72f, pillPaint)
+            canvas.drawRoundRect(pillRect, 18f, 18f, pillBg)
+            canvas.drawRoundRect(pillRect, 18f, 18f, pillBorder)
+            canvas.drawText(catLabel, pillX + 12f, pillY + pillH * 0.72f, pillPaint)
 
             // ==========================================
             // ROW 2 OF CARD: Full-Width Task Title + Status
@@ -442,7 +470,7 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
                     textSize = width * 0.028f
                     color = Color.parseColor("#F59E0B")
                 }
-                statusW = nowPaint.measureText(nowText) + 12f
+                statusW = nowPaint.measureText(nowText) + 14f
                 canvas.drawText(nowText, cardPad + cardW - 22f, row2Y, nowPaint)
             } else if (isPast) {
                 val doneText = "✓ DONE"
@@ -452,134 +480,153 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
                     textSize = width * 0.026f
                     color = Color.parseColor("#10B981")
                 }
-                statusW = donePaint.measureText(doneText) + 12f
+                statusW = donePaint.measureText(doneText) + 14f
                 canvas.drawText(doneText, cardPad + cardW - 22f, row2Y, donePaint)
             }
 
             // Task Title (Large, Bold, across the full card width)
             val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                textSize = width * 0.038f
+                textSize = width * 0.040f
                 color = Color.parseColor(if (isActive) "#FFFFFF" else if (isPast) "#94A3B8" else "#F1F5F9")
             }
-            val maxTitleW = cardW - 68f - statusW
+            val maxTitleW = cardW - 70f - statusW
             var displayTitle = title
             while (displayTitle.length > 3 && titlePaint.measureText(displayTitle) > maxTitleW) {
                 displayTitle = displayTitle.dropLast(1)
             }
             if (displayTitle.length < title.length) displayTitle += "…"
 
-            canvas.drawText(displayTitle, cardPad + 28f, row2Y, titlePaint)
+            canvas.drawText(displayTitle, cardPad + 30f, row2Y, titlePaint)
         }
 
-        val timelineEndY = timelineStartY + blockCount * (cardHeight + cardGap)
+        val timelineEndY = timelineStartY + scheduleTotalH
 
-        // 7. Cadence Hobbies (Full Width if single, 2x2 Grid if multiple)
-        var currentY = timelineEndY + height * 0.010f
-        if (userHabits.isNotEmpty()) {
-            val hobbiesCount = Math.min(4, userHabits.size)
-            val hobHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                textSize = width * 0.026f
-                color = Color.parseColor("#94A3B8")
-            }
-            val trackWord = if (hobbiesCount == 1) "TRACK" else "TRACKS"
-            canvas.drawText("✦ CADENCE • HOBBIES & PASSIONS", cardPad + 10f, currentY + height * 0.012f, hobHeaderPaint)
+        // =========================================================================
+        // 7. Cadence Hobbies (Guaranteed display, fills space to bottom!)
+        // =========================================================================
+        val gap3 = usableH * 0.015f
+        val currentY = timelineEndY + gap3
 
-            val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                textAlign = Paint.Align.RIGHT
-                typeface = Typeface.MONOSPACE
-                textSize = width * 0.024f
-                color = Color.parseColor("#64748B")
-            }
-            canvas.drawText("$hobbiesCount ACTIVE $trackWord", cardPad + cardW - 10f, currentY + height * 0.012f, countPaint)
+        // Fallback so hobbies are never missing
+        if (userHabits.isEmpty()) {
+            userHabits.add(HabitItem("Mindful Focus", "🧘", streak, "Cadence Track"))
+            userHabits.add(HabitItem("Daily Hydration", "💧", streak, "Vitality Track"))
+        }
 
-            val hobStartY = currentY + height * 0.018f
-            val hobCardH = if (hobbiesCount == 1) height * 0.070f else height * 0.055f
-            val hobGap = 12f
+        val hobbiesCount = Math.min(4, userHabits.size)
+        val hobHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textSize = width * 0.027f
+            color = Color.parseColor("#94A3B8")
+        }
+        val trackWord = if (hobbiesCount == 1) "TRACK" else "TRACKS"
+        canvas.drawText("✦ CADENCE • HOBBIES & PASSIONS", cardPad + 12f, currentY + usableH * 0.010f, hobHeaderPaint)
 
-            if (hobbiesCount == 1) {
-                // Single hobby takes full width with large, readable fonts!
-                val habit = userHabits[0]
-                val hRect = RectF(cardPad, hobStartY, cardPad + cardW, hobStartY + hobCardH)
-                canvas.drawRoundRect(hRect, 20f, 20f, cardBgPaint)
-                canvas.drawRoundRect(hRect, 20f, 20f, cardBorderPaint)
+        val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.MONOSPACE
+            textSize = width * 0.024f
+            color = Color.parseColor("#64748B")
+        }
+        canvas.drawText("$hobbiesCount ACTIVE $trackWord", cardPad + cardW - 12f, currentY + usableH * 0.010f, countPaint)
+
+        val hobStartY = currentY + usableH * 0.014f
+        val hobFootnoteH = usableH * 0.025f
+        val hobAvailableH = (topMargin + usableH) - hobStartY - hobFootnoteH
+        val hobGap = 14f
+
+        val rows = (hobbiesCount + 1) / 2
+        if (rows == 1) {
+            // 1 row: 1 full-width card or 2 side-by-side cards with expansive height
+            val isSingle = hobbiesCount == 1
+            val hobCardW = if (isSingle) cardW else (cardW - hobGap) / 2f
+            val hobCardH = minOf(usableH * 0.130f, hobAvailableH)
+
+            for (idx in 0 until hobbiesCount) {
+                val habit = userHabits[idx]
+                val hX = if (isSingle) cardPad else cardPad + idx * (hobCardW + hobGap)
+                val hY = hobStartY
+                val hRect = RectF(hX, hY, hX + hobCardW, hY + hobCardH)
+                canvas.drawRoundRect(hRect, 44f, 44f, cardBgPaint)
+                canvas.drawRoundRect(hRect, 44f, 44f, cardBorderPaint)
 
                 val emoji = resolveEmoji(habit.icon, habit.name)
-                val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = width * 0.056f }
-                canvas.drawText(emoji, cardPad + 22f, hobStartY + hobCardH * 0.68f, emojiPaint)
-
-                val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                    textSize = width * 0.038f
-                    color = Color.WHITE
-                }
-                canvas.drawText(habit.name, cardPad + 84f, hobStartY + hobCardH * 0.44f, hobNamePaint)
-
-                val hobCatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    typeface = Typeface.DEFAULT
-                    textSize = width * 0.026f
-                    color = Color.parseColor("#94A3B8")
-                }
-                canvas.drawText(habit.category.ifEmpty { "Cadence Track" }, cardPad + 84f, hobStartY + hobCardH * 0.80f, hobCatPaint)
+                val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = width * 0.052f }
+                canvas.drawText(emoji, hX + 22f, hY + hobCardH * 0.52f, emojiPaint)
 
                 val streakText = "${habit.streak}d 🔥"
                 val singleStreakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     textAlign = Paint.Align.RIGHT
                     typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                    textSize = width * 0.036f
-                    color = Color.parseColor("#FBBF24")
+                    textSize = width * 0.028f
+                    color = Color.parseColor("#F59E0B")
                 }
-                canvas.drawText(streakText, cardPad + cardW - 24f, hobStartY + hobCardH * 0.60f, singleStreakPaint)
-            } else {
-                val hobCardW = (cardW - hobGap) / 2f
-                for (idx in 0 until hobbiesCount) {
-                    val habit = userHabits[idx]
-                    val row = idx / 2
-                    val col = idx % 2
-                    val hX = cardPad + col * (hobCardW + hobGap)
-                    val hY = hobStartY + row * (hobCardH + hobGap)
+                canvas.drawText(streakText, hX + hobCardW - 18f, hY + hobCardH * 0.44f, singleStreakPaint)
 
-                    val hRect = RectF(hX, hY, hX + hobCardW, hY + hobCardH)
-                    canvas.drawRoundRect(hRect, 18f, 18f, cardBgPaint)
-                    canvas.drawRoundRect(hRect, 18f, 18f, cardBorderPaint)
-
-                    val emoji = resolveEmoji(habit.icon, habit.name)
-                    val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = width * 0.044f }
-                    canvas.drawText(emoji, hX + 16f, hY + hobCardH * 0.52f, emojiPaint)
-
-                    val streakText = "${habit.streak}d 🔥"
-                    val streakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        textAlign = Paint.Align.RIGHT
-                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                        textSize = width * 0.026f
-                        color = Color.parseColor("#FBBF24")
-                    }
-                    canvas.drawText(streakText, hX + hobCardW - 14f, hY + hobCardH * 0.42f, streakPaint)
-
-                    val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                        textSize = width * 0.030f
-                        color = Color.WHITE
-                    }
-                    var hDisplayName = habit.name
-                    while (hDisplayName.length > 3 && hobNamePaint.measureText(hDisplayName) > hobCardW - 44f) {
-                        hDisplayName = hDisplayName.dropLast(1)
-                    }
-                    if (hDisplayName.length < habit.name.length) hDisplayName += "…"
-                    canvas.drawText(hDisplayName, hX + 16f, hY + hobCardH * 0.82f, hobNamePaint)
+                val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                    textSize = width * 0.034f
+                    color = Color.WHITE
                 }
+                var hDisplayName = habit.name
+                while (hDisplayName.length > 3 && hobNamePaint.measureText(hDisplayName) > hobCardW - 44f) {
+                    hDisplayName = hDisplayName.dropLast(1)
+                }
+                if (hDisplayName.length < habit.name.length) hDisplayName += "…"
+                canvas.drawText(hDisplayName, hX + 22f, hY + hobCardH * 0.82f, hobNamePaint)
+            }
+        } else {
+            // 2 rows of 2 columns, filling available height evenly
+            val hobCardW = (cardW - hobGap) / 2f
+            val hobCardH = (hobAvailableH - hobGap) / 2f
+
+            for (idx in 0 until hobbiesCount) {
+                val habit = userHabits[idx]
+                val r = idx / 2
+                val c = idx % 2
+                val hX = cardPad + c * (hobCardW + hobGap)
+                val hY = hobStartY + r * (hobCardH + hobGap)
+
+                val hRect = RectF(hX, hY, hX + hobCardW, hY + hobCardH)
+                canvas.drawRoundRect(hRect, 38f, 38f, cardBgPaint)
+                canvas.drawRoundRect(hRect, 38f, 38f, cardBorderPaint)
+
+                val emoji = resolveEmoji(habit.icon, habit.name)
+                val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = width * 0.046f }
+                canvas.drawText(emoji, hX + 18f, hY + hobCardH * 0.50f, emojiPaint)
+
+                val streakText = "${habit.streak}d 🔥"
+                val streakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textAlign = Paint.Align.RIGHT
+                    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                    textSize = width * 0.026f
+                    color = Color.parseColor("#F59E0B")
+                }
+                canvas.drawText(streakText, hX + hobCardW - 16f, hY + hobCardH * 0.42f, streakPaint)
+
+                val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                    textSize = width * 0.032f
+                    color = Color.WHITE
+                }
+                var hDisplayName = habit.name
+                while (hDisplayName.length > 3 && hobNamePaint.measureText(hDisplayName) > hobCardW - 44f) {
+                    hDisplayName = hDisplayName.dropLast(1)
+                }
+                if (hDisplayName.length < habit.name.length) hDisplayName += "…"
+                canvas.drawText(hDisplayName, hX + 18f, hY + hobCardH * 0.82f, hobNamePaint)
             }
         }
 
-        // 9. Bottom subtle brand
+        // 9. Bottom subtle brand mark
         val footPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
-            textSize = width * 0.024f
+            textSize = width * 0.022f
             color = Color.parseColor("#44FFFFFF")
         }
-        canvas.drawText("ODYSSEY CADENCE LOCKSCREEN", width / 2f, height * 0.965f, footPaint)
+        canvas.drawText("ODYSSEY CADENCE LOCKSCREEN", width / 2f, height - bottomMargin * 0.40f, footPaint)
     }
 
     companion object {

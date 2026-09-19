@@ -4,6 +4,7 @@ import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import { EveningReminderModal } from "@/components/notifications/evening-reminder-modal";
 import { FloatingFeedbackButton } from "@/components/feedback/feedback-modal";
+import { AppUpdateModal } from "@/components/common/app-update-modal";
 import { usePathname } from "next/navigation";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
       <FloatingFeedbackButton />
       <EveningReminderModal />
+      <AppUpdateModal />
       <BottomNav />
     </>
   );

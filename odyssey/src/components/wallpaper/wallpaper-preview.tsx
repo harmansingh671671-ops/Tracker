@@ -198,15 +198,15 @@ export function WallpaperPreview({
         ) : null}
       </div>
 
-      {/* 2. HEADER ANCHOR CARD (Utilizes the upper screen area) */}
+      {/* 2. HEADER ANCHOR CARD (Utilizes the upper screen area with high-radius corners) */}
       <div className="px-4 pt-1 z-10 animate-in fade-in duration-300">
-        <div className="rounded-2xl p-3 sm:p-3.5 bg-[#13151D]/85 border border-white/15 backdrop-blur-md flex items-center justify-between shadow-xl">
+        <div className="rounded-[28px] p-3 sm:p-3.5 bg-[#13151D]/85 border border-white/15 backdrop-blur-md flex items-center justify-between shadow-xl">
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-[10.5px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold">
                 ODYSSEY • CH. 0{data.chapter}
               </span>
-              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+              <span className="text-[9px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
                 DAY {data.activeDay} OF 365
               </span>
             </div>
@@ -234,9 +234,9 @@ export function WallpaperPreview({
 
       {/* 3. CORE 24-HOUR SPECTRUM BAR */}
       <div className="px-4 w-full z-10 mt-2">
-        <div className="rounded-xl p-2.5 px-3 bg-[#13151D]/75 border border-white/15 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
+        <div className="rounded-2xl p-2.5 px-3 bg-[#13151D]/75 border border-white/15 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
           {/* Multi-segmented Timeline Bar (24 individual 1-hour slots) */}
-          <div className="relative w-full py-0.5">
+          <div className="relative w-full py-1">
             <div className="h-2.5 w-full bg-slate-900 rounded-full flex overflow-hidden border border-white/15 shadow-inner">
               {all24HourlyBlocks.map((b) => {
                 const widthPct = (1 / 24) * 100;
@@ -255,28 +255,36 @@ export function WallpaperPreview({
               })}
             </div>
 
-            {/* Active Time Needle Marker */}
+            {/* Active Time Needle Marker - Large Radiant Glowing Beacon (Larger than bar!) */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 -ml-1.5 pointer-events-none flex items-center justify-center transition-all duration-300"
+              className="absolute top-1/2 -translate-y-1/2 -ml-3 pointer-events-none flex items-center justify-center transition-all duration-300 z-10"
               style={{
                 left: `${Math.min(
-                  98,
+                  96,
                   Math.max(
-                    2,
+                    4,
                     ((activeHour + (activeHourOverride !== null ? 0.5 : currentMinute / 60)) / 24) * 100
                   )
                 )}%`,
               }}
             >
-              <div className="w-3 h-3 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_10px_#F59E0B]" />
+              {/* Tier 1: Soft Ambient Radiant Aura */}
+              <div className="absolute w-9 h-9 rounded-full bg-amber-400/25 animate-pulse blur-[3px]" />
+              {/* Tier 2: Glowing Halo Ring */}
+              <div className="absolute w-6 h-6 rounded-full bg-amber-400/35 border border-amber-300/80 shadow-[0_0_12px_#F59E0B]" />
+              {/* Tier 3: Solid Amber Core Body */}
+              <div className="relative w-4 h-4 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_10px_#F59E0B] flex items-center justify-center">
+                {/* Tier 4: Specular White Pinpoint */}
+                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+              </div>
             </div>
           </div>
 
           <div className="flex justify-between items-center text-[9px] font-mono text-slate-400 tracking-wider">
             <span className="text-slate-500">00:00</span>
             <span className="text-slate-500">06:00</span>
-            <span className="text-amber-400 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
+            <span className="text-amber-400 font-bold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_#F59E0B] inline-block" />
               {String(activeHour).padStart(2, "0")}:00 ACTIVE
             </span>
             <span className="text-slate-500">18:00</span>
@@ -285,7 +293,7 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR - 2-ROW SPACIOUS DESIGN) */}
+      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR - EXPANSIVE 2-ROW DESIGN, NO LEFT BAR) */}
       <div className="px-4 py-2 flex flex-col gap-2 z-10">
         <div className="flex items-center justify-between px-1">
           <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
@@ -307,23 +315,22 @@ export function WallpaperPreview({
           return (
             <div
               key={`${block.hour}-${idx}`}
-              className={`rounded-2xl p-2.5 px-3 transition-all flex flex-col gap-1.5 border ${
+              className={`rounded-[24px] p-3.5 px-4 transition-all flex flex-col gap-1.5 border ${
                 isActive
-                  ? "bg-[#181B26] border-amber-400/90 shadow-[0_0_24px_rgba(245,158,11,0.25)] relative overflow-hidden ring-1 ring-amber-400/50"
+                  ? "bg-[#181B26] border-amber-400/90 shadow-[0_0_24px_rgba(245,158,11,0.22)] relative overflow-hidden ring-1 ring-amber-400/40"
                   : isPast
                   ? "bg-[#13151D]/60 border-white/10 opacity-75"
                   : "bg-[#13151D]/85 border-white/15"
               }`}
             >
-              {isActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-400 shadow-[0_0_12px_#F59E0B]" />
-              )}
-
               {/* ROW 1: Time Interval (Left) + Category Pill Badge (Right) */}
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {isActive ? (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <span className="absolute w-3.5 h-3.5 rounded-full bg-amber-400/30 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#F59E0B]" />
+                    </div>
                   ) : (
                     <span
                       className={`w-2 h-2 rounded-full shrink-0 ${
@@ -341,7 +348,7 @@ export function WallpaperPreview({
                 </div>
 
                 <span
-                  className={`px-2 py-0.5 rounded-md text-[9.5px] font-mono font-bold border shrink-0 ${theme.badge}`}
+                  className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold border shrink-0 ${theme.badge}`}
                 >
                   {theme.label}
                 </span>
@@ -350,7 +357,7 @@ export function WallpaperPreview({
               {/* ROW 2: Full-Width Activity Title + Active/Done Beacon */}
               <div className="flex items-center justify-between gap-2 w-full pt-0.5">
                 <span
-                  className={`text-[13px] font-bold leading-tight truncate ${
+                  className={`text-[13.5px] font-bold leading-tight truncate ${
                     isActive ? "text-white" : isPast ? "text-slate-300" : "text-slate-100"
                   }`}
                   title={block.title}
@@ -374,9 +381,14 @@ export function WallpaperPreview({
         })}
       </div>
 
-      {/* 5. CADENCE HOBBIES & PASSIONS (Full Width if single, 2x2 Grid if multiple) */}
-      {data.includeHobbies !== false && data.habits && data.habits.length > 0 && (() => {
-        const userHobbies = data.habits.slice(0, 4);
+      {/* 5. CADENCE HOBBIES & PASSIONS (Guaranteed Display - Always Visible, Full Width if single, 2x2 Grid if multiple) */}
+      {data.includeHobbies !== false && (() => {
+        const userHobbies = (data.habits && data.habits.length > 0)
+          ? data.habits.slice(0, 4)
+          : [
+              { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Cadence Track" } as any,
+              { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" } as any,
+            ];
         const count = userHobbies.length;
 
         return (
@@ -395,7 +407,7 @@ export function WallpaperPreview({
               {userHobbies.map((h, hIdx) => (
                 <div
                   key={h.id || hIdx}
-                  className="rounded-2xl p-3 bg-[#13151D]/85 border border-white/15 flex items-center justify-between gap-3 transition-all shadow-md"
+                  className="rounded-[24px] p-3 bg-[#13151D]/85 border border-white/15 flex items-center justify-between gap-3 transition-all shadow-md"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-xl shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
@@ -408,7 +420,7 @@ export function WallpaperPreview({
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30 font-bold shrink-0">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 font-bold shrink-0">
                     {h.currentStreak || 0}d 🔥
                   </span>
                 </div>

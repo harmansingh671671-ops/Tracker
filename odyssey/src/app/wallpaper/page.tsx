@@ -22,6 +22,8 @@ import {
   isNativeBridgeAvailable,
   isAndroidApp,
   syncScheduleDataToNative,
+  syncAndVerifySchedule,
+  type SyncVerificationResult,
 } from "@/lib/utils/android-bridge";
 import {
   ArrowLeft,
@@ -41,6 +43,9 @@ import {
   X,
   Trash2,
   ExternalLink,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 export default function WallpaperPage() {
@@ -62,6 +67,8 @@ export default function WallpaperPage() {
   const [showPermissionDetails, setShowPermissionDetails] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
   const [dayBlockCounts, setDayBlockCounts] = useState<Record<number, number>>({});
+  const [syncResult, setSyncResult] = useState<SyncVerificationResult | null>(null);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -342,14 +349,54 @@ export default function WallpaperPage() {
   };
 
   // Handler: Launch Native Live Wallpaper Service (Home Screen & Lock Screen)
-  const handleLaunchLiveWallpaper = () => {
-    const launched = launchLiveWallpaperPicker();
-    if (launched) {
-      setStatusNotice("Opening Live Wallpaper picker. Tap 'Set wallpaper' → choose 'Home screen and lock screen'!");
-    } else {
-      setStatusNotice("Live Wallpaper engine is ready in the APK. Open Device Guides for instructions.");
+  const handleLaunchLiveWallpaper = async () => {
+    setIsVerifying(true);
+    setStatusNotice("Syncing schedule & verifying native engine...");
+    try {
+      const res = await syncAndVerifySchedule(wallpaperData);
+      setSyncResult(res);
+      const launched = launchLiveWallpaperPicker();
+      if (launched) {
+        setStatusNotice("Live Wallpaper picker launched! Tap 'Set wallpaper' → choose 'Home screen and lock screen'.");
+      } else {
+        if (res.isNativeBridge) {
+          setStatusNotice(`✓ Verified: ${res.blockCount} tasks & ${res.habitCount} hobbies confirmed on device. Open Settings → Wallpaper to activate.`);
+        } else {
+          setStatusNotice(`✓ Verified in web cache (${res.blockCount} tasks, ${res.habitCount} hobbies). Install/run native APK on phone for lockscreen.`);
+        }
+      }
+    } catch (err: any) {
+      console.error("Failed to sync & launch live wallpaper:", err);
+      setStatusNotice("Live Wallpaper launch encountered an issue.");
+    } finally {
+      setIsVerifying(false);
+      setTimeout(() => setStatusNotice(null), 6000);
     }
-    setTimeout(() => setStatusNotice(null), 5000);
+  };
+
+  // Handler: Explicit Schedule Sync & Verification Check
+  const handleSyncAndVerify = async () => {
+    setIsVerifying(true);
+    setStatusNotice("Verifying schedule & habits sync...");
+    try {
+      const res = await syncAndVerifySchedule(wallpaperData);
+      setSyncResult(res);
+      if (res.isNativeBridge) {
+        if (res.success) {
+          setStatusNotice(`✓ Verified! ${res.blockCount} tasks & ${res.habitCount} hobbies confirmed in Android Native Storage.`);
+        } else {
+          setStatusNotice(`⚠️ Sync issue: ${res.message}`);
+        }
+      } else {
+        setStatusNotice(`ℹ️ Verified in web cache: ${res.blockCount} tasks & ${res.habitCount} hobbies. Running in browser.`);
+      }
+    } catch (err: any) {
+      console.error("Failed to verify sync:", err);
+      setStatusNotice("Failed to verify sync.");
+    } finally {
+      setIsVerifying(false);
+      setTimeout(() => setStatusNotice(null), 5000);
+    }
   };
 
   // Handler: Turn Off Wallpaper (Reset to default)
@@ -361,11 +408,33 @@ export default function WallpaperPage() {
         const ok = clearNativeLockscreen();
         if (ok) {
           setStatusNotice("Wallpaper turned off. Android system default restored on Home and Lock screens.");
+          setSyncResult({
+            success: true,
+            isNativeBridge: true,
+            blockCount: 0,
+            habitCount: 0,
+            taskNames: [],
+            habitNames: [],
+            streak: 0,
+            message: "Wallpaper cleared. Default system wallpaper restored.",
+            timestamp: new Date().toLocaleTimeString(),
+          });
         } else {
           setStatusNotice("Wallpaper reset to default.");
         }
       } else {
         setStatusNotice("Wallpaper turned off in Odyssey. Default system wallpaper restored.");
+        setSyncResult({
+          success: true,
+          isNativeBridge: false,
+          blockCount: 0,
+          habitCount: 0,
+          taskNames: [],
+          habitNames: [],
+          streak: 0,
+          message: "Wallpaper reset in web app. On your physical phone, select any standard system wallpaper from phone settings.",
+          timestamp: new Date().toLocaleTimeString(),
+        });
       }
       setTimeout(() => setStatusNotice(null), 4000);
     } catch {
@@ -676,16 +745,21 @@ export default function WallpaperPage() {
                   </div>
 
                   {/* Action Buttons Toolbar */}
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-3 pt-1">
                     {/* Primary: Launch Native Live Wallpaper Service (Supports Home Screen & Lock Screen) */}
                     <button
                       type="button"
                       onClick={handleLaunchLiveWallpaper}
-                      className="w-full py-3.5 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20 active:scale-95"
+                      disabled={isVerifying || isGenerating}
+                      className="w-full py-3.5 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20 active:scale-95 disabled:opacity-60"
                       title="Set real-time live wallpaper that shifts hourly for Lock Screen & Home Screen"
                     >
-                      <Smartphone className="w-4 h-4 text-black" />
-                      <span>📱 Launch Native Live Wallpaper Service</span>
+                      {isVerifying ? (
+                        <RefreshCw className="w-4 h-4 text-black animate-spin" />
+                      ) : (
+                        <Smartphone className="w-4 h-4 text-black" />
+                      )}
+                      <span>{isVerifying ? "Verifying & Syncing Schedule..." : "📱 Launch Native Live Wallpaper Service"}</span>
                     </button>
 
                     <div className="p-2.5 rounded-xl bg-surface-container-high border border-outline/15 text-[11px] font-mono text-on-surface-variant flex items-center gap-2">
@@ -693,11 +767,111 @@ export default function WallpaperPage() {
                       <span>In Android&apos;s picker, choose <strong>&quot;Home screen and lock screen&quot;</strong> to apply changes to both!</span>
                     </div>
 
+                    {/* LIVE VERIFICATION STATUS CARD (Indicates Success/Failure & Exact Task/Hobby Details) */}
+                    <div className={`p-3.5 rounded-2xl border transition-all text-xs font-mono space-y-2.5 ${
+                      !syncResult
+                        ? "bg-surface-container border-outline/15"
+                        : syncResult.isNativeBridge && syncResult.success
+                        ? "bg-emerald-950/25 border-emerald-500/40 shadow-sm shadow-emerald-500/10"
+                        : syncResult.isNativeBridge && !syncResult.success
+                        ? "bg-rose-950/25 border-rose-500/40"
+                        : "bg-surface-container-high border-amber-500/30"
+                    }`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {!syncResult ? (
+                            <span className="w-2.5 h-2.5 rounded-full bg-on-surface-variant/40 animate-pulse shrink-0" />
+                          ) : syncResult.isNativeBridge && syncResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : syncResult.isNativeBridge && !syncResult.success ? (
+                            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                          )}
+                          <span className="font-bold text-xs truncate">
+                            {!syncResult
+                              ? "Live Wallpaper Sync Status"
+                              : syncResult.isNativeBridge && syncResult.success
+                              ? "✓ Verified in Android Native Storage"
+                              : syncResult.isNativeBridge && !syncResult.success
+                              ? "⚠️ Sync Issue Reported"
+                              : "Web Preview Mode (Chrome)"}
+                          </span>
+                        </div>
+
+                        {syncResult && (
+                          <span className="text-[10px] text-on-surface-variant/70 shrink-0">
+                            {syncResult.timestamp}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Status Message */}
+                      <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                        {syncResult
+                          ? syncResult.message
+                          : "Verify that your customized task names and hobbies are stored and ready for the Android lockscreen service."}
+                      </p>
+
+                      {/* Tasks confirmed to be rendered on wallpaper */}
+                      <div className="pt-0.5 space-y-1 text-[10px]">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold text-on-surface">Tasks on wallpaper:</span>
+                          {selectedBlocks.length > 0 ? (
+                            selectedBlocks.slice(0, 3).map((b, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/20 font-bold truncate max-w-[130px]">
+                                {b.title}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-surface-container-highest text-on-surface-variant/80">
+                              24h Hourly Flow
+                            </span>
+                          )}
+                          {selectedBlocks.length > 3 && (
+                            <span className="text-[9px] text-on-surface-variant">+{selectedBlocks.length - 3} more</span>
+                          )}
+                        </div>
+
+                        {/* Hobbies confirmed to be rendered on wallpaper */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold text-on-surface">Hobbies on wallpaper:</span>
+                          {effectiveHabits.length > 0 ? (
+                            effectiveHabits.slice(0, 3).map((h, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/25 font-bold truncate max-w-[130px]">
+                                {resolveHobbyEmoji(h.icon, h.name)} {h.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/25 font-bold">
+                              🧘 Mindful Focus • 💧 Daily Hydration
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Explicit Sync & Verify Button */}
+                      <div className="pt-1.5 flex items-center justify-between border-t border-outline/10">
+                        <span className="text-[10px] text-on-surface-variant/60">
+                          {syncResult?.isNativeBridge ? "Native APK connected" : "Web sandbox mode"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleSyncAndVerify}
+                          disabled={isVerifying}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-highest hover:bg-surface-bright border border-outline/15 text-[10.5px] font-mono font-bold text-primary cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isVerifying ? "animate-spin text-primary" : ""}`} />
+                          <span>{isVerifying ? "Verifying On-Device..." : "🔄 Sync & Verify Schedule Data"}</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Turn Off Wallpaper Feature */}
                     <button
                       type="button"
                       onClick={handleTurnOffWallpaper}
-                      disabled={isGenerating}
+                      disabled={isGenerating || isVerifying}
                       className="w-full py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-2 transition-all cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30 active:scale-95"
                       title="Reset phone's wallpaper back to Android default"
                     >

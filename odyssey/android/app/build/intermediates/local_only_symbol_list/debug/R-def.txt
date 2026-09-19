@@ -1,7 +1,0 @@
-R_DEF: Internal format may change without notice
-local
-string app_name
-string default_vercel_url
-string wallpaper_description
-style Theme.Odyssey
-xml wallpaper
