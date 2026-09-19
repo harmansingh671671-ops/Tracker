@@ -241,7 +241,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
 
   // 3. TOP SAFE ZONE (y: 0 to topSafeZone)
   // Clean OLED dark space so the phone's native lock, date, big clock (e.g. 00:48) and notifications NEVER collide with text!
-  const topSafeZone = data.topClockOffset ?? 840;
+  const topSafeZone = data.topClockOffset ?? (data.showClockGuide ? 620 : 270);
 
   if (data.showClockGuide) {
     // OS Status bar hints (only visible in app preview simulation guide)
@@ -257,122 +257,122 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     ctx.textAlign = "center";
     ctx.font = "600 28px 'Plus Jakarta Sans', sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-    ctx.fillText(data.formattedDate.toUpperCase(), width / 2, 330);
+    ctx.fillText(data.formattedDate.toUpperCase(), width / 2, 280);
 
-    ctx.font = "300 160px 'Plus Jakarta Sans', -apple-system, sans-serif";
+    ctx.font = "300 130px 'Plus Jakarta Sans', -apple-system, sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
-    ctx.fillText(timeStr, width / 2, 530);
+    ctx.fillText(timeStr, width / 2, 440);
 
     // Simulated lockscreen notification card hint
-    const notifW = width - 180;
-    const notifH = 82;
-    const notifY = 660;
+    const notifW = width - 240;
+    const notifH = 70;
+    const notifY = 510;
     ctx.fillStyle = "rgba(30, 41, 59, 0.40)";
     ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect((width - notifW) / 2, notifY, notifW, notifH, 20);
+    ctx.roundRect((width - notifW) / 2, notifY, notifW, notifH, 18);
     ctx.fill();
     ctx.stroke();
 
     ctx.textAlign = "left";
     ctx.font = "600 20px 'Plus Jakarta Sans', sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-    ctx.fillText("Android System • 1 notification", (width - notifW) / 2 + 25, notifY + 48);
+    ctx.fillText("Android System • 1 notification", (width - notifW) / 2 + 25, notifY + 42);
   }
 
-  const cardPad = 60;
-  const cardW = width - cardPad * 2; // 960px
+  const cardPad = 50;
+  const cardW = width - cardPad * 2; // 980px
 
-  // 4. HEADER ANCHOR CARD (Positioned right below clock safe zone)
-  const headerY = topSafeZone + 15;
-  const headerH = 115;
+  // 4. HEADER ANCHOR CARD (Positioned right below clock/notch safe zone)
+  const headerY = topSafeZone;
+  const headerH = 190;
 
-  ctx.fillStyle = "rgba(19, 21, 29, 0.72)";
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  ctx.fillStyle = "rgba(19, 21, 29, 0.82)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(cardPad, headerY, cardW, headerH, 20);
+  ctx.roundRect(cardPad, headerY, cardW, headerH, 24);
   ctx.fill();
   ctx.stroke();
 
   // Left Title: ODYSSEY • CH. 0X
-  ctx.font = "700 18px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+  ctx.font = "700 26px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
   const chapterText = `ODYSSEY • CH. 0${data.chapter}`;
-  ctx.fillText(chapterText, cardPad + 24, headerY + 38);
+  ctx.fillText(chapterText, cardPad + 30, headerY + 60);
 
   // Day Badge Pill
   const chapterTextW = ctx.measureText(chapterText).width;
   const dayBadgeText = `DAY ${data.activeDay} OF 365`;
-  ctx.font = "700 16px 'JetBrains Mono', monospace";
-  const badgeW = ctx.measureText(dayBadgeText).width + 18;
-  const badgeX = cardPad + 24 + chapterTextW + 14;
+  ctx.font = "700 22px 'JetBrains Mono', monospace";
+  const badgeW = ctx.measureText(dayBadgeText).width + 24;
+  const badgeX = cardPad + 30 + chapterTextW + 18;
 
-  ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
-  ctx.strokeStyle = "rgba(16, 185, 129, 0.35)";
-  ctx.lineWidth = 1.2;
+  ctx.fillStyle = "rgba(16, 185, 129, 0.2)";
+  ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(badgeX, headerY + 22, badgeW, 24, 12);
+  ctx.roundRect(badgeX, headerY + 32, badgeW, 36, 12);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#34d399";
-  ctx.fillText(dayBadgeText, badgeX + 9, headerY + 39);
+  ctx.fillText(dayBadgeText, badgeX + 12, headerY + 58);
 
-  // User Rank & Level
-  ctx.font = "700 24px 'Plus Jakarta Sans', sans-serif";
-  ctx.fillStyle = "#f8fafc";
-  ctx.fillText(`${data.rankBadge} ${data.rankName}`, cardPad + 24, headerY + 76);
+  // User Rank & Level (Large bold)
+  ctx.font = "700 36px 'Plus Jakarta Sans', sans-serif";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(`${data.rankBadge} ${data.rankName}`, cardPad + 30, headerY + 125);
 
-  ctx.font = "500 17px 'Plus Jakarta Sans', sans-serif";
-  ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
-  ctx.fillText(`Level ${String(data.userLevel).padStart(2, "0")} Cadence`, cardPad + 24, headerY + 100);
-
-  // Minimal Streak Count (Replaces the circular progress gauge on the right)
-  const streakNum = data.userStreak !== undefined ? data.userStreak : data.activeDay;
-  const streakX = cardPad + cardW - 25;
-  ctx.textAlign = "right";
-  ctx.font = "700 30px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "#fbbf24";
-  ctx.fillText(`${streakNum} 🔥`, streakX, headerY + 54);
-
-  ctx.font = "600 12px 'JetBrains Mono', monospace";
+  ctx.font = "500 24px 'Plus Jakarta Sans', sans-serif";
   ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
-  ctx.fillText("DAYS STREAK", streakX, headerY + 78);
+  ctx.fillText(`Level ${String(data.userLevel).padStart(2, "0")} Cadence`, cardPad + 30, headerY + 162);
+
+  // Minimal Streak Count on right
+  const streakNum = data.userStreak !== undefined ? data.userStreak : data.activeDay;
+  const streakX = cardPad + cardW - 30;
+  ctx.textAlign = "right";
+  ctx.font = "700 44px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "#fbbf24";
+  ctx.fillText(`${streakNum} 🔥`, streakX, headerY + 95);
+
+  ctx.font = "600 18px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+  ctx.fillText("DAYS STREAK", streakX, headerY + 145);
   ctx.textAlign = "left";
 
   // 5. TIMELINE HEADER & SPECTRUM BAR
-  const scheduleHeaderY = headerY + headerH + 22;
-  ctx.font = "700 18px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+  const scheduleHeaderY = headerY + headerH + 28;
+  ctx.font = "700 24px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
   ctx.fillText("SCHEDULE • ACTIVE HOUR CENTERED", cardPad + 10, scheduleHeaderY);
 
   ctx.textAlign = "right";
-  ctx.font = "700 16px 'JetBrains Mono', monospace";
+  ctx.font = "700 24px 'JetBrains Mono', monospace";
   ctx.fillStyle = "#f59e0b";
   ctx.fillText(`● ${timeStr} ACTIVE`, cardPad + cardW - 10, scheduleHeaderY);
   ctx.textAlign = "left";
 
   // 24-Hour Cadence Spectrum Bar
   const specY = scheduleHeaderY + 18;
-  const specH = 46;
-  ctx.fillStyle = "rgba(19, 21, 29, 0.65)";
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  ctx.lineWidth = 1.5;
+  const specH = 92;
+  ctx.fillStyle = "rgba(19, 21, 29, 0.75)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(cardPad, specY, cardW, specH, 14);
+  ctx.roundRect(cardPad, specY, cardW, specH, 18);
   ctx.fill();
   ctx.stroke();
 
   // Multi-segment 24h timeline strip
-  const stripX = cardPad + 16;
-  const stripY = specY + 11;
-  const stripW = cardW - 32;
-  const stripH = 12;
+  const stripX = cardPad + 24;
+  const stripY = specY + 20;
+  const stripW = cardW - 48;
+  const stripH = 22;
 
-  ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+  ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
   ctx.beginPath();
-  ctx.roundRect(stripX, stripY, stripW, stripH, 6);
+  ctx.roundRect(stripX, stripY, stripW, stripH, 10);
   ctx.fill();
 
   const allHourlyBlocks = build24HourlyBlocks(data.blocks);
@@ -393,31 +393,31 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   const needleX = stripX + (currentHourFloat / 24) * stripW;
   ctx.fillStyle = "#f59e0b";
   ctx.strokeStyle = "#090a0f";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.arc(needleX, stripY + stripH / 2, 7.5, 0, Math.PI * 2);
+  ctx.arc(needleX, stripY + stripH / 2, 12, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
   // Legend timestamps
-  ctx.font = "600 14px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(148, 163, 184, 0.65)";
-  ctx.fillText("00:00", stripX, specY + 38);
-  ctx.fillText("06:00", stripX + stripW * 0.23, specY + 38);
+  ctx.font = "600 20px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
+  ctx.fillText("00:00", stripX, specY + 75);
+  ctx.fillText("06:00", stripX + stripW * 0.23, specY + 75);
   ctx.textAlign = "center";
-  ctx.fillText("12:00", stripX + stripW * 0.5, specY + 38);
-  ctx.fillText("18:00", stripX + stripW * 0.77, specY + 38);
+  ctx.fillText("12:00", stripX + stripW * 0.5, specY + 75);
+  ctx.fillText("18:00", stripX + stripW * 0.77, specY + 75);
   ctx.textAlign = "right";
-  ctx.fillText("24:00", stripX + stripW, specY + 38);
+  ctx.fillText("24:00", stripX + stripW, specY + 75);
   ctx.textAlign = "left";
 
-  // 6. 5-CARD HOURLY SCHEDULE WINDOW (Strictly Centered on Active Hour)
+  // 6. 5-CARD HOURLY SCHEDULE WINDOW (Spacious 2-Row Layout, Large Text, Never Clips!)
   const blockCount = 5;
   const displayBlocks = getCenteredHourlyWindow(allHourlyBlocks, currentHour, blockCount);
 
-  const timelineStartY = specY + specH + 16;
-  const cardHeight = 88;
-  const cardGap = 10;
+  const timelineStartY = specY + specH + 24;
+  const cardHeight = 175;
+  const cardGap = 20;
 
   displayBlocks.forEach((block, idx) => {
     const cardY = timelineStartY + idx * (cardHeight + cardGap);
@@ -427,150 +427,174 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
       (block.hour > currentHour && block.hour - currentHour > 12);
 
     if (isActive) {
-      // Golden beacon glowing box around the active hour
-      const activeGlow = ctx.createRadialGradient(
-        cardPad + cardW / 2, cardY + cardHeight / 2, 50,
-        cardPad + cardW / 2, cardY + cardHeight / 2, cardW / 2
-      );
-      activeGlow.addColorStop(0, "rgba(245, 158, 11, 0.14)");
-      activeGlow.addColorStop(1, "rgba(245, 158, 11, 0)");
-      ctx.fillStyle = activeGlow;
-      ctx.fillRect(cardPad - 15, cardY - 10, cardW + 30, cardHeight + 20);
-
-      ctx.fillStyle = "#161924";
-      ctx.strokeStyle = "rgba(245, 158, 11, 0.95)";
-      ctx.lineWidth = 2.2;
+      ctx.fillStyle = "#181b26";
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 3.2;
     } else {
-      ctx.fillStyle = isPast ? "rgba(19, 21, 29, 0.45)" : "rgba(19, 21, 29, 0.72)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.lineWidth = 1.2;
+      ctx.fillStyle = isPast ? "rgba(19, 21, 29, 0.5)" : "rgba(19, 21, 29, 0.82)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = 1.6;
     }
 
     ctx.beginPath();
-    ctx.roundRect(cardPad, cardY, cardW, cardHeight, 16);
+    ctx.roundRect(cardPad, cardY, cardW, cardHeight, 22);
     ctx.fill();
     ctx.stroke();
 
-    // Left category color pill indicator
+    if (isActive) {
+      // Left amber indicator bar
+      ctx.fillStyle = "#f59e0b";
+      ctx.beginPath();
+      ctx.roundRect(cardPad, cardY, 9, cardHeight, 8);
+      ctx.fill();
+    }
+
+    // Category theme
     const cat = (block.category || "").toLowerCase();
     let col = "#6366f1";
-    if (cat.includes("sleep") || cat.includes("rest")) col = "#818cf8";
-    else if (cat.includes("habit") || cat.includes("vitality") || cat.includes("gym")) col = "#10b981";
-    else if (cat.includes("sync") || cat.includes("meeting")) col = "#0284c7";
-    else if (cat.includes("buffer") || cat.includes("break") || cat.includes("renewal")) col = "#f59e0b";
+    let catLabel = "Deep Focus";
+    if (cat.includes("sleep") || cat.includes("rest")) {
+      col = "#818cf8";
+      catLabel = "Rest";
+    } else if (cat.includes("habit") || cat.includes("vitality") || cat.includes("gym")) {
+      col = "#10b981";
+      catLabel = "Vitality";
+    } else if (cat.includes("sync") || cat.includes("meeting")) {
+      col = "#38bdf8";
+      catLabel = "Sync";
+    } else if (cat.includes("buffer") || cat.includes("break") || cat.includes("renewal")) {
+      col = "#f59e0b";
+      catLabel = "Renewal";
+    }
 
-    ctx.fillStyle = col;
+    // ==========================================
+    // ROW 1: Time Interval (Left) + Category Badge (Right)
+    // ==========================================
+    const row1Y = cardY + 58;
+
+    // Left dot
+    ctx.fillStyle = isActive ? "#f59e0b" : isPast ? "#10b981" : "#475569";
     ctx.beginPath();
-    ctx.arc(cardPad + 26, cardY + cardHeight / 2, 4.5, 0, Math.PI * 2);
+    ctx.arc(cardPad + 34, row1Y - 8, isActive ? 8 : 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Time Slot
-    ctx.font = isActive ? "700 20px 'JetBrains Mono', monospace" : "600 19px 'JetBrains Mono', monospace";
-    ctx.fillStyle = isActive ? "#fbbf24" : isPast ? "rgba(148, 163, 184, 0.55)" : "#e2e8f0";
-    ctx.fillText(`${block.startTime} → ${block.endTime}`, cardPad + 42, cardY + 52);
+    // Time text
+    ctx.font = isActive ? "700 28px 'JetBrains Mono', monospace" : "600 26px 'JetBrains Mono', monospace";
+    ctx.fillStyle = isActive ? "#fef08a" : isPast ? "#94a3b8" : "#e2e8f0";
+    ctx.fillText(`${block.startTime} → ${block.endTime}`, cardPad + 56, row1Y);
 
-    // Category Tag Pill
-    const tagText = block.tag || (cat.includes("sleep") ? "Rest" : "Focus");
-    ctx.font = "600 13px 'JetBrains Mono', monospace";
-    const tagW = ctx.measureText(tagText).width + 18;
-    const tagX = cardPad + 235;
+    // Category badge pill on right
+    ctx.font = "700 22px 'JetBrains Mono', monospace";
+    const tagW = ctx.measureText(catLabel).width + 26;
+    const tagX = cardPad + cardW - tagW - 24;
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(tagX, cardY + 29, tagW, 26, 7);
+    ctx.roundRect(tagX, cardY + 24, tagW, 44, 12);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(203, 213, 225, 0.85)";
-    ctx.fillText(tagText, tagX + 9, cardY + 47);
+    ctx.fillStyle = col;
+    ctx.fillText(catLabel, tagX + 13, cardY + 54);
 
-    // Title / Activity Name
-    ctx.textAlign = "right";
+    // ==========================================
+    // ROW 2: Full-Width Task Title + Status (NOW / DONE)
+    // ==========================================
+    const row2Y = cardY + 135;
+
+    let statusW = 0;
     if (isActive) {
-      ctx.font = "700 13px 'JetBrains Mono', monospace";
+      ctx.textAlign = "right";
+      ctx.font = "700 24px 'JetBrains Mono', monospace";
       ctx.fillStyle = "#f59e0b";
-      ctx.fillText("● ACTIVE NOW", cardPad + cardW - 22, cardY + 34);
-
-      ctx.font = "700 20px 'Plus Jakarta Sans', sans-serif";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(truncateText(ctx, block.title || "Focus", 360), cardPad + cardW - 22, cardY + 63);
-    } else {
-      ctx.font = "600 18px 'Plus Jakarta Sans', sans-serif";
-      ctx.fillStyle = isPast ? "#94a3b8" : "#cbd5e1";
-      ctx.fillText(truncateText(ctx, block.title || "Scheduled", 400), cardPad + cardW - 22, cardY + 52);
+      ctx.fillText("● NOW", cardPad + cardW - 26, row2Y);
+      statusW = ctx.measureText("● NOW").width + 30;
+      ctx.textAlign = "left";
+    } else if (isPast) {
+      ctx.textAlign = "right";
+      ctx.font = "700 22px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "#10b981";
+      ctx.fillText("✓ DONE", cardPad + cardW - 26, row2Y);
+      statusW = ctx.measureText("✓ DONE").width + 30;
+      ctx.textAlign = "left";
     }
-    ctx.textAlign = "left";
+
+    // Task Title (Large & Bold across entire card width)
+    ctx.font = "700 34px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = isActive ? "#ffffff" : isPast ? "#94a3b8" : "#f1f5f9";
+    const maxTitleW = cardW - 70 - statusW;
+    ctx.fillText(truncateText(ctx, block.title || "Scheduled Block", maxTitleW), cardPad + 34, row2Y);
   });
 
   const timelineEndHeight = timelineStartY + blockCount * (cardHeight + cardGap);
 
   // 7. CADENCE HOBBIES & PASSIONS (Supports 1 full-width card or 2-column grid)
-  let currentCardY = timelineEndHeight + 18;
+  let currentCardY = timelineEndHeight + 20;
   const userHobbies = data.includeHobbies !== false && data.habits && data.habits.length > 0
     ? data.habits.slice(0, 4)
     : [];
 
   if (userHobbies.length > 0) {
-    const hobHeaderY = currentCardY + 18;
-    ctx.font = "700 17px 'JetBrains Mono', monospace";
-    ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+    const hobHeaderY = currentCardY + 22;
+    ctx.font = "700 24px 'JetBrains Mono', monospace";
+    ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
     ctx.fillText("✦ CADENCE • HOBBIES & PASSIONS", cardPad + 10, hobHeaderY);
 
     ctx.textAlign = "right";
-    ctx.font = "600 14px 'JetBrains Mono', monospace";
+    ctx.font = "600 20px 'JetBrains Mono', monospace";
     ctx.fillStyle = "rgba(100, 116, 139, 0.9)";
     ctx.fillText(`${userHobbies.length} ACTIVE ${userHobbies.length === 1 ? "TRACK" : "TRACKS"}`, cardPad + cardW - 10, hobHeaderY);
     ctx.textAlign = "left";
 
-    const hobStartY = hobHeaderY + 12;
+    const hobStartY = hobHeaderY + 16;
     const isSingle = userHobbies.length === 1;
 
     if (isSingle) {
       // Prominent Full-Width Card for 1 single hobby
       const h = userHobbies[0];
-      const hobH = 74;
-      ctx.fillStyle = "rgba(19, 21, 29, 0.75)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.lineWidth = 1.5;
+      const hobH = 150;
+      ctx.fillStyle = "rgba(19, 21, 29, 0.82)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(cardPad, hobStartY, cardW, hobH, 16);
+      ctx.roundRect(cardPad, hobStartY, cardW, hobH, 22);
       ctx.fill();
       ctx.stroke();
 
       // Emoji
       const emoji = resolveHobbyEmoji(h.icon, h.name);
-      ctx.font = "32px sans-serif";
-      ctx.fillText(emoji, cardPad + 20, hobStartY + 48);
+      ctx.font = "52px sans-serif";
+      ctx.fillText(emoji, cardPad + 28, hobStartY + 95);
 
       // Title and category
-      ctx.font = "700 20px 'Plus Jakarta Sans', sans-serif";
+      ctx.font = "700 34px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(truncateText(ctx, h.name, cardW - 180), cardPad + 68, hobStartY + 36);
+      ctx.fillText(truncateText(ctx, h.name, cardW - 280), cardPad + 105, hobStartY + 68);
 
-      ctx.font = "500 14px 'Plus Jakarta Sans', sans-serif";
-      ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
-      ctx.fillText(h.category || "Cadence Track", cardPad + 68, hobStartY + 60);
+      ctx.font = "500 24px 'Plus Jakarta Sans', sans-serif";
+      ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+      ctx.fillText(h.category || "Cadence Track", cardPad + 105, hobStartY + 115);
 
       // Streak flame pill on the right
       const streakText = `${h.currentStreak || 0}d 🔥`;
-      ctx.font = "700 15px 'JetBrains Mono', monospace";
-      const streakW = ctx.measureText(streakText).width + 18;
-      const streakX = cardPad + cardW - streakW - 18;
-      ctx.fillStyle = "rgba(245, 158, 11, 0.12)";
-      ctx.strokeStyle = "rgba(245, 158, 11, 0.3)";
-      ctx.lineWidth = 1;
+      ctx.font = "700 28px 'JetBrains Mono', monospace";
+      const streakW = ctx.measureText(streakText).width + 28;
+      const streakX = cardPad + cardW - streakW - 28;
+      ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.4)";
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(streakX, hobStartY + 24, streakW, 26, 13);
+      ctx.roundRect(streakX, hobStartY + 48, streakW, 54, 16);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = "#fbbf24";
-      ctx.fillText(streakText, streakX + 9, hobStartY + 42);
+      ctx.fillText(streakText, streakX + 14, hobStartY + 86);
     } else {
       // 2-Column Grid for multiple hobbies
-      const hobH = 72;
-      const hobGap = 12;
+      const hobH = 135;
+      const hobGap = 16;
       const hobW = (cardW - hobGap) / 2;
 
       userHobbies.forEach((h, idx) => {
@@ -579,37 +603,37 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
         const hX = cardPad + col * (hobW + hobGap);
         const hY = hobStartY + row * (hobH + hobGap);
 
-        ctx.fillStyle = "rgba(19, 21, 29, 0.72)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-        ctx.lineWidth = 1.5;
+        ctx.fillStyle = "rgba(19, 21, 29, 0.8)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.roundRect(hX, hY, hobW, hobH, 16);
+        ctx.roundRect(hX, hY, hobW, hobH, 20);
         ctx.fill();
         ctx.stroke();
 
         // Emoji
         const emoji = resolveHobbyEmoji(h.icon, h.name);
-        ctx.font = "24px sans-serif";
-        ctx.fillText(emoji, hX + 14, hY + 42);
+        ctx.font = "40px sans-serif";
+        ctx.fillText(emoji, hX + 22, hY + 75);
 
         // Streak flame badge
         const streakText = `${h.currentStreak || 0}d 🔥`;
-        ctx.font = "700 13px 'JetBrains Mono', monospace";
-        const streakW = ctx.measureText(streakText).width + 14;
-        ctx.fillStyle = "rgba(245, 158, 11, 0.12)";
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.3)";
-        ctx.lineWidth = 1;
+        ctx.font = "700 20px 'JetBrains Mono', monospace";
+        const streakW = ctx.measureText(streakText).width + 20;
+        ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
+        ctx.strokeStyle = "rgba(245, 158, 11, 0.4)";
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.roundRect(hX + hobW - streakW - 10, hY + 10, streakW, 20, 10);
+        ctx.roundRect(hX + hobW - streakW - 16, hY + 16, streakW, 36, 12);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = "#fbbf24";
-        ctx.fillText(streakText, hX + hobW - streakW - 3, hY + 25);
+        ctx.fillText(streakText, hX + hobW - streakW - 6, hY + 41);
 
         // Name
-        ctx.font = "700 17px 'Plus Jakarta Sans', sans-serif";
+        ctx.font = "700 26px 'Plus Jakarta Sans', sans-serif";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(truncateText(ctx, h.name, hobW - 30), hX + 14, hY + 64);
+        ctx.fillText(truncateText(ctx, h.name, hobW - 40), hX + 22, hY + 112);
       });
     }
   }

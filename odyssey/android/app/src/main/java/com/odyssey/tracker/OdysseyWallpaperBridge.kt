@@ -39,13 +39,13 @@ class OdysseyWallpaperBridge(private val context: Context) {
             val wallpaperManager = WallpaperManager.getInstance(context)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Apply directly to the Lock Screen (FLAG_LOCK)
-                wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK)
+                // Apply directly to both Lock Screen and Home Screen
+                wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
             } else {
                 wallpaperManager.setBitmap(bitmap)
             }
 
-            Log.d("OdysseyWallpaper", "Successfully applied lockscreen wallpaper directly via WallpaperManager")
+            Log.d("OdysseyWallpaper", "Successfully applied wallpaper directly to Lock and Home screens via WallpaperManager")
             true
         } catch (e: Exception) {
             Log.e("OdysseyWallpaper", "Failed to apply wallpaper directly: ${e.message}", e)
@@ -54,7 +54,7 @@ class OdysseyWallpaperBridge(private val context: Context) {
     }
 
     /**
-     * Clears custom lockscreen wallpaper and restores the system default.
+     * Clears custom wallpaper and restores the system default on both Lock and Home screens.
      * Also cancels the background hourly auto-update worker.
      */
     @JavascriptInterface
@@ -62,15 +62,16 @@ class OdysseyWallpaperBridge(private val context: Context) {
         return try {
             val wallpaperManager = WallpaperManager.getInstance(context)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                wallpaperManager.clear(WallpaperManager.FLAG_LOCK)
+                try { wallpaperManager.clear(WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
+                try { wallpaperManager.clear(WallpaperManager.FLAG_SYSTEM) } catch (_: Exception) {}
             } else {
                 wallpaperManager.clear()
             }
             OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
-            Log.d("OdysseyWallpaper", "Successfully cleared lockscreen wallpaper and restored system default")
+            Log.d("OdysseyWallpaper", "Successfully cleared wallpaper and restored system default on Lock & Home screens")
             true
         } catch (e: Exception) {
-            Log.e("OdysseyWallpaper", "Failed to clear lockscreen wallpaper: ${e.message}", e)
+            Log.e("OdysseyWallpaper", "Failed to clear wallpaper: ${e.message}", e)
             false
         }
     }

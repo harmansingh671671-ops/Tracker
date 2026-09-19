@@ -17,12 +17,8 @@ import {
   type WallpaperData,
 } from "@/lib/utils/wallpaper-generator";
 import {
-  setNativeLockscreen,
   clearNativeLockscreen,
   launchLiveWallpaperPicker,
-  enableNativeHourlyAutoUpdate,
-  disableNativeHourlyAutoUpdate,
-  checkNativeAutoUpdateStatus,
   isNativeBridgeAvailable,
   isAndroidApp,
   syncScheduleDataToNative,
@@ -63,14 +59,12 @@ export default function WallpaperPage() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [ambientActive, setAmbientActive] = useState<boolean>(false);
-  const [hourlyAutoUpdateActive, setHourlyAutoUpdateActive] = useState<boolean>(false);
   const [showPermissionDetails, setShowPermissionDetails] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
   const [dayBlockCounts, setDayBlockCounts] = useState<Record<number, number>>({});
 
   useEffect(() => {
     setMounted(true);
-    setHourlyAutoUpdateActive(checkNativeAutoUpdateStatus());
   }, []);
 
   const activeDay = useMemo(() => {
@@ -347,78 +341,28 @@ export default function WallpaperPage() {
     }
   };
 
-  // Handler: Direct Native APK Lockscreen Setting
-  const handleSetNativeDirect = async () => {
-    if (!isNativeBridgeAvailable()) {
-      setStatusNotice("Direct lockscreen sync requires the Native APK. Web browsers are sandboxed by Android security.");
-      setTimeout(() => setStatusNotice(null), 5000);
-      return;
-    }
-    setIsGenerating(true);
-    setStatusNotice("Applying to lockscreen via native Android WallpaperManager...");
-    try {
-      const result = await setNativeLockscreen(wallpaperData);
-      setStatusNotice(result.message);
-      setTimeout(() => setStatusNotice(null), 4000);
-    } catch {
-      setStatusNotice("Could not apply to lockscreen.");
-      setTimeout(() => setStatusNotice(null), 3500);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Handler: Launch Native Live Wallpaper Service
+  // Handler: Launch Native Live Wallpaper Service (Home Screen & Lock Screen)
   const handleLaunchLiveWallpaper = () => {
     const launched = launchLiveWallpaperPicker();
     if (launched) {
-      setStatusNotice("Opening Live Wallpaper picker. Choose 'Set Wallpaper' → 'Lock Screen'.");
+      setStatusNotice("Opening Live Wallpaper picker. Tap 'Set wallpaper' → choose 'Home screen and lock screen'!");
     } else {
       setStatusNotice("Live Wallpaper engine is ready in the APK. Open Device Guides for instructions.");
     }
-    setTimeout(() => setStatusNotice(null), 4500);
+    setTimeout(() => setStatusNotice(null), 5000);
   };
 
-  // Handler: Toggle Background Hourly Auto-Update
-  const handleToggleHourlyAutoUpdate = async () => {
-    if (!hourlyAutoUpdateActive) {
-      setIsGenerating(true);
-      setStatusNotice("Activating hourly background auto-update...");
-      try {
-        const ok = await enableNativeHourlyAutoUpdate(wallpaperData);
-        if (ok) {
-          setHourlyAutoUpdateActive(true);
-          setStatusNotice("⚡ Hourly background updater active! Refreshes at every :00 mark.");
-        } else {
-          setStatusNotice("Auto-updater is ready in the APK. Open Device Guides for instructions.");
-        }
-        setTimeout(() => setStatusNotice(null), 4500);
-      } catch {
-        setStatusNotice("Could not start background updater.");
-        setTimeout(() => setStatusNotice(null), 3000);
-      } finally {
-        setIsGenerating(false);
-      }
-    } else {
-      disableNativeHourlyAutoUpdate();
-      setHourlyAutoUpdateActive(false);
-      setStatusNotice("Hourly background auto-update paused.");
-      setTimeout(() => setStatusNotice(null), 3500);
-    }
-  };
-
-  // Handler: Turn Off Lockscreen Wallpaper (Reset to default)
+  // Handler: Turn Off Wallpaper (Reset to default)
   const handleTurnOffWallpaper = async () => {
     setIsGenerating(true);
-    setStatusNotice("Turning off lockscreen wallpaper...");
+    setStatusNotice("Turning off wallpaper...");
     try {
       if (isNativeBridgeAvailable()) {
         const ok = clearNativeLockscreen();
-        setHourlyAutoUpdateActive(false);
         if (ok) {
-          setStatusNotice("Lockscreen wallpaper turned off. Android system default restored.");
+          setStatusNotice("Wallpaper turned off. Android system default restored on Home and Lock screens.");
         } else {
-          setStatusNotice("Lockscreen reset to default.");
+          setStatusNotice("Wallpaper reset to default.");
         }
       } else {
         setStatusNotice("Wallpaper turned off in Odyssey. Default system wallpaper restored.");
@@ -733,76 +677,32 @@ export default function WallpaperPage() {
 
                   {/* Action Buttons Toolbar */}
                   <div className="space-y-2 pt-1">
-                    {/* If running in Native APK: 1-Tap Direct Lockscreen Setting */}
-                    {isNativeBridgeAvailable() ? (
-                      <button
-                        type="button"
-                        onClick={handleSetNativeDirect}
-                        disabled={isGenerating}
-                        className="w-full py-3 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20 active:scale-95"
-                      >
-                        <Zap className="w-4 h-4 text-black" />
-                        <span>
-                          {isGenerating ? "Setting Lockscreen..." : "⚡ Set on Lockscreen (1-Tap Native Direct)"}
-                        </span>
-                      </button>
-                    ) : (
-                      /* On Web / PWA: Fullscreen Live Display */
-                      <button
-                        type="button"
-                        onClick={handleToggleAmbient}
-                        className={`w-full py-3 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 ${
-                          ambientActive
-                            ? "bg-amber-400 text-black shadow-amber-400/25"
-                            : "bg-primary hover:bg-primary-fixed text-on-primary shadow-primary/20"
-                        }`}
-                        title="Always-on dynamic live clock mode (Screen Wake Lock enabled)"
-                      >
-                        <Maximize2 className="w-4 h-4" />
-                        <span>{ambientActive ? "Exit Live Ambient Display" : "⚡ Launch Live Dynamic Display"}</span>
-                      </button>
-                    )}
+                    {/* Primary: Launch Native Live Wallpaper Service (Supports Home Screen & Lock Screen) */}
+                    <button
+                      type="button"
+                      onClick={handleLaunchLiveWallpaper}
+                      className="w-full py-3.5 px-4 rounded-xl font-bold font-mono text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20 active:scale-95"
+                      title="Set real-time live wallpaper that shifts hourly for Lock Screen & Home Screen"
+                    >
+                      <Smartphone className="w-4 h-4 text-black" />
+                      <span>📱 Launch Native Live Wallpaper Service</span>
+                    </button>
 
-                    {/* Dynamic Hourly & Background Modes */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Live Wallpaper Auto-Hourly Picker */}
-                      <button
-                        type="button"
-                        onClick={handleLaunchLiveWallpaper}
-                        className="py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-surface-container-high hover:bg-surface-bright text-on-surface border-outline/20 active:scale-95"
-                        title="Set real-time live wallpaper that shifts hourly"
-                      >
-                        <Smartphone className="w-3.5 h-3.5 text-amber-400" />
-                        <span>📱 Native Live Service</span>
-                      </button>
-
-                      {/* Background Hourly Auto-Updater */}
-                      <button
-                        type="button"
-                        onClick={handleToggleHourlyAutoUpdate}
-                        disabled={isGenerating}
-                        className={`py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
-                          hourlyAutoUpdateActive
-                            ? "bg-amber-400/20 text-amber-300 border-amber-400/40"
-                            : "bg-surface-container-high hover:bg-surface-bright text-on-surface border-outline/20"
-                        }`}
-                        title="Automatically refresh the lockscreen every hour in the background"
-                      >
-                        <Clock className={`w-3.5 h-3.5 ${hourlyAutoUpdateActive ? "text-amber-400" : "text-on-surface-variant"}`} />
-                        <span>{hourlyAutoUpdateActive ? "Auto :00 [ON]" : "Auto :00 [OFF]"}</span>
-                      </button>
+                    <div className="p-2.5 rounded-xl bg-surface-container-high border border-outline/15 text-[11px] font-mono text-on-surface-variant flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>In Android&apos;s picker, choose <strong>&quot;Home screen and lock screen&quot;</strong> to apply changes to both!</span>
                     </div>
 
-                    {/* Turn Off Lockscreen Wallpaper Feature */}
+                    {/* Turn Off Wallpaper Feature */}
                     <button
                       type="button"
                       onClick={handleTurnOffWallpaper}
                       disabled={isGenerating}
                       className="w-full py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-2 transition-all cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30 active:scale-95"
-                      title="Reset phone's lockscreen wallpaper back to Android default"
+                      title="Reset phone's wallpaper back to Android default"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      <span>Turn Off Lockscreen Wallpaper (Reset Default)</span>
+                      <span>Turn Off Wallpaper (Reset to Default)</span>
                     </button>
 
                     {/* Direct Explanation for Web / PWA users */}

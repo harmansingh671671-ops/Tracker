@@ -162,83 +162,70 @@ export function WallpaperPreview({
       <div className="absolute top-[40%] -right-20 w-64 h-64 bg-emerald-950/20 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-slate-900/40 rounded-full blur-[90px] pointer-events-none" />
 
-      {/* 1. TOP SAFE ZONE (~36% height for OS Clock & Notifications) */}
-      <div className="relative w-full pt-3 px-6 flex flex-col items-center justify-between z-10" style={{ minHeight: "220px" }}>
+      {/* 1. TOP SAFE ZONE (~12% height for camera notch & status bar) */}
+      <div
+        className="relative w-full px-5 flex flex-col items-center justify-between z-10 transition-all duration-300"
+        style={{ minHeight: showClockGuide ? "145px" : "48px", paddingTop: "12px" }}
+      >
         {/* Status Bar */}
-        <div className="w-full flex items-center justify-between text-xs text-white/35 font-mono pt-1">
-          <span className="text-[11px] font-semibold text-white/45 tracking-tight">{timeStr}</span>
+        <div className="w-full flex items-center justify-between text-xs text-white/40 font-mono">
+          <span className="text-[11.5px] font-semibold text-white/50 tracking-tight">{timeStr}</span>
 
           {/* Dynamic Island / Notch Placeholder */}
-          <div className="w-22 h-4.5 bg-black/90 border border-white/10 rounded-full flex items-center justify-center gap-1.5 px-2">
-            <div className="w-2 h-2 rounded-full bg-white/15" />
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+          <div className="w-20 h-4 bg-black/90 border border-white/10 rounded-full flex items-center justify-center gap-1.5 px-2">
+            <div className="w-2 h-2 rounded-full bg-white/20" />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/70" />
           </div>
 
-          <div className="flex items-center gap-1 text-[10px] text-white/40">
+          <div className="flex items-center gap-1 text-[10.5px] text-white/50">
             <Signal className="w-3 h-3" />
             <Wifi className="w-3 h-3" />
             <BatteryCharging className="w-3.5 h-3.5" />
           </div>
         </div>
 
-        {/* Lockscreen Clock Simulation (Matches real Android lockscreen) */}
+        {/* Lockscreen Clock Simulation (Only when Clock Guide is toggled ON) */}
         {showClockGuide ? (
-          <div className="flex flex-col items-center text-center my-auto pt-2 animate-in fade-in duration-300 w-full">
-            <span className="text-[11px] font-semibold tracking-[0.25em] uppercase text-white/40 font-mono">
+          <div className="flex flex-col items-center text-center my-auto pt-1 animate-in fade-in duration-300 w-full">
+            <span className="text-[10px] font-semibold tracking-[0.25em] uppercase text-white/45 font-mono">
               {data.formattedDate}
             </span>
-            <span className="text-5xl sm:text-6xl font-light tracking-tight text-white/50 my-1 font-mono">
+            <span className="text-4xl sm:text-5xl font-light tracking-tight text-white/60 my-0.5 font-mono">
               {timeStr}
             </span>
-
-            {/* Simulated notification pill guide */}
-            <div className="w-[85%] max-w-[280px] p-2 rounded-2xl bg-slate-800/40 border border-white/10 flex items-center justify-between gap-2 mt-1">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 text-xs">
-                  ⚡
-                </div>
-                <span className="text-[10px] text-white/50 font-sans font-medium">Android System • 1 notif</span>
-              </div>
-              <span className="text-[9px] text-white/30 font-mono">Just now</span>
-            </div>
+            <span className="text-[9px] text-white/35 font-mono">Android System Clock Guide</span>
           </div>
-        ) : (
-          <div className="my-auto flex flex-col items-center justify-center py-6 text-center">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-white/25 border border-white/10 px-3 py-1 rounded-full">
-              Clean OLED Clock Safe-Zone
-            </span>
-          </div>
-        )}
+        ) : null}
       </div>
 
-      {/* 2. HEADER ANCHOR CARD (Positioned right below clock safe zone) */}
-      <div className="px-4.5 pt-1.5 z-10 animate-in fade-in duration-300">
-        <div className="rounded-2xl p-3 bg-[#13151D]/75 border border-white/10 backdrop-blur-md flex items-center justify-between shadow-lg">
-          <div className="flex flex-col gap-1">
+      {/* 2. HEADER ANCHOR CARD (Utilizes the upper screen area) */}
+      <div className="px-4 pt-1 z-10 animate-in fade-in duration-300">
+        <div className="rounded-2xl p-3 sm:p-3.5 bg-[#13151D]/85 border border-white/15 backdrop-blur-md flex items-center justify-between shadow-xl">
+          <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[9.5px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold">
+              <span className="text-[10.5px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold">
                 ODYSSEY • CH. 0{data.chapter}
               </span>
-              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
                 DAY {data.activeDay} OF 365
               </span>
             </div>
-            <div className="text-[14px] font-bold text-slate-100 flex items-center gap-1.5">
+            <div className="text-[15px] sm:text-base font-bold text-white flex items-center gap-1.5 truncate">
               <span>{data.rankBadge}</span>
-              <span>{data.rankName}</span>
+              <span className="truncate">{data.rankName}</span>
             </div>
-            <span className="text-[9.5px] text-slate-400 font-medium">
+            <span className="text-[10px] text-slate-400 font-medium">
               Level {String(data.userLevel).padStart(2, "0")} Cadence
             </span>
           </div>
 
-          {/* Minimal Streak Count (Replacing the circular progress gauge) */}
-          <div className="flex flex-col items-end justify-center pl-2">
-            <div className="flex items-center gap-1 text-amber-300 font-mono font-bold text-base sm:text-lg">
+          {/* Minimal Streak Count on Right */}
+          <div className="flex flex-col items-end justify-center pl-3 shrink-0">
+            <div className="flex items-center gap-1 text-amber-300 font-mono font-bold text-lg sm:text-xl">
               <span>{data.userStreak ?? data.activeDay}</span>
               <span>🔥</span>
             </div>
-            <span className="text-[8px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
+            <span className="text-[8.5px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
               DAYS STREAK
             </span>
           </div>
@@ -246,11 +233,11 @@ export function WallpaperPreview({
       </div>
 
       {/* 3. CORE 24-HOUR SPECTRUM BAR */}
-      <div className="px-4.5 w-full z-10 mt-2">
-        <div className="rounded-xl p-2 px-2.5 bg-[#13151D]/60 border border-white/10 backdrop-blur-md flex flex-col gap-1.5">
+      <div className="px-4 w-full z-10 mt-2">
+        <div className="rounded-xl p-2.5 px-3 bg-[#13151D]/75 border border-white/15 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
           {/* Multi-segmented Timeline Bar (24 individual 1-hour slots) */}
           <div className="relative w-full py-0.5">
-            <div className="h-2 w-full bg-slate-900/90 rounded-full flex overflow-hidden border border-white/10 shadow-inner">
+            <div className="h-2.5 w-full bg-slate-900 rounded-full flex overflow-hidden border border-white/15 shadow-inner">
               {all24HourlyBlocks.map((b) => {
                 const widthPct = (1 / 24) * 100;
                 const theme = getCategoryTheme(b.category);
@@ -270,7 +257,7 @@ export function WallpaperPreview({
 
             {/* Active Time Needle Marker */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 -ml-1 pointer-events-none flex items-center justify-center transition-all duration-300"
+              className="absolute top-1/2 -translate-y-1/2 -ml-1.5 pointer-events-none flex items-center justify-center transition-all duration-300"
               style={{
                 left: `${Math.min(
                   98,
@@ -281,15 +268,15 @@ export function WallpaperPreview({
                 )}%`,
               }}
             >
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_8px_#F59E0B]" />
+              <div className="w-3 h-3 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_10px_#F59E0B]" />
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-[8.5px] font-mono text-slate-400 tracking-wider">
+          <div className="flex justify-between items-center text-[9px] font-mono text-slate-400 tracking-wider">
             <span className="text-slate-500">00:00</span>
             <span className="text-slate-500">06:00</span>
             <span className="text-amber-400 font-bold flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-amber-400 animate-ping inline-block" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
               {String(activeHour).padStart(2, "0")}:00 ACTIVE
             </span>
             <span className="text-slate-500">18:00</span>
@@ -298,14 +285,14 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR) */}
-      <div className="px-4.5 py-1.5 flex flex-col gap-1.5 z-10">
-        <div className="flex items-center justify-between px-1 py-0.5">
-          <span className="text-[9.5px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold flex items-center gap-1.5">
-            <Clock className="w-3 h-3 text-amber-400" />
+      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR - 2-ROW SPACIOUS DESIGN) */}
+      <div className="px-4 py-2 flex flex-col gap-2 z-10">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
             SCHEDULE • ACTIVE HOUR CENTERED
           </span>
-          <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-400">
+          <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-white/5 border border-white/15 text-emerald-400">
             {effectivePlannedHours}/24H PLANNED
           </span>
         </div>
@@ -320,32 +307,33 @@ export function WallpaperPreview({
           return (
             <div
               key={`${block.hour}-${idx}`}
-              className={`rounded-xl p-2 pl-2.5 transition-all flex items-center justify-between border ${
+              className={`rounded-2xl p-2.5 px-3 transition-all flex flex-col gap-1.5 border ${
                 isActive
-                  ? "bg-[#161924] border-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.25)] relative overflow-hidden ring-1 ring-amber-400/40"
+                  ? "bg-[#181B26] border-amber-400/90 shadow-[0_0_24px_rgba(245,158,11,0.25)] relative overflow-hidden ring-1 ring-amber-400/50"
                   : isPast
-                  ? "bg-[#13151D]/50 border-white/5 opacity-70"
-                  : "bg-[#13151D]/75 border-white/10"
+                  ? "bg-[#13151D]/60 border-white/10 opacity-75"
+                  : "bg-[#13151D]/85 border-white/15"
               }`}
             >
               {isActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 shadow-[0_0_10px_#F59E0B]" />
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-400 shadow-[0_0_12px_#F59E0B]" />
               )}
 
-              <div className="flex items-center gap-2 pl-0.5 min-w-0">
-                <div className="flex items-center gap-1.5 shrink-0">
+              {/* ROW 1: Time Interval (Left) + Category Pill Badge (Right) */}
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
                   {isActive ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
                   ) : (
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        isPast ? "bg-emerald-400/70" : "bg-slate-600"
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        isPast ? "bg-emerald-400" : "bg-slate-500"
                       }`}
                     />
                   )}
                   <span
-                    className={`font-mono text-[10.5px] ${
-                      isActive ? "font-bold text-amber-200" : "font-medium text-slate-300"
+                    className={`font-mono text-xs ${
+                      isActive ? "font-bold text-amber-200" : isPast ? "text-slate-400" : "font-medium text-slate-200"
                     }`}
                   >
                     {block.startTime} → {block.endTime}
@@ -353,20 +341,32 @@ export function WallpaperPreview({
                 </div>
 
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0 ${theme.badge}`}
+                  className={`px-2 py-0.5 rounded-md text-[9.5px] font-mono font-bold border shrink-0 ${theme.badge}`}
                 >
                   {theme.label}
                 </span>
               </div>
 
-              <div className="text-[11px] font-semibold text-slate-200 truncate pl-2 flex items-center gap-1.5 ml-auto">
-                <span className="truncate max-w-[125px] sm:max-w-[155px] text-right">{block.title}</span>
+              {/* ROW 2: Full-Width Activity Title + Active/Done Beacon */}
+              <div className="flex items-center justify-between gap-2 w-full pt-0.5">
+                <span
+                  className={`text-[13px] font-bold leading-tight truncate ${
+                    isActive ? "text-white" : isPast ? "text-slate-300" : "text-slate-100"
+                  }`}
+                  title={block.title}
+                >
+                  {block.title}
+                </span>
+
                 {isActive ? (
-                  <span className="shrink-0 text-[8.5px] font-mono px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30">
-                    NOW
+                  <span className="shrink-0 text-[9.5px] font-mono px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-bold border border-amber-400/40">
+                    ● NOW
                   </span>
                 ) : isPast ? (
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold flex items-center gap-1 border border-emerald-500/30">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    DONE
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -380,35 +380,35 @@ export function WallpaperPreview({
         const count = userHobbies.length;
 
         return (
-          <div className="px-4.5 pt-1.5 flex flex-col gap-1 z-10 animate-in fade-in duration-300">
+          <div className="px-4 pt-1 flex flex-col gap-1.5 z-10 animate-in fade-in duration-300">
             <div className="flex items-center justify-between px-0.5">
-              <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-slate-400 font-bold flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+              <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400" />
                 CADENCE • HOBBIES &amp; PASSIONS
               </span>
-              <span className="text-[8px] font-mono text-slate-500 font-medium">
+              <span className="text-[9px] font-mono text-slate-400 font-medium">
                 {count} {count === 1 ? "ACTIVE TRACK" : "ACTIVE TRACKS"}
               </span>
             </div>
 
-            <div className={count === 1 ? "grid grid-cols-1" : "grid grid-cols-2 gap-1.5"}>
+            <div className={count === 1 ? "grid grid-cols-1" : "grid grid-cols-2 gap-2"}>
               {userHobbies.map((h, hIdx) => (
                 <div
                   key={h.id || hIdx}
-                  className="rounded-xl p-2.5 bg-[#13151D]/75 border border-white/10 flex items-center justify-between gap-2 transition-all"
+                  className="rounded-2xl p-3 bg-[#13151D]/85 border border-white/15 flex items-center justify-between gap-3 transition-all shadow-md"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xl shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
                     <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-slate-100 truncate">
+                      <div className="text-[12.5px] font-bold text-white truncate">
                         {h.name}
                       </div>
-                      <div className="text-[8.5px] text-slate-400 truncate">
+                      <div className="text-[9.5px] text-slate-400 truncate">
                         {h.category || "Cadence Track"}
                       </div>
                     </div>
                   </div>
-                  <span className="text-[8.5px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold shrink-0">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30 font-bold shrink-0">
                     {h.currentStreak || 0}d 🔥
                   </span>
                 </div>
@@ -418,30 +418,30 @@ export function WallpaperPreview({
         );
       })()}
 
-      {/* 7. BOTTOM SAFE ZONE (Matches Real Android Fingerprint & Shortcuts) */}
-      <div className="w-full px-7 pb-4 pt-3 mt-auto flex flex-col items-center justify-end z-10">
-        <div className="w-full flex items-center justify-between text-white/30 select-none pointer-events-none mb-2">
+      {/* 7. BOTTOM SAFE ZONE (Clean space for navigation bar & fingerprint) */}
+      <div className="w-full px-7 pb-3 pt-2 mt-auto flex flex-col items-center justify-end z-10">
+        <div className="w-full flex items-center justify-between text-white/30 select-none pointer-events-none mb-1">
           {/* Flashlight button */}
-          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shadow-sm">
+          <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shadow-sm">
             <Flashlight className="w-4 h-4" />
           </div>
 
           {/* Real Android in-display fingerprint sensor guide */}
           <div className="flex flex-col items-center justify-center">
-            <div className="w-12 h-12 rounded-full border border-white/15 flex items-center justify-center text-white/35 bg-white/[0.02]">
-              <Fingerprint className="w-7 h-7" />
+            <div className="w-11 h-11 rounded-full border border-white/15 flex items-center justify-center text-white/35 bg-white/[0.02]">
+              <Fingerprint className="w-6 h-6" />
             </div>
           </div>
 
           {/* Camera button */}
-          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shadow-sm">
+          <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shadow-sm">
             <Camera className="w-4 h-4" />
           </div>
         </div>
 
         {/* Subtle Brand Tag */}
-        <span className="text-[7.5px] font-mono tracking-[0.25em] text-white/20 uppercase font-semibold">
-          ODYSSEY CADENCE LOCKSCREEN
+        <span className="text-[8px] font-mono tracking-[0.25em] text-white/30 uppercase font-semibold">
+          ODYSSEY CADENCE LIVE SERVICE
         </span>
       </div>
     </div>
