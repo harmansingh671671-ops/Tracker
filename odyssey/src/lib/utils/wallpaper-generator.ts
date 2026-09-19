@@ -343,21 +343,9 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillText("DAYS STREAK", streakX, headerY + 145);
   ctx.textAlign = "left";
 
-  // 5. TIMELINE HEADER & SPECTRUM BAR
-  const scheduleHeaderY = headerY + headerH + 28;
-  ctx.font = "700 24px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
-  ctx.fillText("SCHEDULE • ACTIVE HOUR CENTERED", cardPad + 14, scheduleHeaderY);
-
-  ctx.textAlign = "right";
-  ctx.font = "700 24px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "#f59e0b";
-  ctx.fillText(`● ${timeStr} ACTIVE`, cardPad + cardW - 14, scheduleHeaderY);
-  ctx.textAlign = "left";
-
-  // 24-Hour Cadence Spectrum Bar (34px rounded container)
-  const specY = scheduleHeaderY + 18;
-  const specH = 92;
+  // 5. 24-HOUR CADENCE SPECTRUM BAR (Expanded, clean, no squeezed text)
+  const specY = headerY + headerH + 24;
+  const specH = 104;
   ctx.fillStyle = "rgba(19, 21, 29, 0.75)";
   ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
   ctx.lineWidth = 2;
@@ -368,7 +356,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
 
   // Multi-segment 24h timeline strip
   const stripX = cardPad + 24;
-  const stripY = specY + 20;
+  const stripY = specY + 22;
   const stripW = cardW - 48;
   const stripH = 22;
 
@@ -425,16 +413,26 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.arc(needleX, needleY, 7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Legend timestamps
-  ctx.font = "600 20px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
-  ctx.fillText("00:00", stripX, specY + 75);
-  ctx.fillText("06:00", stripX + stripW * 0.23, specY + 75);
+  // Active hour time badge directly below moving dot
+  const dotTimeText = `${String(currentHour).padStart(2, "0")}:00`;
+  ctx.font = "700 20px 'JetBrains Mono', monospace";
+  const pillTextW = ctx.measureText(dotTimeText).width;
+  const pillW = pillTextW + 24;
+  const pillH = 30;
+  const pillX = Math.max(cardPad + 10, Math.min(cardPad + cardW - pillW - 10, needleX - pillW / 2));
+  const pillY = needleY + 25;
+
+  ctx.fillStyle = "rgba(9, 10, 15, 0.85)";
+  ctx.strokeStyle = "rgba(245, 158, 11, 0.4)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(pillX, pillY, pillW, pillH, 15);
+  ctx.fill();
+  ctx.stroke();
+
   ctx.textAlign = "center";
-  ctx.fillText("12:00", stripX + stripW * 0.5, specY + 75);
-  ctx.fillText("18:00", stripX + stripW * 0.77, specY + 75);
-  ctx.textAlign = "right";
-  ctx.fillText("24:00", stripX + stripW, specY + 75);
+  ctx.fillStyle = "#fcd34d";
+  ctx.fillText(dotTimeText, pillX + pillW / 2, pillY + 22);
   ctx.textAlign = "left";
 
   // 6. 5-CARD HOURLY SCHEDULE WINDOW (High-Curvature 54px Rounded Cards, Expansive, NO Left Bar!)

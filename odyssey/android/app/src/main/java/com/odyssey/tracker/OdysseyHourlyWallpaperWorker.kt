@@ -266,26 +266,10 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         }
         canvas.drawText("DAYS STREAK", cardPad + cardW - 28f, headerY + headerH * 0.80f, streakLabelPaint)
 
-        // 5. Spectrum Bar & Header
+        // 5. 24-Hour Cadence Spectrum Bar (Expanded, clean, no squeezed text)
         val gap1 = usableH * 0.014f
-        val specHeaderY = headerY + headerH + gap1
-        val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            textSize = width * 0.028f
-            color = Color.parseColor("#94A3B8")
-        }
-        canvas.drawText("SCHEDULE • ACTIVE HOUR CENTERED", cardPad + 12f, specHeaderY, headPaint)
-
-        val activeTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textAlign = Paint.Align.RIGHT
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            textSize = width * 0.028f
-            color = Color.parseColor("#F59E0B")
-        }
-        canvas.drawText("● $timeStr ACTIVE", cardPad + cardW - 12f, specHeaderY, activeTimePaint)
-
-        val specY = specHeaderY + usableH * 0.008f
-        val specH = usableH * 0.058f
+        val specY = headerY + headerH + gap1
+        val specH = usableH * 0.068f
         val specRect = RectF(cardPad, specY, cardPad + cardW, specY + specH)
         canvas.drawRoundRect(specRect, 34f, 34f, cardBgPaint)
         canvas.drawRoundRect(specRect, 34f, 34f, cardBorderPaint)
@@ -293,7 +277,7 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         val stripX = cardPad + 22f
         val stripY = specY + specH * 0.22f
         val stripW = cardW - 44f
-        val stripH = specH * 0.28f // ~26px height
+        val stripH = specH * 0.26f // ~26px height
         val slotW = stripW / 24f
 
         val segPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -335,22 +319,34 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         val pinWhiteCore = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         canvas.drawCircle(pinX, pinCenterY, 7f, pinWhiteCore)
 
-        val specLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.MONOSPACE
-            textSize = width * 0.023f
-            color = Color.parseColor("#64748B")
-        }
-        canvas.drawText("00:00", stripX, specY + specH * 0.84f, specLabelPaint)
-        canvas.drawText("06:00", stripX + stripW * 0.23f, specY + specH * 0.84f, specLabelPaint)
-        val centerSpecPaint = Paint(specLabelPaint).apply {
+        // Active hour time badge directly below moving beacon needle
+        val dotTimeStr = String.format(java.util.Locale.US, "%02d:00", currentHour)
+        val dotLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
-            color = Color.parseColor("#F59E0B")
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textSize = width * 0.024f
+            color = Color.parseColor("#FCD34D")
         }
-        canvas.drawText("● 12:00", stripX + stripW / 2f, specY + specH * 0.84f, centerSpecPaint)
-        canvas.drawText("18:00", stripX + stripW * 0.77f, specY + specH * 0.84f, specLabelPaint)
-        val endSpecPaint = Paint(specLabelPaint).apply { textAlign = Paint.Align.RIGHT }
-        canvas.drawText("24:00", stripX + stripW, specY + specH * 0.84f, endSpecPaint)
+        val textBounds = Rect()
+        dotLabelPaint.getTextBounds(dotTimeStr, 0, dotTimeStr.length, textBounds)
+        val pillW = textBounds.width() + 28f
+        val pillH = textBounds.height() + 14f
+        val pillX = (pinX - pillW / 2f).coerceIn(cardPad + 10f, cardPad + cardW - pillW - 10f)
+        val pillY = pinCenterY + 24f
+        val pillRect = RectF(pillX, pillY, pillX + pillW, pillY + pillH)
+
+        val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E0090A0F")
+            style = Paint.Style.FILL
+        }
+        val pillBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#55F59E0B")
+            style = Paint.Style.STROKE
+            strokeWidth = 1.8f
+        }
+        canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBgPaint)
+        canvas.drawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillBorderPaint)
+        canvas.drawText(dotTimeStr, pillRect.centerX(), pillY + pillH * 0.72f, dotLabelPaint)
 
         // 6. Adaptive Schedule Timeline (High-Curvature 54f Rounded Cards, NO Left Bar!)
         val blockCount = 5
