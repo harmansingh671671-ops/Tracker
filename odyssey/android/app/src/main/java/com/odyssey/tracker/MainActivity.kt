@@ -64,9 +64,29 @@ class MainActivity : AppCompatActivity() {
             addJavascriptInterface(bridge, "OdysseyAndroid")
             addJavascriptInterface(bridge, "Android")
 
+            setDownloadListener { url, _, _, _, _ ->
+                try {
+                    val downloadIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(downloadIntent)
+                } catch (e: Exception) {
+                    android.util.Log.e("OdysseyNative", "Failed to handle download: ${e.message}")
+                }
+            }
+
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val url = request?.url?.toString() ?: return false
+                    // APK downloads always open externally in system downloader/browser
+                    if (url.endsWith(".apk") || url.contains("/downloads/")) {
+                        return try {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            true
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
                     // Keep internal app navigation within WebView
                     if (url.contains("vercel.app") || url.contains("localhost") || url.startsWith("file://")) {
                         return false
