@@ -31,8 +31,8 @@ export default function StatsPage() {
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const rankInfo = useMemo(
-    () => getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0, user?.integrityScore ?? 100)),
-    [user?.militaryRank, user?.streak, user?.integrityScore]
+    () => getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0)),
+    [user?.militaryRank, user?.streak]
   );
 
   useEffect(() => {
@@ -58,7 +58,6 @@ export default function StatsPage() {
 
     let csvContent = "data:text/csv;charset=utf-8,Category,Item,Status,Metric\n";
     csvContent += `Profile,Streak,Active,${user?.streak ?? 0} days\n`;
-    csvContent += `Profile,Discipline,Score,${user?.integrityScore ?? 100}%\n`;
     csvContent += `Profile,Total XP,Current,${user?.xp ?? 0}\n`;
     csvContent += `Profile,Diamonds,Balance,${user?.diamonds ?? 0}\n`;
 
@@ -114,7 +113,7 @@ export default function StatsPage() {
               </span>
             </div>
             <h1 className="text-lg sm:text-xl text-on-surface font-bold tracking-tight mt-0.5">
-              Discipline & Stats
+              Performance &amp; Stats
             </h1>
           </div>
 
@@ -160,7 +159,7 @@ export default function StatsPage() {
                   </span>
                 </div>
                 <span className="text-[11px] font-mono text-on-surface-variant">
-                  {user?.integrityScore ?? 100}% Integrity • {user?.streak ?? 0} Day Cadence
+                  {user?.streak ?? 0} Day Streak • Active Traveler
                 </span>
               </div>
             </div>
@@ -247,24 +246,28 @@ export default function StatsPage() {
             </span>
           </div>
 
-          {/* 4. Discipline Integrity */}
+          {/* 4. Task & Habit Completion */}
           <div className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 shadow-xs space-y-1">
             <div className="flex items-center justify-between text-emerald-400">
               <div className="flex items-center gap-1 text-[11px] font-mono font-bold uppercase tracking-wider">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Discipline</span>
+                <span>Completion</span>
               </div>
               <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-emerald-400/15">
-                Optimal
+                Active
               </span>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-xl sm:text-2xl font-black font-mono text-on-surface">
-                {user?.integrityScore ?? 100}%
+                {blocks.length > 0
+                  ? Math.round(
+                      (blocks.filter((b) => b.status === "completed").length / blocks.length) * 100
+                    )
+                  : 100}%
               </span>
             </div>
             <span className="text-[10.5px] font-mono text-on-surface-variant block">
-              Cadence adherence
+              Today&apos;s tasks completed
             </span>
           </div>
         </div>

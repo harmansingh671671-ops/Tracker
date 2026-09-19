@@ -114,7 +114,7 @@ export default function ShopPage() {
     if (chestClaimed) return;
     setChestClaimed(true);
     addDiamonds(10);
-    setToastMsg({ text: "Daily Discipline Chest Claimed! +10 Gems added to Vault." });
+    setToastMsg({ text: "Daily Cadence Chest Claimed! +10 Gems added to Vault." });
     setTimeout(() => setToastMsg(null), 3000);
   };
 

@@ -12,17 +12,17 @@ export const RANKS: RankInfo[] = [
   { name: 'Novice', streak: 7, efficiency: 50, badge: '🧭', division: 'Bronze', description: '1 week completed: finding your daily rhythm' },
   { name: 'Builder', streak: 14, efficiency: 60, badge: '🔨', division: 'Bronze', description: '2 weeks completed: actively building strong habits' },
   { name: 'Consistent', streak: 30, efficiency: 70, badge: '⚡', division: 'Silver', description: '1 full month of reliable daily routine' },
-  { name: 'Specialist', streak: 60, efficiency: 75, badge: '🎯', division: 'Silver', description: '2 months: steady focus and proven discipline' },
+  { name: 'Specialist', streak: 60, efficiency: 75, badge: '🎯', division: 'Silver', description: '2 months: steady daily focus and strong habits' },
   { name: 'Expert', streak: 90, efficiency: 80, badge: '⚔️', division: 'Gold', description: '3 months (1 quarter) of high consistency' },
   { name: 'Pro', streak: 180, efficiency: 85, badge: '🌟', division: 'Gold', description: 'Half a year of continuous dedication' },
   { name: 'Master', streak: 270, efficiency: 85, badge: '💎', division: 'Platinum', description: '9 months of self-mastery and excellence' },
-  { name: 'Legend', streak: 365, efficiency: 90, badge: '👑', division: 'Diamond', description: '1 full year of unbroken discipline' }
+  { name: 'Legend', streak: 365, efficiency: 90, badge: '👑', division: 'Diamond', description: '1 full year of continuous dedication' }
 ];
 
-export function calculateRank(streak: number = 0, efficiency: number = 100): string {
+export function calculateRank(streak: number = 0, _legacyEfficiency?: number): string {
   let eligibleRank = RANKS[0].name;
   for (const rank of RANKS) {
-    if (streak >= rank.streak && efficiency >= rank.efficiency) {
+    if (streak >= rank.streak) {
       eligibleRank = rank.name;
     }
   }

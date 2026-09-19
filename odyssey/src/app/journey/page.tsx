@@ -215,8 +215,8 @@ export default function JourneyPage() {
   }, [user?.createdAt, currentDateStr]);
 
   const rankInfo = useMemo(
-    () => getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0, user?.integrityScore ?? 100)),
-    [user?.militaryRank, user?.streak, user?.integrityScore]
+    () => getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0)),
+    [user?.militaryRank, user?.streak]
   );
 
   const activeChapter = Math.ceil(activeDay / 7);

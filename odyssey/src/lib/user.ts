@@ -16,7 +16,7 @@ export async function getOrCreateUser(): Promise<Profile> {
       return await resetAllDataToZero();
     }
     // Automatically migrate legacy/military rank to the new practical rank
-    const modernRank = calculateRank(user.streak, user.integrityScore);
+    const modernRank = calculateRank(user.streak);
     if (!user.militaryRank || user.militaryRank === 'Civilian' || user.militaryRank === 'Sepoy' || user.militaryRank === 'Explorer') {
       user.militaryRank = modernRank;
       await db.profiles.update(user.id, { militaryRank: modernRank });

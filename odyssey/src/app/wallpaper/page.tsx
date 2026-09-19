@@ -285,10 +285,10 @@ export default function WallpaperPage() {
   const activeChapter = Math.ceil(selectedDayNumber / 7);
 
   const rankInfo = useMemo(() => {
-    return getRankInfo(
-      user?.militaryRank || calculateRank(user?.streak ?? 0, user?.integrityScore ?? 100)
-    );
-  }, [user?.militaryRank, user?.streak, user?.integrityScore]);
+    const rankStr =
+      user?.militaryRank || calculateRank(user?.streak ?? 0);
+    return getRankInfo(rankStr);
+  }, [user?.militaryRank, user?.streak]);
 
   // Consolidated wallpaper payload for selected day
   const wallpaperData: WallpaperData = useMemo(() => {

@@ -4,6 +4,9 @@ export interface Profile {
   id: string;
   username: string;
   displayName: string;
+  age?: number;
+  bio?: string;
+  motto?: string;
   dateOfBirth: string;
   createdAt: string;
   
