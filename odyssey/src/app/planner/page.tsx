@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -136,6 +137,23 @@ function PlannerContent() {
 
   // Group Collapses (Sleep collapsed by default)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // Client mount check for React Portal
+  const [mounted, setMounted] = useState<boolean>(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent background scrolling while edit modal is open
+  useEffect(() => {
+    if (isEditModalOpen) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [isEditModalOpen]);
 
   // System clock ticker for live hour calculations
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
@@ -1060,10 +1078,16 @@ function PlannerContent() {
         </div>
       </div>
 
-      {/* Edit Modal (Only opened when user explicitly clicks 3-dots on an existing block to edit/delete) */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-surface-container-high border border-outline/30 rounded-2xl p-4 shadow-2xl space-y-3 text-left">
+      {/* Edit Modal (Rendered via React Portal directly into document.body to avoid parent container transform/scroll clipping) */}
+      {isEditModalOpen && mounted && createPortal(
+        <div
+          onClick={() => setIsEditModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm max-h-[90vh] overflow-y-auto bg-surface-container-high border border-outline/30 rounded-2xl p-4 shadow-2xl space-y-3 text-left"
+          >
             <div className="flex items-center justify-between border-b border-outline/15 pb-2">
               <h3 className="text-sm font-bold text-on-surface">Edit Time Block</h3>
               <button
@@ -1186,7 +1210,8 @@ function PlannerContent() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
