@@ -12,7 +12,6 @@ import {
   Check,
   Zap,
   Sparkles,
-  Clock,
   BatteryCharging,
   Wifi,
   Signal,
@@ -236,7 +235,7 @@ export function WallpaperPreview({
       <div className="px-4 w-full z-10 mt-2">
         <div className="rounded-2xl p-2.5 px-3 bg-[#13151D]/75 border border-white/15 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
           {/* Multi-segmented Timeline Bar (24 individual 1-hour slots) */}
-          <div className="relative w-full py-1">
+          <div className="relative w-full pt-1 pb-8">
             <div className="h-2.5 w-full bg-slate-900 rounded-full flex overflow-hidden border border-white/15 shadow-inner">
               {all24HourlyBlocks.map((b) => {
                 const widthPct = (1 / 24) * 100;
@@ -257,7 +256,7 @@ export function WallpaperPreview({
 
             {/* Active Time Needle Marker - Large Radiant Glowing Beacon (Larger than bar!) */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 -ml-3 pointer-events-none flex items-center justify-center transition-all duration-300 z-10"
+              className="absolute top-1/2 -translate-y-1/2 -ml-3 pointer-events-none flex flex-col items-center transition-all duration-300 z-10"
               style={{
                 left: `${Math.min(
                   96,
@@ -268,43 +267,29 @@ export function WallpaperPreview({
                 )}%`,
               }}
             >
-              {/* Tier 1: Soft Ambient Radiant Aura */}
-              <div className="absolute w-9 h-9 rounded-full bg-amber-400/25 animate-pulse blur-[3px]" />
-              {/* Tier 2: Glowing Halo Ring */}
-              <div className="absolute w-6 h-6 rounded-full bg-amber-400/35 border border-amber-300/80 shadow-[0_0_12px_#F59E0B]" />
-              {/* Tier 3: Solid Amber Core Body */}
-              <div className="relative w-4 h-4 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_10px_#F59E0B] flex items-center justify-center">
-                {/* Tier 4: Specular White Pinpoint */}
-                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+              {/* Beacon layers */}
+              <div className="flex items-center justify-center relative">
+                {/* Tier 1: Soft Ambient Radiant Aura */}
+                <div className="absolute w-9 h-9 rounded-full bg-amber-400/25 animate-pulse blur-[3px]" />
+                {/* Tier 2: Glowing Halo Ring */}
+                <div className="absolute w-6 h-6 rounded-full bg-amber-400/35 border border-amber-300/80 shadow-[0_0_12px_#F59E0B]" />
+                {/* Tier 3: Solid Amber Core Body */}
+                <div className="relative w-4 h-4 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_10px_#F59E0B] flex items-center justify-center">
+                  {/* Tier 4: Specular White Pinpoint */}
+                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                </div>
               </div>
+              {/* Active hour time label directly below the dot */}
+              <span className="mt-[18px] text-[8.5px] font-mono font-bold text-amber-300 tracking-wide whitespace-nowrap bg-[#090A0F]/80 px-1.5 py-0.5 rounded-full border border-amber-400/30 shadow-[0_0_6px_rgba(245,158,11,0.3)]">
+                {String(activeHour).padStart(2, "0")}:00
+              </span>
             </div>
-          </div>
-
-          <div className="flex justify-between items-center text-[9px] font-mono text-slate-400 tracking-wider">
-            <span className="text-slate-500">00:00</span>
-            <span className="text-slate-500">06:00</span>
-            <span className="text-amber-400 font-bold flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_#F59E0B] inline-block" />
-              {String(activeHour).padStart(2, "0")}:00 ACTIVE
-            </span>
-            <span className="text-slate-500">18:00</span>
-            <span className="text-slate-500">24:00</span>
           </div>
         </div>
       </div>
 
-      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR - EXPANSIVE 2-ROW DESIGN, NO LEFT BAR) */}
-      <div className="px-4 py-2 flex flex-col gap-2 z-10">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            SCHEDULE • ACTIVE HOUR CENTERED
-          </span>
-          <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-white/5 border border-white/15 text-emerald-400">
-            {effectivePlannedHours}/24H PLANNED
-          </span>
-        </div>
-
+      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR) */}
+      <div className="px-4 pt-1 pb-2 flex flex-col gap-2 z-10">
         {centeredWindow.map((block, idx) => {
           const isActive = block.hour === activeHour;
           const isPast =
