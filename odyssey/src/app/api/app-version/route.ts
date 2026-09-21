@@ -19,17 +19,17 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 2,
-    versionName: "1.1.0",
+    versionCode: 3,
+    versionName: "1.2.0",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
-    releaseDate: "2026-09-19",
+    releaseDate: "2026-09-22",
     mandatory: false,
     changelog: [
-      "Smooth rounded card corners (54f) on Home & Lock screens",
-      "Radiant glowing beacon indicator on horizontal timeline bar",
-      "Always-visible hobbies section with flame streak counters",
-      "Dynamic task name synchronization directly from the app",
-      "Seamless in-app one-tap updates (no uninstalls required)",
+      "XX:57 task cadence alerts with 'Roger that' action",
+      "Tap 'Update Task' to open the exact hour edit modal directly",
+      "Instant wallpaper auto-sync whenever tasks are edited",
+      "Full dedicated profile page with custom motto & focus",
+      "Seamless in-place update (0 data lost, no uninstall)",
     ],
   };
 
