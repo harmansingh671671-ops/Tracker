@@ -17,8 +17,9 @@ export function Header() {
       <div className="h-12 sm:h-14 px-2.5 sm:px-4 max-w-xl sm:max-w-2xl mx-auto flex items-center justify-between gap-1.5">
         {/* Logo Title */}
         <div className="flex items-center">
-          <Link href="/planner" className="text-base sm:text-lg text-on-surface font-bold tracking-tight hover:opacity-90 transition-opacity">
-            Odyssey
+          <Link href="/planner" className="flex items-center gap-2 text-base sm:text-lg text-on-surface font-bold tracking-tight hover:opacity-90 transition-opacity">
+            <img src="/logo.png" alt="Odyssey" className="w-5 h-5 rounded-md object-contain border border-primary/20 shadow-sm" />
+            <span>Odyssey</span>
           </Link>
         </div>
 
