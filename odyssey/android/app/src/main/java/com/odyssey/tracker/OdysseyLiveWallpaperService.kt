@@ -1,5 +1,6 @@
 package com.odyssey.tracker
 
+import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -49,6 +50,7 @@ data class HobbyItem(
  * - Fully utilizes screen height from top to bottom (no wasted space, no squeezed content).
  * - Zero battery drain: sleeps and removes callbacks whenever screen is off.
  */
+@SuppressLint("NewApi")
 class OdysseyLiveWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine {

@@ -1,5 +1,6 @@
 package com.odyssey.tracker
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -27,6 +28,7 @@ import java.util.Locale
  *     2. "Update Task" action button (and card tap) -> Opens the app directly
  *        to that hour's edit pop-up (identical to the 3-dots modal in planner).
  */
+@SuppressLint("NewApi")
 class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
 
     companion object {

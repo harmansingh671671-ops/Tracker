@@ -1,5 +1,6 @@
 package com.odyssey.tracker
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.WallpaperManager
@@ -20,6 +21,7 @@ import java.util.Calendar
  * renders the rich dynamic adaptive lockscreen canvas, and applies the wallpaper directly
  * via WallpaperManager.FLAG_LOCK.
  */
+@SuppressLint("NewApi")
 class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
