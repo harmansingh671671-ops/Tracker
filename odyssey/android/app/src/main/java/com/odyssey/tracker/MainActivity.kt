@@ -28,6 +28,8 @@ import androidx.appcompat.app.AppCompatActivity
  * 3. Zero APK rebuilds needed when iterating on UI, habits, charts, or logic.
  * 4. The native bridge allows the Vercel site to silently update the phone's lockscreen.
  */
+class MainActivity : AppCompatActivity() {
+
     companion object {
         const val EXTRA_OPEN_HOUR_EDIT = "EXTRA_OPEN_HOUR_EDIT"
         private const val PERMISSION_REQUEST_CODE = 8821
