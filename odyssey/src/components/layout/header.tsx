@@ -18,7 +18,7 @@ export function Header() {
         {/* Logo Title */}
         <div className="flex items-center">
           <Link href="/planner" className="flex items-center gap-2 text-base sm:text-lg text-on-surface font-bold tracking-tight hover:opacity-90 transition-opacity">
-            <img src="/logo.svg" alt="Odyssey" className="w-5 h-5 rounded-md object-contain border border-primary/20 shadow-sm" />
+            <img src="/logo.png" alt="Odyssey" className="w-5 h-5 rounded-md object-contain border border-primary/20 shadow-sm" />
             <span>Odyssey</span>
           </Link>
         </div>
