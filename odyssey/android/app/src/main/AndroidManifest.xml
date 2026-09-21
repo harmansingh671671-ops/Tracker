@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -64,6 +65,27 @@
             <intent-filter>
                 <action android:name="com.odyssey.tracker.ACTION_HOURLY_WALLPAPER_UPDATE" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Odyssey XX:57 Cadence Notification Worker -->
+        <receiver
+            android:name=".OdysseyCadenceNotificationWorker"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.odyssey.tracker.ACTION_CADENCE_NOTIFICATION" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Odyssey Notification Action Receiver ("Roger that") -->
+        <receiver
+            android:name=".OdysseyNotificationActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.odyssey.tracker.ACTION_ROGER_THAT" />
             </intent-filter>
         </receiver>
 

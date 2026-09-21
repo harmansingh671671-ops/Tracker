@@ -700,5 +700,17 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
             val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
             return prefs.getBoolean("hourly_auto_update_enabled", false)
         }
+
+        fun updateLockscreenNow(context: Context) {
+            Thread {
+                try {
+                    val worker = OdysseyHourlyWallpaperWorker()
+                    worker.updateLockscreenWallpaper(context)
+                    Log.d(TAG, "updateLockscreenNow completed successfully")
+                } catch (e: Exception) {
+                    Log.e(TAG, "updateLockscreenNow failed: ${e.message}", e)
+                }
+            }.start()
+        }
     }
 }

@@ -28,9 +28,13 @@ import androidx.appcompat.app.AppCompatActivity
  * 3. Zero APK rebuilds needed when iterating on UI, habits, charts, or logic.
  * 4. The native bridge allows the Vercel site to silently update the phone's lockscreen.
  */
-class MainActivity : AppCompatActivity() {
+    companion object {
+        const val EXTRA_OPEN_HOUR_EDIT = "EXTRA_OPEN_HOUR_EDIT"
+        private const val PERMISSION_REQUEST_CODE = 8821
+    }
 
     private lateinit var webView: WebView
+    private var pendingOpenHour: Int = -1
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,9 +44,32 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
 
+        // Ensure notification channel is created
+        OdysseyCadenceNotificationWorker.ensureNotificationChannel(this)
+
+        // Request POST_NOTIFICATIONS permission on Android 13+ (API 33+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), PERMISSION_REQUEST_CODE)
+            }
+        }
+
+        // Schedule next cadence notification alarm if enabled or first run
         val prefs = getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+        val notificationsEnabled = prefs.getBoolean("cadence_notifications_enabled", true)
+        if (notificationsEnabled) {
+            OdysseyCadenceNotificationWorker.scheduleNextCadenceNotification(this)
+        }
+
+        pendingOpenHour = intent.getIntExtra(EXTRA_OPEN_HOUR_EDIT, -1)
+
         val defaultUrl = getString(R.string.default_vercel_url)
-        val targetUrl = intent.getStringExtra("TARGET_URL") ?: prefs.getString("live_vercel_url", defaultUrl) ?: defaultUrl
+        var targetUrl = intent.getStringExtra("TARGET_URL") ?: prefs.getString("live_vercel_url", defaultUrl) ?: defaultUrl
+
+        if (pendingOpenHour in 0..23) {
+            val delimiter = if (targetUrl.contains("?")) "&" else "?"
+            targetUrl = "$targetUrl${delimiter}openHour=$pendingOpenHour"
+        }
 
         webView = WebView(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -76,6 +103,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    if (pendingOpenHour in 0..23) {
+                        val js = "(function(){ setTimeout(function(){ window.dispatchEvent(new CustomEvent('odyssey:open-hour-edit', { detail: { hour: $pendingOpenHour } })); }, 600); })();"
+                        view?.evaluateJavascript(js, null)
+                        pendingOpenHour = -1
+                    }
+                }
+
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val url = request?.url?.toString() ?: return false
                     // APK downloads always open externally in system downloader/browser
@@ -121,6 +157,20 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(targetUrl)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleOpenHourIntent(intent)
+    }
+
+    private fun handleOpenHourIntent(intent: Intent) {
+        val hour = intent.getIntExtra(EXTRA_OPEN_HOUR_EDIT, -1)
+        if (hour in 0..23) {
+            val js = "window.dispatchEvent(new CustomEvent('odyssey:open-hour-edit', { detail: { hour: $hour } }));"
+            webView.evaluateJavascript(js, null)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         webView.onResume()
@@ -136,3 +186,4 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 }
+

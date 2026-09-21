@@ -1,4 +1,6 @@
 import { type WallpaperData, generateWallpaperCanvas, build24HourlyBlocks } from "./wallpaper-generator";
+import { db } from "../db";
+import { calculateRank, getRankInfo } from "./gamification";
 
 export interface NativeWallpaperResult {
   success: boolean;
@@ -32,6 +34,9 @@ declare global {
       enableHourlyAutoUpdate?: () => boolean;
       disableHourlyAutoUpdate?: () => boolean;
       isHourlyAutoUpdateEnabled?: () => boolean;
+      enableCadenceNotifications?: () => boolean;
+      disableCadenceNotifications?: () => boolean;
+      isCadenceNotificationsEnabled?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
       downloadAndInstallApk?: (apkUrl: string) => boolean;
@@ -47,6 +52,9 @@ declare global {
       enableHourlyAutoUpdate?: () => boolean;
       disableHourlyAutoUpdate?: () => boolean;
       isHourlyAutoUpdateEnabled?: () => boolean;
+      enableCadenceNotifications?: () => boolean;
+      disableCadenceNotifications?: () => boolean;
+      isCadenceNotificationsEnabled?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
       downloadAndInstallApk?: (apkUrl: string) => boolean;
@@ -544,5 +552,80 @@ export async function checkForAppUpdate(): Promise<AppUpdateCheckResult | null> 
   } catch {
     return null;
   }
+}
+
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Automatically fetches today's latest schedule & habits from IndexedDB
+ * and pushes the updated payload directly to the Android native bridge.
+ * This ensures the lockscreen & live wallpapers refresh immediately
+ * whenever any task is added, edited, deleted, or auto-filled!
+ */
+export async function syncCurrentScheduleToNative(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+
+  return new Promise((resolve) => {
+    if (syncDebounceTimer) {
+      clearTimeout(syncDebounceTimer);
+    }
+
+    syncDebounceTimer = setTimeout(async () => {
+      try {
+        const users = await db.profiles.toArray();
+        const user = users[0];
+        if (!user) {
+          resolve(false);
+          return;
+        }
+
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+        const blocks = await db.scheduleBlocks
+          .where("[userId+date]")
+          .equals([user.id, todayStr])
+          .toArray();
+
+        // Sort blocks by start time
+        blocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+        const habits = await db.habits
+          .where("userId")
+          .equals(user.id)
+          .toArray();
+
+        const rankInfo = getRankInfo(user.militaryRank || calculateRank(user.streak ?? 0));
+        const plannedHours = blocks.length;
+        const activeDay = user.streak > 0 ? user.streak : 1;
+        const activeChapter = Math.ceil(activeDay / 7);
+
+        const wallpaperData: WallpaperData = {
+          chapter: activeChapter,
+          activeDay,
+          rankBadge: rankInfo.badge,
+          rankName: rankInfo.name,
+          userLevel: user.level ?? 1,
+          userStreak: user.streak ?? 1,
+          plannedHours,
+          dateStr: todayStr,
+          formattedDate: now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+          blocks,
+          habits,
+          showClockGuide: false,
+          includeHobbies: true,
+        };
+
+        const res = await syncScheduleDataToNative(wallpaperData);
+        resolve(res);
+      } catch (err) {
+        console.warn("syncCurrentScheduleToNative failed:", err);
+        resolve(false);
+      }
+    }, 250);
+  });
 }
 

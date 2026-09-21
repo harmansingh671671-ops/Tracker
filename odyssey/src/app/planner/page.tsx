@@ -8,6 +8,7 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useWallpaperStore } from "@/lib/stores/wallpaper-store";
 import { type ScheduleBlock } from "@/lib/db";
+import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import {
   ArrowLeft,
   Compass,
@@ -358,6 +359,9 @@ function PlannerContent() {
     setAutoFillLocked(true);
     setTimeout(() => setAutoFillLocked(false), 2500);
     await fetchBlocksForDate(user.id, selectedDate);
+    if (isSelectedToday) {
+      syncCurrentScheduleToNative().catch(() => {});
+    }
   };
 
   // Focus the next available unwritten hour input
@@ -432,6 +436,9 @@ function PlannerContent() {
     });
 
     await fetchBlocksForDate(user.id, selectedDate);
+    if (isSelectedToday) {
+      syncCurrentScheduleToNative().catch(() => {});
+    }
 
     // Re-confirm focus on next hour input after React finishes re-render
     if (focusNext) {
@@ -459,38 +466,76 @@ function PlannerContent() {
     e.preventDefault();
     if (!editingBlockId || !editTitle.trim()) return;
 
-    await updateBlock(editingBlockId, {
-      title: editTitle.trim(),
-      description: editDesc.trim() || undefined,
-      category: editCategory,
-      status: editStatus,
-      completedAt: editStatus === "completed" ? new Date().toISOString() : undefined,
-      missReason: editStatus === "missed" ? "Did not follow" : undefined,
-      tag:
-        editCategory === "work"
-          ? "Deep Work"
-          : editCategory === "habits"
-          ? "Vitality"
-          : editCategory === "sleep"
-          ? "Rest"
-          : "Break",
-    });
+    if (editingBlockId.startsWith("temp-")) {
+      const h = parseInt(editingBlockId.replace("temp-", ""), 10);
+      const startStr = `${h.toString().padStart(2, "0")}:00`;
+      const nextH = h + 1;
+      const endStr = nextH === 24 ? "24:00" : `${nextH.toString().padStart(2, "0")}:00`;
+      if (user) {
+        await addBlock({
+          userId: user.id,
+          date: selectedDate,
+          startTime: startStr,
+          endTime: endStr,
+          title: editTitle.trim(),
+          description: editDesc.trim() || undefined,
+          category: editCategory,
+          status: editStatus,
+          completedAt: editStatus === "completed" ? new Date().toISOString() : undefined,
+          missReason: editStatus === "missed" ? "Did not follow" : undefined,
+          tag:
+            editCategory === "work"
+              ? "Deep Work"
+              : editCategory === "habits"
+              ? "Vitality"
+              : editCategory === "sleep"
+              ? "Rest"
+              : "Break",
+          isCommitted: true,
+        });
+      }
+    } else {
+      await updateBlock(editingBlockId, {
+        title: editTitle.trim(),
+        description: editDesc.trim() || undefined,
+        category: editCategory,
+        status: editStatus,
+        completedAt: editStatus === "completed" ? new Date().toISOString() : undefined,
+        missReason: editStatus === "missed" ? "Did not follow" : undefined,
+        tag:
+          editCategory === "work"
+            ? "Deep Work"
+            : editCategory === "habits"
+            ? "Vitality"
+            : editCategory === "sleep"
+            ? "Rest"
+            : "Break",
+      });
+    }
 
     setIsEditModalOpen(false);
     setEditingBlockId(null);
     if (user) {
       await fetchBlocksForDate(user.id, selectedDate);
     }
+    if (isSelectedToday) {
+      syncCurrentScheduleToNative().catch(() => {});
+    }
   };
 
   // Delete block from Edit Modal
   const handleDeleteFromEditModal = async () => {
     if (!editingBlockId) return;
-    await deleteBlock(editingBlockId);
+    if (!editingBlockId.startsWith("temp-")) {
+      await deleteBlock(editingBlockId);
+    }
     setIsEditModalOpen(false);
     setEditingBlockId(null);
     if (user) {
       await fetchBlocksForDate(user.id, selectedDate);
+    }
+    if (isSelectedToday) {
+      syncCurrentScheduleToNative().catch(() => {});
     }
   };
 
@@ -506,6 +551,9 @@ function PlannerContent() {
     if (newStatus === "completed") {
       addXp(25);
     }
+    if (isSelectedToday) {
+      syncCurrentScheduleToNative().catch(() => {});
+    }
   };
 
   const handleMarkMissed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
@@ -516,7 +564,59 @@ function PlannerContent() {
       status: newStatus,
       missReason: newStatus === "missed" ? "Did not follow" : undefined,
     });
+    if (isSelectedToday) {
+      syncCurrentScheduleToNative().catch(() => {});
+    }
   };
+
+  // Deep-link from Android Notification "Update Task" (XX:57)
+  const openHourParam = searchParams.get("openHour");
+  useEffect(() => {
+    const handleTriggerHour = (h: number) => {
+      if (h < 0 || h > 23) return;
+      const existing = hourBlockMap[h];
+      if (existing) {
+        handleOpenEditModal(existing);
+      } else {
+        const startStr = `${h.toString().padStart(2, "0")}:00`;
+        const nextH = h + 1;
+        const endStr = nextH === 24 ? "24:00" : `${nextH.toString().padStart(2, "0")}:00`;
+        const placeholderBlock: ScheduleBlock = {
+          id: `temp-${h}`,
+          userId: user?.id || "",
+          date: selectedDate,
+          startTime: startStr,
+          endTime: endStr,
+          title: "",
+          category: "work",
+          tag: "Deep Work",
+          status: "pending",
+          isCommitted: true,
+          createdAt: new Date().toISOString(),
+        };
+        handleOpenEditModal(placeholderBlock);
+      }
+    };
+
+    if (openHourParam !== null && openHourParam !== undefined) {
+      const h = parseInt(openHourParam, 10);
+      if (!isNaN(h)) {
+        setTimeout(() => handleTriggerHour(h), 350);
+      }
+    }
+
+    const onCustomEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && typeof detail.hour === "number") {
+        handleTriggerHour(detail.hour);
+      }
+    };
+
+    window.addEventListener("odyssey:open-hour-edit", onCustomEvent);
+    return () => {
+      window.removeEventListener("odyssey:open-hour-edit", onCustomEvent);
+    };
+  }, [openHourParam, hourBlockMap, user?.id, selectedDate]);
 
   const toggleGroupCollapse = (groupId: string, defaultCollapsed: boolean) => {
     setCollapsedGroups((prev) => {

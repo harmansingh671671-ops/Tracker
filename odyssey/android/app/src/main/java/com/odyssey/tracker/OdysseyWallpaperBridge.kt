@@ -94,11 +94,27 @@ class OdysseyWallpaperBridge(private val context: Context) {
         return try {
             val success = prefs.edit().putString("latest_schedule_json", scheduleJson).commit()
             if (success) {
+                // 1. Broadcast to Live Wallpaper Service for instant canvas redraw
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(intent)
-                Log.d("OdysseyWallpaper", "Synced schedule data to native preferences & broadcasted update to Live Wallpaper Service")
+
+                // 2. Also refresh Static Lockscreen Wallpaper immediately without manual re-apply
+                try {
+                    OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Could not immediately update static lockscreen: ${e.message}")
+                }
+
+                // 3. Ensure the XX:57 background cadence notification is armed
+                try {
+                    OdysseyCadenceNotificationWorker.scheduleNextCadenceNotification(context)
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Could not arm cadence notification: ${e.message}")
+                }
+
+                Log.d("OdysseyWallpaper", "Synced schedule data to native preferences, updated wallpapers & armed cadence notification")
             }
             success
         } catch (e: Exception) {
@@ -124,10 +140,26 @@ class OdysseyWallpaperBridge(private val context: Context) {
 
             val success = prefs.edit().putString("latest_schedule_json", scheduleJson).commit()
             if (success) {
+                // 1. Broadcast to Live Wallpaper Service
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(intent)
+
+                // 2. Refresh Static Lockscreen Wallpaper immediately
+                try {
+                    OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Could not immediately update static lockscreen: ${e.message}")
+                }
+
+                // 3. Ensure the XX:57 background cadence notification is armed
+                try {
+                    OdysseyCadenceNotificationWorker.scheduleNextCadenceNotification(context)
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Could not arm cadence notification: ${e.message}")
+                }
+
                 Log.d("OdysseyWallpaper", "Verified & synced $blocksCount blocks and $habitsCount habits to native preferences")
                 "{\"success\":true,\"blockCount\":$blocksCount,\"habitCount\":$habitsCount,\"streak\":$streak,\"message\":\"Verified: $blocksCount tasks & $habitsCount hobbies saved to Android Live Wallpaper\"}"
             } else {
@@ -230,6 +262,44 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun isHourlyAutoUpdateEnabled(): Boolean {
         return OdysseyHourlyWallpaperWorker.isScheduled(context)
+    }
+
+    /**
+     * Enables automatic XX:57 background cadence notifications.
+     */
+    @JavascriptInterface
+    fun enableCadenceNotifications(): Boolean {
+        return try {
+            OdysseyCadenceNotificationWorker.scheduleNextCadenceNotification(context)
+            Log.d("OdysseyWallpaper", "Cadence notifications enabled successfully")
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to enable cadence notifications: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Disables automatic XX:57 background cadence notifications.
+     */
+    @JavascriptInterface
+    fun disableCadenceNotifications(): Boolean {
+        return try {
+            OdysseyCadenceNotificationWorker.cancelCadenceNotification(context)
+            Log.d("OdysseyWallpaper", "Cadence notifications cancelled")
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to cancel cadence notifications: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Returns whether cadence notifications are currently active.
+     */
+    @JavascriptInterface
+    fun isCadenceNotificationsEnabled(): Boolean {
+        return prefs.getBoolean("cadence_notifications_enabled", true)
     }
 
     /**
