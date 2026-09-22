@@ -83,7 +83,22 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
             }
 
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (alarmManager.canScheduleExactAlarms()) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            cal.timeInMillis,
+                            pendingIntent
+                        )
+                    } else {
+                        Log.w(TAG, "canScheduleExactAlarms is false. Scheduling with setAndAllowWhileIdle fallback.")
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            cal.timeInMillis,
+                            pendingIntent
+                        )
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         cal.timeInMillis,
@@ -103,9 +118,37 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
                     .apply()
 
                 Log.d(TAG, "Next cadence notification scheduled for: ${cal.time}")
+            } catch (se: SecurityException) {
+                Log.w(TAG, "SecurityException while setting exact alarm. Falling back to setAndAllowWhileIdle: ${se.message}")
+                try {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        cal.timeInMillis,
+                        pendingIntent
+                    )
+                    context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("cadence_notifications_enabled", true)
+                        .apply()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed fallback alarm: ${e.message}", e)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to schedule cadence notification: ${e.message}", e)
             }
+        }
+
+        fun dispatchCadenceNotificationNow(context: Context, forceTest: Boolean = false) {
+            ensureNotificationChannel(context)
+            Thread {
+                try {
+                    val worker = OdysseyCadenceNotificationWorker()
+                    worker.processAndDispatchNotification(context, forceTest)
+                    Log.d(TAG, "Immediate cadence notification dispatched (forceTest=$forceTest)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to dispatch immediate cadence notification: ${e.message}", e)
+                }
+            }.start()
         }
 
         fun cancelCadenceNotification(context: Context) {
@@ -138,7 +181,7 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         val pendingResult = goAsync()
         Thread {
             try {
-                processAndDispatchNotification(context)
+                processAndDispatchNotification(context, forceTest = false)
             } catch (e: Exception) {
                 Log.e(TAG, "Error in cadence notification: ${e.message}", e)
             } finally {
@@ -148,7 +191,7 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         }.start()
     }
 
-    private fun processAndDispatchNotification(context: Context) {
+    private fun processAndDispatchNotification(context: Context, forceTest: Boolean = false) {
         val now = Calendar.getInstance()
         val nextHour = (now.get(Calendar.HOUR_OF_DAY) + 1) % 24
         val nextHourEnd = (nextHour + 1) % 24
@@ -190,8 +233,8 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         }
 
         // 1. SLEEP & REST EXCLUSION CHECK
-        // If the upcoming hour is marked as Sleep or Rest, skip notification completely
-        if (isSleepOrRest(blockTitle, blockCategory, blockTag)) {
+        // If the upcoming hour is marked as Sleep or Rest, skip notification completely (unless forceTest)
+        if (!forceTest && isSleepOrRest(blockTitle, blockCategory, blockTag)) {
             Log.d(TAG, "Hour $nextHour is Sleep/Rest ('$blockTitle', cat: '$blockCategory'). Skipping notification.")
             return
         }
@@ -201,7 +244,7 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         val endFormatted = String.format(Locale.getDefault(), "%02d:00", nextHourEnd)
         val hourRangeStr = "$startFormatted - $endFormatted"
 
-        val notifTitle = "Next Hour • $hourRangeStr"
+        val notifTitle = if (forceTest) "Odyssey Test • Next Hour $hourRangeStr" else "Next Hour • $hourRangeStr"
         val notifBody = if (hasBlock && blockTitle.isNotBlank()) {
             "Upcoming: $blockTitle"
         } else {
@@ -240,6 +283,7 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(notifBody))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(updateTaskPendingIntent) // Tapping card opens the hour edit modal
             .addAction(0, "Roger that", rogerPendingIntent) // Roger that dismisses
@@ -247,7 +291,7 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
 
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
-            Log.d(TAG, "Dispatched XX:57 notification for hour $nextHour ('$blockTitle')")
+            Log.d(TAG, "Dispatched XX:57 notification for hour $nextHour ('$blockTitle', forceTest=$forceTest)")
         } catch (e: SecurityException) {
             Log.w(TAG, "POST_NOTIFICATIONS permission not granted: ${e.message}")
         } catch (e: Exception) {

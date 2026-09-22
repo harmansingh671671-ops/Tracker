@@ -17,8 +17,10 @@ import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
+import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileOutputStream
 
 /**
  * OdysseyWallpaperBridge
@@ -30,6 +32,23 @@ import java.io.File
 class OdysseyWallpaperBridge(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+
+    private fun backupCurrentWallpaperIfNeeded(wallpaperManager: WallpaperManager) {
+        try {
+            val backupFile = File(context.filesDir, "previous_user_wallpaper.png")
+            if (!backupFile.exists()) {
+                val drawable = wallpaperManager.drawable
+                if (drawable is BitmapDrawable && drawable.bitmap != null) {
+                    FileOutputStream(backupFile).use { out ->
+                        drawable.bitmap.compress(Bitmap.CompressFormat.PNG, 95, out)
+                    }
+                    Log.d("OdysseyWallpaper", "Backed up user previous wallpaper to ${backupFile.absolutePath}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("OdysseyWallpaper", "Could not backup previous wallpaper: ${e.message}")
+        }
+    }
 
     /**
      * Directly applies the base64 PNG image onto the Android Lock Screen.
@@ -45,6 +64,7 @@ class OdysseyWallpaperBridge(private val context: Context) {
             val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
 
             val wallpaperManager = WallpaperManager.getInstance(context)
+            backupCurrentWallpaperIfNeeded(wallpaperManager)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 // Apply directly to both Lock Screen and Home Screen
@@ -62,21 +82,46 @@ class OdysseyWallpaperBridge(private val context: Context) {
     }
 
     /**
-     * Clears custom wallpaper and restores the system default on both Lock and Home screens.
+     * Clears custom wallpaper. If a previous user wallpaper was backed up before Odyssey was applied,
+     * restores that original wallpaper. Otherwise resets to system stock default.
      * Also cancels the background hourly auto-update worker.
      */
     @JavascriptInterface
     fun clearLockscreenWallpaper(): Boolean {
         return try {
             val wallpaperManager = WallpaperManager.getInstance(context)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                try { wallpaperManager.clear(WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
-                try { wallpaperManager.clear(WallpaperManager.FLAG_SYSTEM) } catch (_: Exception) {}
-            } else {
-                wallpaperManager.clear()
+            val backupFile = File(context.filesDir, "previous_user_wallpaper.png")
+            var restored = false
+
+            if (backupFile.exists()) {
+                try {
+                    val backupBitmap = BitmapFactory.decodeFile(backupFile.absolutePath)
+                    if (backupBitmap != null) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
+                        } else {
+                            wallpaperManager.setBitmap(backupBitmap)
+                        }
+                        backupFile.delete()
+                        restored = true
+                        Log.d("OdysseyWallpaper", "Successfully restored user's previous wallpaper from backup")
+                    }
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Could not restore backup bitmap: ${e.message}")
+                }
             }
+
+            if (!restored) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    try { wallpaperManager.clear(WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
+                    try { wallpaperManager.clear(WallpaperManager.FLAG_SYSTEM) } catch (_: Exception) {}
+                } else {
+                    wallpaperManager.clear()
+                }
+                Log.d("OdysseyWallpaper", "Cleared wallpaper back to system defaults")
+            }
+
             OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
-            Log.d("OdysseyWallpaper", "Successfully cleared wallpaper and restored system default on Lock & Home screens")
             true
         } catch (e: Exception) {
             Log.e("OdysseyWallpaper", "Failed to clear wallpaper: ${e.message}", e)
@@ -100,11 +145,16 @@ class OdysseyWallpaperBridge(private val context: Context) {
                 }
                 context.sendBroadcast(intent)
 
-                // 2. Also refresh Static Lockscreen Wallpaper immediately without manual re-apply
-                try {
-                    OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
-                } catch (e: Exception) {
-                    Log.w("OdysseyWallpaper", "Could not immediately update static lockscreen: ${e.message}")
+                // 2. Only refresh static lockscreen if Live Wallpaper is NOT currently running!
+                // If Live Wallpaper is active, calling setBitmap will kill and freeze the live engine.
+                val wallpaperManager = WallpaperManager.getInstance(context)
+                val isLiveActive = wallpaperManager.wallpaperInfo?.packageName == context.packageName
+                if (!isLiveActive && OdysseyHourlyWallpaperWorker.isScheduled(context)) {
+                    try {
+                        OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
+                    } catch (e: Exception) {
+                        Log.w("OdysseyWallpaper", "Could not immediately update static lockscreen: ${e.message}")
+                    }
                 }
 
                 // 3. Ensure the XX:57 background cadence notification is armed
@@ -146,11 +196,15 @@ class OdysseyWallpaperBridge(private val context: Context) {
                 }
                 context.sendBroadcast(intent)
 
-                // 2. Refresh Static Lockscreen Wallpaper immediately
-                try {
-                    OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
-                } catch (e: Exception) {
-                    Log.w("OdysseyWallpaper", "Could not immediately update static lockscreen: ${e.message}")
+                // 2. Only refresh static lockscreen if Live Wallpaper is NOT currently active!
+                val wallpaperManager = WallpaperManager.getInstance(context)
+                val isLiveActive = wallpaperManager.wallpaperInfo?.packageName == context.packageName
+                if (!isLiveActive && OdysseyHourlyWallpaperWorker.isScheduled(context)) {
+                    try {
+                        OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
+                    } catch (e: Exception) {
+                        Log.w("OdysseyWallpaper", "Could not immediately update static lockscreen: ${e.message}")
+                    }
                 }
 
                 // 3. Ensure the XX:57 background cadence notification is armed
@@ -204,6 +258,8 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun launchLiveWallpaperPicker() {
         try {
+            val wallpaperManager = WallpaperManager.getInstance(context)
+            backupCurrentWallpaperIfNeeded(wallpaperManager)
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
                 putExtra(
                     WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
@@ -300,6 +356,56 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun isCadenceNotificationsEnabled(): Boolean {
         return prefs.getBoolean("cadence_notifications_enabled", true)
+    }
+
+    /**
+     * Instantly dispatches a test cadence notification to verify delivery and action buttons.
+     */
+    @JavascriptInterface
+    fun triggerTestNotification(): Boolean {
+        return try {
+            OdysseyCadenceNotificationWorker.dispatchCadenceNotificationNow(context, forceTest = true)
+            Log.d("OdysseyWallpaper", "Triggered test cadence notification successfully")
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to trigger test notification: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Arms the background XX:57 cadence notification alarm.
+     */
+    @JavascriptInterface
+    fun armCadenceNotification(): Boolean {
+        return try {
+            OdysseyCadenceNotificationWorker.scheduleNextCadenceNotification(context)
+            Log.d("OdysseyWallpaper", "Armed cadence notification alarm")
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to arm cadence notification: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Opens Android's system wallpaper picker so the user can easily re-select
+     * their custom gallery or default wallpaper when clearing the schedule wallpaper.
+     */
+    @JavascriptInterface
+    fun openSystemWallpaperChooser(): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(intent, "Choose Wallpaper").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to open system wallpaper chooser: ${e.message}", e)
+            false
+        }
     }
 
     /**

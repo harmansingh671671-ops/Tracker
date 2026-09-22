@@ -23,6 +23,8 @@ import {
   isAndroidApp,
   syncScheduleDataToNative,
   syncAndVerifySchedule,
+  triggerNativeTestNotification,
+  openSystemWallpaperPicker,
   type SyncVerificationResult,
 } from "@/lib/utils/android-bridge";
 import {
@@ -46,6 +48,8 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  Bell,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export default function WallpaperPage() {
@@ -443,6 +447,30 @@ export default function WallpaperPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Handler: Open phone system wallpaper picker to select previous / custom wallpaper
+  const handleOpenWallpaperPicker = () => {
+    const ok = openSystemWallpaperPicker();
+    if (!ok) {
+      setStatusNotice("Please choose your preferred wallpaper from phone Settings > Wallpaper.");
+      setTimeout(() => setStatusNotice(null), 3500);
+    }
+  };
+
+  // Handler: Instant Cadence Notification Test Trigger
+  const handleTestNotification = () => {
+    if (isNativeBridgeAvailable()) {
+      const ok = triggerNativeTestNotification();
+      if (ok) {
+        setStatusNotice("Test notification dispatched! Check your notification shade (with 'Roger that' & 'Update Task').");
+      } else {
+        setStatusNotice("Could not trigger notification. Please check if notifications are allowed in system settings.");
+      }
+    } else {
+      setStatusNotice("Cadence notifications run natively in the Odyssey Android APK outside the browser.");
+    }
+    setTimeout(() => setStatusNotice(null), 4500);
   };
 
   // Handler: Ambient Fullscreen Mode with WakeLock
@@ -867,17 +895,55 @@ export default function WallpaperPage() {
                       </div>
                     </div>
 
-                    {/* Turn Off Wallpaper Feature */}
-                    <button
-                      type="button"
-                      onClick={handleTurnOffWallpaper}
-                      disabled={isGenerating || isVerifying}
-                      className="w-full py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-2 transition-all cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30 active:scale-95"
-                      title="Reset phone's wallpaper back to Android default"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      <span>Turn Off Wallpaper (Reset to Default)</span>
-                    </button>
+                    {/* Turn Off Wallpaper & Restore Previous Options */}
+                    <div className="space-y-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleTurnOffWallpaper}
+                        disabled={isGenerating || isVerifying}
+                        className="w-full py-2.5 px-3 rounded-xl font-bold font-mono text-xs shadow-md border flex items-center justify-center gap-2 transition-all cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30 active:scale-95"
+                        title="Remove schedule wallpaper and restore your previous wallpaper (or system default)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        <span>Turn Off Wallpaper (Restore Previous Wallpaper)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenWallpaperPicker}
+                        className="w-full py-2 px-3 rounded-xl font-bold font-mono text-[11px] border flex items-center justify-center gap-2 transition-all cursor-pointer bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface border-outline/15 active:scale-95"
+                        title="Open phone's wallpaper gallery/chooser to pick any previous wallpaper"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                        <span>Open Phone Wallpaper Gallery / Chooser</span>
+                      </button>
+                    </div>
+
+                    {/* Cadence Notification Verification Card */}
+                    <div className="p-3.5 rounded-2xl bg-surface-container border border-outline/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Bell className="w-3.5 h-3.5 text-cyan-400" />
+                          <span className="text-xs font-mono font-bold text-on-surface">
+                            Hourly Cadence Alerts (XX:57):
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-bold">
+                          Active Outside App
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        The app notifies you 3 minutes before the next hour starts with &quot;Roger that&quot; and &quot;Update Task&quot; buttons. Sleep &amp; Rest blocks are automatically skipped.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleTestNotification}
+                        className="w-full py-2 px-3 rounded-xl font-bold font-mono text-[11px] bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+                      >
+                        <Bell className="w-3 h-3 text-cyan-400" />
+                        <span>Send Test Notification Now</span>
+                      </button>
+                    </div>
 
                     {/* Direct Explanation for Web / PWA users */}
                     {!isNativeBridgeAvailable() && (

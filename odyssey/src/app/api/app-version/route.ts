@@ -19,17 +19,17 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 3,
-    versionName: "1.2.0",
+    versionCode: 4,
+    versionName: "1.2.1",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
     releaseDate: "2026-09-22",
     mandatory: false,
     changelog: [
-      "XX:57 task cadence alerts with 'Roger that' action",
-      "Tap 'Update Task' to open the exact hour edit modal directly",
-      "Instant wallpaper auto-sync whenever tasks are edited",
-      "Full dedicated profile page with custom motto & focus",
-      "Seamless in-place update (0 data lost, no uninstall)",
+      "Smooth Live Wallpaper: Fixed freezing so glowing pulse continues seamlessly when schedule updates",
+      "Reliable Cadence Alerts: Fixed background XX:57 notification delivery on Android 13/14",
+      "Test Notification Trigger: Instantly test alerts with 'Roger that' & 'Update Task'",
+      "Wallpaper Restoration: Restores your original phone wallpaper when turning off schedule wallpaper",
+      "Seamless In-App Update: All habits and streak data preserved without uninstalling",
     ],
   };
 

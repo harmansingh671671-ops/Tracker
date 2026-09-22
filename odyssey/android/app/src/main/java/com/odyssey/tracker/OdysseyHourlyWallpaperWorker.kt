@@ -42,6 +42,14 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
 
     private fun updateLockscreenWallpaper(context: Context) {
         val wallpaperManager = WallpaperManager.getInstance(context)
+
+        // CRITICAL: If Odyssey Live Wallpaper is active, do NOT overwrite with static bitmap!
+        // Calling setBitmap kills the live wallpaper engine and causes it to freeze.
+        if (wallpaperManager.wallpaperInfo?.packageName == context.packageName) {
+            Log.d(TAG, "Odyssey Live Wallpaper is currently active. Skipping static setBitmap to preserve smooth live animation.")
+            return
+        }
+
         val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
         val rawJson = prefs.getString("latest_schedule_json", null) ?: return
 
@@ -704,6 +712,11 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         }
 
         fun updateLockscreenNow(context: Context) {
+            val wallpaperManager = WallpaperManager.getInstance(context)
+            if (wallpaperManager.wallpaperInfo?.packageName == context.packageName) {
+                Log.d(TAG, "Odyssey Live Wallpaper is currently active. Skipping updateLockscreenNow to avoid freezing live service.")
+                return
+            }
             Thread {
                 try {
                     val worker = OdysseyHourlyWallpaperWorker()

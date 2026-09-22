@@ -37,6 +37,9 @@ declare global {
       enableCadenceNotifications?: () => boolean;
       disableCadenceNotifications?: () => boolean;
       isCadenceNotificationsEnabled?: () => boolean;
+      triggerTestNotification?: () => boolean;
+      armCadenceNotification?: () => boolean;
+      openSystemWallpaperChooser?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
       downloadAndInstallApk?: (apkUrl: string) => boolean;
@@ -55,6 +58,9 @@ declare global {
       enableCadenceNotifications?: () => boolean;
       disableCadenceNotifications?: () => boolean;
       isCadenceNotificationsEnabled?: () => boolean;
+      triggerTestNotification?: () => boolean;
+      armCadenceNotification?: () => boolean;
+      openSystemWallpaperChooser?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
       downloadAndInstallApk?: (apkUrl: string) => boolean;
@@ -458,6 +464,97 @@ export function clearNativeLockscreen(): boolean {
   }
 
   return false;
+}
+
+/**
+ * Instantly triggers a test cadence notification on native Android.
+ */
+export function triggerNativeTestNotification(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.triggerTestNotification) {
+    try {
+      return Boolean(window.OdysseyAndroid.triggerTestNotification());
+    } catch {}
+  }
+  if (window.Android?.triggerTestNotification) {
+    try {
+      return Boolean(window.Android.triggerTestNotification());
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Opens the Android system wallpaper picker so the user can easily select
+ * their previous gallery photo or custom wallpaper.
+ */
+export function openSystemWallpaperPicker(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.openSystemWallpaperChooser) {
+    try {
+      return Boolean(window.OdysseyAndroid.openSystemWallpaperChooser());
+    } catch {}
+  }
+  if (window.Android?.openSystemWallpaperChooser) {
+    try {
+      return Boolean(window.Android.openSystemWallpaperChooser());
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Enables automatic XX:57 cadence notifications.
+ */
+export function enableCadenceNotifications(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.enableCadenceNotifications) {
+    try {
+      return Boolean(window.OdysseyAndroid.enableCadenceNotifications());
+    } catch {}
+  }
+  if (window.Android?.enableCadenceNotifications) {
+    try {
+      return Boolean(window.Android.enableCadenceNotifications());
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Disables automatic XX:57 cadence notifications.
+ */
+export function disableCadenceNotifications(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.disableCadenceNotifications) {
+    try {
+      return Boolean(window.OdysseyAndroid.disableCadenceNotifications());
+    } catch {}
+  }
+  if (window.Android?.disableCadenceNotifications) {
+    try {
+      return Boolean(window.Android.disableCadenceNotifications());
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Checks whether cadence notifications are enabled in native preferences.
+ */
+export function isCadenceNotificationsEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  if (window.OdysseyAndroid?.isCadenceNotificationsEnabled) {
+    try {
+      return Boolean(window.OdysseyAndroid.isCadenceNotificationsEnabled());
+    } catch {}
+  }
+  if (window.Android?.isCadenceNotificationsEnabled) {
+    try {
+      return Boolean(window.Android.isCadenceNotificationsEnabled());
+    } catch {}
+  }
+  return true;
 }
 
 export interface AppUpdateCheckResult {
