@@ -807,3 +807,38 @@ export async function syncCurrentScheduleToNative(): Promise<boolean> {
   });
 }
 
+/**
+ * Sends a test notification to Android or browser.
+ */
+export function sendTestNotificationToAndroid(
+  timeStr = "09:42",
+  taskTitle = "Deep Focus Sprint",
+  category = "Focus"
+): boolean {
+  const nativeOk = triggerNativeTestNotification();
+  if (nativeOk) return true;
+
+  if (typeof window !== "undefined" && "Notification" in window) {
+    if (Notification.permission === "granted") {
+      new Notification(`Odyssey Cadence • XX:57 Heads-Up`, {
+        body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
+        icon: "/logo.png",
+      });
+      return true;
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((perm) => {
+        if (perm === "granted") {
+          new Notification(`Odyssey Cadence • XX:57 Heads-Up`, {
+            body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
+            icon: "/logo.png",
+          });
+        }
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+
+

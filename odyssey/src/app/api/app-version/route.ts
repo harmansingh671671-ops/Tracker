@@ -19,17 +19,17 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 4,
-    versionName: "1.2.1",
+    versionCode: 5,
+    versionName: "1.3.0",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
     releaseDate: "2026-09-22",
     mandatory: false,
     changelog: [
-      "Smooth Live Wallpaper: Fixed freezing so glowing pulse continues seamlessly when schedule updates",
-      "Reliable Cadence Alerts: Fixed background XX:57 notification delivery on Android 13/14",
-      "Test Notification Trigger: Instantly test alerts with 'Roger that' & 'Update Task'",
-      "Wallpaper Restoration: Restores your original phone wallpaper when turning off schedule wallpaper",
-      "Seamless In-App Update: All habits and streak data preserved without uninstalling",
+      "2-Task Cadence Wallpaper: Redesigned wallpaper displaying strictly Current Task (NOW) & Upcoming Task (NEXT) with breathing pulse beacon",
+      "Mindful Rhythm App Redesign: Fluid obsidian slate aesthetic with Plus Jakarta Sans & JetBrains Mono typography",
+      "Chrono Stream Planner: Complete 24h timeline with inline hour editing modal and instant Dexie DB binding",
+      "Wallpaper Cadence Studio: Interactive 19.5:9 phone preview, clock overlay simulator, and dual alternate photo managers",
+      "Conscious Rituals Vault: Redesigned daily habits with tomorrow's reward vault and streak multiplier preservation",
     ],
   };
 

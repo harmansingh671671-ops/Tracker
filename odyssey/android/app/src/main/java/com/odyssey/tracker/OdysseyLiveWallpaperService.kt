@@ -452,164 +452,219 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             canvas.drawText(dotTimeStr, pillRect.centerX(), pillY + pillH * 0.72f, dotLabelPaint)
 
             // =========================================================================
-            // 3. 5-CARD HOURLY SCHEDULE WINDOW (High-Curvature 54f, Expansive, NO Left Bar!)
+            // 3. 2-TASK CADENCE WINDOW (Strictly 2 Tasks: Current NOW & Upcoming NEXT)
             // =========================================================================
-            val blockCount = 5
-            val gap2 = usableH * 0.014f
+            val gap2 = usableH * 0.016f
             val timelineStartY = specY + specH + gap2
-            val scheduleTotalH = usableH * 0.530f
-            val cardGap = usableH * 0.011f
-            val cardHeight = (scheduleTotalH - 4f * cardGap) / 5f
+            val cardGap = usableH * 0.012f
+            val cardH1 = usableH * 0.138f
+            val cardH2 = usableH * 0.122f
 
-            val half = blockCount / 2
-            for (i in 0 until blockCount) {
-                val offset = i - half
-                val targetHour = (currentHour + offset + 24) % 24
-                val cY = timelineStartY + i * (cardHeight + cardGap)
-                val isActive = offset == 0
-                val isPast = offset < 0
+            // --- 1. CURRENT TASK (NOW) ---
+            val curY = timelineStartY
+            val curRect = RectF(cardPad, curY, cardPad + cardW, curY + cardH1)
 
-                val cRect = RectF(cardPad, cY, cardPad + cardW, cY + cardHeight)
-
-                // Match user task from synced database
-                val matching = userBlocks.find { b -> 
-                    (targetHour >= b.startHour && targetHour < b.endHour) ||
-                    b.startTime.startsWith(String.format(Locale.getDefault(), "%02d", targetHour))
-                }
-                val title = matching?.title ?: when (targetHour) {
-                    !in 6..22 -> if (targetHour == 23) "Wind Down & Rest" else "Obsidian Rest & Sleep"
-                    in 6..7 -> "Morning Vitality & Priming"
-                    in 12..13 -> "Mindful Recovery & Lunch"
-                    in 17..18 -> "Active Sync & Movement"
-                    else -> "Deep Focus Block"
-                }
-
-                val cat = matching?.category ?: ""
-                val (catLabel, catColor) = getCategoryTheme(cat, targetHour)
-
-                if (isActive) {
-                    val activeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = "#181B26".toColorInt()
-                    }
-                    val activeBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = "#F59E0B".toColorInt()
-                        style = Paint.Style.STROKE
-                        strokeWidth = 2.8f
-                    }
-                    // Clean, symmetrical 54f rounded card (left accent bar REMOVED!)
-                    canvas.drawRoundRect(cRect, 54f, 54f, activeBg)
-                    canvas.drawRoundRect(cRect, 54f, 54f, activeBorder)
-                } else {
-                    val normalBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = (if (isPast) "#8013151D" else "#BF13151D").toColorInt()
-                    }
-                    canvas.drawRoundRect(cRect, 54f, 54f, normalBg)
-                    canvas.drawRoundRect(cRect, 54f, 54f, borderPaint)
-                }
-
-                // ROW 1 OF CARD: Time Range + Category Pill
-                val row1Y = cY + cardHeight * 0.36f
-
-                // Left Dot Indicator (Smooth breathing glow on active dot, NO blinking!)
-                val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-                val dotX = cardPad + 30f
-                val dotY = row1Y - 6f
-                if (isActive) {
-                    // Outer aura gently expands 11f..15f and fades 40..90
-                    val dotGlowAlpha = (40 + (50 * breathPhase)).toInt().coerceIn(0, 255)
-                    val dotGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.argb(dotGlowAlpha, 245, 158, 11)
-                    }
-                    canvas.drawCircle(dotX, dotY, 11f + 4f * breathPhase, dotGlow)
-                    
-                    // Core dot: solid amber with gentle smooth alpha breathing 200..255 (never disappears)
-                    val dotAlpha = (200 + (55 * breathPhase)).toInt().coerceIn(0, 255)
-                    dotPaint.color = Color.argb(dotAlpha, 245, 158, 11)
-                    canvas.drawCircle(dotX, dotY, 7f, dotPaint)
-                } else {
-                    dotPaint.color = (if (isPast) "#10B981" else "#475569").toColorInt()
-                    canvas.drawCircle(dotX, dotY, 5.5f, dotPaint)
-                }
-
-                // Time String (Large & Bold)
-                val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                    textSize = width * 0.034f
-                    color = (if (isActive) "#FEF08A" else if (isPast) "#94A3B8" else "#E2E8F0").toColorInt()
-                }
-                val startTime = String.format(Locale.getDefault(), "%02d:00", targetHour)
-                val endTime = String.format(Locale.getDefault(), "%02d:00", (targetHour + 1) % 24)
-                val timeText = "$startTime → $endTime"
-                canvas.drawText(timeText, cardPad + 50f, row1Y, timePaint)
-
-                // Category Pill Badge (Smooth 18f rounded pill)
-                val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = catColor.toColorInt()
-                    textSize = width * 0.025f
-                    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                }
-                val pillTextW = pillPaint.measureText(catLabel)
-                val pillH = cardHeight * 0.30f
-                val pillW = pillTextW + 24f
-                val pillX = cardPad + cardW - pillW - 20f
-                val pillY = cY + cardHeight * 0.12f
-                val pillRect = RectF(pillX, pillY, pillX + pillW, pillY + pillH)
-                val pillBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = ("#2E" + catColor.removePrefix("#")).toColorInt()
-                }
-                val pillBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = ("#66" + catColor.removePrefix("#")).toColorInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = 1.4f
-                }
-                canvas.drawRoundRect(pillRect, 18f, 18f, pillBg)
-                canvas.drawRoundRect(pillRect, 18f, 18f, pillBorder)
-                canvas.drawText(catLabel, pillX + 12f, pillY + pillH * 0.72f, pillPaint)
-
-                // ROW 2 OF CARD: Full-Width Task Title + Status
-                val row2Y = cY + cardHeight * 0.78f
-
-                var statusW = 0f
-                if (isActive) {
-                    val nowText = "● NOW"
-                    val nowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        textAlign = Paint.Align.RIGHT
-                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                        textSize = width * 0.028f
-                        color = "#F59E0B".toColorInt()
-                    }
-                    statusW = nowPaint.measureText(nowText) + 14f
-                    canvas.drawText(nowText, cardPad + cardW - 22f, row2Y, nowPaint)
-                } else if (isPast) {
-                    val doneText = "✓ DONE"
-                    val donePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        textAlign = Paint.Align.RIGHT
-                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                        textSize = width * 0.026f
-                        color = "#10B981".toColorInt()
-                    }
-                    statusW = donePaint.measureText(doneText) + 14f
-                    canvas.drawText(doneText, cardPad + cardW - 22f, row2Y, donePaint)
-                }
-
-                // Task Title (Large, Bold, across the full card width)
-                val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                    textSize = width * 0.040f
-                    color = (if (isActive) "#FFFFFF" else if (isPast) "#94A3B8" else "#F1F5F9").toColorInt()
-                }
-
-                val maxTitleW = cardW - 70f - statusW
-                var displayTitle = title
-                while (displayTitle.length > 3 && titlePaint.measureText(displayTitle) > maxTitleW) {
-                    displayTitle = displayTitle.dropLast(1)
-                }
-                if (displayTitle.length < title.length) displayTitle += "…"
-
-                canvas.drawText(displayTitle, cardPad + 30f, row2Y, titlePaint)
+            val curMatching = userBlocks.find { b ->
+                (currentHour >= b.startHour && currentHour < b.endHour) ||
+                b.startTime.startsWith(String.format(Locale.getDefault(), "%02d", currentHour))
             }
+            val curTitle = curMatching?.title ?: when (currentHour) {
+                !in 6..22 -> if (currentHour == 23) "Circadian Slumber Inception" else "Deep Circadian Rest"
+                in 6..7 -> "Morning Priming & Vitality"
+                in 12..13 -> "Mindful Recovery & Lunch"
+                in 17..18 -> "Active Movement & Sync"
+                else -> "Deep Focus Block"
+            }
+            val curCat = curMatching?.category ?: ""
+            val (curCatLabel, curCatColor) = getCategoryTheme(curCat, currentHour)
 
-            val timelineEndY = timelineStartY + scheduleTotalH
+            // Dynamic Live Breathing Aura around NOW Card
+            val curGlowAlpha = (40 + (55 * breathPhase)).toInt().coerceIn(0, 255)
+            val curGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(curGlowAlpha, 90, 240, 179)
+                style = Paint.Style.STROKE
+                strokeWidth = 5f + (3f * breathPhase)
+            }
+            val curOuterRect = RectF(cardPad - 2f, curY - 2f, cardPad + cardW + 2f, curY + cardH1 + 2f)
+            canvas.drawRoundRect(curOuterRect, 50f, 50f, curGlowPaint)
+
+            // Current Card Body & Crisp Emerald Border
+            val curBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#172033".toColorInt()
+                style = Paint.Style.FILL
+            }
+            val curBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#5AF0B3".toColorInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 3.2f
+            }
+            canvas.drawRoundRect(curRect, 48f, 48f, curBgPaint)
+            canvas.drawRoundRect(curRect, 48f, 48f, curBorderPaint)
+
+            // Current Row 1: "NOW" Pill Badge + Time Range + Category Pill
+            val curRow1Y = curY + cardH1 * 0.36f
+
+            // Emerald "NOW" Badge Pill
+            val nowBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                textSize = width * 0.024f
+                color = "#003825".toColorInt()
+            }
+            val nowBadgeText = "NOW"
+            val nowBadgeW = nowBadgePaint.measureText(nowBadgeText) + 24f
+            val nowBadgeH = cardH1 * 0.28f
+            val nowBadgeY = curY + cardH1 * 0.14f
+            val nowBadgeRect = RectF(cardPad + 24f, nowBadgeY, cardPad + 24f + nowBadgeW, nowBadgeY + nowBadgeH)
+            val nowBadgeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#5AF0B3".toColorInt()
+            }
+            canvas.drawRoundRect(nowBadgeRect, 14f, 14f, nowBadgeBg)
+            canvas.drawText(nowBadgeText, cardPad + 36f, nowBadgeY + nowBadgeH * 0.72f, nowBadgePaint)
+
+            // Current Time Range
+            val curTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                textSize = width * 0.032f
+                color = "#FEF08A".toColorInt()
+            }
+            val curStart = String.format(Locale.getDefault(), "%02d:00", currentHour)
+            val curEnd = String.format(Locale.getDefault(), "%02d:00", (currentHour + 1) % 24)
+            canvas.drawText("$curStart → $curEnd", cardPad + 32f + nowBadgeW + 12f, curRow1Y, curTimePaint)
+
+            // Current Category Pill Badge
+            val curCatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = curCatColor.toColorInt()
+                textSize = width * 0.024f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            }
+            val curCatW = curCatPaint.measureText(curCatLabel) + 24f
+            val curCatX = cardPad + cardW - curCatW - 24f
+            val curCatRect = RectF(curCatX, nowBadgeY, curCatX + curCatW, nowBadgeY + nowBadgeH)
+            val curCatBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = ("#2E" + curCatColor.removePrefix("#")).toColorInt()
+            }
+            val curCatBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = ("#80" + curCatColor.removePrefix("#")).toColorInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 1.4f
+            }
+            canvas.drawRoundRect(curCatRect, 14f, 14f, curCatBg)
+            canvas.drawRoundRect(curCatRect, 14f, 14f, curCatBorder)
+            canvas.drawText(curCatLabel, curCatX + 12f, nowBadgeY + nowBadgeH * 0.72f, curCatPaint)
+
+            // Current Row 2: Full Large Task Title
+            val curTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                textSize = width * 0.046f
+                color = Color.WHITE
+            }
+            val maxCurTitleW = cardW - 48f
+            var curDisplayTitle = curTitle
+            while (curDisplayTitle.length > 3 && curTitlePaint.measureText(curDisplayTitle) > maxCurTitleW) {
+                curDisplayTitle = curDisplayTitle.dropLast(1)
+            }
+            if (curDisplayTitle.length < curTitle.length) curDisplayTitle += "…"
+            canvas.drawText(curDisplayTitle, cardPad + 24f, curY + cardH1 * 0.78f, curTitlePaint)
+
+            // --- 2. UPCOMING TASK (NEXT) ---
+            val nextHour = (currentHour + 1) % 24
+            val nextY = curY + cardH1 + cardGap
+            val nextRect = RectF(cardPad, nextY, cardPad + cardW, nextY + cardH2)
+
+            val nextMatching = userBlocks.find { b ->
+                (nextHour >= b.startHour && nextHour < b.endHour) ||
+                b.startTime.startsWith(String.format(Locale.getDefault(), "%02d", nextHour))
+            }
+            val nextTitle = nextMatching?.title ?: when (nextHour) {
+                !in 6..22 -> if (nextHour == 23) "Circadian Slumber Inception" else "Deep Circadian Rest"
+                in 6..7 -> "Morning Priming & Vitality"
+                in 12..13 -> "Mindful Recovery & Lunch"
+                in 17..18 -> "Active Movement & Sync"
+                else -> "Next Scheduled Hour"
+            }
+            val nextCat = nextMatching?.category ?: ""
+            val (nextCatLabel, nextCatColor) = getCategoryTheme(nextCat, nextHour)
+
+            val nextBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#DF131B2E".toColorInt()
+                style = Paint.Style.FILL
+            }
+            val nextBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#24FFFFFF".toColorInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 1.8f
+            }
+            canvas.drawRoundRect(nextRect, 44f, 44f, nextBgPaint)
+            canvas.drawRoundRect(nextRect, 44f, 44f, nextBorderPaint)
+
+            // Upcoming Row 1: "UPCOMING" Pill + Time Range + Category Pill
+            val nextRow1Y = nextY + cardH2 * 0.36f
+
+            val upBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                textSize = width * 0.022f
+                color = "#BDC2FF".toColorInt()
+            }
+            val upBadgeText = "UPCOMING"
+            val upBadgeW = upBadgePaint.measureText(upBadgeText) + 20f
+            val upBadgeH = cardH2 * 0.28f
+            val upBadgeY = nextY + cardH2 * 0.14f
+            val upBadgeRect = RectF(cardPad + 24f, upBadgeY, cardPad + 24f + upBadgeW, upBadgeY + upBadgeH)
+            val upBadgeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#283548".toColorInt()
+            }
+            val upBadgeBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#55BDC2FF".toColorInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 1.2f
+            }
+            canvas.drawRoundRect(upBadgeRect, 12f, 12f, upBadgeBg)
+            canvas.drawRoundRect(upBadgeRect, 12f, 12f, upBadgeBorder)
+            canvas.drawText(upBadgeText, cardPad + 34f, upBadgeY + upBadgeH * 0.72f, upBadgePaint)
+
+            val nextTimePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                textSize = width * 0.028f
+                color = "#CBD5E1".toColorInt()
+            }
+            val nextStart = String.format(Locale.getDefault(), "%02d:00", nextHour)
+            val nextEnd = String.format(Locale.getDefault(), "%02d:00", (nextHour + 1) % 24)
+            canvas.drawText("$nextStart → $nextEnd", cardPad + 30f + upBadgeW + 12f, nextRow1Y, nextTimePaint)
+
+            val nextCatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = nextCatColor.toColorInt()
+                textSize = width * 0.022f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            }
+            val nextCatW = nextCatPaint.measureText(nextCatLabel) + 22f
+            val nextCatX = cardPad + cardW - nextCatW - 24f
+            val nextCatRect = RectF(nextCatX, upBadgeY, nextCatX + nextCatW, upBadgeY + upBadgeH)
+            val nextCatBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = ("#22" + nextCatColor.removePrefix("#")).toColorInt()
+            }
+            val nextCatBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = ("#66" + nextCatColor.removePrefix("#")).toColorInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 1.2f
+            }
+            canvas.drawRoundRect(nextCatRect, 12f, 12f, nextCatBg)
+            canvas.drawRoundRect(nextCatRect, 12f, 12f, nextCatBorder)
+            canvas.drawText(nextCatLabel, nextCatX + 11f, upBadgeY + upBadgeH * 0.72f, nextCatPaint)
+
+            // Upcoming Row 2: Upcoming Task Title
+            val nextTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                textSize = width * 0.040f
+                color = "#E2E8F0".toColorInt()
+            }
+            var nextDisplayTitle = nextTitle
+            while (nextDisplayTitle.length > 3 && nextTitlePaint.measureText(nextDisplayTitle) > maxCurTitleW) {
+                nextDisplayTitle = nextDisplayTitle.dropLast(1)
+            }
+            if (nextDisplayTitle.length < nextTitle.length) nextDisplayTitle += "…"
+            canvas.drawText(nextDisplayTitle, cardPad + 24f, nextY + cardH2 * 0.78f, nextTitlePaint)
+
+            val timelineEndY = nextY + cardH2
 
             // =========================================================================
             // 4. CADENCE HOBBIES & PASSIONS (Guaranteed display, fills space to bottom!)

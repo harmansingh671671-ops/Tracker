@@ -60,6 +60,7 @@ const config: Config = {
       fontFamily: {
         sans: ["Plus Jakarta Sans", "sans-serif"],
         body: ["Plus Jakarta Sans", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       fontSize: {
         "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }],

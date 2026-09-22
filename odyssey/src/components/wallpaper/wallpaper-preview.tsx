@@ -288,82 +288,88 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 4. CORE SCHEDULE TIMELINE CARDS (DYNAMICALLY CENTERED ON ACTIVE HOUR) */}
-      <div className="px-4 pt-1 pb-2 flex flex-col gap-2 z-10">
-        {centeredWindow.map((block, idx) => {
-          const isActive = block.hour === activeHour;
-          const isPast =
-            (block.hour < activeHour && activeHour - block.hour < 12) ||
-            (block.hour > activeHour && block.hour - activeHour > 12);
-          const theme = getCategoryTheme(block.category);
+      {/* 4. 2-TASK CADENCE WINDOW (CURRENT TASK & UPCOMING TASK ONLY) */}
+      <div className="px-4 pt-1.5 pb-2 flex flex-col gap-2.5 z-10">
+        {/* Card 1: Current Task (NOW) */}
+        {(() => {
+          const curBlock = all24HourlyBlocks[activeHour] || {
+            hour: activeHour,
+            startTime: `${String(activeHour).padStart(2, "0")}:00`,
+            endTime: `${String((activeHour + 1) % 24).padStart(2, "0")}:00`,
+            title: "Deep Focus Session",
+            category: "work",
+            tag: "Focus",
+            isUserDefined: false,
+          };
+          const curTheme = getCategoryTheme(curBlock.category);
 
           return (
-            <div
-              key={`${block.hour}-${idx}`}
-              className={`rounded-[24px] p-3.5 px-4 transition-all flex flex-col gap-1.5 border ${
-                isActive
-                  ? "bg-[#181B26] border-amber-400/90 shadow-[0_0_24px_rgba(245,158,11,0.22)] relative overflow-hidden ring-1 ring-amber-400/40"
-                  : isPast
-                  ? "bg-[#13151D]/60 border-white/10 opacity-75"
-                  : "bg-[#13151D]/85 border-white/15"
-              }`}
-            >
-              {/* ROW 1: Time Interval (Left) + Category Pill Badge (Right) */}
+            <div className="rounded-[28px] p-3.5 px-4 transition-all flex flex-col gap-2 bg-[#172033] border-2 border-primary/90 shadow-[0_0_24px_rgba(90,240,179,0.25)] relative overflow-hidden ring-1 ring-primary/40">
+              {/* Row 1: "NOW" Pill + Time + Category Pill */}
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2.5">
-                  {isActive ? (
-                    <div className="relative flex items-center justify-center shrink-0">
-                      <span className="absolute w-3.5 h-3.5 rounded-full bg-amber-400/30 animate-pulse" />
-                      <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#F59E0B]" />
-                    </div>
-                  ) : (
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${
-                        isPast ? "bg-emerald-400" : "bg-slate-500"
-                      }`}
-                    />
-                  )}
-                  <span
-                    className={`font-mono text-xs ${
-                      isActive ? "font-bold text-amber-200" : isPast ? "text-slate-400" : "font-medium text-slate-200"
-                    }`}
-                  >
-                    {block.startTime} → {block.endTime}
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary text-[#003825] shadow-sm">
+                    NOW
+                  </span>
+                  <span className="font-mono text-xs font-bold text-amber-200">
+                    {curBlock.startTime} → {curBlock.endTime}
                   </span>
                 </div>
-
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold border shrink-0 ${theme.badge}`}
-                >
-                  {theme.label}
+                <span className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold border shrink-0 ${curTheme.badge}`}>
+                  {curTheme.label}
                 </span>
               </div>
 
-              {/* ROW 2: Full-Width Activity Title + Active/Done Beacon */}
+              {/* Row 2: Large Bold Title */}
               <div className="flex items-center justify-between gap-2 w-full pt-0.5">
-                <span
-                  className={`text-[13.5px] font-bold leading-tight truncate ${
-                    isActive ? "text-white" : isPast ? "text-slate-300" : "text-slate-100"
-                  }`}
-                  title={block.title}
-                >
-                  {block.title}
+                <span className="text-[15px] font-bold leading-tight text-white truncate" title={curBlock.title}>
+                  {curBlock.title}
                 </span>
-
-                {isActive ? (
-                  <span className="shrink-0 text-[9.5px] font-mono px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-bold border border-amber-400/40">
-                    ● NOW
-                  </span>
-                ) : isPast ? (
-                  <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold flex items-center gap-1 border border-emerald-500/30">
-                    <CheckCircle2 className="w-2.5 h-2.5" />
-                    DONE
-                  </span>
-                ) : null}
               </div>
             </div>
           );
-        })}
+        })()}
+
+        {/* Card 2: Upcoming Task (NEXT) */}
+        {(() => {
+          const nextHour = (activeHour + 1) % 24;
+          const nextBlock = all24HourlyBlocks[nextHour] || {
+            hour: nextHour,
+            startTime: `${String(nextHour).padStart(2, "0")}:00`,
+            endTime: `${String((nextHour + 1) % 24).padStart(2, "0")}:00`,
+            title: "Circadian Alignment & Rest",
+            category: "sleep",
+            tag: "Rest",
+            isUserDefined: false,
+          };
+          const nextTheme = getCategoryTheme(nextBlock.category);
+
+          return (
+            <div className="rounded-[24px] p-3.5 px-4 transition-all flex flex-col gap-2 bg-[#131B2E]/90 border border-white/15">
+              {/* Row 1: "UPCOMING" Pill + Time + Category Pill */}
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-[#283548] text-secondary border border-secondary/30">
+                    UPCOMING
+                  </span>
+                  <span className="font-mono text-xs font-medium text-slate-300">
+                    {nextBlock.startTime} → {nextBlock.endTime}
+                  </span>
+                </div>
+                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold border shrink-0 ${nextTheme.badge}`}>
+                  {nextTheme.label}
+                </span>
+              </div>
+
+              {/* Row 2: Upcoming Title */}
+              <div className="flex items-center justify-between gap-2 w-full pt-0.5">
+                <span className="text-sm font-semibold leading-tight text-slate-200 truncate" title={nextBlock.title}>
+                  {nextBlock.title}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 5. CADENCE HOBBIES & PASSIONS (Guaranteed Display - Always Visible, Full Width if single, 2x2 Grid if multiple) */}

@@ -435,123 +435,157 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillText(dotTimeText, pillX + pillW / 2, pillY + 22);
   ctx.textAlign = "left";
 
-  // 6. 5-CARD HOURLY SCHEDULE WINDOW (High-Curvature 54px Rounded Cards, Expansive, NO Left Bar!)
-  const blockCount = 5;
-  const displayBlocks = getCenteredHourlyWindow(allHourlyBlocks, currentHour, blockCount);
+  // 6. 2-TASK CADENCE WINDOW (Strictly 2 Tasks: Current NOW & Upcoming NEXT)
+  const currentBlock = allHourlyBlocks[currentHour] || {
+    hour: currentHour,
+    startTime: `${String(currentHour).padStart(2, "0")}:00`,
+    endTime: `${String((currentHour + 1) % 24).padStart(2, "0")}:00`,
+    title: "Deep Focus Session",
+    category: "work",
+    tag: "Focus",
+    isUserDefined: false,
+  };
 
-  const timelineStartY = specY + specH + Math.round(usableH * 0.014);
-  const scheduleTotalH = Math.round(usableH * 0.530);
-  const cardGap = Math.round(usableH * 0.011);
-  const cardHeight = Math.round((scheduleTotalH - 4 * cardGap) / 5);
+  const nextHour = (currentHour + 1) % 24;
+  const nextBlock = allHourlyBlocks[nextHour] || {
+    hour: nextHour,
+    startTime: `${String(nextHour).padStart(2, "0")}:00`,
+    endTime: `${String((nextHour + 1) % 24).padStart(2, "0")}:00`,
+    title: "Circadian Alignment & Rest",
+    category: "sleep",
+    tag: "Rest",
+    isUserDefined: false,
+  };
 
-  displayBlocks.forEach((block, idx) => {
-    const cardY = timelineStartY + idx * (cardHeight + cardGap);
-    const isActive = block.hour === currentHour;
-    const isPast =
-      (block.hour < currentHour && currentHour - block.hour < 12) ||
-      (block.hour > currentHour && block.hour - currentHour > 12);
+  const timelineStartY = specY + specH + Math.round(usableH * 0.018);
+  const cardGap = 20;
+  const currentCardH = 175;
+  const nextCardH = 155;
 
-    if (isActive) {
-      ctx.fillStyle = "#181b26";
-      ctx.strokeStyle = "#f59e0b";
-      ctx.lineWidth = 3.2;
-    } else {
-      ctx.fillStyle = isPast ? "rgba(19, 21, 29, 0.5)" : "rgba(19, 21, 29, 0.82)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.lineWidth = 1.6;
-    }
+  // Helper for category theme
+  const getCatDetails = (category: string) => {
+    const cat = (category || "").toLowerCase();
+    if (cat.includes("sleep") || cat.includes("rest")) return { col: "#818cf8", bg: "rgba(129, 140, 248, 0.15)", label: "Rest" };
+    if (cat.includes("habit") || cat.includes("vitality") || cat.includes("gym")) return { col: "#34d399", bg: "rgba(52, 211, 153, 0.15)", label: "Vitality" };
+    if (cat.includes("sync") || cat.includes("meeting")) return { col: "#38bdf8", bg: "rgba(56, 189, 248, 0.15)", label: "Sync" };
+    if (cat.includes("buffer") || cat.includes("break") || cat.includes("renewal")) return { col: "#fbbf24", bg: "rgba(251, 191, 36, 0.15)", label: "Renewal" };
+    return { col: "#5af0b3", bg: "rgba(90, 240, 179, 0.15)", label: "Focus" };
+  };
 
-    ctx.beginPath();
-    ctx.roundRect(cardPad, cardY, cardW, cardHeight, 54);
-    ctx.fill();
-    ctx.stroke();
+  // --- CARD 1: CURRENT TASK (NOW) ---
+  const currentY = timelineStartY;
+  const curCat = getCatDetails(currentBlock.category);
 
-    // Category theme
-    const cat = (block.category || "").toLowerCase();
-    let col = "#6366f1";
-    let catLabel = "Deep Focus";
-    if (cat.includes("sleep") || cat.includes("rest")) {
-      col = "#818cf8";
-      catLabel = "Rest";
-    } else if (cat.includes("habit") || cat.includes("vitality") || cat.includes("gym")) {
-      col = "#10b981";
-      catLabel = "Vitality";
-    } else if (cat.includes("sync") || cat.includes("meeting")) {
-      col = "#38bdf8";
-      catLabel = "Sync";
-    } else if (cat.includes("buffer") || cat.includes("break") || cat.includes("renewal")) {
-      col = "#f59e0b";
-      catLabel = "Renewal";
-    }
+  // High-Curvature Card background with glowing emerald border
+  ctx.fillStyle = "#172033";
+  ctx.strokeStyle = "#5af0b3";
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.roundRect(cardPad, currentY, cardW, currentCardH, 48);
+  ctx.fill();
+  ctx.stroke();
 
-    // ==========================================
-    // ROW 1: Time Interval (Left) + Category Badge (Right)
-    // ==========================================
-    const row1Y = cardY + Math.round(cardHeight * 0.36);
+  // Ambient outer pulse glow around Current card
+  ctx.strokeStyle = "rgba(90, 240, 179, 0.22)";
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.roundRect(cardPad - 2, currentY - 2, cardW + 4, currentCardH + 4, 50);
+  ctx.stroke();
 
-    // Left dot (radiant ambient glow, NO blinking!)
-    if (isActive) {
-      ctx.fillStyle = "rgba(245, 158, 11, 0.35)";
-      ctx.beginPath();
-      ctx.arc(cardPad + 36, row1Y - 8, 13, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = isActive ? "#f59e0b" : isPast ? "#10b981" : "#475569";
-    ctx.beginPath();
-    ctx.arc(cardPad + 36, row1Y - 8, isActive ? 7.5 : 5.5, 0, Math.PI * 2);
-    ctx.fill();
+  // Row 1: "NOW" Pill Badge + Time Interval + Category Badge
+  const curRow1Y = currentY + 48;
 
-    // Time text
-    ctx.font = isActive ? "700 30px 'JetBrains Mono', monospace" : "600 28px 'JetBrains Mono', monospace";
-    ctx.fillStyle = isActive ? "#fef08a" : isPast ? "#94a3b8" : "#e2e8f0";
-    ctx.fillText(`${block.startTime} → ${block.endTime}`, cardPad + 62, row1Y);
+  // Emerald "NOW" Pill Badge
+  ctx.font = "800 20px 'JetBrains Mono', monospace";
+  const nowText = "NOW";
+  const nowBadgeW = ctx.measureText(nowText).width + 24;
+  ctx.fillStyle = "#5af0b3";
+  ctx.beginPath();
+  ctx.roundRect(cardPad + 32, currentY + 24, nowBadgeW, 36, 14);
+  ctx.fill();
+  ctx.fillStyle = "#003825";
+  ctx.fillText(nowText, cardPad + 44, currentY + 49);
 
-    // Category badge pill on right (smooth 18px rounded pill)
-    ctx.font = "700 22px 'JetBrains Mono', monospace";
-    const tagW = ctx.measureText(catLabel).width + 26;
-    const tagX = cardPad + cardW - tagW - 28;
+  // Time Interval text
+  ctx.font = "700 28px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "#fef08a";
+  ctx.fillText(`${currentBlock.startTime} → ${currentBlock.endTime}`, cardPad + 32 + nowBadgeW + 18, curRow1Y);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(tagX, cardY + 24, tagW, 44, 18);
-    ctx.fill();
-    ctx.stroke();
+  // Category Badge Pill (Right side)
+  ctx.font = "700 22px 'JetBrains Mono', monospace";
+  const curTagW = ctx.measureText(curCat.label).width + 26;
+  const curTagX = cardPad + cardW - curTagW - 32;
+  ctx.fillStyle = curCat.bg;
+  ctx.strokeStyle = curCat.col;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.roundRect(curTagX, currentY + 24, curTagW, 38, 16);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = curCat.col;
+  ctx.fillText(curCat.label, curTagX + 13, currentY + 50);
 
-    ctx.fillStyle = col;
-    ctx.fillText(catLabel, tagX + 13, cardY + 54);
+  // Row 2: Full Prominent Task Title
+  ctx.font = "700 40px 'Plus Jakarta Sans', sans-serif";
+  ctx.fillStyle = "#ffffff";
+  const maxCurTitleW = cardW - 64;
+  ctx.fillText(truncateText(ctx, currentBlock.title || "Scheduled Focus Sprint", maxCurTitleW), cardPad + 32, currentY + 125);
 
-    // ==========================================
-    // ROW 2: Full-Width Task Title + Status (NOW / DONE)
-    // ==========================================
-    const row2Y = cardY + Math.round(cardHeight * 0.78);
+  // --- CARD 2: UPCOMING TASK (NEXT) ---
+  const nextY = currentY + currentCardH + cardGap;
+  const nextCat = getCatDetails(nextBlock.category);
 
-    let statusW = 0;
-    if (isActive) {
-      ctx.textAlign = "right";
-      ctx.font = "700 26px 'JetBrains Mono', monospace";
-      ctx.fillStyle = "#f59e0b";
-      ctx.fillText("● NOW", cardPad + cardW - 28, row2Y);
-      statusW = ctx.measureText("● NOW").width + 30;
-      ctx.textAlign = "left";
-    } else if (isPast) {
-      ctx.textAlign = "right";
-      ctx.font = "700 24px 'JetBrains Mono', monospace";
-      ctx.fillStyle = "#10b981";
-      ctx.fillText("✓ DONE", cardPad + cardW - 28, row2Y);
-      statusW = ctx.measureText("✓ DONE").width + 30;
-      ctx.textAlign = "left";
-    }
+  // Clean secondary background
+  ctx.fillStyle = "rgba(19, 27, 46, 0.88)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(cardPad, nextY, cardW, nextCardH, 44);
+  ctx.fill();
+  ctx.stroke();
 
-    // Task Title (Large & Bold across entire card width)
-    ctx.font = "700 36px 'Plus Jakarta Sans', sans-serif";
-    ctx.fillStyle = isActive ? "#ffffff" : isPast ? "#94a3b8" : "#f1f5f9";
-    const maxTitleW = cardW - 74 - statusW;
-    ctx.fillText(truncateText(ctx, block.title || "Scheduled Block", maxTitleW), cardPad + 36, row2Y);
-  });
+  // Row 1: "UPCOMING" Pill + Time Interval + Category Badge
+  const nextRow1Y = nextY + 46;
 
-  const timelineEndHeight = timelineStartY + blockCount * (cardHeight + cardGap);
+  // Slate/Lavender "UPCOMING" Pill
+  ctx.font = "700 18px 'JetBrains Mono', monospace";
+  const nextText = "UPCOMING";
+  const nextBadgeW = ctx.measureText(nextText).width + 22;
+  ctx.fillStyle = "#283548";
+  ctx.strokeStyle = "rgba(189, 194, 255, 0.4)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.roundRect(cardPad + 32, nextY + 22, nextBadgeW, 34, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#bdc2ff";
+  ctx.fillText(nextText, cardPad + 43, nextY + 46);
+
+  // Next Time text
+  ctx.font = "600 26px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "rgba(226, 232, 240, 0.9)";
+  ctx.fillText(`${nextBlock.startTime} → ${nextBlock.endTime}`, cardPad + 32 + nextBadgeW + 18, nextRow1Y);
+
+  // Next Category badge
+  ctx.font = "700 20px 'JetBrains Mono', monospace";
+  const nextTagW = ctx.measureText(nextCat.label).width + 24;
+  const nextTagX = cardPad + cardW - nextTagW - 32;
+  ctx.fillStyle = nextCat.bg;
+  ctx.strokeStyle = nextCat.col;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.roundRect(nextTagX, nextY + 22, nextTagW, 34, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = nextCat.col;
+  ctx.fillText(nextCat.label, nextTagX + 12, nextY + 46);
+
+  // Row 2: Upcoming Task Title
+  ctx.font = "600 34px 'Plus Jakarta Sans', sans-serif";
+  ctx.fillStyle = "rgba(241, 245, 249, 0.95)";
+  ctx.fillText(truncateText(ctx, nextBlock.title || "Next Scheduled Hour", cardW - 64), cardPad + 32, nextY + 112);
+
+  const timelineEndHeight = nextY + nextCardH;
 
   // 7. CADENCE HOBBIES & PASSIONS (Guaranteed display - fills remaining screen down to bottom)
   let currentCardY = timelineEndHeight + Math.round(usableH * 0.015);

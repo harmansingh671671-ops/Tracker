@@ -2,22 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Compass, CheckCircle2, Store, BarChart3 } from "lucide-react";
+import { Calendar, CheckCircle2, Compass, BarChart3, Store, Wallpaper } from "lucide-react";
 
 const navItems = [
   { path: "/planner", label: "Today", Icon: Calendar },
+  { path: "/habits", label: "Habits", Icon: CheckCircle2 },
   { path: "/journey", label: "Journey", Icon: Compass },
-  { path: "/habits", label: "Hobbies", Icon: CheckCircle2 },
-  { path: "/shop", label: "Shop", Icon: Store },
   { path: "/stats", label: "Stats", Icon: BarChart3 },
+  { path: "/shop", label: "Armory", Icon: Store },
+  { path: "/wallpaper", label: "Wallpaper", Icon: Wallpaper },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl border-t border-outline/10">
-      <div className="h-16 px-space-xs flex items-center justify-around max-w-xl sm:max-w-2xl mx-auto">
+    <nav className="fixed bottom-0 w-full z-40 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl border-t border-outline/10">
+      <div className="h-16 px-1 flex items-center justify-around max-w-xl sm:max-w-2xl mx-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.path;
           const IconComponent = item.Icon;
@@ -25,9 +26,9 @@ export function BottomNav() {
             <Link
               key={item.path}
               href={item.path}
-              className={`relative flex flex-col items-center justify-center min-w-[48px] px-2 py-1 gap-1 transition-all duration-200 active:scale-90 ${
+              className={`relative flex flex-col items-center justify-center min-w-[46px] px-1.5 py-1 gap-1 transition-all duration-200 active:scale-90 ${
                 isActive
-                  ? "text-primary"
+                  ? "text-primary font-bold"
                   : "text-on-surface-variant/70 hover:text-on-surface"
               }`}
             >
@@ -42,7 +43,7 @@ export function BottomNav() {
                 )}
               </div>
               <span
-                className={`font-label-sm text-[10.5px] transition-all duration-200 ${
+                className={`font-label-sm text-[10px] transition-all duration-200 ${
                   isActive ? "font-bold text-primary" : "font-medium"
                 }`}
               >
@@ -55,4 +56,3 @@ export function BottomNav() {
     </nav>
   );
 }
-
