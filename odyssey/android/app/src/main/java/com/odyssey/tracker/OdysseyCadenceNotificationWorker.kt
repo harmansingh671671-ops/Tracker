@@ -83,29 +83,14 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
             }
 
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (alarmManager.canScheduleExactAlarms()) {
-                        alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            cal.timeInMillis,
-                            pendingIntent
-                        )
-                    } else {
-                        Log.w(TAG, "canScheduleExactAlarms is false. Scheduling with setAndAllowWhileIdle fallback.")
-                        alarmManager.setAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            cal.timeInMillis,
-                            pendingIntent
-                        )
-                    }
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         cal.timeInMillis,
                         pendingIntent
                     )
                 } else {
-                    alarmManager.setExact(
+                    alarmManager.set(
                         AlarmManager.RTC_WAKEUP,
                         cal.timeInMillis,
                         pendingIntent
@@ -118,21 +103,6 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
                     .apply()
 
                 Log.d(TAG, "Next cadence notification scheduled for: ${cal.time}")
-            } catch (se: SecurityException) {
-                Log.w(TAG, "SecurityException while setting exact alarm. Falling back to setAndAllowWhileIdle: ${se.message}")
-                try {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        cal.timeInMillis,
-                        pendingIntent
-                    )
-                    context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
-                        .edit()
-                        .putBoolean("cadence_notifications_enabled", true)
-                        .apply()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed fallback alarm: ${e.message}", e)
-                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to schedule cadence notification: ${e.message}", e)
             }

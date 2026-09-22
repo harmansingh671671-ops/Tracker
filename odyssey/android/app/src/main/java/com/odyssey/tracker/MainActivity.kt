@@ -37,6 +37,27 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var pendingOpenHour: Int = -1
+    private var filePathCallback: android.webkit.ValueCallback<Array<Uri>>? = null
+
+    private val fileChooserLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (filePathCallback != null) {
+            val uris = if (result.resultCode == RESULT_OK && result.data != null) {
+                val dataUri = result.data?.data
+                val clipData = result.data?.clipData
+                when {
+                    dataUri != null -> arrayOf(dataUri)
+                    clipData != null -> (0 until clipData.itemCount).map { clipData.getItemAt(it).uri }.toTypedArray()
+                    else -> null
+                }
+            } else {
+                null
+            }
+            filePathCallback?.onReceiveValue(uris)
+            filePathCallback = null
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -139,7 +160,27 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            webChromeClient = WebChromeClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: android.webkit.ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    this@MainActivity.filePathCallback?.onReceiveValue(null)
+                    this@MainActivity.filePathCallback = filePathCallback
+                    val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "image/*"
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                    }
+                    return try {
+                        fileChooserLauncher.launch(intent)
+                        true
+                    } catch (e: Exception) {
+                        this@MainActivity.filePathCallback = null
+                        false
+                    }
+                }
+            }
         }
 
         setContentView(webView)

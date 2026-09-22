@@ -1,24 +1,19 @@
 package com.odyssey.tracker
 
-import android.app.DownloadManager
 import android.app.WallpaperManager
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
-import android.provider.Settings
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
-import android.graphics.drawable.BitmapDrawable
-import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 
@@ -51,11 +46,13 @@ class OdysseyWallpaperBridge(private val context: Context) {
     }
 
     /**
-     * Directly applies the base64 PNG image onto the Android Lock Screen.
-     * Uses WallpaperManager.FLAG_LOCK on Android 7.0+ (API 24+).
+     * Applies a wallpaper bitmap to target screen:
+     * - "lock" -> WallpaperManager.FLAG_LOCK
+     * - "home" -> WallpaperManager.FLAG_SYSTEM
+     * - "both" -> WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM
      */
     @JavascriptInterface
-    fun setLockscreenWallpaper(base64Image: String): Boolean {
+    fun setCustomWallpaper(base64Image: String, targetScreen: String): Boolean {
         return try {
             val cleanBase64 = base64Image
                 .replace("data:image/png;base64,", "")
@@ -67,50 +64,136 @@ class OdysseyWallpaperBridge(private val context: Context) {
             backupCurrentWallpaperIfNeeded(wallpaperManager)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Apply directly to both Lock Screen and Home Screen
-                wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
+                val flag = when (targetScreen.lowercase()) {
+                    "lock" -> WallpaperManager.FLAG_LOCK
+                    "home" -> WallpaperManager.FLAG_SYSTEM
+                    else -> WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM
+                }
+                wallpaperManager.setBitmap(bitmap, null, true, flag)
             } else {
                 wallpaperManager.setBitmap(bitmap)
             }
 
-            Log.d("OdysseyWallpaper", "Successfully applied wallpaper directly to Lock and Home screens via WallpaperManager")
+            Log.d("OdysseyWallpaper", "Successfully applied custom wallpaper to $targetScreen via WallpaperManager")
             true
         } catch (e: Exception) {
-            Log.e("OdysseyWallpaper", "Failed to apply wallpaper directly: ${e.message}", e)
+            Log.e("OdysseyWallpaper", "Failed to apply custom wallpaper to $targetScreen: ${e.message}", e)
             false
         }
     }
 
     /**
-     * Clears custom wallpaper. If a previous user wallpaper was backed up before Odyssey was applied,
-     * restores that original wallpaper. Otherwise resets to system stock default.
-     * Also cancels the background hourly auto-update worker.
+     * Directly applies the base64 PNG image onto the Android Lock and Home screens.
+     */
+    @JavascriptInterface
+    fun setLockscreenWallpaper(base64Image: String): Boolean {
+        return setCustomWallpaper(base64Image, "both")
+    }
+
+    /**
+     * Saves user's custom alternate wallpaper in local preferences.
+     * targetScreen: "lock" or "home"
+     */
+    @JavascriptInterface
+    fun saveAlternateWallpaper(base64Image: String, targetScreen: String): Boolean {
+        return try {
+            val key = if (targetScreen.lowercase() == "home") "alternate_home_wallpaper" else "alternate_lock_wallpaper"
+            prefs.edit().putString(key, base64Image).commit()
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to save alternate wallpaper: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Returns the user's saved alternate wallpaper base64 string for "lock" or "home".
+     */
+    @JavascriptInterface
+    fun getAlternateWallpaper(targetScreen: String): String {
+        val key = if (targetScreen.lowercase() == "home") "alternate_home_wallpaper" else "alternate_lock_wallpaper"
+        return prefs.getString(key, "") ?: ""
+    }
+
+    /**
+     * Applies the user's saved alternate wallpaper directly to "lock", "home", or "both".
+     */
+    @JavascriptInterface
+    fun applyAlternateWallpaper(targetScreen: String): Boolean {
+        val altLock = getAlternateWallpaper("lock")
+        val altHome = getAlternateWallpaper("home")
+
+        return try {
+            when (targetScreen.lowercase()) {
+                "lock" -> {
+                    if (altLock.isNotBlank()) setCustomWallpaper(altLock, "lock") else false
+                }
+                "home" -> {
+                    if (altHome.isNotBlank()) setCustomWallpaper(altHome, "home") else false
+                }
+                else -> {
+                    var ok = false
+                    if (altLock.isNotBlank()) {
+                        setCustomWallpaper(altLock, "lock")
+                        ok = true
+                    }
+                    if (altHome.isNotBlank()) {
+                        setCustomWallpaper(altHome, "home")
+                        ok = true
+                    }
+                    ok
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to apply alternate wallpaper: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Clears custom schedule wallpaper. If the user saved custom alternate wallpapers
+     * for Lock or Home screen, restores those alternate wallpapers.
+     * Otherwise restores previous backup bitmap or system defaults.
      */
     @JavascriptInterface
     fun clearLockscreenWallpaper(): Boolean {
         return try {
             val wallpaperManager = WallpaperManager.getInstance(context)
-            val backupFile = File(context.filesDir, "previous_user_wallpaper.png")
             var restored = false
 
-            if (backupFile.exists()) {
-                try {
-                    val backupBitmap = BitmapFactory.decodeFile(backupFile.absolutePath)
-                    if (backupBitmap != null) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
-                        } else {
-                            wallpaperManager.setBitmap(backupBitmap)
+            // 1. Check if user configured custom alternate wallpapers for Lock or Home screen
+            val altLock = getAlternateWallpaper("lock")
+            val altHome = getAlternateWallpaper("home")
+
+            if (altLock.isNotBlank() || altHome.isNotBlank()) {
+                if (altLock.isNotBlank()) setCustomWallpaper(altLock, "lock")
+                if (altHome.isNotBlank()) setCustomWallpaper(altHome, "home")
+                restored = true
+                Log.d("OdysseyWallpaper", "Restored user's chosen alternate wallpapers for Lock/Home")
+            }
+
+            // 2. Otherwise restore previous backup bitmap
+            if (!restored) {
+                val backupFile = File(context.filesDir, "previous_user_wallpaper.png")
+                if (backupFile.exists()) {
+                    try {
+                        val backupBitmap = BitmapFactory.decodeFile(backupFile.absolutePath)
+                        if (backupBitmap != null) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
+                            } else {
+                                wallpaperManager.setBitmap(backupBitmap)
+                            }
+                            backupFile.delete()
+                            restored = true
+                            Log.d("OdysseyWallpaper", "Successfully restored user's previous wallpaper from backup")
                         }
-                        backupFile.delete()
-                        restored = true
-                        Log.d("OdysseyWallpaper", "Successfully restored user's previous wallpaper from backup")
+                    } catch (e: Exception) {
+                        Log.w("OdysseyWallpaper", "Could not restore backup bitmap: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.w("OdysseyWallpaper", "Could not restore backup bitmap: ${e.message}")
                 }
             }
 
+            // 3. Fallback: Clear to system default
             if (!restored) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     try { wallpaperManager.clear(WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
@@ -436,106 +519,6 @@ class OdysseyWallpaperBridge(private val context: Context) {
             pInfo.versionName ?: "1.0"
         } catch (e: Exception) {
             "1.0"
-        }
-    }
-
-    /**
-     * Downloads an updated APK and launches Android's native in-place installer
-     * preserving all existing user habits and database entries.
-     */
-    @JavascriptInterface
-    fun downloadAndInstallApk(apkUrl: String): Boolean {
-        val resolvedUrl = if (apkUrl.startsWith("http://") || apkUrl.startsWith("https://")) {
-            apkUrl
-        } else {
-            val cleanPath = if (apkUrl.startsWith("/")) apkUrl.substring(1) else apkUrl
-            "https://odyssey-dun-rho.vercel.app/$cleanPath"
-        }
-
-        return try {
-            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
-            if (downloadManager == null) {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(browserIntent)
-                return true
-            }
-
-            // Clean up previous update file if it exists
-            val destFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "odyssey-update.apk")
-            if (destFile.exists()) {
-                destFile.delete()
-            }
-
-            val request = DownloadManager.Request(Uri.parse(resolvedUrl)).apply {
-                setTitle("Odyssey Update")
-                setDescription("Downloading latest Odyssey APK...")
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "odyssey-update.apk")
-                setMimeType("application/vnd.android.package-archive")
-            }
-
-            val downloadId = downloadManager.enqueue(request)
-
-            val onComplete = object : BroadcastReceiver() {
-                override fun onReceive(ctxt: Context?, intent: Intent?) {
-                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) ?: -1
-                    if (id == downloadId) {
-                        try {
-                            context.unregisterReceiver(this)
-                        } catch (e: Exception) {}
-
-                        if (destFile.exists() && destFile.length() > 0) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                if (!context.packageManager.canRequestPackageInstalls()) {
-                                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                                        data = Uri.parse("package:${context.packageName}")
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(settingsIntent)
-                                }
-                            }
-
-                            val contentUri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                destFile
-                            )
-                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(contentUri, "application/vnd.android.package-archive")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(installIntent)
-                        } else {
-                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(browserIntent)
-                        }
-                    }
-                }
-            }
-
-            val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(onComplete, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                context.registerReceiver(onComplete, filter)
-            }
-            true
-        } catch (e: Exception) {
-            Log.e("OdysseyWallpaper", "downloadAndInstallApk failed: ${e.message}", e)
-            try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(browserIntent)
-                true
-            } catch (err: Exception) {
-                false
-            }
         }
     }
 

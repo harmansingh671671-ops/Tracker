@@ -25,6 +25,10 @@ declare global {
   interface Window {
     OdysseyAndroid?: {
       setLockscreenWallpaper?: (base64Image: string) => boolean;
+      setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+      saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+      getAlternateWallpaper?: (targetScreen: string) => string;
+      applyAlternateWallpaper?: (targetScreen: string) => boolean;
       clearLockscreenWallpaper?: () => boolean;
       syncSchedule?: (scheduleJson: string) => boolean | void;
       syncScheduleWithResult?: (scheduleJson: string) => string;
@@ -42,11 +46,14 @@ declare global {
       openSystemWallpaperChooser?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
-      downloadAndInstallApk?: (apkUrl: string) => boolean;
       isSupported?: () => boolean;
     };
     Android?: {
       setWallpaper?: (base64Image: string) => void;
+      setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+      saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+      getAlternateWallpaper?: (targetScreen: string) => string;
+      applyAlternateWallpaper?: (targetScreen: string) => boolean;
       syncSchedule?: (scheduleJson: string) => void;
       syncScheduleWithResult?: (scheduleJson: string) => string;
       getSyncedSchedule?: () => string;
@@ -63,7 +70,6 @@ declare global {
       openSystemWallpaperChooser?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
-      downloadAndInstallApk?: (apkUrl: string) => boolean;
     };
     AndroidWallpaper?: {
       setWallpaper?: (base64Image: string, target?: string) => boolean;
@@ -557,6 +563,81 @@ export function isCadenceNotificationsEnabled(): boolean {
   return true;
 }
 
+/**
+ * Applies a custom wallpaper image directly to target:
+ * "lock" -> Lock screen only
+ * "home" -> Home screen only
+ * "both" -> Lock and Home screen
+ */
+export function setCustomTargetWallpaper(base64Image: string, target: "lock" | "home" | "both" = "both"): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.setCustomWallpaper) {
+    try {
+      return Boolean(window.OdysseyAndroid.setCustomWallpaper(base64Image, target));
+    } catch {}
+  }
+  if (window.Android?.setCustomWallpaper) {
+    try {
+      return Boolean(window.Android.setCustomWallpaper(base64Image, target));
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Saves the user's custom alternate wallpaper in native storage.
+ */
+export function saveNativeAlternateWallpaper(base64Image: string, target: "lock" | "home"): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.saveAlternateWallpaper) {
+    try {
+      return Boolean(window.OdysseyAndroid.saveAlternateWallpaper(base64Image, target));
+    } catch {}
+  }
+  if (window.Android?.saveAlternateWallpaper) {
+    try {
+      return Boolean(window.Android.saveAlternateWallpaper(base64Image, target));
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Retrieves the user's saved alternate wallpaper from native storage.
+ */
+export function getNativeAlternateWallpaper(target: "lock" | "home"): string {
+  if (typeof window === "undefined") return "";
+  if (window.OdysseyAndroid?.getAlternateWallpaper) {
+    try {
+      return window.OdysseyAndroid.getAlternateWallpaper(target) || "";
+    } catch {}
+  }
+  if (window.Android?.getAlternateWallpaper) {
+    try {
+      return window.Android.getAlternateWallpaper(target) || "";
+    } catch {}
+  }
+  return "";
+}
+
+/**
+ * Applies the user's saved alternate wallpaper directly to lock, home, or both.
+ */
+export function applyNativeAlternateWallpaper(target: "lock" | "home" | "both" = "both"): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.applyAlternateWallpaper) {
+    try {
+      return Boolean(window.OdysseyAndroid.applyAlternateWallpaper(target));
+    } catch {}
+  }
+  if (window.Android?.applyAlternateWallpaper) {
+    try {
+      return Boolean(window.Android.applyAlternateWallpaper(target));
+    } catch {}
+  }
+  return false;
+}
+
 export interface AppUpdateCheckResult {
   hasUpdate: boolean;
   currentVersionCode: number;
@@ -604,11 +685,11 @@ export function downloadAndInstallNativeApk(apkUrl: string): boolean {
         ? apkUrl
         : `${window.location.origin}${apkUrl.startsWith("/") ? "" : "/"}${apkUrl}`;
 
-    if (window.OdysseyAndroid?.downloadAndInstallApk) {
-      return window.OdysseyAndroid.downloadAndInstallApk(fullUrl);
+    if ((window.OdysseyAndroid as any)?.downloadAndInstallApk) {
+      return (window.OdysseyAndroid as any).downloadAndInstallApk(fullUrl);
     }
-    if (window.Android?.downloadAndInstallApk) {
-      return window.Android.downloadAndInstallApk(fullUrl);
+    if ((window.Android as any)?.downloadAndInstallApk) {
+      return (window.Android as any).downloadAndInstallApk(fullUrl);
     }
     // Browser fallback: trigger immediate direct file download without opening empty tabs
     const a = document.createElement("a");

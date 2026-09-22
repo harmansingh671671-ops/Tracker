@@ -25,6 +25,10 @@ import {
   syncAndVerifySchedule,
   triggerNativeTestNotification,
   openSystemWallpaperPicker,
+  setCustomTargetWallpaper,
+  saveNativeAlternateWallpaper,
+  getNativeAlternateWallpaper,
+  applyNativeAlternateWallpaper,
   type SyncVerificationResult,
 } from "@/lib/utils/android-bridge";
 import {
@@ -50,6 +54,7 @@ import {
   AlertCircle,
   Bell,
   Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 
 export default function WallpaperPage() {
@@ -73,9 +78,18 @@ export default function WallpaperPage() {
   const [dayBlockCounts, setDayBlockCounts] = useState<Record<number, number>>({});
   const [syncResult, setSyncResult] = useState<SyncVerificationResult | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [scheduleTargetScreen, setScheduleTargetScreen] = useState<"lock" | "home" | "both">("both");
+  const [altLockWallpaper, setAltLockWallpaper] = useState<string | null>(null);
+  const [altHomeWallpaper, setAltHomeWallpaper] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      const savedLock = getNativeAlternateWallpaper("lock");
+      if (savedLock) setAltLockWallpaper(savedLock);
+      const savedHome = getNativeAlternateWallpaper("home");
+      if (savedHome) setAltHomeWallpaper(savedHome);
+    }
   }, []);
 
   const activeDay = useMemo(() => {
@@ -456,6 +470,39 @@ export default function WallpaperPage() {
       setStatusNotice("Please choose your preferred wallpaper from phone Settings > Wallpaper.");
       setTimeout(() => setStatusNotice(null), 3500);
     }
+  };
+
+  // Handler: Upload custom Alternate Wallpaper for Lock or Home screen
+  const handleUploadAlternate = (e: React.ChangeEvent<HTMLInputElement>, screen: "lock" | "home") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      if (base64) {
+        if (screen === "lock") {
+          setAltLockWallpaper(base64);
+          saveNativeAlternateWallpaper(base64, "lock");
+        } else {
+          setAltHomeWallpaper(base64);
+          saveNativeAlternateWallpaper(base64, "home");
+        }
+        setStatusNotice(`Alternate ${screen === "lock" ? "Lock Screen" : "Home Screen"} wallpaper saved!`);
+        setTimeout(() => setStatusNotice(null), 3500);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handler: Apply custom Alternate Wallpaper directly
+  const handleApplyAlternate = (screen: "lock" | "home" | "both") => {
+    const ok = applyNativeAlternateWallpaper(screen);
+    if (ok) {
+      setStatusNotice(`Alternate wallpaper applied to ${screen === "both" ? "Lock & Home screen" : screen + " screen"}!`);
+    } else {
+      setStatusNotice(`Could not apply alternate wallpaper. Please upload an image first.`);
+    }
+    setTimeout(() => setStatusNotice(null), 3500);
   };
 
   // Handler: Instant Cadence Notification Test Trigger
@@ -893,6 +940,134 @@ export default function WallpaperPage() {
                           <span>{isVerifying ? "Verifying On-Device..." : "🔄 Sync & Verify Schedule Data"}</span>
                         </button>
                       </div>
+                    </div>
+
+                    {/* CUSTOM ALTERNATE WALLPAPERS SYSTEM (Lock Screen & Home Screen) */}
+                    <div className="p-4 rounded-2xl bg-surface-container border border-outline/15 space-y-3.5 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-amber-400" />
+                          <span className="text-xs font-mono font-bold text-on-surface">
+                            Alternate Wallpapers (Lock &amp; Home)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold">
+                          Custom Photos
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Provide custom photos/artwork for Lock Screen and Home Screen. These are automatically restored whenever you turn off the schedule wallpaper, or can be applied anytime.
+                      </p>
+
+                      {/* Dual Upload Cards: Lock Screen vs Home Screen */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        {/* 1. Alternate Lock Screen */}
+                        <div className="p-3 rounded-xl bg-surface-container-high border border-outline/10 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between text-xs font-mono font-bold text-on-surface mb-1">
+                              <span className="flex items-center gap-1.5">
+                                <span>🔒</span>
+                                <span>Lock Screen Photo</span>
+                              </span>
+                              {altLockWallpaper && (
+                                <span className="text-[9.5px] text-emerald-400 font-normal">● Saved</span>
+                              )}
+                            </div>
+                            <p className="text-[10.5px] text-on-surface-variant/80">
+                              Replaces lockscreen when schedule is turned off.
+                            </p>
+                          </div>
+
+                          {altLockWallpaper && (
+                            <div className="relative w-full h-20 rounded-lg overflow-hidden border border-outline/20 bg-black/40">
+                              <img src={altLockWallpaper} alt="Alternate Lockscreen" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <label className="flex-1 py-1.5 px-2.5 rounded-lg bg-surface-container-highest hover:bg-surface-bright text-[10.5px] font-mono font-bold text-primary border border-outline/15 cursor-pointer text-center flex items-center justify-center gap-1 transition-all active:scale-95">
+                              <Upload className="w-3 h-3" />
+                              <span>{altLockWallpaper ? "Change Photo" : "Upload Photo"}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleUploadAlternate(e, "lock")}
+                              />
+                            </label>
+                            {altLockWallpaper && (
+                              <button
+                                type="button"
+                                onClick={() => handleApplyAlternate("lock")}
+                                className="py-1.5 px-2 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary border border-primary/25 text-[10.5px] font-mono font-bold cursor-pointer transition-all active:scale-95"
+                                title="Apply to Lock Screen now"
+                              >
+                                Apply
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 2. Alternate Home Screen */}
+                        <div className="p-3 rounded-xl bg-surface-container-high border border-outline/10 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between text-xs font-mono font-bold text-on-surface mb-1">
+                              <span className="flex items-center gap-1.5">
+                                <span>📱</span>
+                                <span>Home Screen Photo</span>
+                              </span>
+                              {altHomeWallpaper && (
+                                <span className="text-[9.5px] text-emerald-400 font-normal">● Saved</span>
+                              )}
+                            </div>
+                            <p className="text-[10.5px] text-on-surface-variant/80">
+                              Keep favorite wallpaper on home screen while lockscreen has schedule.
+                            </p>
+                          </div>
+
+                          {altHomeWallpaper && (
+                            <div className="relative w-full h-20 rounded-lg overflow-hidden border border-outline/20 bg-black/40">
+                              <img src={altHomeWallpaper} alt="Alternate Homescreen" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <label className="flex-1 py-1.5 px-2.5 rounded-lg bg-surface-container-highest hover:bg-surface-bright text-[10.5px] font-mono font-bold text-primary border border-outline/15 cursor-pointer text-center flex items-center justify-center gap-1 transition-all active:scale-95">
+                              <Upload className="w-3 h-3" />
+                              <span>{altHomeWallpaper ? "Change Photo" : "Upload Photo"}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleUploadAlternate(e, "home")}
+                              />
+                            </label>
+                            {altHomeWallpaper && (
+                              <button
+                                type="button"
+                                onClick={() => handleApplyAlternate("home")}
+                                className="py-1.5 px-2 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary border border-primary/25 text-[10.5px] font-mono font-bold cursor-pointer transition-all active:scale-95"
+                                title="Apply to Home Screen now"
+                              >
+                                Apply
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Apply Both Alternates */}
+                      {(altLockWallpaper || altHomeWallpaper) && (
+                        <button
+                          type="button"
+                          onClick={() => handleApplyAlternate("both")}
+                          className="w-full py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] font-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Apply Saved Alternate Photos to Screens Now</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Turn Off Wallpaper & Restore Previous Options */}

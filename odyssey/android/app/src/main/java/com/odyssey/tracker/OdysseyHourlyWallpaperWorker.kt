@@ -661,13 +661,13 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
 
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
+                    alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         cal.timeInMillis,
                         pendingIntent
                     )
                 } else {
-                    alarmManager.setExact(
+                    alarmManager.set(
                         AlarmManager.RTC_WAKEUP,
                         cal.timeInMillis,
                         pendingIntent
