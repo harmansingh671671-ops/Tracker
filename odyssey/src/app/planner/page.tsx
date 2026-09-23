@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
@@ -12,7 +12,6 @@ import { DistributionModal } from "@/components/planner/distribution-modal";
 import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
 import {
   Clock,
-  Plus,
   CheckCircle2,
   Brain,
   Heart,
@@ -25,6 +24,8 @@ import {
   ChevronRight,
   Flame,
   Sparkles,
+  Check,
+  XCircle,
 } from "lucide-react";
 
 // Synchronous local cache helpers to ensure Frame-0 instant rendering without flashes
@@ -99,6 +100,33 @@ export default function PlannerPage() {
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
   const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
+  const [hintToast, setHintToast] = useState<string | null>(null);
+
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+
+  const showHint = (msg: string) => {
+    setHintToast(msg);
+    setTimeout(() => {
+      setHintToast((curr) => (curr === msg ? null : curr));
+    }, 2000);
+  };
+
+  const handleToggleBlockStatus = async (
+    e: React.MouseEvent,
+    block: ScheduleBlock | null,
+    currentStatus?: string
+  ) => {
+    e.stopPropagation();
+    if (!block || !block.id) return;
+    const isCompleted = currentStatus === "completed" || block.status === "completed";
+    const nextStatus = isCompleted ? "missed" : "completed";
+    await db.scheduleBlocks.update(block.id, {
+      status: nextStatus,
+    });
+    await loadBlocks(selectedDate);
+    syncCurrentScheduleToNative();
+  };
 
   const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
     setExpandedGroupIds((prev) => ({
@@ -408,7 +436,7 @@ export default function PlannerPage() {
     if (!isCustom || !cat) {
       return {
         label: "Open Slot",
-        Icon: Plus,
+        Icon: Clock,
         color: "text-on-surface-variant/40",
         badgeBg: "bg-surface-container-lowest border-outline/10 text-on-surface-variant/40",
         cardBorder: "border-dashed border-outline/15 hover:border-primary/40",
@@ -476,17 +504,86 @@ export default function PlannerPage() {
     slot: (typeof full24Hours)[0],
     options?: { isInsideGroup?: boolean; groupType?: string }
   ) => {
+    const isPastHour =
+      selectedDate < todayStr ||
+      (selectedDate === todayStr && slot.hour < currentHour);
     const isCurrent = isSelectedToday && currentHour === slot.hour;
     const isRecentlySaved = recentlySavedHour === slot.hour;
     const cat = getCatStyle(slot.category, slot.isCustom);
     const CatIcon = cat.Icon;
 
+    const handleSlotClick = (e: React.MouseEvent) => {
+      if (isPastHour) {
+        if (isLongPressTriggeredRef.current) {
+          isLongPressTriggeredRef.current = false;
+          return;
+        }
+        showHint("Tap & hold to edit past hours");
+        return;
+      }
+      handleOpenHour(slot.hour, slot.block, slot.hour + 1);
+    };
+
+    const handleTouchStart = () => {
+      if (!isPastHour) return;
+      isLongPressTriggeredRef.current = false;
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressTriggeredRef.current = true;
+        try {
+          if (typeof window !== "undefined" && navigator?.vibrate) {
+            navigator.vibrate(40);
+          }
+        } catch {}
+        handleOpenHour(slot.hour, slot.block, slot.hour + 1);
+      }, 450);
+    };
+
+    const handleTouchMove = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
+    const handleMouseDown = () => {
+      if (!isPastHour) return;
+      isLongPressTriggeredRef.current = false;
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressTriggeredRef.current = true;
+        handleOpenHour(slot.hour, slot.block, slot.hour + 1);
+      }, 450);
+    };
+
+    const handleMouseUp = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
     if (slot.isCustom) {
       return (
         <div
           key={`slot-${slot.hour}`}
-          onClick={() => handleOpenHour(slot.hour, slot.block, slot.hour + 1)}
-          className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${
+          onClick={handleSlotClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onContextMenu={(e) => { if (isPastHour) e.preventDefault(); }}
+          className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${
             options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
           } my-1 shadow-sm ${
             isRecentlySaved
@@ -540,28 +637,64 @@ export default function PlannerPage() {
             </div>
           </div>
 
-          {/* Right Status */}
+          {/* Right Status: Tick / Cross for completed / missed hours */}
           <div className="flex items-center gap-2 shrink-0">
             {slot.status === "completed" ? (
-              <div className="text-emerald-400">
+              <button
+                type="button"
+                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
+                title="Completed (tap to toggle)"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+              >
                 <CheckCircle2 className="w-5 h-5" />
-              </div>
+              </button>
+            ) : slot.status === "missed" ? (
+              <button
+                type="button"
+                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
+                title="Missed (tap to toggle)"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            ) : isPastHour ? (
+              <button
+                type="button"
+                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
+                title="Past hour (tap to mark completed)"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
             ) : (
-              <div className="text-on-surface-variant/30 group-hover:text-primary transition-colors">
-                <Plus className="w-4 h-4" />
-              </div>
+              <button
+                type="button"
+                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
+                title="Tap to mark completed"
+                className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         </div>
       );
     }
 
-    // Open / Unscheduled Slot
+    // Open / Unscheduled Slot - Clean, no plus icon
     return (
       <div
         key={`slot-${slot.hour}`}
-        onClick={() => handleOpenHour(slot.hour, null, slot.hour + 1)}
-        className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
+        onClick={handleSlotClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onContextMenu={(e) => { if (isPastHour) e.preventDefault(); }}
+        className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
           isRecentlySaved
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
             : isCurrent
@@ -586,17 +719,13 @@ export default function PlannerPage() {
 
         <div className="flex-1 min-w-0">
           <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
-            Empty Slot
+            {isPastHour ? "Passed Slot" : "Empty Slot"}
           </h4>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] font-mono text-on-surface-variant/35 group-hover:text-primary transition-colors flex items-center gap-1">
-              + Tap to schedule
+            <span className="text-[10px] font-mono text-on-surface-variant/35">
+              {isPastHour ? "Hold to schedule past" : "Tap to schedule"}
             </span>
           </div>
-        </div>
-
-        <div className="shrink-0 text-on-surface-variant/20 group-hover:text-primary transition-colors">
-          <Plus className="w-4 h-4" />
         </div>
       </div>
     );
@@ -842,6 +971,16 @@ export default function PlannerPage() {
               <span className="text-white font-semibold">{saveToast.title}</span>
               <span className="text-on-surface-variant/80 ml-1.5 text-[11px]">({saveToast.time})</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Past Hour Tap & Hold Hint Toast */}
+      {hintToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
+          <div className="px-4 py-2 rounded-full bg-surface-container-highest/95 border border-outline/25 text-on-surface text-xs font-mono font-medium shadow-xl backdrop-blur-md flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            <span>{hintToast}</span>
           </div>
         </div>
       )}
