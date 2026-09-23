@@ -37,13 +37,31 @@ export default function PlannerPage() {
   };
 
   const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
-  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const d = p.get("date");
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    }
+    return getLocalDateStr();
+  });
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
+
+  // Sync selectedDate if query param changes or on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const d = p.get("date");
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        setSelectedDate(d);
+      }
+    }
+  }, []);
 
   // Live timer for current minute, hour, and date change
   useEffect(() => {
@@ -95,19 +113,21 @@ export default function PlannerPage() {
     });
   }, [blocks]);
 
-  // 7-day horizontal selector strip
+  // 7-day horizontal selector strip centered around the selected date's week
   const weekDays = useMemo(() => {
-    const today = new Date();
+    const [y, m, dNum] = (selectedDate || todayStr).split("-").map(Number);
+    const refDate = new Date(y, m - 1, dNum);
+    const dayOfWeek = (refDate.getDay() + 6) % 7; // Mon=0..Sun=6
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() - today.getDay() + 1 + i); // Mon..Sun
+      const d = new Date(refDate);
+      d.setDate(refDate.getDate() - dayOfWeek + i);
       const dateStr = getLocalDateStr(d);
       const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
       const dayNum = d.getDate();
       const isToday = dateStr === todayStr;
       return { dateStr, dayName, dayNum, isToday };
     });
-  }, [todayStr]);
+  }, [selectedDate, todayStr]);
 
   const isSelectedToday = selectedDate === todayStr;
   const isSelectedPastDay = selectedDate < todayStr;
@@ -255,6 +275,30 @@ export default function PlannerPage() {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
+      {/* Non-Today Indicator Banner */}
+      {!isSelectedToday && (
+        <div className="flex items-center justify-between px-2 py-1.5 rounded-xl bg-surface-container-low border border-primary/20 text-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-1.5 font-mono text-on-surface-variant text-[11px]">
+            <Calendar className="w-3.5 h-3.5 text-primary" />
+            <span>
+              {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedDate(todayStr)}
+            className="px-2.5 py-0.5 rounded-full bg-primary/20 text-primary text-[11px] font-mono font-bold hover:bg-primary/30 active:scale-95 transition-all cursor-pointer"
+          >
+            Back to Today
+          </button>
+        </div>
+      )}
+
       {/* 7-Day Horizontal Date Selector Strip */}
       <div className="flex items-center justify-between gap-1.5 p-1.5 bg-surface-container-low rounded-2xl border border-outline/10">
         {weekDays.map((day) => {

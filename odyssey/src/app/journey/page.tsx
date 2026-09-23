@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
-import { getJourneyDayNumber } from "@/lib/utils/journey";
+import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
 import {
   Check,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 export default function JourneyPage() {
+  const router = useRouter();
   const { user, fetchUser } = useUserStore();
   const [activeSession, setActiveSession] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -213,6 +215,11 @@ export default function JourneyPage() {
     setPastDaysCount(activeDay - 1);
   };
 
+  const handleOpenDaySchedule = (dayNum: number) => {
+    const dateStr = getDateForJourneyDay(dayNum, user?.createdAt);
+    router.push(`/planner?date=${dateStr}&day=${dayNum}`);
+  };
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-6">
       {/* Odyssey Progress Summary Banner */}
@@ -362,10 +369,12 @@ export default function JourneyPage() {
                     <div className="absolute w-16 h-16 rounded-full bg-primary/30 blur-md" />
                     <button
                       data-journey-node={node.day}
-                      onClick={() => setActiveSession(!activeSession)}
-                      className="relative w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary flex items-center justify-center shadow-lg shadow-primary/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                      type="button"
+                      onClick={() => handleOpenDaySchedule(node.day)}
+                      className="relative w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary flex items-center justify-center shadow-lg shadow-primary/40 hover:scale-110 active:scale-95 transition-all cursor-pointer group"
+                      title={`Open Today's Schedule (Day ${node.day})`}
                     >
-                      <Bolt className="w-7 h-7 fill-current" />
+                      <Bolt className="w-7 h-7 fill-current group-hover:scale-110 transition-transform" />
                     </button>
                   </div>
 
@@ -389,14 +398,11 @@ export default function JourneyPage() {
                     </div>
 
                     <button
-                      onClick={() => setActiveSession(!activeSession)}
-                      className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        activeSession
-                          ? "bg-surface-container-highest text-primary"
-                          : "bg-primary text-on-primary shadow-md shadow-primary/20 hover:opacity-95"
-                      }`}
+                      type="button"
+                      onClick={() => handleOpenDaySchedule(node.day)}
+                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-primary text-on-primary shadow-md shadow-primary/20 hover:opacity-95 transition-all cursor-pointer"
                     >
-                      <span>{activeSession ? "Session Active (44:59)" : "Start Daily Focus"}</span>
+                      <span>Open Day {node.day} Schedule</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -407,35 +413,53 @@ export default function JourneyPage() {
             if (node.isPast) {
               return (
                 <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform`}>
-                  <div
+                  <button
+                    type="button"
                     data-journey-node={node.day}
-                    className="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md shadow-primary/20"
+                    onClick={() => handleOpenDaySchedule(node.day)}
+                    className="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md shadow-primary/20 hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40"
+                    title={`Open Day ${node.day} Schedule`}
                   >
-                    <Check className="w-6 h-6 stroke-[3]" />
-                  </div>
-                  <span className="mt-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[11px] font-mono">
+                    <Check className="w-6 h-6 stroke-[3] group-hover:scale-110 transition-transform" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDaySchedule(node.day)}
+                    className="mt-1 px-2.5 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-mono transition-colors cursor-pointer"
+                  >
                     Day {node.day} Completed
-                  </span>
+                  </button>
                 </div>
               );
             }
 
-            // Upcoming Locked Node
+            // Upcoming Node
             return (
-              <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform opacity-75`}>
-                <div
+              <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform opacity-80 hover:opacity-100`}>
+                <button
+                  type="button"
                   data-journey-node={node.day}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                  onClick={() => handleOpenDaySchedule(node.day)}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center border hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40 ${
                     node.isMilestone
-                      ? "bg-secondary-container/50 border-secondary text-secondary shadow-md"
-                      : "bg-surface-container border-outline/20 text-on-surface-variant"
+                      ? "bg-secondary-container/60 border-secondary text-secondary shadow-md hover:bg-secondary-container"
+                      : "bg-surface-container border-outline/20 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                   }`}
+                  title={`Plan Day ${node.day} Schedule`}
                 >
-                  {node.isMilestone ? <Gift className="w-6 h-6" /> : <Lock className="w-5 h-5" />}
-                </div>
-                <span className="mt-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[11px] font-mono">
+                  {node.isMilestone ? (
+                    <Gift className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  ) : (
+                    <Lock className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenDaySchedule(node.day)}
+                  className="mt-1 px-2.5 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-mono transition-colors cursor-pointer"
+                >
                   {node.isMilestone ? `Day ${node.day} Milestone Chest` : `Day ${node.day}`}
-                </span>
+                </button>
               </div>
             );
           })}
