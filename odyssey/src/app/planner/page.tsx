@@ -28,17 +28,27 @@ export default function PlannerPage() {
   const { user, fetchUser } = useUserStore();
   const { habits, fetchHabits } = useHabitStore();
 
+  const getLocalDateStr = (d = new Date()) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
+  const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
 
-  // Live timer for current minute and hour
+  // Live timer for current minute, hour, and date change
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentHour(new Date().getHours());
+      const now = new Date();
+      setCurrentHour(now.getHours());
+      setTodayStr(getLocalDateStr(now));
     }, 15000);
     return () => clearInterval(timer);
   }, []);
@@ -89,13 +99,16 @@ export default function PlannerPage() {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(today.getDate() - today.getDay() + 1 + i); // Mon..Sun
-      const dateStr = d.toISOString().split("T")[0];
+      const dateStr = getLocalDateStr(d);
       const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
       const dayNum = d.getDate();
-      const isToday = dateStr === today.toISOString().split("T")[0];
+      const isToday = dateStr === todayStr;
       return { dateStr, dayName, dayNum, isToday };
     });
-  }, []);
+  }, [todayStr]);
+
+  const isSelectedToday = selectedDate === todayStr;
+  const isSelectedPastDay = selectedDate < todayStr;
 
   // Category summary counts - strictly from user scheduled blocks!
   const categoryStats = useMemo(() => {
@@ -308,8 +321,8 @@ export default function PlannerPage() {
       {/* 24-Hour Chrono Stream Timeline (Blocked by category type, no central cutting line) */}
       <div className="flex flex-col">
         {full24Hours.map((slot, index) => {
-          const isCurrent = slot.hour === currentHour;
-          const isPast = slot.hour < currentHour;
+          const isCurrent = isSelectedToday && slot.hour === currentHour;
+          const isPast = isSelectedPastDay || (isSelectedToday && slot.hour < currentHour);
           const cat = getCatStyle(slot.category, slot.isCustom);
           const CatIcon = cat.Icon;
 
