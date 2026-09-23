@@ -55,64 +55,14 @@ export function build24HourlyBlocks(userBlocks: ScheduleBlock[] = []): HourlyBlo
         isUserDefined: true,
       });
     } else {
-      // Natural circadian cadence fallback
-      let defaultTitle = "Deep Focus";
-      let defaultCategory = "work";
-      let defaultTag = "Focus";
-
-      if (h === 23) {
-        defaultTitle = "Circadian Slumber Inception";
-        defaultCategory = "sleep";
-        defaultTag = "Rest";
-      } else if (h === 0) {
-        defaultTitle = "Deep Circadian Slumber (H1)";
-        defaultCategory = "sleep";
-        defaultTag = "Rest";
-      } else if (h === 1) {
-        defaultTitle = "REM Cycle Phase I";
-        defaultCategory = "sleep";
-        defaultTag = "Rest";
-      } else if (h === 2) {
-        defaultTitle = "Deep Delta Sleep Wave";
-        defaultCategory = "sleep";
-        defaultTag = "Rest";
-      } else if (h < 6) {
-        defaultTitle = "Obsidian Rest & Recovery";
-        defaultCategory = "sleep";
-        defaultTag = "Rest";
-      } else if (h >= 6 && h < 8) {
-        defaultTitle = "Morning Priming & Vitality";
-        defaultCategory = "vitality";
-        defaultTag = "Vitality";
-      } else if (h === 12 || h === 13) {
-        defaultTitle = "Mindful Recovery & Lunch";
-        defaultCategory = "renewal";
-        defaultTag = "Renewal";
-      } else if (h >= 17 && h < 19) {
-        defaultTitle = "Active Sync & Movement";
-        defaultCategory = "sync";
-        defaultTag = "Sync";
-      } else if (h >= 19 && h < 21) {
-        defaultTitle = "Evening Reflection & Study";
-        defaultCategory = "work";
-        defaultTag = "Focus";
-      } else if (h === 21) {
-        defaultTitle = "Digital Sunset & Fiction Reading";
-        defaultCategory = "renewal";
-        defaultTag = "Renewal";
-      } else if (h === 22) {
-        defaultTitle = "Melatonin Prep & Ambient Rest";
-        defaultCategory = "sleep";
-        defaultTag = "Rest";
-      }
-
+      // Unscheduled hour: keep strictly empty (no fake prefilled circadian titles)
       result.push({
         hour: h,
         startTime: sTime,
         endTime: eTime,
-        title: defaultTitle,
-        category: defaultCategory,
-        tag: defaultTag,
+        title: "",
+        category: "",
+        tag: "",
         isUserDefined: false,
       });
     }
@@ -511,25 +461,29 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillStyle = "#fef08a";
   ctx.fillText(`${currentBlock.startTime} → ${currentBlock.endTime}`, cardPad + 32 + nowBadgeW + 18, curRow1Y);
 
-  // Category Badge Pill (Right side)
-  ctx.font = "700 22px 'JetBrains Mono', monospace";
-  const curTagW = ctx.measureText(curCat.label).width + 26;
-  const curTagX = cardPad + cardW - curTagW - 32;
-  ctx.fillStyle = curCat.bg;
-  ctx.strokeStyle = curCat.col;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.roundRect(curTagX, currentY + 24, curTagW, 38, 16);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = curCat.col;
-  ctx.fillText(curCat.label, curTagX + 13, currentY + 50);
+  // Category Badge Pill (Right side) - only if user defined
+  if (currentBlock.category) {
+    ctx.font = "700 22px 'JetBrains Mono', monospace";
+    const curTagW = ctx.measureText(curCat.label).width + 26;
+    const curTagX = cardPad + cardW - curTagW - 32;
+    ctx.fillStyle = curCat.bg;
+    ctx.strokeStyle = curCat.col;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(curTagX, currentY + 24, curTagW, 38, 16);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = curCat.col;
+    ctx.fillText(curCat.label, curTagX + 13, currentY + 50);
+  }
 
-  // Row 2: Full Prominent Task Title
-  ctx.font = "700 40px 'Plus Jakarta Sans', sans-serif";
-  ctx.fillStyle = "#ffffff";
-  const maxCurTitleW = cardW - 64;
-  ctx.fillText(truncateText(ctx, currentBlock.title || "Scheduled Focus Sprint", maxCurTitleW), cardPad + 32, currentY + 125);
+  // Row 2: Full Prominent Task Title (Strictly empty if user has not scheduled anything)
+  if (currentBlock.title) {
+    ctx.font = "700 40px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    const maxCurTitleW = cardW - 64;
+    ctx.fillText(truncateText(ctx, currentBlock.title, maxCurTitleW), cardPad + 32, currentY + 125);
+  }
 
   // --- CARD 2: UPCOMING TASK (NEXT) ---
   const nextY = currentY + currentCardH + cardGap;
@@ -566,24 +520,28 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillStyle = "rgba(226, 232, 240, 0.9)";
   ctx.fillText(`${nextBlock.startTime} → ${nextBlock.endTime}`, cardPad + 32 + nextBadgeW + 18, nextRow1Y);
 
-  // Next Category badge
-  ctx.font = "700 20px 'JetBrains Mono', monospace";
-  const nextTagW = ctx.measureText(nextCat.label).width + 24;
-  const nextTagX = cardPad + cardW - nextTagW - 32;
-  ctx.fillStyle = nextCat.bg;
-  ctx.strokeStyle = nextCat.col;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.roundRect(nextTagX, nextY + 22, nextTagW, 34, 14);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = nextCat.col;
-  ctx.fillText(nextCat.label, nextTagX + 12, nextY + 46);
+  // Next Category badge - only if user defined
+  if (nextBlock.category) {
+    ctx.font = "700 20px 'JetBrains Mono', monospace";
+    const nextTagW = ctx.measureText(nextCat.label).width + 24;
+    const nextTagX = cardPad + cardW - nextTagW - 32;
+    ctx.fillStyle = nextCat.bg;
+    ctx.strokeStyle = nextCat.col;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.roundRect(nextTagX, nextY + 22, nextTagW, 34, 14);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = nextCat.col;
+    ctx.fillText(nextCat.label, nextTagX + 12, nextY + 46);
+  }
 
-  // Row 2: Upcoming Task Title
-  ctx.font = "600 34px 'Plus Jakarta Sans', sans-serif";
-  ctx.fillStyle = "rgba(241, 245, 249, 0.95)";
-  ctx.fillText(truncateText(ctx, nextBlock.title || "Next Scheduled Hour", cardW - 64), cardPad + 32, nextY + 112);
+  // Row 2: Upcoming Task Title (Strictly empty if user has not scheduled anything)
+  if (nextBlock.title) {
+    ctx.font = "600 34px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "rgba(241, 245, 249, 0.95)";
+    ctx.fillText(truncateText(ctx, nextBlock.title, cardW - 64), cardPad + 32, nextY + 112);
+  }
 
   const timelineEndHeight = nextY + nextCardH;
 

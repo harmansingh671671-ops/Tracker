@@ -58,7 +58,7 @@ export default function PlannerPage() {
     loadBlocks(selectedDate);
   }, [selectedDate, fetchUser, fetchHabits, loadBlocks, user?.id]);
 
-  // Build full 24 hours array
+  // Build full 24 hours array (Unscheduled hours remain EMPTY - no fake titles)
   const full24Hours = useMemo(() => {
     return Array.from({ length: 24 }, (_, h) => {
       const sTime = `${String(h).padStart(2, "0")}:00`;
@@ -70,34 +70,18 @@ export default function PlannerPage() {
         return h >= sH && h < eH;
       });
 
-      let defaultTitle = "Deep Focus Block";
-      let defaultCat = "work";
-      if (h < 6 || h >= 23) {
-        defaultTitle = h === 23 ? "Wind Down & Sleep" : "Deep Obsidian Rest";
-        defaultCat = "sleep";
-      } else if (h in [6, 7]) {
-        defaultTitle = "Morning Priming & Vitality";
-        defaultCat = "vitality";
-      } else if (h in [12, 13]) {
-        defaultTitle = "Mindful Recovery & Lunch";
-        defaultCat = "renewal";
-      } else if (h in [17, 18]) {
-        defaultTitle = "Active Sync & Movement";
-        defaultCat = "sync";
-      }
-
       return {
         hour: h,
         startTime: sTime,
         endTime: eTime,
         block: matching || null,
-        title: matching?.title || defaultTitle,
-        category: matching?.category || defaultCat,
+        title: matching ? matching.title : "", // KEEP EMPTY IF NOT WRITTEN BY USER!
+        category: matching ? matching.category : "",
         isCustom: !!matching,
-        status: matching?.status || (h < currentHour ? "completed" : "planned"),
+        status: matching?.status || "pending",
       };
     });
-  }, [blocks, currentHour]);
+  }, [blocks]);
 
   // 7-day horizontal selector strip
   const weekDays = useMemo(() => {
@@ -113,7 +97,7 @@ export default function PlannerPage() {
     });
   }, []);
 
-  // Category summary counts
+  // Category summary counts - strictly from user scheduled blocks!
   const categoryStats = useMemo(() => {
     let focusH = 0;
     let vitalityH = 0;
@@ -122,7 +106,8 @@ export default function PlannerPage() {
     let restH = 0;
 
     full24Hours.forEach((h) => {
-      const c = h.category.toLowerCase();
+      if (!h.isCustom) return; // Do NOT count unwritten hours!
+      const c = (h.category || "").toLowerCase();
       if (c.includes("sleep") || c.includes("rest")) restH++;
       else if (c.includes("vitality") || c.includes("habit")) vitalityH++;
       else if (c.includes("sync") || c.includes("meeting")) syncH++;
@@ -130,7 +115,8 @@ export default function PlannerPage() {
       else focusH++;
     });
 
-    return { focusH, vitalityH, syncH, renewalH, restH };
+    const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
+    return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
   }, [full24Hours]);
 
   const handleOpenHour = (hour: number, block?: ScheduleBlock | null) => {
@@ -184,25 +170,76 @@ export default function PlannerPage() {
     syncCurrentScheduleToNative();
   };
 
-  const getCatStyle = (cat: string) => {
-    const c = (cat || "").toLowerCase();
+  const getCatStyle = (cat: string, isCustom: boolean) => {
+    if (!isCustom || !cat) {
+      return {
+        label: "Open Slot",
+        Icon: Plus,
+        color: "text-on-surface-variant/40",
+        badgeBg: "bg-surface-container-lowest border-outline/10 text-on-surface-variant/40",
+        cardBorder: "border-dashed border-outline/15 hover:border-primary/40",
+        cardBg: "bg-surface-container-lowest/30 hover:bg-surface-container-lowest/70",
+        accent: "border-outline/10",
+      };
+    }
+    const c = cat.toLowerCase();
     if (c.includes("sleep") || c.includes("rest")) {
-      return { label: "Rest", Icon: Moon, color: "text-indigo-400", bg: "bg-indigo-500/15 border-indigo-500/30" };
+      return {
+        label: "Rest & Sleep",
+        Icon: Moon,
+        color: "text-indigo-400",
+        badgeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-400",
+        cardBorder: "border-indigo-500/35 hover:border-indigo-500/60",
+        cardBg: "bg-indigo-950/25 hover:bg-indigo-950/35",
+        accent: "border-indigo-500/40",
+      };
     }
     if (c.includes("vitality") || c.includes("habit")) {
-      return { label: "Vitality", Icon: Heart, color: "text-emerald-400", bg: "bg-emerald-500/15 border-emerald-500/30" };
+      return {
+        label: "Vitality",
+        Icon: Heart,
+        color: "text-emerald-400",
+        badgeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
+        cardBorder: "border-emerald-500/35 hover:border-emerald-500/60",
+        cardBg: "bg-emerald-950/25 hover:bg-emerald-950/35",
+        accent: "border-emerald-500/40",
+      };
     }
     if (c.includes("sync") || c.includes("meeting")) {
-      return { label: "Sync", Icon: MessageSquare, color: "text-sky-400", bg: "bg-sky-500/15 border-sky-500/30" };
+      return {
+        label: "Active Sync",
+        Icon: MessageSquare,
+        color: "text-sky-400",
+        badgeBg: "bg-sky-500/15 border-sky-500/30 text-sky-400",
+        cardBorder: "border-sky-500/35 hover:border-sky-500/60",
+        cardBg: "bg-sky-950/25 hover:bg-sky-950/35",
+        accent: "border-sky-500/40",
+      };
     }
     if (c.includes("renewal") || c.includes("buffer")) {
-      return { label: "Renewal", Icon: Coffee, color: "text-amber-400", bg: "bg-amber-500/15 border-amber-500/30" };
+      return {
+        label: "Renewal",
+        Icon: Coffee,
+        color: "text-amber-400",
+        badgeBg: "bg-amber-500/15 border-amber-500/30 text-amber-400",
+        cardBorder: "border-amber-500/35 hover:border-amber-500/60",
+        cardBg: "bg-amber-950/25 hover:bg-amber-950/35",
+        accent: "border-amber-500/40",
+      };
     }
-    return { label: "Focus", Icon: Brain, color: "text-primary", bg: "bg-primary/15 border-primary/30" };
+    return {
+      label: "Deep Work",
+      Icon: Brain,
+      color: "text-primary",
+      badgeBg: "bg-primary/15 border-primary/30 text-primary",
+      cardBorder: "border-primary/35 hover:border-primary/60",
+      cardBg: "bg-[#0d1d24] hover:bg-[#12252e]",
+      accent: "border-primary/40",
+    };
   };
 
   return (
-    <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-16 pt-2 space-y-5">
+    <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
       {/* 7-Day Horizontal Date Selector Strip */}
       <div className="flex items-center justify-between gap-1.5 p-1.5 bg-surface-container-low rounded-2xl border border-outline/10">
         {weekDays.map((day) => {
@@ -233,63 +270,89 @@ export default function PlannerPage() {
       <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold text-on-surface flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            24h Cadence Distribution
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            <span>Cadence Distribution</span>
           </span>
-          <span className="font-mono text-[11px] text-on-surface-variant">
-            {categoryStats.focusH}h Focus • {categoryStats.restH}h Rest
+          <span className="font-mono text-on-surface-variant text-[11px]">
+            {categoryStats.plannedTotal > 0
+              ? `${categoryStats.plannedTotal}h scheduled • ${24 - categoryStats.plannedTotal}h open`
+              : "0h scheduled • Tap any hour to plan"}
           </span>
         </div>
 
         {/* Proportional Balance Bar */}
         <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
-          <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
-          <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
-          <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
-          <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
-          <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
+          {categoryStats.plannedTotal > 0 ? (
+            <>
+              <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
+              <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
+              <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
+              <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
+              <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
+            </>
+          ) : (
+            <div className="w-full h-full bg-surface-container-highest/60" />
+          )}
         </div>
 
         {/* Legend */}
         <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant px-1 pt-0.5">
-          <span className="flex items-center gap-1 text-primary">● Focus</span>
-          <span className="flex items-center gap-1 text-emerald-400">● Vitality</span>
-          <span className="flex items-center gap-1 text-sky-400">● Sync</span>
-          <span className="flex items-center gap-1 text-amber-400">● Renewal</span>
-          <span className="flex items-center gap-1 text-indigo-400">● Rest</span>
+          <span className="flex items-center gap-1 text-primary">● Focus ({categoryStats.focusH}h)</span>
+          <span className="flex items-center gap-1 text-emerald-400">● Vitality ({categoryStats.vitalityH}h)</span>
+          <span className="flex items-center gap-1 text-sky-400">● Sync ({categoryStats.syncH}h)</span>
+          <span className="flex items-center gap-1 text-amber-400">● Renewal ({categoryStats.renewalH}h)</span>
+          <span className="flex items-center gap-1 text-indigo-400">● Rest ({categoryStats.restH}h)</span>
         </div>
       </div>
 
-      {/* 24-Hour Chrono Stream Timeline */}
-      <div className="space-y-2.5 relative">
-        {/* Continuous vertical timeline connector line */}
-        <div className="absolute left-[39px] top-6 bottom-6 w-0.5 bg-gradient-to-b from-indigo-500 via-primary to-indigo-500/40 -z-0" />
-
-        {full24Hours.map((slot) => {
+      {/* 24-Hour Chrono Stream Timeline (Blocked by category type, no central cutting line) */}
+      <div className="flex flex-col">
+        {full24Hours.map((slot, index) => {
           const isCurrent = slot.hour === currentHour;
           const isPast = slot.hour < currentHour;
-          const cat = getCatStyle(slot.category);
+          const cat = getCatStyle(slot.category, slot.isCustom);
           const CatIcon = cat.Icon;
+
+          const prevSlot = index > 0 ? full24Hours[index - 1] : null;
+          const nextSlot = index < 23 ? full24Hours[index + 1] : null;
+
+          const isSameBlockAsPrev = Boolean(
+            slot.isCustom &&
+            prevSlot?.isCustom &&
+            (slot.block?.id === prevSlot?.block?.id || (slot.category === prevSlot?.category && slot.title === prevSlot?.title))
+          );
+          const isSameBlockAsNext = Boolean(
+            slot.isCustom &&
+            nextSlot?.isCustom &&
+            (slot.block?.id === nextSlot?.block?.id || (slot.category === nextSlot?.category && slot.title === nextSlot?.title))
+          );
+
+          let roundStyle = "rounded-2xl my-1";
+          if (isSameBlockAsPrev && isSameBlockAsNext) {
+            roundStyle = "rounded-none border-t-0 border-b-0 -mt-px";
+          } else if (isSameBlockAsPrev && !isSameBlockAsNext) {
+            roundStyle = "rounded-b-2xl rounded-t-none border-t-0 -mt-px mb-2";
+          } else if (!isSameBlockAsPrev && isSameBlockAsNext) {
+            roundStyle = "rounded-t-2xl rounded-b-none border-b-0 mt-2";
+          }
 
           return (
             <div
               key={slot.hour}
               onClick={() => handleOpenHour(slot.hour, slot.block)}
-              className={`relative z-10 flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${
+              className={`group flex items-center gap-3 p-3 cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} ${roundStyle} ${
                 isCurrent
-                  ? "bg-surface-container border-2 border-primary shadow-lg shadow-primary/10 ring-2 ring-primary/30"
-                  : slot.isCustom
-                  ? "bg-surface-container-low hover:bg-surface-container border-outline/15"
-                  : "bg-surface-container-lowest/60 hover:bg-surface-container-low border-outline/5 opacity-80"
+                  ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+                  : ""
               }`}
             >
-              {/* Hour Dial Circle */}
-              <div className="relative flex flex-col items-center justify-center shrink-0 w-14">
-                <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : "text-on-surface"}`}>
+              {/* Left Side: Hour Time Indicator (ONLY time displayed) */}
+              <div className="flex flex-col items-center justify-center shrink-0 w-12 text-center">
+                <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : slot.isCustom ? "text-on-surface" : "text-on-surface-variant/50"}`}>
                   {String(slot.hour).padStart(2, "0")}:00
                 </span>
                 {isCurrent && (
-                  <span className="text-[9px] font-mono px-1 rounded bg-primary text-on-primary font-bold mt-0.5">
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-0.5 shadow-sm">
                     NOW
                   </span>
                 )}
@@ -297,36 +360,60 @@ export default function PlannerPage() {
 
               {/* Status Dot / Category Icon */}
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.bg} ${cat.color}`}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}
               >
                 <CatIcon className="w-4 h-4" />
               </div>
 
-              {/* Title and Category */}
+              {/* Title and Category Tag (NO duplicate time below title) */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
-                    {slot.title}
-                  </h4>
+                  {slot.isCustom && slot.title ? (
+                    <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
+                      {slot.title}
+                    </h4>
+                  ) : (
+                    <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
+                      Empty Slot
+                    </h4>
+                  )}
                   {slot.isCustom && (
                     <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[11px] font-mono text-on-surface-variant">
-                    {slot.startTime} - {slot.endTime}
-                  </span>
-                  <span className="text-on-surface-variant/40">•</span>
-                  <span className={`text-[10px] font-mono font-semibold ${cat.color}`}>
-                    {cat.label}
-                  </span>
+
+                {/* Subtext: ONLY category / tag, NO duplicate start-end time below */}
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {slot.isCustom ? (
+                    <>
+                      <span className={`text-[10px] font-mono font-semibold ${cat.color}`}>
+                        {cat.label}
+                      </span>
+                      {slot.block?.description && (
+                        <>
+                          <span className="text-on-surface-variant/30">•</span>
+                          <span className="text-[10px] font-mono text-on-surface-variant truncate">
+                            {slot.block.description}
+                          </span>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-[10px] font-mono text-on-surface-variant/35 group-hover:text-primary transition-colors flex items-center gap-1">
+                      + Tap to schedule
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Completion Indicator */}
-              {slot.block?.status === "completed" || (isPast && !slot.isCustom && slot.category === "sleep") ? (
+              {slot.block?.status === "completed" ? (
                 <div className="shrink-0 text-emerald-400">
                   <CheckCircle2 className="w-5 h-5" />
+                </div>
+              ) : slot.isCustom ? (
+                <div className="shrink-0 text-on-surface-variant/30 group-hover:text-primary transition-colors">
+                  <Plus className="w-4 h-4" />
                 </div>
               ) : null}
             </div>

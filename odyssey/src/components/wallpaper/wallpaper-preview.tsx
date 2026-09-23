@@ -296,9 +296,9 @@ export function WallpaperPreview({
             hour: activeHour,
             startTime: `${String(activeHour).padStart(2, "0")}:00`,
             endTime: `${String((activeHour + 1) % 24).padStart(2, "0")}:00`,
-            title: "Deep Focus Session",
-            category: "work",
-            tag: "Focus",
+            title: "",
+            category: "",
+            tag: "",
             isUserDefined: false,
           };
           const curTheme = getCategoryTheme(curBlock.category);
@@ -315,16 +315,24 @@ export function WallpaperPreview({
                     {curBlock.startTime} → {curBlock.endTime}
                   </span>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold border shrink-0 ${curTheme.badge}`}>
-                  {curTheme.label}
-                </span>
+                {curBlock.category && (
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold border shrink-0 ${curTheme.badge}`}>
+                    {curTheme.label}
+                  </span>
+                )}
               </div>
 
-              {/* Row 2: Large Bold Title */}
-              <div className="flex items-center justify-between gap-2 w-full pt-0.5">
-                <span className="text-[15px] font-bold leading-tight text-white truncate" title={curBlock.title}>
-                  {curBlock.title}
-                </span>
+              {/* Row 2: Large Bold Title (Keep empty if not scheduled) */}
+              <div className="flex items-center justify-between gap-2 w-full pt-0.5 min-h-[22px]">
+                {curBlock.title ? (
+                  <span className="text-[15px] font-bold leading-tight text-white truncate" title={curBlock.title}>
+                    {curBlock.title}
+                  </span>
+                ) : (
+                  <span className="text-xs font-mono text-slate-500 italic">
+                    Unscheduled
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -337,9 +345,9 @@ export function WallpaperPreview({
             hour: nextHour,
             startTime: `${String(nextHour).padStart(2, "0")}:00`,
             endTime: `${String((nextHour + 1) % 24).padStart(2, "0")}:00`,
-            title: "Circadian Alignment & Rest",
-            category: "sleep",
-            tag: "Rest",
+            title: "",
+            category: "",
+            tag: "",
             isUserDefined: false,
           };
           const nextTheme = getCategoryTheme(nextBlock.category);
@@ -356,16 +364,24 @@ export function WallpaperPreview({
                     {nextBlock.startTime} → {nextBlock.endTime}
                   </span>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold border shrink-0 ${nextTheme.badge}`}>
-                  {nextTheme.label}
-                </span>
+                {nextBlock.category && (
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold border shrink-0 ${nextTheme.badge}`}>
+                    {nextTheme.label}
+                  </span>
+                )}
               </div>
 
-              {/* Row 2: Upcoming Title */}
-              <div className="flex items-center justify-between gap-2 w-full pt-0.5">
-                <span className="text-sm font-semibold leading-tight text-slate-200 truncate" title={nextBlock.title}>
-                  {nextBlock.title}
-                </span>
+              {/* Row 2: Upcoming Title (Keep empty if not scheduled) */}
+              <div className="flex items-center justify-between gap-2 w-full pt-0.5 min-h-[20px]">
+                {nextBlock.title ? (
+                  <span className="text-sm font-semibold leading-tight text-slate-200 truncate" title={nextBlock.title}>
+                    {nextBlock.title}
+                  </span>
+                ) : (
+                  <span className="text-xs font-mono text-slate-500 italic">
+                    Unscheduled
+                  </span>
+                )}
               </div>
             </div>
           );
