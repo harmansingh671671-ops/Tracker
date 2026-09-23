@@ -462,7 +462,7 @@ export default function JourneyPage() {
             className="px-5 py-2.5 rounded-full bg-surface-container-high border border-outline/25 hover:border-primary/50 text-xs sm:text-sm font-mono font-semibold text-on-surface hover:text-primary shadow-lg flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-primary" />
-            <span>Extend Journey (+7 Days)</span>
+            <span>Extend</span>
             <ChevronDown className="w-4 h-4" />
           </button>
           <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1.5">
