@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  Sparkles,
 } from "lucide-react";
 
 // Synchronous local cache helpers to ensure Frame-0 instant rendering without flashes
@@ -96,11 +97,13 @@ export default function PlannerPage() {
   const [editingHour, setEditingHour] = useState<number>(9);
   const [editingEndHour, setEditingEndHour] = useState<number>(10);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
+  const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
+  const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
 
-  const toggleGroupExpand = (groupId: string) => {
+  const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
     setExpandedGroupIds((prev) => ({
       ...prev,
-      [groupId]: !prev[groupId],
+      [groupId]: explicitState !== undefined ? explicitState : !prev[groupId],
     }));
   };
 
@@ -203,6 +206,9 @@ export default function PlannerPage() {
         const sH = parseInt(b.startTime.split(":")[0], 10);
         let eH = parseInt(b.endTime.split(":")[0], 10);
         if (b.endTime === "24:00" || (eH === 0 && sH > 0)) eH = 24;
+        if (sH > eH) {
+          return h >= sH || h < eH;
+        }
         return h >= sH && h < eH;
       });
 
@@ -362,6 +368,32 @@ export default function PlannerPage() {
         createdAt: new Date().toISOString(),
       });
     }
+    const startH = parseInt(data.startTime.split(":")[0], 10) || 0;
+    const catLower = (data.category || "").toLowerCase();
+    const isSleep = catLower.includes("sleep") || catLower.includes("rest");
+
+    // Automatically expand the sleep group so the newly saved block doesn't disappear into minimized state
+    if (isSleep) {
+      setExpandedGroupIds((prev) => ({
+        ...prev,
+        [`group-${startH}-sleep`]: true,
+      }));
+    }
+
+    setRecentlySavedHour(startH);
+    setSaveToast({
+      title: data.title || (isSleep ? "Rest & Sleep" : "Scheduled Block"),
+      time: `${data.startTime} → ${data.endTime}`,
+    });
+
+    setTimeout(() => {
+      setRecentlySavedHour((curr) => (curr === startH ? null : curr));
+    }, 2800);
+
+    setTimeout(() => {
+      setSaveToast(null);
+    }, 3200);
+
     await loadBlocks(selectedDate);
     syncCurrentScheduleToNative();
   };
@@ -498,19 +530,27 @@ export default function PlannerPage() {
             currentHour >= group.startHour &&
             currentHour < group.endHour;
           const isSleep = group.type === "sleep";
-          const isExpanded = !!expandedGroupIds[group.id];
+          const isRecentlySaved =
+            recentlySavedHour !== null &&
+            (group.hours.includes(recentlySavedHour) || group.startHour === recentlySavedHour);
+          const isExpanded =
+            expandedGroupIds[group.id] !== undefined
+              ? expandedGroupIds[group.id]
+              : isRecentlySaved;
           const cat = getCatStyle(group.category, group.isCustom);
           const CatIcon = cat.Icon;
           const isMultiHour = group.hours.length > 1;
 
-          // Default Minimized Sleep Group
+          // Default Minimized Sleep Group - Only sleep blocks can ever be minimized
           if (isSleep && !isExpanded) {
             return (
               <div
                 key={group.id}
-                onClick={() => toggleGroupExpand(group.id)}
-                className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all cursor-pointer shadow-sm select-none my-0.5 ${
-                  isCurrent
+                onClick={() => toggleGroupExpand(group.id, true)}
+                className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all duration-300 cursor-pointer shadow-sm select-none my-0.5 ${
+                  isRecentlySaved
+                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#11192e]"
+                    : isCurrent
                     ? "ring-2 ring-primary border-primary shadow-[0_0_20px_rgba(90,240,179,0.2)] bg-[#11192e]"
                     : ""
                 }`}
@@ -527,7 +567,12 @@ export default function PlannerPage() {
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25">
                         {group.hours.length}h Sleep
                       </span>
-                      {isCurrent && (
+                      {isRecentlySaved && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse">
+                          SAVED
+                        </span>
+                      )}
+                      {isCurrent && !isRecentlySaved && (
                         <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold">
                           NOW
                         </span>
@@ -540,32 +585,24 @@ export default function PlannerPage() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenHour(group.startHour, group.primaryBlock, group.endHour);
-                    }}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                  <div className="w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
-                    <ChevronDown className="w-3.5 h-3.5" />
+                  <div className="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
+                    <ChevronDown className="w-4 h-4" />
                   </div>
                 </div>
               </div>
             );
           }
 
-          // Expanded Sleep Group OR Unified Multi-Hour/Single Custom Group
+          // Expanded Sleep Group OR Unified Multi-Hour/Single Custom Group (Work, Vitality, Sync, Renewal)
           if (group.isCustom) {
             return (
               <div
                 key={group.id}
                 onClick={() => handleOpenHour(group.startHour, group.primaryBlock, group.endHour)}
-                className={`group flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-1 shadow-sm ${
-                  isCurrent
+                className={`group flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-1 shadow-sm ${
+                  isRecentlySaved
+                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+                    : isCurrent
                     ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
                     : ""
                 }`}
@@ -583,11 +620,15 @@ export default function PlannerPage() {
                       </span>
                     </>
                   ) : null}
-                  {isCurrent && (
+                  {isRecentlySaved ? (
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
+                      SAVED
+                    </span>
+                  ) : isCurrent ? (
                     <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm">
                       NOW
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Category Icon */}
@@ -623,19 +664,19 @@ export default function PlannerPage() {
                   </div>
                 </div>
 
-                {/* Right Actions: Minimize (if expanded sleep) or Status Icon */}
+                {/* Right Actions: Minimize (if expanded sleep - icon only, no text) or Status Icon */}
                 <div className="flex items-center gap-2 shrink-0">
                   {isSleep && isExpanded ? (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleGroupExpand(group.id);
+                        toggleGroupExpand(group.id, false);
                       }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-mono text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors flex items-center gap-1 cursor-pointer"
+                      aria-label="Minimize"
+                      className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0"
                     >
-                      <span>Minimize</span>
-                      <ChevronUp className="w-3.5 h-3.5" />
+                      <ChevronUp className="w-4 h-4" />
                     </button>
                   ) : group.status === "completed" ? (
                     <div className="text-emerald-400">
@@ -719,6 +760,22 @@ export default function PlannerPage() {
         categoryStats={categoryStats}
         blocks={blocks}
       />
+
+      {/* Scheduled Confirmation Toast Feedback */}
+      {saveToast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-[#0a121e]/95 border border-primary/50 text-on-surface shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-md">
+            <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 animate-pulse">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-xs font-mono">
+              <span className="font-bold text-primary">Scheduled: </span>
+              <span className="text-white font-semibold">{saveToast.title}</span>
+              <span className="text-on-surface-variant/80 ml-1.5 text-[11px]">({saveToast.time})</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
