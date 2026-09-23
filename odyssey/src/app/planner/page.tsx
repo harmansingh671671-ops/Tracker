@@ -42,6 +42,11 @@ export default function PlannerPage() {
       const p = new URLSearchParams(window.location.search);
       const d = p.get("date");
       if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+
+      try {
+        const saved = localStorage.getItem("odyssey_planner_selected_date");
+        if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
+      } catch {}
     }
     return getLocalDateStr();
   });
@@ -52,8 +57,37 @@ export default function PlannerPage() {
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
 
-  // Sync selectedDate if query param changes or on mount
+  // Persist selectedDate to localStorage whenever changed
   useEffect(() => {
+    if (typeof window !== "undefined" && selectedDate) {
+      try {
+        localStorage.setItem("odyssey_planner_selected_date", selectedDate);
+      } catch {}
+    }
+  }, [selectedDate]);
+
+  // Restore previously opened date when app is reopened/resumed from minimized state
+  useEffect(() => {
+    const handleReopen = () => {
+      if (document.visibilityState === "visible") {
+        try {
+          const saved = localStorage.getItem("odyssey_planner_selected_date");
+          if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && saved !== selectedDate) {
+            setSelectedDate(saved);
+          }
+        } catch {}
+      } else if (document.visibilityState === "hidden") {
+        if (selectedDate) {
+          try {
+            localStorage.setItem("odyssey_planner_selected_date", selectedDate);
+          } catch {}
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleReopen);
+    window.addEventListener("focus", handleReopen);
+
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search);
       const d = p.get("date");
@@ -61,7 +95,12 @@ export default function PlannerPage() {
         setSelectedDate(d);
       }
     }
-  }, []);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleReopen);
+      window.removeEventListener("focus", handleReopen);
+    };
+  }, [selectedDate]);
 
   // Live timer for current minute, hour, and date change
   useEffect(() => {

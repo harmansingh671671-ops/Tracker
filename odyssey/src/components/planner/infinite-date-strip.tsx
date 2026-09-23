@@ -22,6 +22,11 @@ export function InfiniteDateStrip({
   const containerRef = useRef<HTMLDivElement>(null);
   const todayPillRef = useRef<HTMLButtonElement>(null);
 
+  // Flags to prevent spurious cascading loads during initial layout and centering
+  const isInitializedRef = useRef<boolean>(false);
+  const isProgrammaticScrollRef = useRef<boolean>(false);
+  const isPrependingRef = useRef<boolean>(false);
+
   // Range offsets from today: pastDays (negative) and futureDays (positive)
   const [pastDaysOffset, setPastDaysOffset] = useState<number>(30);
   const [futureDaysOffset, setFutureDaysOffset] = useState<number>(60);
@@ -79,39 +84,100 @@ export function InfiniteDateStrip({
     return items;
   }, [pastDaysOffset, futureDaysOffset, formatOffsetDate, todayStr]);
 
-  // Scroll to a given date pill
-  const scrollToDate = useCallback(
-    (targetDateStr: string, smooth: boolean = true) => {
+  // Check sticky position for Today relative to visible track
+  const checkStickyPosition = useCallback(() => {
+    const container = containerRef.current;
+    const todayEl = todayPillRef.current;
+    if (!container || !todayEl) return;
+
+    const cRect = container.getBoundingClientRect();
+    const tRect = todayEl.getBoundingClientRect();
+
+    if (tRect.right < cRect.left + 45) {
+      setStickyState("left");
+    } else if (tRect.left > cRect.right - 45) {
+      setStickyState("right");
+    } else {
+      setStickyState("none");
+    }
+  }, []);
+
+  // Center a target date in the visible track
+  const centerDate = useCallback(
+    (targetDateStr: string, smooth: boolean = false): boolean => {
       const container = containerRef.current;
-      if (!container) return;
+      if (!container || container.clientWidth === 0) return false;
 
       const targetEl = container.querySelector<HTMLElement>(
         `[data-date-pill="${targetDateStr}"]`
       );
-      if (targetEl) {
-        const targetScrollLeft =
-          targetEl.offsetLeft - container.clientWidth / 2 + targetEl.clientWidth / 2;
-        container.scrollTo({
-          left: Math.max(0, targetScrollLeft),
-          behavior: smooth ? "smooth" : "auto",
-        });
-      }
+      if (!targetEl) return false;
+
+      isProgrammaticScrollRef.current = true;
+      const targetLeft =
+        targetEl.offsetLeft - (container.clientWidth - targetEl.clientWidth) / 2;
+
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
+        behavior: smooth ? "smooth" : "auto",
+      });
+
+      checkStickyPosition();
+
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+        isInitializedRef.current = true;
+        checkStickyPosition();
+      }, smooth ? 250 : 30);
+
+      return true;
     },
-    []
+    [checkStickyPosition]
   );
 
-  // Initial scroll to center selectedDate or Today
+  // Robust initial centering on mount (retries until DOM element exists and layout width is calculated)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToDate(selectedDate || todayStr, false);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [scrollToDate, selectedDate, todayStr]);
+    const target = selectedDate || todayStr;
+    if (!target) return;
 
-  // Prepend earlier past days seamlessly without scroll jump
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const success = centerDate(target, false);
+      if (success || attempts >= 20) {
+        clearInterval(interval);
+      }
+    }, 40);
+
+    return () => clearInterval(interval);
+  }, [centerDate, selectedDate, todayStr]);
+
+  // Re-center when app resumes from minimized/background state
+  useEffect(() => {
+    const handleResume = () => {
+      if (document.visibilityState === "visible") {
+        const target = selectedDate || todayStr;
+        setTimeout(() => {
+          centerDate(target, false);
+        }, 60);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleResume);
+    window.addEventListener("focus", handleResume);
+    return () => {
+      document.removeEventListener("visibilitychange", handleResume);
+      window.removeEventListener("focus", handleResume);
+    };
+  }, [centerDate, selectedDate, todayStr]);
+
+  // Prepend earlier past days seamlessly without scroll jumping
   const prependDays = useCallback(() => {
+    if (isPrependingRef.current) return;
     const container = containerRef.current;
     if (!container) return;
+
+    isPrependingRef.current = true;
     const prevScrollWidth = container.scrollWidth;
     const prevScrollLeft = container.scrollLeft;
 
@@ -122,6 +188,9 @@ export function InfiniteDateStrip({
           const diff = container.scrollWidth - prevScrollWidth;
           container.scrollLeft = prevScrollLeft + diff;
         }
+        setTimeout(() => {
+          isPrependingRef.current = false;
+        }, 60);
       });
       return next;
     });
@@ -134,41 +203,29 @@ export function InfiniteDateStrip({
 
   // Monitor scroll for infinite loading & sticky Today positioning
   const handleScroll = useCallback(() => {
-    const container = containerRef.current;
-    const todayEl = todayPillRef.current;
-    if (!container) return;
+    checkStickyPosition();
 
-    // Check sticky status for Today
-    if (todayEl) {
-      const cRect = container.getBoundingClientRect();
-      const tRect = todayEl.getBoundingClientRect();
-
-      // If Today is to the left of the visible container area
-      if (tRect.right < cRect.left + 54) {
-        setStickyState("left");
-      }
-      // If Today is to the right of the visible container area
-      else if (tRect.left > cRect.right - 54) {
-        setStickyState("right");
-      } else {
-        setStickyState("none");
-      }
+    // NEVER trigger infinite loads until initial centering is complete or during programmatic scroll
+    if (
+      !isInitializedRef.current ||
+      isProgrammaticScrollRef.current ||
+      isPrependingRef.current
+    ) {
+      return;
     }
 
+    const container = containerRef.current;
+    if (!container) return;
+
     // Infinite loading checks
-    if (container.scrollLeft < 150) {
+    if (container.scrollLeft < 80) {
       prependDays();
     } else if (
-      container.scrollWidth - container.scrollLeft - container.clientWidth <
-      150
+      container.scrollWidth - container.scrollLeft - container.clientWidth < 80
     ) {
       appendDays();
     }
-  }, [prependDays, appendDays]);
-
-  useEffect(() => {
-    handleScroll();
-  }, [handleScroll]);
+  }, [checkStickyPosition, prependDays, appendDays]);
 
   return (
     <div className="relative w-full rounded-2xl bg-surface-container-low border border-outline/10 overflow-hidden select-none">
@@ -176,7 +233,7 @@ export function InfiniteDateStrip({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
+        className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {dateItems.map((item) => {
           const isSelected = selectedDate === item.dateStr;
@@ -188,7 +245,10 @@ export function InfiniteDateStrip({
               ref={isToday ? todayPillRef : undefined}
               data-date-pill={item.dateStr}
               type="button"
-              onClick={() => onSelectDate(item.dateStr)}
+              onClick={() => {
+                onSelectDate(item.dateStr);
+                centerDate(item.dateStr, true);
+              }}
               className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all shrink-0 cursor-pointer ${
                 isSelected
                   ? "bg-primary text-on-primary font-bold shadow-md shadow-primary/20 scale-105 z-10"
@@ -230,7 +290,7 @@ export function InfiniteDateStrip({
             type="button"
             onClick={() => {
               onSelectDate(todayStr);
-              scrollToDate(todayStr, true);
+              centerDate(todayStr, true);
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
               selectedDate === todayStr
@@ -257,7 +317,7 @@ export function InfiniteDateStrip({
             type="button"
             onClick={() => {
               onSelectDate(todayStr);
-              scrollToDate(todayStr, true);
+              centerDate(todayStr, true);
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
               selectedDate === todayStr
