@@ -2,6 +2,7 @@
 
 import React, {
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   useMemo,
@@ -13,6 +14,9 @@ interface InfiniteDateStripProps {
   onSelectDate: (dateStr: string) => void;
   todayStr: string;
 }
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export function InfiniteDateStrip({
   selectedDate,
@@ -135,7 +139,40 @@ export function InfiniteDateStrip({
     [checkStickyPosition]
   );
 
-  // Robust initial centering on mount (retries until DOM element exists and layout width is calculated)
+  // Synchronous pre-paint alignment: ensures Today is ALREADY in center before frame 0 paints
+  useIsomorphicLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const target = selectedDate || todayStr;
+    const targetEl = container.querySelector<HTMLElement>(
+      `[data-date-pill="${target}"]`
+    );
+
+    if (targetEl && container.clientWidth > 0) {
+      const targetLeft =
+        targetEl.offsetLeft - (container.clientWidth - targetEl.clientWidth) / 2;
+      container.scrollLeft = Math.max(0, targetLeft);
+      isInitializedRef.current = true;
+      checkStickyPosition();
+    } else {
+      // Instant accurate estimate so the track never paints at past days (scrollLeft = 0)
+      const [ty, tm, td] = todayStr.split("-").map(Number);
+      const [sy, sm, sd] = (selectedDate || todayStr).split("-").map(Number);
+      const diff = Math.round(
+        (new Date(sy, sm - 1, sd).getTime() - new Date(ty, tm - 1, td).getTime()) /
+          86400000
+      );
+      const targetIdx = Math.max(0, pastDaysOffset + diff);
+      const approxOffset = targetIdx * 54;
+      const clientW =
+        container.clientWidth ||
+        (typeof window !== "undefined" ? window.innerWidth : 360);
+      container.scrollLeft = Math.max(0, approxOffset - clientW / 2 + 26);
+    }
+  }, [selectedDate, todayStr, pastDaysOffset, checkStickyPosition]);
+
+  // Robust pixel-perfect centering fallback
   useEffect(() => {
     const target = selectedDate || todayStr;
     if (!target) return;
@@ -144,10 +181,10 @@ export function InfiniteDateStrip({
     const interval = setInterval(() => {
       attempts++;
       const success = centerDate(target, false);
-      if (success || attempts >= 20) {
+      if (success || attempts >= 15) {
         clearInterval(interval);
       }
-    }, 40);
+    }, 30);
 
     return () => clearInterval(interval);
   }, [centerDate, selectedDate, todayStr]);
@@ -159,7 +196,7 @@ export function InfiniteDateStrip({
         const target = selectedDate || todayStr;
         setTimeout(() => {
           centerDate(target, false);
-        }, 60);
+        }, 50);
       }
     };
 

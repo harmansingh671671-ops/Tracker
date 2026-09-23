@@ -25,6 +25,26 @@ import {
   Flame,
 } from "lucide-react";
 
+// Synchronous local cache helpers to ensure Frame-0 instant rendering without flashes
+const getCachedBlocks = (dateStr: string): ScheduleBlock[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(`odyssey_blocks_cache_${dateStr}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [];
+};
+
+const setCachedBlocks = (dateStr: string, blocksList: ScheduleBlock[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`odyssey_blocks_cache_${dateStr}`, JSON.stringify(blocksList));
+  } catch {}
+};
+
 export default function PlannerPage() {
   const { user, fetchUser } = useUserStore();
   const { habits, fetchHabits } = useHabitStore();
@@ -51,7 +71,24 @@ export default function PlannerPage() {
     return getLocalDateStr();
   });
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
-  const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
+
+  // Frame-0 synchronous initial blocks load from cache
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => {
+    const initDate = (() => {
+      if (typeof window !== "undefined") {
+        const p = new URLSearchParams(window.location.search);
+        const d = p.get("date");
+        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+        try {
+          const saved = localStorage.getItem("odyssey_planner_selected_date");
+          if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
+        } catch {}
+      }
+      return getLocalDateStr();
+    })();
+    return getCachedBlocks(initDate);
+  });
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
@@ -74,6 +111,8 @@ export default function PlannerPage() {
           const saved = localStorage.getItem("odyssey_planner_selected_date");
           if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && saved !== selectedDate) {
             setSelectedDate(saved);
+            const cached = getCachedBlocks(saved);
+            if (cached.length > 0) setBlocks(cached);
           }
         } catch {}
       } else if (document.visibilityState === "hidden") {
@@ -114,18 +153,36 @@ export default function PlannerPage() {
 
   const loadBlocks = useCallback(async (dateStr: string) => {
     try {
+      const cached = getCachedBlocks(dateStr);
+      if (cached.length > 0) {
+        setBlocks((prev) => (prev.length === 0 ? cached : prev));
+      }
       const dayBlocks = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
       setBlocks(dayBlocks);
+      setCachedBlocks(dateStr, dayBlocks);
     } catch (err) {
       console.error("Failed to load blocks:", err);
     }
   }, []);
 
+  // Fetch user once on mount
   useEffect(() => {
     fetchUser();
+  }, [fetchUser]);
+
+  // Load habits and blocks cleanly on date change without double-firing on user object resolution
+  useEffect(() => {
     fetchHabits(user?.id || "default", selectedDate);
     loadBlocks(selectedDate);
-  }, [selectedDate, fetchUser, fetchHabits, loadBlocks, user?.id]);
+  }, [selectedDate, fetchHabits, loadBlocks]);
+
+  const handleSelectDate = useCallback((dateStr: string) => {
+    setSelectedDate(dateStr);
+    const cached = getCachedBlocks(dateStr);
+    if (cached.length > 0) {
+      setBlocks(cached);
+    }
+  }, []);
 
   // Build full 24 hours array (Unscheduled hours remain EMPTY - no fake titles)
   const full24Hours = useMemo(() => {
@@ -303,7 +360,7 @@ export default function PlannerPage() {
       {/* Infinite Horizontal Date Selector Strip with Sticky Today */}
       <InfiniteDateStrip
         selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
+        onSelectDate={handleSelectDate}
         todayStr={todayStr}
       />
 
