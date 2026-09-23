@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   X,
   Clock,
@@ -137,16 +137,44 @@ export function DistributionModal({
     return list.filter((item) => item.hours > 0);
   }, [categoryStats, blocks, openHours]);
 
-  if (!isOpen) return null;
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, shouldRender]);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
+
+  if (!shouldRender) return null;
 
   return (
     <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200"
+      onClick={handleClose}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md cursor-pointer ${
+        isClosing ? "modal-backdrop-out" : "modal-backdrop-in"
+      }`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-5 space-y-4 animate-in slide-in-from-bottom-6 duration-300"
+        className={`w-full max-w-lg max-h-[92vh] overflow-y-auto bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-5 space-y-4 cursor-default ${
+          isClosing ? "modal-sheet-out" : "modal-sheet-in"
+        }`}
       >
         {/* Top Drag Handle & Title Bar (Matching Profile & Settings Sheet) */}
         <div className="flex flex-col items-center">
@@ -162,7 +190,7 @@ export function DistributionModal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
               aria-label="Close"
             >

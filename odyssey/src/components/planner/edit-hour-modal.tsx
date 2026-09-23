@@ -95,7 +95,31 @@ export function EditHourModal({
     }
   }, [existingBlock, initialHour, initialEndHour, isOpen]);
 
-  if (!isOpen) return null;
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, shouldRender]);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
+
+  if (!shouldRender) return null;
 
   const startTimeStr = `${String(startH).padStart(2, "0")}:00`;
   const endTimeStr = `${String(endH).padStart(2, "0")}:00`;
@@ -113,12 +137,22 @@ export function EditHourModal({
       status: (existingBlock?.status as any) || "planned",
       habitId: selectedHabitId || undefined,
     });
-    onClose();
+    handleClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-surface-container rounded-t-[28px] sm:rounded-[28px] border border-outline/15 shadow-2xl p-4 sm:p-5 space-y-3.5 animate-in slide-in-from-bottom-6 duration-300">
+    <div
+      onClick={handleClose}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md cursor-pointer ${
+        isClosing ? "modal-backdrop-out" : "modal-backdrop-in"
+      }`}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full max-w-lg bg-surface-container rounded-t-[28px] sm:rounded-[28px] border border-outline/15 shadow-2xl p-4 sm:p-5 space-y-3.5 cursor-default ${
+          isClosing ? "modal-sheet-out" : "modal-sheet-in"
+        }`}
+      >
         {/* Header with Drag Handle & Close */}
         <div className="flex flex-col items-center">
           <div className="w-10 h-1 rounded-full bg-outline/20 mb-2 sm:hidden" />
@@ -132,7 +166,7 @@ export function EditHourModal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -209,7 +243,7 @@ export function EditHourModal({
                 type="button"
                 onClick={() => {
                   if (existingBlock.id) onDelete(existingBlock.id);
-                  onClose();
+                  handleClose();
                 }}
                 className="py-2.5 px-3.5 rounded-xl text-error hover:bg-error-container/20 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
