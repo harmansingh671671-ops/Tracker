@@ -8,6 +8,7 @@ import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
+import { DistributionModal } from "@/components/planner/distribution-modal";
 import {
   Calendar,
   Clock,
@@ -40,6 +41,7 @@ export default function PlannerPage() {
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
 
@@ -279,16 +281,28 @@ export default function PlannerPage() {
         })}
       </div>
 
-      {/* 24-Hour Category Balance Glance Bar */}
-      <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5">
+      {/* 24-Hour Category Distribution Box (Tappable for breakdown pop-up) */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsDistributionModalOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsDistributionModalOpen(true);
+          }
+        }}
+        className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 hover:border-outline/25 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group"
+      >
         <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-on-surface flex items-center gap-1.5">
+          <span className="font-semibold text-on-surface flex items-center gap-1.5 group-hover:text-primary transition-colors">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span>Daily Schedule</span>
           </span>
-          <span className="font-mono text-on-surface-variant text-[11px]">
-            Scheduled: {categoryStats.plannedTotal} Hours
-          </span>
+          <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
+            <span>Scheduled: {categoryStats.plannedTotal} Hours</span>
+            <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
+          </div>
         </div>
 
         {/* Proportional Balance Bar */}
@@ -304,15 +318,6 @@ export default function PlannerPage() {
           ) : (
             <div className="w-full h-full bg-surface-container-highest/60" />
           )}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant px-1 pt-0.5">
-          <span className="flex items-center gap-1 text-primary">● Focus ({categoryStats.focusH}h)</span>
-          <span className="flex items-center gap-1 text-emerald-400">● Vitality ({categoryStats.vitalityH}h)</span>
-          <span className="flex items-center gap-1 text-sky-400">● Sync ({categoryStats.syncH}h)</span>
-          <span className="flex items-center gap-1 text-amber-400">● Renewal ({categoryStats.renewalH}h)</span>
-          <span className="flex items-center gap-1 text-indigo-400">● Rest ({categoryStats.restH}h)</span>
         </div>
       </div>
 
@@ -442,6 +447,15 @@ export default function PlannerPage() {
         initialHour={editingHour}
         initialDate={selectedDate}
         existingBlock={editingBlock}
+      />
+
+      {/* Distribution Detail Pop-up */}
+      <DistributionModal
+        isOpen={isDistributionModalOpen}
+        onClose={() => setIsDistributionModalOpen(false)}
+        dateStr={selectedDate}
+        categoryStats={categoryStats}
+        blocks={blocks}
       />
     </div>
   );
