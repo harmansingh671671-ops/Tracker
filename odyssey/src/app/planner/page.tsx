@@ -472,6 +472,137 @@ export default function PlannerPage() {
     };
   };
 
+  const renderHourSlot = (
+    slot: (typeof full24Hours)[0],
+    options?: { isInsideGroup?: boolean; groupType?: string }
+  ) => {
+    const isCurrent = isSelectedToday && currentHour === slot.hour;
+    const isRecentlySaved = recentlySavedHour === slot.hour;
+    const cat = getCatStyle(slot.category, slot.isCustom);
+    const CatIcon = cat.Icon;
+
+    if (slot.isCustom) {
+      return (
+        <div
+          key={`slot-${slot.hour}`}
+          onClick={() => handleOpenHour(slot.hour, slot.block, slot.hour + 1)}
+          className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${
+            options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
+          } my-1 shadow-sm ${
+            isRecentlySaved
+              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+              : isCurrent
+              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+              : ""
+          }`}
+        >
+          {/* Time Indicator on Left */}
+          <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
+            <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary font-extrabold" : "text-on-surface"}`}>
+              {String(slot.hour).padStart(2, "0")}:00
+            </span>
+            <span className="text-[10px] font-mono text-on-surface-variant/60">
+              {String((slot.hour + 1) % 24 === 0 ? 24 : slot.hour + 1).padStart(2, "0")}:00
+            </span>
+            {isRecentlySaved ? (
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
+                SAVED
+              </span>
+            ) : isCurrent ? (
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm">
+                NOW
+              </span>
+            ) : null}
+          </div>
+
+          {/* Category Icon */}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
+            <CatIcon className="w-4 h-4" />
+          </div>
+
+          {/* Title & Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
+                {slot.title || cat.label}
+              </h4>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
+              <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
+              {slot.block?.description && (
+                <>
+                  <span className="text-on-surface-variant/30">•</span>
+                  <span className="text-on-surface-variant truncate">
+                    {slot.block.description}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right Status */}
+          <div className="flex items-center gap-2 shrink-0">
+            {slot.status === "completed" ? (
+              <div className="text-emerald-400">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            ) : (
+              <div className="text-on-surface-variant/30 group-hover:text-primary transition-colors">
+                <Plus className="w-4 h-4" />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Open / Unscheduled Slot
+    return (
+      <div
+        key={`slot-${slot.hour}`}
+        onClick={() => handleOpenHour(slot.hour, null, slot.hour + 1)}
+        className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
+          isRecentlySaved
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+            : isCurrent
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+            : ""
+        }`}
+      >
+        <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
+          <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : "text-on-surface-variant/50"}`}>
+            {String(slot.hour).padStart(2, "0")}:00
+          </span>
+          {isCurrent && (
+            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-0.5 shadow-sm">
+              NOW
+            </span>
+          )}
+        </div>
+
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
+          <CatIcon className="w-4 h-4" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
+            Empty Slot
+          </h4>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] font-mono text-on-surface-variant/35 group-hover:text-primary transition-colors flex items-center gap-1">
+              + Tap to schedule
+            </span>
+          </div>
+        </div>
+
+        <div className="shrink-0 text-on-surface-variant/20 group-hover:text-primary transition-colors">
+          <Plus className="w-4 h-4" />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
@@ -525,10 +656,6 @@ export default function PlannerPage() {
       {/* 24-Hour Chrono Stream Timeline - Grouping adjacent blocks of same type with minimized sleep */}
       <div className="flex flex-col space-y-1">
         {hourGroups.map((group) => {
-          const isCurrent =
-            isSelectedToday &&
-            currentHour >= group.startHour &&
-            currentHour < group.endHour;
           const isSleep = group.type === "sleep";
           const isRecentlySaved =
             recentlySavedHour !== null &&
@@ -539,204 +666,143 @@ export default function PlannerPage() {
               : isRecentlySaved;
           const cat = getCatStyle(group.category, group.isCustom);
           const CatIcon = cat.Icon;
-          const isMultiHour = group.hours.length > 1;
 
-          // Default Minimized Sleep Group - Only sleep blocks can ever be minimized
-          if (isSleep && !isExpanded) {
+          // Sleep Group Handling - Minimized by default, expands to show all sleep hour slots!
+          if (isSleep) {
+            // Minimized Sleep Group
+            if (!isExpanded) {
+              return (
+                <div
+                  key={group.id}
+                  onClick={() => toggleGroupExpand(group.id, true)}
+                  className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all duration-300 cursor-pointer shadow-sm select-none my-0.5 ${
+                    isRecentlySaved
+                      ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#11192e]"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Moon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-bold text-on-surface">
+                          {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25">
+                          {group.hours.length}h Sleep
+                        </span>
+                        {isRecentlySaved && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse">
+                            SAVED
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-mono text-on-surface-variant/70 truncate mt-0.5">
+                        {group.title || "Circadian Rest & Slumber"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Expanded Sleep Group - Renders header with ChevronUp + ALL individual sleep hour slots!
             return (
               <div
                 key={group.id}
-                onClick={() => toggleGroupExpand(group.id, true)}
-                className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all duration-300 cursor-pointer shadow-sm select-none my-0.5 ${
+                className={`rounded-3xl border border-indigo-500/35 bg-[#090e1d]/90 p-2.5 my-2 space-y-2 shadow-lg transition-all duration-300 ${
                   isRecentlySaved
-                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#11192e]"
-                    : isCurrent
-                    ? "ring-2 ring-primary border-primary shadow-[0_0_20px_rgba(90,240,179,0.2)] bg-[#11192e]"
+                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]"
                     : ""
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                    <Moon className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-on-surface">
-                        {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
-                      </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25">
-                        {group.hours.length}h Sleep
-                      </span>
-                      {isRecentlySaved && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse">
-                          SAVED
-                        </span>
-                      )}
-                      {isCurrent && !isRecentlySaved && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold">
-                          NOW
-                        </span>
-                      )}
+                <div
+                  onClick={() => toggleGroupExpand(group.id, false)}
+                  className="flex items-center justify-between px-3 py-2 rounded-2xl bg-indigo-950/60 border border-indigo-500/25 hover:border-indigo-500/40 cursor-pointer transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Moon className="w-4 h-4" />
                     </div>
-                    <p className="text-[11px] font-mono text-on-surface-variant/70 truncate mt-0.5">
-                      {group.title || "Circadian Rest & Slumber"}
-                    </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-bold text-white">
+                          {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+                          {group.hours.length}h Sleep
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-mono text-indigo-200/70 truncate mt-0.5">
+                        {group.title || "Circadian Rest & Slumber"}
+                      </p>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleGroupExpand(group.id, false);
+                    }}
+                    aria-label="Minimize"
+                    className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
-                    <ChevronDown className="w-4 h-4" />
-                  </div>
+                <div className="space-y-1">
+                  {group.slots.map((slot) => renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" }))}
                 </div>
               </div>
             );
           }
 
-          // Expanded Sleep Group OR Unified Multi-Hour/Single Custom Group (Work, Vitality, Sync, Renewal)
-          if (group.isCustom) {
+          // Multi-Hour Non-Sleep Group (Work, Vitality, Sync, Renewal) - ALWAYS FULLY EXPANDED (never minimized)
+          if (group.isCustom && group.hours.length > 1) {
             return (
               <div
                 key={group.id}
-                onClick={() => handleOpenHour(group.startHour, group.primaryBlock, group.endHour)}
-                className={`group flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-1 shadow-sm ${
+                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2.5 my-2 space-y-2 shadow-lg transition-all duration-300 ${
                   isRecentlySaved
-                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
-                    : isCurrent
-                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]"
                     : ""
                 }`}
               >
-                {/* Time Indicator on Left */}
-                <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
-                  <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary font-extrabold" : "text-on-surface"}`}>
-                    {String(group.startHour).padStart(2, "0")}:00
-                  </span>
-                  {isMultiHour ? (
-                    <>
-                      <span className="text-[9px] font-mono text-on-surface-variant/40 leading-none my-0.5">↓</span>
-                      <span className="text-[11px] font-mono font-semibold text-on-surface-variant/80">
-                        {String(group.endHour).padStart(2, "0")}:00
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container-low/70 border border-outline/10">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
+                      <CatIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-mono font-bold text-white truncate">
+                        {group.title || cat.label}
                       </span>
-                    </>
-                  ) : null}
-                  {isRecentlySaved ? (
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
-                      SAVED
-                    </span>
-                  ) : isCurrent ? (
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm">
-                      NOW
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* Category Icon */}
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
-                  <CatIcon className="w-5 h-5" />
-                </div>
-
-                {/* Title & Group Details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
-                      {group.title || cat.label}
-                    </h4>
-                    {isMultiHour && (
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-semibold border border-outline/10 shrink-0">
-                        {group.hours.length} Hours
+                        {group.hours.length} Hours ({String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00)
                       </span>
-                    )}
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  </div>
-
-                  {/* Subtext: Category and details */}
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
-                    <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
-                    {group.primaryBlock?.description && (
-                      <>
-                        <span className="text-on-surface-variant/30">•</span>
-                        <span className="text-on-surface-variant truncate">
-                          {group.primaryBlock.description}
-                        </span>
-                      </>
-                    )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Right Actions: Minimize (if expanded sleep - icon only, no text) or Status Icon */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {isSleep && isExpanded ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleGroupExpand(group.id, false);
-                      }}
-                      aria-label="Minimize"
-                      className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0"
-                    >
-                      <ChevronUp className="w-4 h-4" />
-                    </button>
-                  ) : group.status === "completed" ? (
-                    <div className="text-emerald-400">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                  ) : (
-                    <div className="text-on-surface-variant/30 group-hover:text-primary transition-colors">
-                      <Plus className="w-4 h-4" />
-                    </div>
-                  )}
+                <div className="space-y-1">
+                  {group.slots.map((slot) => renderHourSlot(slot, { isInsideGroup: true, groupType: group.type }))}
                 </div>
               </div>
             );
           }
 
-          // Open / Unscheduled Hour Slot
-          return (
-            <div
-              key={group.id}
-              onClick={() => handleOpenHour(group.startHour, null, group.endHour)}
-              className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
-                isCurrent
-                  ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
-                  : ""
-              }`}
-            >
-              {/* Hour Time Indicator */}
-              <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
-                <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : "text-on-surface-variant/50"}`}>
-                  {String(group.startHour).padStart(2, "0")}:00
-                </span>
-                {isCurrent && (
-                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-0.5 shadow-sm">
-                    NOW
-                  </span>
-                )}
-              </div>
-
-              {/* Status Dot / Category Icon */}
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
-                <CatIcon className="w-4 h-4" />
-              </div>
-
-              {/* Title & Prompt */}
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
-                  Empty Slot
-                </h4>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] font-mono text-on-surface-variant/35 group-hover:text-primary transition-colors flex items-center gap-1">
-                    + Tap to schedule
-                  </span>
-                </div>
-              </div>
-
-              <div className="shrink-0 text-on-surface-variant/20 group-hover:text-primary transition-colors">
-                <Plus className="w-4 h-4" />
-              </div>
-            </div>
-          );
+          // Single Hour Slot (Custom or Open) - ALWAYS FULLY EXPANDED
+          return renderHourSlot(group.slots[0]);
         })}
       </div>
 
