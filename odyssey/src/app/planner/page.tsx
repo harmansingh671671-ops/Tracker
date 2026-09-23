@@ -526,7 +526,6 @@ export default function PlannerPage() {
               <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
                 {slot.title || cat.label}
               </h4>
-              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
             </div>
             <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
               <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
@@ -681,31 +680,33 @@ export default function PlannerPage() {
                       : ""
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
                       <Moon className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-bold text-on-surface">
+                    <div className="flex flex-col justify-center min-w-0">
+                      <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+                        <span className="text-xs font-mono font-bold text-on-surface whitespace-nowrap shrink-0">
                           {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
                         </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25 whitespace-nowrap shrink-0">
                           {group.hours.length}h Sleep
                         </span>
                         {isRecentlySaved && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse">
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse whitespace-nowrap shrink-0">
                             SAVED
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] font-mono text-on-surface-variant/70 truncate mt-0.5">
-                        {group.title || "Circadian Rest & Slumber"}
-                      </p>
+                      {group.title && group.title !== "Circadian Rest & Slumber" ? (
+                        <p className="text-[11px] font-mono text-on-surface-variant/70 truncate mt-0.5">
+                          {group.title}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     <div className="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
                       <ChevronDown className="w-4 h-4" />
                     </div>
@@ -728,22 +729,24 @@ export default function PlannerPage() {
                   onClick={() => toggleGroupExpand(group.id, false)}
                   className="flex items-center justify-between px-3 py-2 rounded-2xl bg-indigo-950/60 border border-indigo-500/25 hover:border-indigo-500/40 cursor-pointer transition-all"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
                       <Moon className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-bold text-white">
+                    <div className="flex flex-col justify-center min-w-0">
+                      <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+                        <span className="text-xs font-mono font-bold text-white whitespace-nowrap shrink-0">
                           {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
                         </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30 whitespace-nowrap shrink-0">
                           {group.hours.length}h Sleep
                         </span>
                       </div>
-                      <p className="text-[11px] font-mono text-indigo-200/70 truncate mt-0.5">
-                        {group.title || "Circadian Rest & Slumber"}
-                      </p>
+                      {group.title && group.title !== "Circadian Rest & Slumber" ? (
+                        <p className="text-[11px] font-mono text-indigo-200/70 truncate mt-0.5">
+                          {group.title}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -754,7 +757,7 @@ export default function PlannerPage() {
                       toggleGroupExpand(group.id, false);
                     }}
                     aria-label="Minimize"
-                    className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0"
+                    className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0 ml-2"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
@@ -787,7 +790,7 @@ export default function PlannerPage() {
                       <span className="text-xs font-mono font-bold text-white truncate">
                         {group.title || cat.label}
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-semibold border border-outline/10 shrink-0">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-semibold border border-outline/10 shrink-0 whitespace-nowrap">
                         {group.hours.length} Hours ({String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00)
                       </span>
                     </div>
