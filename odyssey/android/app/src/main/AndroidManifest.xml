@@ -40,7 +40,7 @@
             android:name=".OdysseyLiveWallpaperService"
             android:enabled="true"
             android:exported="true"
-            android:label="Odyssey Live Cadence"
+            android:label="Odyssey Live Wallpaper"
             android:permission="android.permission.BIND_WALLPAPER">
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />

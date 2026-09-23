@@ -48,7 +48,7 @@ export function RewardCelebrationModal({
           </span>
           <h3 className="text-xl font-bold tracking-tight text-on-surface mt-1">{title}</h3>
           <p className="text-xs text-on-surface-variant mt-1">
-            Rewards deposited directly into your cadence vault
+            Rewards added directly to your vault
           </p>
         </div>
 

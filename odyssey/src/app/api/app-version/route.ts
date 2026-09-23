@@ -25,10 +25,10 @@ export async function GET(request: Request) {
     releaseDate: "2026-09-22",
     mandatory: false,
     changelog: [
-      "2-Task Cadence Wallpaper: Redesigned wallpaper displaying strictly Current Task (NOW) & Upcoming Task (NEXT) with breathing pulse beacon",
+      "2-Task Live Wallpaper: Redesigned wallpaper displaying strictly Current Task (NOW) & Upcoming Task (NEXT) with breathing pulse beacon",
       "Mindful Rhythm App Redesign: Fluid obsidian slate aesthetic with Plus Jakarta Sans & JetBrains Mono typography",
       "Chrono Stream Planner: Complete 24h timeline with inline hour editing modal and instant Dexie DB binding",
-      "Wallpaper Cadence Studio: Interactive 19.5:9 phone preview, clock overlay simulator, and dual alternate photo managers",
+      "Wallpaper Studio: Interactive 19.5:9 phone preview, clock overlay simulator, and dual alternate photo managers",
       "Conscious Rituals Vault: Redesigned daily habits with tomorrow's reward vault and streak multiplier preservation",
     ],
   };

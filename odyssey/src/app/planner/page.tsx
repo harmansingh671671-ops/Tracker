@@ -284,12 +284,10 @@ export default function PlannerPage() {
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold text-on-surface flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-primary" />
-            <span>Cadence Distribution</span>
+            <span>Daily Schedule</span>
           </span>
           <span className="font-mono text-on-surface-variant text-[11px]">
-            {categoryStats.plannedTotal > 0
-              ? `${categoryStats.plannedTotal}h scheduled • ${24 - categoryStats.plannedTotal}h open`
-              : "0h scheduled • Tap any hour to plan"}
+            Scheduled: {categoryStats.plannedTotal} Hours
           </span>
         </div>
 

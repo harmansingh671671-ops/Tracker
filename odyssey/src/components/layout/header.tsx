@@ -68,11 +68,11 @@ export function Header() {
               </span>
             </div>
 
-            {/* 4. Profile Avatar Button -> Opens Cadence Settings Sheet */}
+            {/* 4. Profile Avatar Button -> Opens Profile Settings Sheet */}
             <button
               onClick={() => setIsProfileOpen(true)}
               className="w-7 h-7 rounded-full p-0.5 bg-gradient-to-tr from-primary to-secondary flex items-center justify-center shrink-0 transition-transform active:scale-95 shadow-sm"
-              title="Profile & Cadence Settings"
+              title="Profile & Settings"
               aria-label="Profile and Settings"
             >
               <img
@@ -85,7 +85,7 @@ export function Header() {
         </div>
       </header>
 
-      {/* Cadence & Profile Settings Sheet */}
+      {/* Profile Settings Sheet */}
       <ProfileSettingsSheet
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}

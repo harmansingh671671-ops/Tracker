@@ -234,7 +234,7 @@ export default function WallpaperPage() {
         </div>
       </div>
 
-      {/* Center Stage: Phone Simulator (19.5:9 ratio mockup previewing 2-Task Cadence Window) */}
+      {/* Center Stage: Phone Simulator (19.5:9 ratio mockup previewing 2-Task Preview) */}
       <div className="flex flex-col items-center">
         <div className="relative w-full max-w-[340px] shadow-2xl rounded-[48px] border-4 border-surface-container-highest/60 overflow-hidden bg-surface-container-lowest">
           <WallpaperPreview
@@ -244,7 +244,7 @@ export default function WallpaperPage() {
           />
         </div>
         <p className="text-[11px] font-mono text-on-surface-variant text-center mt-2.5">
-          Live 2-Task Cadence Window • Current & Upcoming Only
+          Live 2-Task Preview • Current & Upcoming Only
         </p>
       </div>
 

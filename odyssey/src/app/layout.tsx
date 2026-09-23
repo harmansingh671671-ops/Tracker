@@ -16,7 +16,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Odyssey - Mindful Habit & Cadence Tracker",
+  title: "Odyssey - Habit & Schedule Tracker",
   description: "Accountability scheduler, habit tracker, journey map and performance analytics",
   manifest: "/manifest.json",
   appleWebApp: {

@@ -298,7 +298,7 @@ export default function JourneyPage() {
                           : "bg-primary text-on-primary shadow-md shadow-primary/20 hover:opacity-95"
                       }`}
                     >
-                      <span>{activeSession ? "Session Active (44:59)" : "Begin Daily Focus Cadence"}</span>
+                      <span>{activeSession ? "Session Active (44:59)" : "Start Daily Focus"}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>

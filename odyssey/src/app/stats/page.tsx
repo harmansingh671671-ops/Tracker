@@ -60,7 +60,7 @@ export default function StatsPage() {
           <div className="flex items-center gap-2 text-xs text-on-surface-variant font-mono mt-0.5">
             <span className="flex items-center gap-1 text-primary">
               <Activity className="w-3.5 h-3.5" />
-              <span>Cadence Telemetry</span>
+              <span>Performance Analytics</span>
             </span>
             <span>•</span>
             <span className="flex items-center gap-1">
@@ -128,7 +128,7 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* 2-TASK CADENCE WALLPAPER GATEWAY CARD */}
+      {/* 2-TASK WALLPAPER GATEWAY CARD */}
       <Link
         href="/wallpaper"
         className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#121B2B] via-[#0E1624] to-[#0A0F1A] border border-primary/30 hover:border-primary/60 p-4 sm:p-5 shadow-[0_0_24px_rgba(90,240,179,0.08)] hover:shadow-[0_0_32px_rgba(90,240,179,0.18)] transition-all duration-300 block"
@@ -154,7 +154,7 @@ export default function StatsPage() {
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-mono font-bold border border-primary/30">
                   <Sparkles className="w-3 h-3" />
-                  <span>2-TASK CADENCE</span>
+                  <span>2-TASK PREVIEW</span>
                 </span>
                 <span className="flex items-center gap-1 text-[10px] font-mono text-secondary">
                   <Layers className="w-3 h-3" />
@@ -163,7 +163,7 @@ export default function StatsPage() {
               </div>
 
               <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-primary transition-colors flex items-center gap-1.5">
-                <span>Wallpaper Cadence Studio</span>
+                <span>Wallpaper Studio</span>
               </h3>
 
               <div className="flex items-center gap-3 text-[11px] font-mono text-on-surface-variant">

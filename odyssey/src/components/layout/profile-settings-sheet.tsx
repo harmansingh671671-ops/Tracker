@@ -13,7 +13,7 @@ interface ProfileSettingsSheetProps {
 
 export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetProps) {
   const { user, fetchUser } = useUserStore();
-  const [cadenceAlertsEnabled, setCadenceAlertsEnabled] = useState(true);
+  const [hourlyAlertsEnabled, setHourlyAlertsEnabled] = useState(true);
   const [totalBlocks, setTotalBlocks] = useState(0);
   const [totalHabits, setTotalHabits] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -21,9 +21,9 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
   useEffect(() => {
     if (isOpen) {
       fetchUser();
-      const saved = localStorage.getItem("odyssey_cadence_alerts");
+      const saved = localStorage.getItem("odyssey_hourly_alerts");
       if (saved !== null) {
-        setCadenceAlertsEnabled(saved === "true");
+        setHourlyAlertsEnabled(saved === "true");
       }
       db.scheduleBlocks.count().then(setTotalBlocks);
       db.habits.count().then(setTotalHabits);
@@ -35,9 +35,9 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleToggleCadence = (checked: boolean) => {
-    setCadenceAlertsEnabled(checked);
-    localStorage.setItem("odyssey_cadence_alerts", String(checked));
+  const handleToggleHourlyAlerts = (checked: boolean) => {
+    setHourlyAlertsEnabled(checked);
+    localStorage.setItem("odyssey_hourly_alerts", String(checked));
     showToast(checked ? "Hourly XX:57 Heads-Up Alerts enabled." : "Hourly alerts paused.");
   };
 
@@ -53,10 +53,10 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
       const url = URL.createObjectURL(exportBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `odyssey-cadence-backup-${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `odyssey-backup-${new Date().toISOString().split("T")[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("Cadence backup JSON exported successfully.");
+      showToast("Backup JSON exported successfully.");
     } catch {
       showToast("Error exporting backup.");
     }
@@ -86,7 +86,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
     reader.readAsText(file);
   };
 
-  const handleTestCadenceAlert = () => {
+  const handleTestHourlyAlert = () => {
     sendTestNotificationToAndroid("NOW", "Deep Monotasking Sprint", "Focus");
     showToast("Sent XX:57 heads-up test alert via native engine.");
   };
@@ -108,7 +108,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           <div className="w-12 h-1.5 rounded-full bg-outline/20 mb-3" />
           <div className="w-full flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-on-surface">Profile & Cadence Settings</h2>
+              <h2 className="text-xl font-bold tracking-tight text-on-surface">Profile & Settings</h2>
               <p className="text-xs text-on-surface-variant">Manage rhythm, notifications, and local vault</p>
             </div>
             <button
@@ -161,7 +161,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           </div>
         </div>
 
-        {/* Cadence Notification Settings */}
+        {/* Hourly Notification Settings */}
         <div className="rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -176,8 +176,8 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
             <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
               <input
                 type="checkbox"
-                checked={cadenceAlertsEnabled}
-                onChange={(e) => handleToggleCadence(e.target.checked)}
+                checked={hourlyAlertsEnabled}
+                onChange={(e) => handleToggleHourlyAlerts(e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-surface-container peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container after:rounded-full after:h-5 after:w-5 after:transition-all" />
@@ -190,7 +190,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           </div>
 
           <button
-            onClick={handleTestCadenceAlert}
+            onClick={handleTestHourlyAlert}
             className="w-full py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-bright text-xs font-mono font-medium text-tertiary transition-colors flex items-center justify-center gap-2"
           >
             <span>⚡ Send Test XX:57 Notification</span>

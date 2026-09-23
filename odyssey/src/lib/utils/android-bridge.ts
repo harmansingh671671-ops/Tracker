@@ -183,16 +183,16 @@ export function isNativeBridgeAvailable(): boolean {
 export function buildNativeSchedulePayload(data: WallpaperData): string {
   const full24 = build24HourlyBlocks(data.blocks);
   
-  // Collect habits from data, or provide guaranteed default cadence tracks so section is never blank
+  // Collect habits from data, or provide guaranteed default habit tracks so section is never blank
   const habitsList = (data.habits && data.habits.length > 0)
     ? data.habits.slice(0, 4).map((h) => ({
         name: h.name,
         icon: h.icon,
         currentStreak: h.currentStreak || 1,
-        category: h.category || "Cadence Track",
+        category: h.category || "Habit Track",
       }))
     : [
-        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Cadence Track" },
+        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track" },
         { name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" },
       ];
 
@@ -820,7 +820,7 @@ export function sendTestNotificationToAndroid(
 
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
-      new Notification(`Odyssey Cadence • XX:57 Heads-Up`, {
+      new Notification(`Odyssey • XX:57 Heads-Up`, {
         body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
         icon: "/logo.png",
       });
@@ -828,7 +828,7 @@ export function sendTestNotificationToAndroid(
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission().then((perm) => {
         if (perm === "granted") {
-          new Notification(`Odyssey Cadence • XX:57 Heads-Up`, {
+          new Notification(`Odyssey • XX:57 Heads-Up`, {
             body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
             icon: "/logo.png",
           });

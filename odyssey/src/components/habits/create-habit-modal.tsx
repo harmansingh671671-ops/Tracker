@@ -88,7 +88,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
           <div className="w-full flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold tracking-tight text-on-surface">New Daily Ritual</h2>
-              <p className="text-xs text-on-surface-variant">Design a mindful habit cadence</p>
+              <p className="text-xs text-on-surface-variant">Design a mindful daily habit</p>
             </div>
             <button
               onClick={onClose}

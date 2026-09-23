@@ -135,7 +135,7 @@ function getDisplayHobbies(habits: Habit[]): DisplayHobby[] {
         icon: resolveHobbyEmoji(h.icon, h.name),
         title: h.name,
         streak: h.currentStreak || 1,
-        sub: h.category ? `${h.category} • Target active` : "Cadence track",
+        sub: h.category ? `${h.category} • Target active` : "Habit track",
       });
     }
   }
@@ -278,7 +278,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
 
   ctx.font = "500 24px 'Plus Jakarta Sans', sans-serif";
   ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
-  ctx.fillText(`Level ${String(data.userLevel).padStart(2, "0")} Cadence`, cardPad + 36, headerY + 162);
+  ctx.fillText(`Level ${String(data.userLevel).padStart(2, "0")} Explorer`, cardPad + 36, headerY + 162);
 
   // Minimal Streak Count on right
   const streakNum = data.userStreak !== undefined ? data.userStreak : data.activeDay;
@@ -293,7 +293,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillText("DAYS STREAK", streakX, headerY + 145);
   ctx.textAlign = "left";
 
-  // 5. 24-HOUR CADENCE SPECTRUM BAR (Expanded, clean, no squeezed text)
+  // 5. 24-HOUR SPECTRUM BAR (Expanded, clean, no squeezed text)
   const specY = headerY + headerH + 24;
   const specH = 104;
   ctx.fillStyle = "rgba(19, 21, 29, 0.75)";
@@ -385,14 +385,14 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillText(dotTimeText, pillX + pillW / 2, pillY + 22);
   ctx.textAlign = "left";
 
-  // 6. 2-TASK CADENCE WINDOW (Strictly 2 Tasks: Current NOW & Upcoming NEXT)
+  // 6. 2-TASK DISPLAY (Strictly 2 Tasks: Current NOW & Upcoming NEXT)
   const currentBlock = allHourlyBlocks[currentHour] || {
     hour: currentHour,
     startTime: `${String(currentHour).padStart(2, "0")}:00`,
     endTime: `${String((currentHour + 1) % 24).padStart(2, "0")}:00`,
-    title: "Deep Focus Session",
-    category: "work",
-    tag: "Focus",
+    title: "",
+    category: "",
+    tag: "",
     isUserDefined: false,
   };
 
@@ -401,9 +401,9 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     hour: nextHour,
     startTime: `${String(nextHour).padStart(2, "0")}:00`,
     endTime: `${String((nextHour + 1) % 24).padStart(2, "0")}:00`,
-    title: "Circadian Alignment & Rest",
-    category: "sleep",
-    tag: "Rest",
+    title: "",
+    category: "",
+    tag: "",
     isUserDefined: false,
   };
 
@@ -545,12 +545,12 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
 
   const timelineEndHeight = nextY + nextCardH;
 
-  // 7. CADENCE HOBBIES & PASSIONS (Guaranteed display - fills remaining screen down to bottom)
+  // 7. HOBBIES & PASSIONS (Guaranteed display - fills remaining screen down to bottom)
   let currentCardY = timelineEndHeight + Math.round(usableH * 0.015);
   const userHobbies = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
     ? data.habits.slice(0, 4)
     : [
-        { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Cadence Track" } as any,
+        { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track" } as any,
         { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" } as any,
       ];
 
@@ -558,7 +558,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     const hobHeaderY = currentCardY + Math.round(usableH * 0.010);
     ctx.font = "700 24px 'JetBrains Mono', monospace";
     ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
-    ctx.fillText("✦ CADENCE • HOBBIES & PASSIONS", cardPad + 14, hobHeaderY);
+    ctx.fillText("✦ HOBBIES & PASSIONS", cardPad + 14, hobHeaderY);
 
     ctx.textAlign = "right";
     ctx.font = "600 20px 'JetBrains Mono', monospace";
@@ -667,7 +667,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.textAlign = "center";
   ctx.font = "600 15px 'JetBrains Mono', monospace";
   ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
-  ctx.fillText("ODYSSEY CADENCE LOCKSCREEN", width / 2, 2300);
+  ctx.fillText("ODYSSEY LIVE LOCKSCREEN", width / 2, 2300);
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
   ctx.beginPath();

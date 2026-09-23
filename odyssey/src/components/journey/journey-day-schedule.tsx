@@ -700,7 +700,7 @@ export function JourneyDaySchedule({
             <div className="flex items-center gap-1.5 text-primary">
               <Calendar className="w-4 h-4 shrink-0" />
               <span className="text-[11px] uppercase tracking-wider font-semibold">
-                {isToday ? "Today's Cadence" : `Day ${dayNum} Cadence Plan`}
+                {isToday ? "Today's Schedule" : `Day ${dayNum} Schedule`}
               </span>
             </div>
 
@@ -749,7 +749,7 @@ export function JourneyDaySchedule({
             <div className="flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-primary" />
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface">
-                Cadence Completion
+                Schedule Completion
               </span>
             </div>
             <span className="text-xs font-mono font-bold text-primary">

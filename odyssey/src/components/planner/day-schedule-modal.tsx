@@ -244,7 +244,7 @@ export function DayScheduleModal({
       endTime: endStr,
       title: taskTitle.trim(),
       category: taskCategory,
-      tag: taskCategory === "work" ? "Deep Work" : taskCategory === "habits" ? "Vitality" : "Cadence",
+      tag: taskCategory === "work" ? "Deep Work" : taskCategory === "habits" ? "Vitality" : "Routine",
       status: "pending",
       isCommitted: true,
       createdAt: new Date().toISOString(),
@@ -315,7 +315,7 @@ export function DayScheduleModal({
                 </span>
               )}
               <span className="text-xs text-on-surface-variant font-medium">
-                Daily Cadence Plan
+                Daily Plan
               </span>
             </div>
             <h2 className="text-base sm:text-lg font-bold text-on-surface tracking-tight truncate mt-0.5">

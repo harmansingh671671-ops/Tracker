@@ -333,7 +333,7 @@ export default function ProfilePage() {
           {/* Rank Progression Overview */}
           <div className="pt-2 border-t border-outline/10 space-y-2">
             <span className="text-[11px] font-mono font-semibold text-on-surface-variant block uppercase tracking-wider">
-              Cadence Progression Tiers
+              Progression Tiers
             </span>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 text-center">
               {RANKS.slice(0, 5).map((r) => {

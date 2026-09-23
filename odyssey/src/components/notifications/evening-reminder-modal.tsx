@@ -77,7 +77,7 @@ export function EveningReminderModal() {
         if (Notification.permission === "granted") {
           try {
             new Notification("Odyssey: Plan Tomorrow's Schedule", {
-              body: `It's past 20:00! Your schedule for tomorrow is incomplete (${hoursCount}/24h planned). Lock in your cadence before bed.`,
+              body: `It's past 20:00! Your schedule for tomorrow is incomplete (${hoursCount}/24h planned). Plan your day before bed.`,
               icon: "/favicon.ico",
             });
           } catch {
@@ -123,7 +123,7 @@ export function EveningReminderModal() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-xs font-bold">
             <Moon className="w-3.5 h-3.5" />
-            <span>20:00 Cadence Hobby</span>
+            <span>20:00 Evening Plan</span>
           </div>
 
           <button
@@ -155,7 +155,7 @@ export function EveningReminderModal() {
         {/* Quick Status Bar */}
         <div className="p-3 rounded-2xl bg-surface-container border border-outline/15 space-y-1.5">
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-on-surface-variant font-medium">Tomorrow's Cadence</span>
+            <span className="text-on-surface-variant font-medium">Tomorrow's Schedule</span>
             <span className="text-amber-400 font-bold">{plannedHours} / 24 hrs</span>
           </div>
           <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">

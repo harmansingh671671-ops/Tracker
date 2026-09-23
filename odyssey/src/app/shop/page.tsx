@@ -68,7 +68,7 @@ export default function ShopPage() {
         category: "boost",
         price: 20,
         icon: "✨",
-        desc: "Instantly claim 100 XP towards advancing to the next Cadence Division.",
+        desc: "Instantly claim 100 XP towards advancing to the next Division.",
       },
       {
         id: "titan-crest",
@@ -114,14 +114,14 @@ export default function ShopPage() {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-16 pt-2 space-y-5">
-      {/* Micro Weekly Cadence & Rewards Tracker Bar */}
+      {/* Micro Weekly Progress & Rewards Tracker Bar */}
       <div className="w-full bg-surface-container-low rounded-2xl p-3 border border-outline/10 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
             <span className="text-secondary text-sm">⭐</span>
           </div>
           <span className="text-xs font-mono font-medium text-on-surface truncate">
-            Bonus Tier Active • Week 2 Cadence
+            Bonus Tier Active • Week 2 Streak
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">

@@ -100,7 +100,7 @@ export default function HabitsPage() {
       <div className="flex items-center justify-between gap-3 pt-1">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-on-surface">Daily Rituals</h2>
-          <p className="text-xs text-on-surface-variant">Cadence habits & conscious routines</p>
+          <p className="text-xs text-on-surface-variant">Daily habits & mindful routines</p>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
@@ -139,7 +139,7 @@ export default function HabitsPage() {
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
             <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">
-              Today's Cadence
+              Today's Progress
             </span>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-2xl font-bold font-mono text-on-surface">

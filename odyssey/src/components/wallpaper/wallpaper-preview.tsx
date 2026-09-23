@@ -214,7 +214,7 @@ export function WallpaperPreview({
               <span className="truncate">{data.rankName}</span>
             </div>
             <span className="text-[10px] text-slate-400 font-medium">
-              Level {String(data.userLevel).padStart(2, "0")} Cadence
+              Level {String(data.userLevel).padStart(2, "0")} Explorer
             </span>
           </div>
 
@@ -288,7 +288,7 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 4. 2-TASK CADENCE WINDOW (CURRENT TASK & UPCOMING TASK ONLY) */}
+      {/* 4. 2-TASK DISPLAY (CURRENT TASK & UPCOMING TASK ONLY) */}
       <div className="px-4 pt-1.5 pb-2 flex flex-col gap-2.5 z-10">
         {/* Card 1: Current Task (NOW) */}
         {(() => {
@@ -388,12 +388,12 @@ export function WallpaperPreview({
         })()}
       </div>
 
-      {/* 5. CADENCE HOBBIES & PASSIONS (Guaranteed Display - Always Visible, Full Width if single, 2x2 Grid if multiple) */}
+      {/* 5. HOBBIES & PASSIONS (Guaranteed Display - Always Visible, Full Width if single, 2x2 Grid if multiple) */}
       {data.includeHobbies !== false && (() => {
         const userHobbies = (data.habits && data.habits.length > 0)
           ? data.habits.slice(0, 4)
           : [
-              { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Cadence Track" } as any,
+              { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track" } as any,
               { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" } as any,
             ];
         const count = userHobbies.length;
@@ -403,7 +403,7 @@ export function WallpaperPreview({
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-amber-400" />
-                CADENCE • HOBBIES &amp; PASSIONS
+                HOBBIES &amp; PASSIONS
               </span>
               <span className="text-[9px] font-mono text-slate-400 font-medium">
                 {count} {count === 1 ? "ACTIVE TRACK" : "ACTIVE TRACKS"}
@@ -423,7 +423,7 @@ export function WallpaperPreview({
                         {h.name}
                       </div>
                       <div className="text-[9.5px] text-slate-400 truncate">
-                        {h.category || "Cadence Track"}
+                        {h.category || "Habit Track"}
                       </div>
                     </div>
                   </div>
@@ -460,7 +460,7 @@ export function WallpaperPreview({
 
         {/* Subtle Brand Tag */}
         <span className="text-[8px] font-mono tracking-[0.25em] text-white/30 uppercase font-semibold">
-          ODYSSEY CADENCE LIVE SERVICE
+          ODYSSEY LIVE SERVICE
         </span>
       </div>
     </div>
