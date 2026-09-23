@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Coffee,
   Moon,
-  Sparkles,
 } from "lucide-react";
 
 interface EditHourModalProps {
@@ -59,7 +58,6 @@ export function EditHourModal({
   const [category, setCategory] = useState("work");
   const [startH, setStartH] = useState(initialHour);
   const [endH, setEndH] = useState((initialHour + 1) % 24 === 0 ? 24 : initialHour + 1);
-  const [status, setStatus] = useState<"planned" | "completed" | "skipped">("planned");
   const [selectedHabitId, setSelectedHabitId] = useState<string>("");
 
   useEffect(() => {
@@ -71,26 +69,15 @@ export function EditHourModal({
       if (existingBlock.endTime === "24:00" || (e === 0 && s > 0)) e = 24;
       setStartH(s);
       setEndH(e);
-      setStatus(existingBlock.status as any || "planned");
       setSelectedHabitId(existingBlock.tag || "");
     } else {
       const s = initialHour;
       const e = (initialHour + 1) % 24 === 0 ? 24 : initialHour + 1;
       setStartH(s);
       setEndH(e);
-      setTitle(
-        s < 6 || s >= 23
-          ? "Obsidian Rest & Slumber"
-          : s in [6, 7]
-          ? "Morning Priming & Vitality"
-          : s in [12, 13]
-          ? "Mindful Recovery & Lunch"
-          : s in [17, 18]
-          ? "Active Sync & Movement"
-          : ""
-      );
+      // By default keep task title empty - no preloaded placeholder text
+      setTitle("");
       setCategory(s < 6 || s >= 23 ? "sleep" : s in [6, 7] ? "vitality" : s in [12, 13] ? "renewal" : "work");
-      setStatus("planned");
       setSelectedHabitId("");
     }
   }, [existingBlock, initialHour, isOpen]);
@@ -102,7 +89,7 @@ export function EditHourModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalTitle = title.trim() || (category === "sleep" ? "Circadian Slumber" : "Focus Hour");
+    const finalTitle = title.trim() || CATEGORIES.find((c) => c.id === category)?.label || "Focus";
     onSave({
       id: existingBlock?.id,
       title: finalTitle,
@@ -110,7 +97,7 @@ export function EditHourModal({
       startTime: startTimeStr,
       endTime: endTimeStr,
       date: initialDate,
-      status,
+      status: (existingBlock?.status as any) || "planned",
       habitId: selectedHabitId || undefined,
     });
     onClose();
@@ -118,47 +105,46 @@ export function EditHourModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-5 space-y-5 animate-in slide-in-from-bottom-6 duration-300">
-        {/* Drag Handle */}
+      <div className="w-full max-w-lg bg-surface-container rounded-t-[28px] sm:rounded-[28px] border border-outline/15 shadow-2xl p-4 sm:p-5 space-y-3.5 animate-in slide-in-from-bottom-6 duration-300">
+        {/* Header with Drag Handle & Close */}
         <div className="flex flex-col items-center">
-          <div className="w-12 h-1.5 rounded-full bg-outline/20 mb-3" />
+          <div className="w-10 h-1 rounded-full bg-outline/20 mb-2 sm:hidden" />
           <div className="w-full flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-bold tracking-tight text-on-surface">Plan Time Slot</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold tracking-tight text-on-surface">Plan Time Slot</h2>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-lowest text-secondary text-xs font-mono font-semibold border border-outline/10">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="w-3 h-3" />
                 <span>{startTimeStr} → {endTimeStr}</span>
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+              className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Task Title Field */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">TASK TITLE</label>
-            <div className="relative flex items-center">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="What will you conquer this hour?"
-                className="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline-variant rounded-2xl py-3.5 pl-4 pr-4 border border-outline/15 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm text-sm font-medium transition-all"
-                autoFocus
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {/* Task Title Field - Empty by default */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-mono text-on-surface-variant font-medium tracking-wide">TASK TITLE</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What will you conquer this hour?"
+              className="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline-variant/60 rounded-xl py-2.5 px-3.5 border border-outline/15 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm text-sm font-medium transition-all"
+              autoFocus
+            />
           </div>
 
           {/* Category Selector Pills */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">CATEGORY</label>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-mono text-on-surface-variant font-medium tracking-wide">CATEGORY</label>
+            <div className="flex flex-wrap gap-1.5">
               {CATEGORIES.map((cat) => {
                 const isSelected = category === cat.id;
                 const IconComp = cat.Icon;
@@ -167,9 +153,9 @@ export function EditHourModal({
                     key={cat.id}
                     type="button"
                     onClick={() => setCategory(cat.id)}
-                    className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
                       isSelected
-                        ? `${cat.activeBg} shadow-md`
+                        ? `${cat.activeBg} shadow-sm`
                         : "bg-surface-container-high hover:bg-surface-bright text-on-surface border border-outline/10"
                     }`}
                   >
@@ -181,54 +167,14 @@ export function EditHourModal({
             </div>
           </div>
 
-          {/* Status Toggle Bar */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">STATUS</label>
-            <div className="grid grid-cols-3 gap-2 p-1 bg-surface-container-lowest rounded-2xl border border-outline/10">
-              <button
-                type="button"
-                onClick={() => setStatus("planned")}
-                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all ${
-                  status === "planned"
-                    ? "bg-surface-container text-on-surface shadow-sm font-bold"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                Upcoming
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatus("completed")}
-                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all ${
-                  status === "completed"
-                    ? "bg-emerald-500/20 text-emerald-300 font-bold shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                Completed ✓
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatus("skipped")}
-                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all ${
-                  status === "skipped"
-                    ? "bg-red-500/20 text-red-300 font-bold shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                Missed
-              </button>
-            </div>
-          </div>
-
           {/* Linked Habit Attachment (Optional) */}
           {habits && habits.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">LINKED HABIT (OPTIONAL)</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-mono text-on-surface-variant font-medium tracking-wide">LINKED HABIT (OPTIONAL)</label>
               <select
                 value={selectedHabitId}
                 onChange={(e) => setSelectedHabitId(e.target.value)}
-                className="w-full bg-surface-container-lowest text-on-surface rounded-2xl py-3 px-3.5 border border-outline/15 text-xs font-mono focus:border-primary focus:outline-none"
+                className="w-full bg-surface-container-lowest text-on-surface rounded-xl py-2 px-3 border border-outline/15 text-xs font-mono focus:border-primary focus:outline-none cursor-pointer"
               >
                 <option value="">None (Independent Task)</option>
                 {habits.map((h) => {
@@ -244,7 +190,7 @@ export function EditHourModal({
           )}
 
           {/* Footer Actions: Delete & Save */}
-          <div className="flex items-center justify-between gap-3 pt-3">
+          <div className="flex items-center justify-between gap-2.5 pt-1">
             {existingBlock && onDelete ? (
               <button
                 type="button"
@@ -252,21 +198,19 @@ export function EditHourModal({
                   if (existingBlock.id) onDelete(existingBlock.id);
                   onClose();
                 }}
-                className="py-3 px-4 rounded-2xl text-error hover:bg-error-container/20 text-xs font-bold transition-colors flex items-center gap-1.5"
+                className="py-2.5 px-3.5 rounded-xl text-error hover:bg-error-container/20 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Delete</span>
               </button>
-            ) : (
-              <div />
-            )}
+            ) : null}
 
             <button
               type="submit"
-              className="flex-1 py-3.5 px-6 rounded-2xl bg-primary text-on-primary font-bold text-sm shadow-lg shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 px-5 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-md shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>Save Hour Block</span>
+              <span>Save</span>
             </button>
           </div>
         </form>
