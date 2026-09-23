@@ -135,8 +135,10 @@ export default function PlannerPage() {
     }));
   };
 
-  // Persist selectedDate to localStorage whenever changed
+  // Persist selectedDate to localStorage whenever changed and keep ref updated
+  const selectedDateRef = useRef(selectedDate);
   useEffect(() => {
+    selectedDateRef.current = selectedDate;
     if (typeof window !== "undefined" && selectedDate) {
       try {
         localStorage.setItem("odyssey_planner_selected_date", selectedDate);
@@ -144,22 +146,38 @@ export default function PlannerPage() {
     }
   }, [selectedDate]);
 
+  // Consume incoming ?date= from Journey page or notifications on initial load
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const d = p.get("date");
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        setSelectedDate(d);
+        try {
+          localStorage.setItem("odyssey_planner_selected_date", d);
+          // Clean URL so the query param doesn't lock future date switching
+          window.history.replaceState(null, "", window.location.pathname);
+        } catch {}
+      }
+    }
+  }, []);
+
   // Restore previously opened date when app is reopened/resumed from minimized state
   useEffect(() => {
     const handleReopen = () => {
       if (document.visibilityState === "visible") {
         try {
           const saved = localStorage.getItem("odyssey_planner_selected_date");
-          if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && saved !== selectedDate) {
+          if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && saved !== selectedDateRef.current) {
             setSelectedDate(saved);
             const cached = getCachedBlocks(saved);
             if (cached.length > 0) setBlocks(cached);
           }
         } catch {}
       } else if (document.visibilityState === "hidden") {
-        if (selectedDate) {
+        if (selectedDateRef.current) {
           try {
-            localStorage.setItem("odyssey_planner_selected_date", selectedDate);
+            localStorage.setItem("odyssey_planner_selected_date", selectedDateRef.current);
           } catch {}
         }
       }
@@ -168,19 +186,11 @@ export default function PlannerPage() {
     document.addEventListener("visibilitychange", handleReopen);
     window.addEventListener("focus", handleReopen);
 
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      const d = p.get("date");
-      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        setSelectedDate(d);
-      }
-    }
-
     return () => {
       document.removeEventListener("visibilitychange", handleReopen);
       window.removeEventListener("focus", handleReopen);
     };
-  }, [selectedDate]);
+  }, []);
 
   // Live timer for current minute, hour, and date change
   useEffect(() => {
@@ -219,6 +229,12 @@ export default function PlannerPage() {
 
   const handleSelectDate = useCallback((dateStr: string) => {
     setSelectedDate(dateStr);
+    try {
+      localStorage.setItem("odyssey_planner_selected_date", dateStr);
+      if (typeof window !== "undefined" && window.location.search) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    } catch {}
     const cached = getCachedBlocks(dateStr);
     if (cached.length > 0) {
       setBlocks(cached);
