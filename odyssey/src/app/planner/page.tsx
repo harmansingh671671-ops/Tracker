@@ -11,7 +11,6 @@ import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
 import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
 import {
-  Calendar,
   Clock,
   Plus,
   CheckCircle2,
@@ -261,29 +260,6 @@ export default function PlannerPage() {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
-      {/* Non-Today Indicator Banner */}
-      {!isSelectedToday && (
-        <div className="flex items-center justify-between px-2 py-1.5 rounded-xl bg-surface-container-low border border-primary/20 text-xs animate-in fade-in duration-200">
-          <div className="flex items-center gap-1.5 font-mono text-on-surface-variant text-[11px]">
-            <Calendar className="w-3.5 h-3.5 text-primary" />
-            <span>
-              {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSelectedDate(todayStr)}
-            className="px-2.5 py-0.5 rounded-full bg-primary/20 text-primary text-[11px] font-mono font-bold hover:bg-primary/30 active:scale-95 transition-all cursor-pointer"
-          >
-            Back to Today
-          </button>
-        </div>
-      )}
 
       {/* Infinite Horizontal Date Selector Strip with Sticky Today */}
       <InfiniteDateStrip
