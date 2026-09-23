@@ -509,6 +509,8 @@ export function openSystemWallpaperPicker(): boolean {
   return false;
 }
 
+export const openSystemWallpaperChooser = openSystemWallpaperPicker;
+
 /**
  * Enables automatic XX:57 cadence notifications.
  */

@@ -23,6 +23,8 @@ import {
   getNativeAlternateWallpaper,
   clearNativeAlternateWallpaper,
   applyNativeAlternateWallpaper,
+  openSystemWallpaperChooser,
+  isAndroidApp,
   sendTestNotificationToAndroid,
 } from "@/lib/utils/android-bridge";
 import {
@@ -233,6 +235,15 @@ export default function WallpaperPage() {
     }
   };
 
+  const handleOpenSystemWallpaperChooser = () => {
+    const opened = openSystemWallpaperChooser();
+    if (opened) {
+      showToast("Opening Android System Wallpaper Chooser...");
+    } else {
+      showToast("System wallpaper chooser opened.");
+    }
+  };
+
   const handleLaunchLiveWallpaper = () => {
     syncScheduleDataToNative(wallpaperData);
     const launched = launchLiveWallpaperPicker();
@@ -434,10 +445,11 @@ export default function WallpaperPage() {
               </div>
 
               {/* Clickable Image Box */}
-              <label className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
+              <div className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
                 <input
                   type="file"
                   accept="image/*"
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => handlePhotoUpload(e, "lock")}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />
@@ -449,35 +461,36 @@ export default function WallpaperPage() {
                 ) : altLockPhoto ? (
                   <>
                     <img src={altLockPhoto} alt="Lock screen alternate" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10 pointer-events-none">
                       <Upload className="w-3.5 h-3.5" />
                       <span>Tap to change</span>
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
+                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors pointer-events-none">
                     <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
                     <span className="text-[10px] font-mono">Tap to choose photo</span>
                   </div>
                 )}
-              </label>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <label className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
+                <div className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
                   <input
                     type="file"
                     accept="image/*"
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => handlePhotoUpload(e, "lock")}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                   />
                   {isProcessingLock ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary pointer-events-none" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5" />
+                    <Upload className="w-3.5 h-3.5 pointer-events-none" />
                   )}
-                  <span>{isProcessingLock ? "Processing..." : "Change Photo"}</span>
-                </label>
+                  <span className="pointer-events-none">{isProcessingLock ? "Processing..." : "Change Photo"}</span>
+                </div>
 
                 {altLockPhoto && (
                   <button
@@ -513,10 +526,11 @@ export default function WallpaperPage() {
               </div>
 
               {/* Clickable Image Box */}
-              <label className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
+              <div className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
                 <input
                   type="file"
                   accept="image/*"
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => handlePhotoUpload(e, "home")}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />
@@ -528,35 +542,36 @@ export default function WallpaperPage() {
                 ) : altHomePhoto ? (
                   <>
                     <img src={altHomePhoto} alt="Home screen alternate" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10 pointer-events-none">
                       <Upload className="w-3.5 h-3.5" />
                       <span>Tap to change</span>
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
+                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors pointer-events-none">
                     <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
                     <span className="text-[10px] font-mono">Tap to choose photo</span>
                   </div>
                 )}
-              </label>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <label className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
+                <div className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
                   <input
                     type="file"
                     accept="image/*"
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => handlePhotoUpload(e, "home")}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                   />
                   {isProcessingHome ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary pointer-events-none" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5" />
+                    <Upload className="w-3.5 h-3.5 pointer-events-none" />
                   )}
-                  <span>{isProcessingHome ? "Processing..." : "Change Photo"}</span>
-                </label>
+                  <span className="pointer-events-none">{isProcessingHome ? "Processing..." : "Change Photo"}</span>
+                </div>
 
                 {altHomePhoto && (
                   <button
@@ -578,6 +593,21 @@ export default function WallpaperPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Android System Wallpaper Picker Bridge Button */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleOpenSystemWallpaperChooser}
+              className="w-full py-2.5 px-4 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-outline/10 shadow-sm active:scale-[0.99] cursor-pointer"
+            >
+              <ImageIcon className="w-4 h-4 text-primary" />
+              <span>Open Android System Wallpaper Picker</span>
+            </button>
+            <p className="text-[10px] font-mono text-on-surface-variant/70 text-center mt-1">
+              Directly launches Android's native wallpaper chooser / Google Photos / Gallery
+            </p>
           </div>
         </div>
 
