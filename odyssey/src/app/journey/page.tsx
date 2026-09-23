@@ -11,7 +11,6 @@ import {
   Lock,
   Gift,
   Flame,
-  ArrowRight,
   ChevronDown,
   ChevronUp,
   Sparkles,
@@ -21,7 +20,6 @@ import {
 export default function JourneyPage() {
   const router = useRouter();
   const { user, fetchUser } = useUserStore();
-  const [activeSession, setActiveSession] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
   const [isTodayInView, setIsTodayInView] = useState(true);
@@ -162,7 +160,7 @@ export default function JourneyPage() {
       clearTimeout(timer);
       ro?.disconnect();
     };
-  }, [updatePath, activeSession]);
+  }, [updatePath]);
 
   // Smooth scroll to Today
   const scrollToToday = useCallback((smooth: boolean = true) => {
@@ -396,15 +394,6 @@ export default function JourneyPage() {
                         +10 💎
                       </span>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDaySchedule(node.day)}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-primary text-on-primary shadow-md shadow-primary/20 hover:opacity-95 transition-all cursor-pointer"
-                    >
-                      <span>Open Day {node.day} Schedule</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               );
