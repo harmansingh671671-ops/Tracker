@@ -9,6 +9,7 @@ import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
+import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
 import {
   Calendar,
   Clock,
@@ -113,21 +114,6 @@ export default function PlannerPage() {
     });
   }, [blocks]);
 
-  // 7-day horizontal selector strip centered around the selected date's week
-  const weekDays = useMemo(() => {
-    const [y, m, dNum] = (selectedDate || todayStr).split("-").map(Number);
-    const refDate = new Date(y, m - 1, dNum);
-    const dayOfWeek = (refDate.getDay() + 6) % 7; // Mon=0..Sun=6
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(refDate);
-      d.setDate(refDate.getDate() - dayOfWeek + i);
-      const dateStr = getLocalDateStr(d);
-      const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
-      const dayNum = d.getDate();
-      const isToday = dateStr === todayStr;
-      return { dateStr, dayName, dayNum, isToday };
-    });
-  }, [selectedDate, todayStr]);
 
   const isSelectedToday = selectedDate === todayStr;
   const isSelectedPastDay = selectedDate < todayStr;
@@ -299,31 +285,12 @@ export default function PlannerPage() {
         </div>
       )}
 
-      {/* 7-Day Horizontal Date Selector Strip */}
-      <div className="flex items-center justify-between gap-1.5 p-1.5 bg-surface-container-low rounded-2xl border border-outline/10">
-        {weekDays.map((day) => {
-          const isSelected = selectedDate === day.dateStr;
-          return (
-            <button
-              key={day.dateStr}
-              onClick={() => setSelectedDate(day.dateStr)}
-              className={`flex-1 py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all ${
-                isSelected
-                  ? "bg-primary text-on-primary font-bold shadow-md shadow-primary/20 scale-105"
-                  : "hover:bg-surface-container/60 text-on-surface-variant"
-              }`}
-            >
-              <span className="text-[10px] font-mono uppercase">{day.dayName}</span>
-              <span className={`text-sm font-bold font-mono ${isSelected ? "text-on-primary" : "text-on-surface"}`}>
-                {day.dayNum}
-              </span>
-              {day.isToday && (
-                <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-on-primary" : "bg-primary"}`} />
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* Infinite Horizontal Date Selector Strip with Sticky Today */}
+      <InfiniteDateStrip
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        todayStr={todayStr}
+      />
 
       {/* 24-Hour Category Distribution Box (Tappable for breakdown pop-up) */}
       <div
