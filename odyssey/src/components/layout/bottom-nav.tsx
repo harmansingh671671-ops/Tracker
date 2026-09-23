@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, CheckCircle2, Compass, BarChart3, Store, Wallpaper } from "lucide-react";
+import { Calendar, CheckCircle2, Compass, BarChart3, Store } from "lucide-react";
 
 const navItems = [
   { path: "/planner", label: "Today", Icon: Calendar },
@@ -10,7 +10,6 @@ const navItems = [
   { path: "/journey", label: "Journey", Icon: Compass },
   { path: "/stats", label: "Stats", Icon: BarChart3 },
   { path: "/shop", label: "Armory", Icon: Store },
-  { path: "/wallpaper", label: "Wallpaper", Icon: Wallpaper },
 ];
 
 export function BottomNav() {
