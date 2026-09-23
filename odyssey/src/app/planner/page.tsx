@@ -421,14 +421,6 @@ export default function PlannerPage() {
         })}
       </div>
 
-      {/* Floating Add Task Button */}
-      <button
-        onClick={() => handleOpenHour(currentHour, null)}
-        className="fixed bottom-20 right-5 z-40 w-14 h-14 rounded-full bg-primary text-on-primary shadow-xl shadow-primary/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-        title="Plan Hour Block"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
 
       {/* Edit Hour Modal Sheet */}
       <EditHourModal
