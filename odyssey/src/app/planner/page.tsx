@@ -19,7 +19,8 @@ import {
   MessageSquare,
   Coffee,
   Moon,
-  Sparkles,
+  ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
   Flame,
@@ -93,6 +94,15 @@ export default function PlannerPage() {
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
+  const [editingEndHour, setEditingEndHour] = useState<number>(10);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
+
+  const toggleGroupExpand = (groupId: string) => {
+    setExpandedGroupIds((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   // Persist selectedDate to localStorage whenever changed
   useEffect(() => {
@@ -235,8 +245,84 @@ export default function PlannerPage() {
     return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
   }, [full24Hours]);
 
-  const handleOpenHour = (hour: number, block?: ScheduleBlock | null) => {
+  // Helper to determine canonical category type for adjacent grouping
+  const getCategoryType = useCallback((category?: string, isCustom?: boolean): string => {
+    if (!isCustom || !category) return "open";
+    const c = category.toLowerCase();
+    if (c.includes("sleep") || c.includes("rest")) return "sleep";
+    if (c.includes("vitality") || c.includes("habit")) return "vitality";
+    if (c.includes("sync") || c.includes("meeting")) return "sync";
+    if (c.includes("renewal") || c.includes("buffer")) return "renewal";
+    return "work";
+  }, []);
+
+  // Group adjacent custom blocks of the same type together
+  interface HourGroup {
+    id: string;
+    type: string;
+    isCustom: boolean;
+    startHour: number;
+    endHour: number;
+    hours: number[];
+    slots: typeof full24Hours;
+    title: string;
+    category: string;
+    primaryBlock?: ScheduleBlock | null;
+    status: string;
+  }
+
+  const hourGroups = useMemo(() => {
+    const groups: HourGroup[] = [];
+    let currentGroup: HourGroup | null = null;
+
+    full24Hours.forEach((slot) => {
+      const type = getCategoryType(slot.category, slot.isCustom);
+      const isCustom = slot.isCustom;
+
+      // Merge if both are custom, same category type, and consecutive
+      const canMerge =
+        currentGroup &&
+        currentGroup.isCustom &&
+        isCustom &&
+        currentGroup.type === type;
+
+      if (canMerge && currentGroup) {
+        currentGroup.endHour = slot.hour + 1;
+        currentGroup.hours.push(slot.hour);
+        currentGroup.slots.push(slot);
+        if (!currentGroup.title && slot.title) {
+          currentGroup.title = slot.title;
+        }
+      } else {
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentGroup = {
+          id: `group-${slot.hour}-${type}`,
+          type,
+          isCustom,
+          startHour: slot.hour,
+          endHour: slot.hour + 1,
+          hours: [slot.hour],
+          slots: [slot],
+          title: slot.title || "",
+          category: slot.category || "",
+          primaryBlock: slot.block || null,
+          status: slot.status || "pending",
+        };
+      }
+    });
+
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  }, [full24Hours, getCategoryType]);
+
+  const handleOpenHour = (hour: number, block?: ScheduleBlock | null, endHour?: number) => {
     setEditingHour(hour);
+    setEditingEndHour(endHour !== undefined ? endHour : (hour + 1) % 24 === 0 ? 24 : hour + 1);
     setEditingBlock(block || null);
     setIsEditModalOpen(true);
   };
@@ -404,51 +490,182 @@ export default function PlannerPage() {
         </div>
       </div>
 
-      {/* 24-Hour Chrono Stream Timeline (Blocked by category type, no central cutting line) */}
-      <div className="flex flex-col">
-        {full24Hours.map((slot, index) => {
-          const isCurrent = isSelectedToday && slot.hour === currentHour;
-          const isPast = isSelectedPastDay || (isSelectedToday && slot.hour < currentHour);
-          const cat = getCatStyle(slot.category, slot.isCustom);
+      {/* 24-Hour Chrono Stream Timeline - Grouping adjacent blocks of same type with minimized sleep */}
+      <div className="flex flex-col space-y-1">
+        {hourGroups.map((group) => {
+          const isCurrent =
+            isSelectedToday &&
+            currentHour >= group.startHour &&
+            currentHour < group.endHour;
+          const isSleep = group.type === "sleep";
+          const isExpanded = !!expandedGroupIds[group.id];
+          const cat = getCatStyle(group.category, group.isCustom);
           const CatIcon = cat.Icon;
+          const isMultiHour = group.hours.length > 1;
 
-          const prevSlot = index > 0 ? full24Hours[index - 1] : null;
-          const nextSlot = index < 23 ? full24Hours[index + 1] : null;
+          // Default Minimized Sleep Group
+          if (isSleep && !isExpanded) {
+            return (
+              <div
+                key={group.id}
+                onClick={() => toggleGroupExpand(group.id)}
+                className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all cursor-pointer shadow-sm select-none my-0.5 ${
+                  isCurrent
+                    ? "ring-2 ring-primary border-primary shadow-[0_0_20px_rgba(90,240,179,0.2)] bg-[#11192e]"
+                    : ""
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <Moon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-on-surface">
+                        {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25">
+                        {group.hours.length}h Sleep
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold">
+                          NOW
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-mono text-on-surface-variant/70 truncate mt-0.5">
+                      {group.title || "Circadian Rest & Slumber"}
+                    </p>
+                  </div>
+                </div>
 
-          const isSameBlockAsPrev = Boolean(
-            slot.isCustom &&
-            prevSlot?.isCustom &&
-            (slot.block?.id === prevSlot?.block?.id || (slot.category === prevSlot?.category && slot.title === prevSlot?.title))
-          );
-          const isSameBlockAsNext = Boolean(
-            slot.isCustom &&
-            nextSlot?.isCustom &&
-            (slot.block?.id === nextSlot?.block?.id || (slot.category === nextSlot?.category && slot.title === nextSlot?.title))
-          );
-
-          let roundStyle = "rounded-2xl my-1";
-          if (isSameBlockAsPrev && isSameBlockAsNext) {
-            roundStyle = "rounded-none border-t-0 border-b-0 -mt-px";
-          } else if (isSameBlockAsPrev && !isSameBlockAsNext) {
-            roundStyle = "rounded-b-2xl rounded-t-none border-t-0 -mt-px mb-2";
-          } else if (!isSameBlockAsPrev && isSameBlockAsNext) {
-            roundStyle = "rounded-t-2xl rounded-b-none border-b-0 mt-2";
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenHour(group.startHour, group.primaryBlock, group.endHour);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                  <div className="w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </div>
+            );
           }
 
+          // Expanded Sleep Group OR Unified Multi-Hour/Single Custom Group
+          if (group.isCustom) {
+            return (
+              <div
+                key={group.id}
+                onClick={() => handleOpenHour(group.startHour, group.primaryBlock, group.endHour)}
+                className={`group flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-1 shadow-sm ${
+                  isCurrent
+                    ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+                    : ""
+                }`}
+              >
+                {/* Time Indicator on Left */}
+                <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
+                  <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary font-extrabold" : "text-on-surface"}`}>
+                    {String(group.startHour).padStart(2, "0")}:00
+                  </span>
+                  {isMultiHour ? (
+                    <>
+                      <span className="text-[9px] font-mono text-on-surface-variant/40 leading-none my-0.5">↓</span>
+                      <span className="text-[11px] font-mono font-semibold text-on-surface-variant/80">
+                        {String(group.endHour).padStart(2, "0")}:00
+                      </span>
+                    </>
+                  ) : null}
+                  {isCurrent && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm">
+                      NOW
+                    </span>
+                  )}
+                </div>
+
+                {/* Category Icon */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
+                  <CatIcon className="w-5 h-5" />
+                </div>
+
+                {/* Title & Group Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
+                      {group.title || cat.label}
+                    </h4>
+                    {isMultiHour && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-semibold border border-outline/10 shrink-0">
+                        {group.hours.length} Hours
+                      </span>
+                    )}
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  </div>
+
+                  {/* Subtext: Category and details */}
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
+                    <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
+                    {group.primaryBlock?.description && (
+                      <>
+                        <span className="text-on-surface-variant/30">•</span>
+                        <span className="text-on-surface-variant truncate">
+                          {group.primaryBlock.description}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Actions: Minimize (if expanded sleep) or Status Icon */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {isSleep && isExpanded ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGroupExpand(group.id);
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-mono text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Minimize</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                  ) : group.status === "completed" ? (
+                    <div className="text-emerald-400">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  ) : (
+                    <div className="text-on-surface-variant/30 group-hover:text-primary transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // Open / Unscheduled Hour Slot
           return (
             <div
-              key={slot.hour}
-              onClick={() => handleOpenHour(slot.hour, slot.block)}
-              className={`group flex items-center gap-3 p-3 cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} ${roundStyle} ${
+              key={group.id}
+              onClick={() => handleOpenHour(group.startHour, null, group.endHour)}
+              className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
                 isCurrent
                   ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
                   : ""
               }`}
             >
-              {/* Left Side: Hour Time Indicator (ONLY time displayed) */}
-              <div className="flex flex-col items-center justify-center shrink-0 w-12 text-center">
-                <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : slot.isCustom ? "text-on-surface" : "text-on-surface-variant/50"}`}>
-                  {String(slot.hour).padStart(2, "0")}:00
+              {/* Hour Time Indicator */}
+              <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
+                <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : "text-on-surface-variant/50"}`}>
+                  {String(group.startHour).padStart(2, "0")}:00
                 </span>
                 {isCurrent && (
                   <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-0.5 shadow-sm">
@@ -458,68 +675,29 @@ export default function PlannerPage() {
               </div>
 
               {/* Status Dot / Category Icon */}
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}
-              >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
                 <CatIcon className="w-4 h-4" />
               </div>
 
-              {/* Title and Category Tag (NO duplicate time below title) */}
+              {/* Title & Prompt */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {slot.isCustom && slot.title ? (
-                    <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
-                      {slot.title}
-                    </h4>
-                  ) : (
-                    <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
-                      Empty Slot
-                    </h4>
-                  )}
-                  {slot.isCustom && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  )}
-                </div>
-
-                {/* Subtext: ONLY category / tag, NO duplicate start-end time below */}
+                <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
+                  Empty Slot
+                </h4>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  {slot.isCustom ? (
-                    <>
-                      <span className={`text-[10px] font-mono font-semibold ${cat.color}`}>
-                        {cat.label}
-                      </span>
-                      {slot.block?.description && (
-                        <>
-                          <span className="text-on-surface-variant/30">•</span>
-                          <span className="text-[10px] font-mono text-on-surface-variant truncate">
-                            {slot.block.description}
-                          </span>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-[10px] font-mono text-on-surface-variant/35 group-hover:text-primary transition-colors flex items-center gap-1">
-                      + Tap to schedule
-                    </span>
-                  )}
+                  <span className="text-[10px] font-mono text-on-surface-variant/35 group-hover:text-primary transition-colors flex items-center gap-1">
+                    + Tap to schedule
+                  </span>
                 </div>
               </div>
 
-              {/* Completion Indicator */}
-              {slot.block?.status === "completed" ? (
-                <div className="shrink-0 text-emerald-400">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-              ) : slot.isCustom ? (
-                <div className="shrink-0 text-on-surface-variant/30 group-hover:text-primary transition-colors">
-                  <Plus className="w-4 h-4" />
-                </div>
-              ) : null}
+              <div className="shrink-0 text-on-surface-variant/20 group-hover:text-primary transition-colors">
+                <Plus className="w-4 h-4" />
+              </div>
             </div>
           );
         })}
       </div>
-
 
       {/* Edit Hour Modal Sheet */}
       <EditHourModal
@@ -528,6 +706,7 @@ export default function PlannerPage() {
         onSave={handleSaveBlock}
         onDelete={handleDeleteBlock}
         initialHour={editingHour}
+        initialEndHour={editingEndHour}
         initialDate={selectedDate}
         existingBlock={editingBlock}
       />

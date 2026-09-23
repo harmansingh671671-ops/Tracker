@@ -31,6 +31,7 @@ interface EditHourModalProps {
   }) => void;
   onDelete?: (id: string) => void;
   initialHour?: number;
+  initialEndHour?: number;
   initialDate: string;
   existingBlock?: ScheduleBlock | null;
 }
@@ -49,6 +50,7 @@ export function EditHourModal({
   onSave,
   onDelete,
   initialHour = 9,
+  initialEndHour,
   initialDate,
   existingBlock,
 }: EditHourModalProps) {
@@ -57,7 +59,13 @@ export function EditHourModal({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("work");
   const [startH, setStartH] = useState(initialHour);
-  const [endH, setEndH] = useState((initialHour + 1) % 24 === 0 ? 24 : initialHour + 1);
+  const [endH, setEndH] = useState(
+    initialEndHour !== undefined
+      ? initialEndHour
+      : (initialHour + 1) % 24 === 0
+      ? 24
+      : initialHour + 1
+  );
   const [selectedHabitId, setSelectedHabitId] = useState<string>("");
 
   useEffect(() => {
@@ -72,7 +80,12 @@ export function EditHourModal({
       setSelectedHabitId(existingBlock.tag || "");
     } else {
       const s = initialHour;
-      const e = (initialHour + 1) % 24 === 0 ? 24 : initialHour + 1;
+      const e =
+        initialEndHour !== undefined
+          ? initialEndHour
+          : (initialHour + 1) % 24 === 0
+          ? 24
+          : initialHour + 1;
       setStartH(s);
       setEndH(e);
       // By default keep task title empty - no preloaded placeholder text
@@ -80,7 +93,7 @@ export function EditHourModal({
       setCategory(s < 6 || s >= 23 ? "sleep" : s in [6, 7] ? "vitality" : s in [12, 13] ? "renewal" : "work");
       setSelectedHabitId("");
     }
-  }, [existingBlock, initialHour, isOpen]);
+  }, [existingBlock, initialHour, initialEndHour, isOpen]);
 
   if (!isOpen) return null;
 
