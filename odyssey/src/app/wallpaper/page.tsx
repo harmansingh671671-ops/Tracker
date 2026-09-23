@@ -21,6 +21,7 @@ import {
   setCustomTargetWallpaper,
   saveNativeAlternateWallpaper,
   getNativeAlternateWallpaper,
+  clearNativeAlternateWallpaper,
   applyNativeAlternateWallpaper,
   sendTestNotificationToAndroid,
 } from "@/lib/utils/android-bridge";
@@ -50,6 +51,8 @@ import {
   RefreshCw,
   Bell,
   HelpCircle,
+  Loader2,
+  Trash2,
 } from "lucide-react";
 
 export default function WallpaperPage() {
@@ -64,9 +67,8 @@ export default function WallpaperPage() {
 
   const [altLockPhoto, setAltLockPhoto] = useState<string | null>(null);
   const [altHomePhoto, setAltHomePhoto] = useState<string | null>(null);
-
-  const lockFileInputRef = useRef<HTMLInputElement>(null);
-  const homeFileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingLock, setIsProcessingLock] = useState(false);
+  const [isProcessingHome, setIsProcessingHome] = useState(false);
 
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
 
@@ -145,21 +147,81 @@ export default function WallpaperPage() {
     showToast(`Target configured: ${labels[target]}`);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, target: "lock" | "home") => {
+  const compressImageForWallpaper = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.onload = (e) => {
+        const rawResult = e.target?.result as string;
+        if (!rawResult) {
+          reject(new Error("Empty image data"));
+          return;
+        }
+
+        const img = new Image();
+        img.onerror = () => reject(new Error("Failed to decode image"));
+        img.onload = () => {
+          const MAX_WIDTH = 1440;
+          const MAX_HEIGHT = 2560;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(rawResult);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.85);
+          resolve(compressed);
+        };
+        img.src = rawResult;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "lock" | "home") => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
+    if (target === "lock") setIsProcessingLock(true);
+    else setIsProcessingHome(true);
+
+    try {
+      const base64 = await compressImageForWallpaper(file);
       if (base64) {
         saveNativeAlternateWallpaper(base64, target);
         if (target === "lock") setAltLockPhoto(base64);
         else setAltHomePhoto(base64);
-        showToast(`${target === "lock" ? "Lock" : "Home"} Screen alternate photo saved.`);
+        showToast(`${target === "lock" ? "Lock" : "Home"} Screen photo saved! Tap Apply to set it.`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Failed to process photo:", err);
+      showToast("Could not process photo. Please choose a different image.");
+    } finally {
+      e.target.value = "";
+      if (target === "lock") setIsProcessingLock(false);
+      else setIsProcessingHome(false);
+    }
+  };
+
+  const handleRemovePhoto = (e: React.MouseEvent, target: "lock" | "home") => {
+    e.stopPropagation();
+    clearNativeAlternateWallpaper(target);
+    if (target === "lock") setAltLockPhoto(null);
+    else setAltHomePhoto(null);
+    showToast(`${target === "lock" ? "Lock" : "Home"} Screen custom photo removed.`);
   };
 
   const handleApplyAlternate = (target: "lock" | "home") => {
@@ -370,34 +432,68 @@ export default function WallpaperPage() {
                   {altLockPhoto ? "Saved" : "Default"}
                 </span>
               </div>
-              <div className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center">
-                {altLockPhoto ? (
-                  <img src={altLockPhoto} alt="Lock screen alternate" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center gap-1 text-on-surface-variant">
-                    <ImageIcon className="w-6 h-6 opacity-40" />
-                    <span className="text-[10px] font-mono">No Custom Photo</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => lockFileInputRef.current?.click()}
-                  className="flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Change Photo</span>
-                </button>
+
+              {/* Clickable Image Box */}
+              <label className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
                 <input
-                  ref={lockFileInputRef}
                   type="file"
                   accept="image/*"
                   onChange={(e) => handlePhotoUpload(e, "lock")}
-                  className="hidden"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />
+                {isProcessingLock ? (
+                  <div className="flex flex-col items-center gap-1.5 text-primary">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span className="text-[10px] font-mono font-medium">Processing photo...</span>
+                  </div>
+                ) : altLockPhoto ? (
+                  <>
+                    <img src={altLockPhoto} alt="Lock screen alternate" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Tap to change</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
+                    <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-[10px] font-mono">Tap to choose photo</span>
+                  </div>
+                )}
+              </label>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <label className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handlePhotoUpload(e, "lock")}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                  />
+                  {isProcessingLock ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isProcessingLock ? "Processing..." : "Change Photo"}</span>
+                </label>
+
+                {altLockPhoto && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemovePhoto(e, "lock")}
+                    title="Remove custom photo"
+                    className="p-2 rounded-lg bg-surface-container-high hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 <button
+                  type="button"
                   onClick={() => handleApplyAlternate("lock")}
-                  className="py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors"
+                  className="py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Apply
                 </button>
@@ -415,34 +511,68 @@ export default function WallpaperPage() {
                   {altHomePhoto ? "Saved" : "Default"}
                 </span>
               </div>
-              <div className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center">
-                {altHomePhoto ? (
-                  <img src={altHomePhoto} alt="Home screen alternate" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center gap-1 text-on-surface-variant">
-                    <ImageIcon className="w-6 h-6 opacity-40" />
-                    <span className="text-[10px] font-mono">No Custom Photo</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => homeFileInputRef.current?.click()}
-                  className="flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Change Photo</span>
-                </button>
+
+              {/* Clickable Image Box */}
+              <label className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
                 <input
-                  ref={homeFileInputRef}
                   type="file"
                   accept="image/*"
                   onChange={(e) => handlePhotoUpload(e, "home")}
-                  className="hidden"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />
+                {isProcessingHome ? (
+                  <div className="flex flex-col items-center gap-1.5 text-primary">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span className="text-[10px] font-mono font-medium">Processing photo...</span>
+                  </div>
+                ) : altHomePhoto ? (
+                  <>
+                    <img src={altHomePhoto} alt="Home screen alternate" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Tap to change</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
+                    <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-[10px] font-mono">Tap to choose photo</span>
+                  </div>
+                )}
+              </label>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <label className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handlePhotoUpload(e, "home")}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                  />
+                  {isProcessingHome ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isProcessingHome ? "Processing..." : "Change Photo"}</span>
+                </label>
+
+                {altHomePhoto && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemovePhoto(e, "home")}
+                    title="Remove custom photo"
+                    className="p-2 rounded-lg bg-surface-container-high hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 <button
+                  type="button"
                   onClick={() => handleApplyAlternate("home")}
-                  className="py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors"
+                  className="py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Apply
                 </button>

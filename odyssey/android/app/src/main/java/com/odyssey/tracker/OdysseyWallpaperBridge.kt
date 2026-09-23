@@ -54,10 +54,12 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun setCustomWallpaper(base64Image: String, targetScreen: String): Boolean {
         return try {
-            val cleanBase64 = base64Image
-                .replace("data:image/png;base64,", "")
-                .replace("data:image/jpeg;base64,", "")
-            val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+            val cleanBase64 = if (base64Image.contains(",")) {
+                base64Image.substringAfter(",")
+            } else {
+                base64Image
+            }
+            val decodedBytes = Base64.decode(cleanBase64.trim(), Base64.DEFAULT)
             val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
 
             val wallpaperManager = WallpaperManager.getInstance(context)

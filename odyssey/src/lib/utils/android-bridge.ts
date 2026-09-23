@@ -585,39 +585,77 @@ export function setCustomTargetWallpaper(base64Image: string, target: "lock" | "
 }
 
 /**
- * Saves the user's custom alternate wallpaper in native storage.
+ * Saves the user's custom alternate wallpaper in local & native storage.
  */
 export function saveNativeAlternateWallpaper(base64Image: string, target: "lock" | "home"): boolean {
   if (typeof window === "undefined") return false;
+  try {
+    localStorage.setItem(`odyssey_alt_wallpaper_${target}`, base64Image);
+  } catch (e) {
+    console.warn("localStorage quota or error saving alternate wallpaper:", e);
+  }
+
+  let nativeSuccess = false;
   if (window.OdysseyAndroid?.saveAlternateWallpaper) {
     try {
-      return Boolean(window.OdysseyAndroid.saveAlternateWallpaper(base64Image, target));
-    } catch {}
+      nativeSuccess = Boolean(window.OdysseyAndroid.saveAlternateWallpaper(base64Image, target));
+    } catch (e) {
+      console.warn("OdysseyAndroid.saveAlternateWallpaper error:", e);
+    }
   }
   if (window.Android?.saveAlternateWallpaper) {
     try {
-      return Boolean(window.Android.saveAlternateWallpaper(base64Image, target));
-    } catch {}
+      nativeSuccess = Boolean(window.Android.saveAlternateWallpaper(base64Image, target));
+    } catch (e) {
+      console.warn("Android.saveAlternateWallpaper error:", e);
+    }
   }
-  return false;
+  return nativeSuccess || true;
 }
 
 /**
- * Retrieves the user's saved alternate wallpaper from native storage.
+ * Retrieves the user's saved alternate wallpaper from native or local storage.
  */
 export function getNativeAlternateWallpaper(target: "lock" | "home"): string {
   if (typeof window === "undefined") return "";
   if (window.OdysseyAndroid?.getAlternateWallpaper) {
     try {
-      return window.OdysseyAndroid.getAlternateWallpaper(target) || "";
+      const val = window.OdysseyAndroid.getAlternateWallpaper(target);
+      if (val && val.length > 0) return val;
     } catch {}
   }
   if (window.Android?.getAlternateWallpaper) {
     try {
-      return window.Android.getAlternateWallpaper(target) || "";
+      const val = window.Android.getAlternateWallpaper(target);
+      if (val && val.length > 0) return val;
     } catch {}
   }
+  try {
+    const local = localStorage.getItem(`odyssey_alt_wallpaper_${target}`);
+    if (local) return local;
+  } catch {}
   return "";
+}
+
+/**
+ * Clears the user's saved alternate wallpaper from local & native storage.
+ */
+export function clearNativeAlternateWallpaper(target: "lock" | "home"): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    localStorage.removeItem(`odyssey_alt_wallpaper_${target}`);
+  } catch {}
+  if (window.OdysseyAndroid?.saveAlternateWallpaper) {
+    try {
+      window.OdysseyAndroid.saveAlternateWallpaper("", target);
+    } catch {}
+  }
+  if (window.Android?.saveAlternateWallpaper) {
+    try {
+      window.Android.saveAlternateWallpaper("", target);
+    } catch {}
+  }
+  return true;
 }
 
 /**

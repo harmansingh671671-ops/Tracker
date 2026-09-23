@@ -168,16 +168,30 @@ class MainActivity : AppCompatActivity() {
                 ): Boolean {
                     this@MainActivity.filePathCallback?.onReceiveValue(null)
                     this@MainActivity.filePathCallback = filePathCallback
-                    val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
-                        type = "image/*"
-                        addCategory(Intent.CATEGORY_OPENABLE)
+                    val intent = try {
+                        fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                            type = "image/*"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                        }
+                    } catch (e: Exception) {
+                        Intent(Intent.ACTION_GET_CONTENT).apply {
+                            type = "image/*"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                        }
                     }
                     return try {
                         fileChooserLauncher.launch(intent)
                         true
                     } catch (e: Exception) {
-                        this@MainActivity.filePathCallback = null
-                        false
+                        try {
+                            val pickIntent = Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                            fileChooserLauncher.launch(pickIntent)
+                            true
+                        } catch (e2: Exception) {
+                            this@MainActivity.filePathCallback?.onReceiveValue(null)
+                            this@MainActivity.filePathCallback = null
+                            false
+                        }
                     }
                 }
             }
