@@ -90,7 +90,7 @@ export default function ShopPage() {
   const handlePurchase = async (item: ShopItem) => {
     if (!user) return;
     if ((user.diamonds ?? 0) < item.price) {
-      showToast(`Need ${item.price - (user.diamonds ?? 0)} more diamonds. Complete rituals!`, true);
+      showToast(`Need ${item.price - (user.diamonds ?? 0)} more diamonds. Complete habits!`, true);
       return;
     }
     const success = await buyItem(item.id, item.price);

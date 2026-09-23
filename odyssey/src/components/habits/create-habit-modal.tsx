@@ -26,8 +26,18 @@ const EMOJIS = [
   { emoji: "✍️", label: "Journaling" },
   { emoji: "🎸", label: "Music" },
   { emoji: "🏃", label: "Running" },
-  { emoji: "☀️", label: "Priming" },
-  { emoji: "🌙", label: "Wind Down" },
+  { emoji: "☀️", label: "Morning" },
+  { emoji: "🌙", label: "Sleep" },
+  { emoji: "🚶", label: "Walking" },
+  { emoji: "🍎", label: "Nutrition" },
+  { emoji: "⚡", label: "Vitality" },
+  { emoji: "🌿", label: "Nature" },
+  { emoji: "🎯", label: "Focus" },
+  { emoji: "☕", label: "Recharge" },
+  { emoji: "🧠", label: "Study" },
+  { emoji: "🔥", label: "Discipline" },
+  { emoji: "🎨", label: "Art" },
+  { emoji: "🧹", label: "Organize" },
 ];
 
 const DOMAINS = [
@@ -66,7 +76,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalName = name.trim() || "Daily Vitality Ritual";
+    const finalName = name.trim() || "Daily Routine";
     onSave({
       name: finalName,
       icon,
@@ -87,8 +97,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
           <div className="w-12 h-1.5 rounded-full bg-outline/20 mb-3" />
           <div className="w-full flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-on-surface">New Daily Ritual</h2>
-              <p className="text-xs text-on-surface-variant">Design a mindful daily habit</p>
+              <h2 className="text-xl font-bold tracking-tight text-on-surface">New Habit</h2>
+              <p className="text-xs text-on-surface-variant">Design a mindful daily routine</p>
             </div>
             <button
               onClick={onClose}
@@ -102,7 +112,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Habit Name Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">RITUAL NAME</label>
+            <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT NAME</label>
             <input
               type="text"
               value={name}
@@ -251,7 +261,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
           <div className="p-3 rounded-xl bg-surface-container-low border border-outline/10 flex items-center justify-between text-xs font-mono">
             <span className="text-on-surface-variant flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Ritual Creation Yield:
+              Habit Creation Yield:
             </span>
             <span className="text-primary font-bold">+30 XP • +5 💎</span>
           </div>
@@ -262,7 +272,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
             className="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-bold text-sm shadow-lg shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
             <Check className="w-4 h-4" />
-            <span>Create Daily Ritual</span>
+            <span>Create Habit</span>
           </button>
         </form>
       </div>

@@ -250,7 +250,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
 
           <div className="p-2.5 rounded-xl bg-surface-container text-xs text-on-surface-variant font-mono flex items-center justify-between">
             <span>Storage:</span>
-            <span className="text-on-surface">{totalBlocks} Hours Planned • {totalHabits} Active Rituals</span>
+            <span className="text-on-surface">{totalBlocks} Hours Planned • {totalHabits} Active Habits</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

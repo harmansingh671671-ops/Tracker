@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { type ScheduleBlock } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
+import { resolveHabitIconString } from "@/components/habits/habit-icon";
 import {
   X,
   Check,
@@ -230,11 +231,14 @@ export function EditHourModal({
                 className="w-full bg-surface-container-lowest text-on-surface rounded-2xl py-3 px-3.5 border border-outline/15 text-xs font-mono focus:border-primary focus:outline-none"
               >
                 <option value="">None (Independent Task)</option>
-                {habits.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.icon} {h.name} ({h.category || "Habit"})
-                  </option>
-                ))}
+                {habits.map((h) => {
+                  const iconValue = resolveHabitIconString(h.icon, h.name).value;
+                  return (
+                    <option key={h.id} value={h.id}>
+                      {iconValue} {h.name} ({h.category || "Habit"})
+                    </option>
+                  );
+                })}
               </select>
             </div>
           )}

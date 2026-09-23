@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
+import { HabitIcon } from "@/components/habits/habit-icon";
 import {
   Plus,
   Flame,
@@ -55,11 +56,11 @@ export default function HabitsPage() {
     if (!user) return;
     const isNowCompleted = await toggleHabitLog(user.id, habitId, today);
     if (isNowCompleted) {
-      showToast("Ritual completed! +15 XP • +1 💎 Vaulted");
+      showToast("Habit completed! +15 XP • +1 💎 Vaulted");
     }
   };
 
-  const handleCreateRitual = async (data: {
+  const handleCreateHabit = async (data: {
     name: string;
     icon: string;
     category: string;
@@ -79,13 +80,13 @@ export default function HabitsPage() {
       archivedAt: undefined,
     });
     await fetchHabits(user.id, today);
-    showToast("New ritual created! +30 XP • +5 💎 added");
+    showToast("New habit created! +30 XP • +5 💎 added");
   };
 
-  const handleDeleteRitual = async (e: React.MouseEvent, habitId: string) => {
+  const handleDeleteHabit = async (e: React.MouseEvent, habitId: string) => {
     e.stopPropagation();
     await deleteHabit(habitId);
-    showToast("Habit ritual deleted.");
+    showToast("Habit deleted.");
   };
 
   // Today's day index (0=Mon, 6=Sun)
@@ -99,25 +100,24 @@ export default function HabitsPage() {
       {/* Header Action Row */}
       <div className="flex items-center justify-between gap-3 pt-1">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-on-surface">Daily Rituals</h2>
-          <p className="text-xs text-on-surface-variant">Daily habits & mindful routines</p>
+          <h2 className="text-xl font-bold tracking-tight text-on-surface">Daily Habits</h2>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-1.5 bg-primary hover:bg-primary-container text-on-primary px-4 py-2 rounded-full text-xs font-bold transition-all shadow-md shadow-primary/20 active:scale-95"
+          className="flex items-center gap-1.5 bg-primary hover:bg-primary-container text-on-primary px-4 py-2 rounded-full text-xs font-bold transition-all shadow-md shadow-primary/20 active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Habit</span>
         </button>
       </div>
 
-      {/* Tomorrow's Reward Vault Banner */}
+      {/* Reward Vault Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-surface-container-high p-4 flex flex-col gap-2 border border-outline/10 shadow-sm">
         <div className="absolute -right-8 -top-8 w-28 h-28 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-secondary">
             <Lock className="w-4 h-4" />
-            <span className="text-xs font-mono font-bold tracking-wider uppercase">Tomorrow's Reward Vault</span>
+            <span className="text-xs font-mono font-bold tracking-wider uppercase">Reward Vault</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="flex items-center gap-1 bg-surface-container px-2.5 py-0.5 rounded-full text-primary font-mono text-xs font-semibold">
@@ -129,9 +129,6 @@ export default function HabitsPage() {
             </span>
           </div>
         </div>
-        <p className="text-[11px] text-on-surface-variant leading-tight">
-          Complete daily rituals to unlock full bonus yields at tomorrow's sunrise.
-        </p>
       </div>
 
       {/* Habit Completion Overview Card */}
@@ -199,20 +196,20 @@ export default function HabitsPage() {
         </div>
       </div>
 
-      {/* Rituals List */}
+      {/* Habits List */}
       <div className="space-y-2.5">
         {habits.length === 0 ? (
           <div className="p-8 rounded-2xl bg-surface-container-low border border-outline/10 text-center space-y-3">
-            <span className="text-3xl">🧘</span>
-            <h3 className="text-base font-bold text-on-surface">No Rituals Yet</h3>
+            <span className="text-3xl">🎯</span>
+            <h3 className="text-base font-bold text-on-surface">No Habits Yet</h3>
             <p className="text-xs text-on-surface-variant max-w-xs mx-auto">
-              Build positive momentum by creating your first daily mindful ritual.
+              Build positive momentum by creating your first daily routine.
             </p>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="py-2.5 px-5 rounded-full bg-primary text-on-primary text-xs font-bold"
+              className="py-2.5 px-5 rounded-full bg-primary text-on-primary text-xs font-bold cursor-pointer"
             >
-              Add First Ritual
+              Add First Habit
             </button>
           </div>
         ) : (
@@ -229,15 +226,15 @@ export default function HabitsPage() {
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Emoji Avatar */}
+                  {/* Habit Icon Avatar */}
                   <div
-                    className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 transition-transform ${
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-transform ${
                       isCompleted
                         ? "bg-primary/20 border border-primary/30"
                         : "bg-surface-container-high group-hover:scale-105"
                     }`}
                   >
-                    <span>{h.icon || "🎯"}</span>
+                    <HabitIcon icon={h.icon} name={h.name} className="w-5 h-5 text-primary" />
                   </div>
 
                   <div className="flex flex-col min-w-0">
@@ -251,7 +248,7 @@ export default function HabitsPage() {
                       </h4>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
-                      <span className="text-primary font-medium">{h.category || "Ritual"}</span>
+                      <span className="text-primary font-medium">{h.category || "Routine"}</span>
                       <span>•</span>
                       <span className="text-amber-400 flex items-center gap-0.5">
                         <Flame className="w-3 h-3" />
@@ -285,9 +282,9 @@ export default function HabitsPage() {
                   {/* Delete Button */}
                   <button
                     type="button"
-                    onClick={(e) => handleDeleteRitual(e, h.id)}
+                    onClick={(e) => handleDeleteHabit(e, h.id)}
                     className="p-1 text-on-surface-variant/40 hover:text-error transition-colors"
-                    title="Delete ritual"
+                    title="Delete habit"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -310,7 +307,7 @@ export default function HabitsPage() {
       <CreateHabitModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSave={handleCreateRitual}
+        onSave={handleCreateHabit}
       />
     </div>
   );

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       "Mindful Rhythm App Redesign: Fluid obsidian slate aesthetic with Plus Jakarta Sans & JetBrains Mono typography",
       "Chrono Stream Planner: Complete 24h timeline with inline hour editing modal and instant Dexie DB binding",
       "Wallpaper Studio: Interactive 19.5:9 phone preview, clock overlay simulator, and dual alternate photo managers",
-      "Conscious Rituals Vault: Redesigned daily habits with tomorrow's reward vault and streak multiplier preservation",
+      "Habit Vault: Redesigned daily habits with reward vault and streak multiplier preservation",
     ],
   };
 
