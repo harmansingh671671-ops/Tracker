@@ -11,12 +11,22 @@ import {
   Gift,
   Flame,
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 
 export default function JourneyPage() {
   const { user, fetchUser } = useUserStore();
   const [activeSession, setActiveSession] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const todayRef = useRef<HTMLDivElement>(null);
+  const [isTodayInView, setIsTodayInView] = useState(true);
+
+  // Dynamic day range: allows extending infinitely forward and scrolling back to Day 1
+  const [pastDaysCount, setPastDaysCount] = useState<number>(3);
+  const [futureDaysCount, setFutureDaysCount] = useState<number>(7);
 
   const [curvePaths, setCurvePaths] = useState<{
     completedPath: string;
@@ -43,10 +53,16 @@ export default function JourneyPage() {
   const targetXp = currentLevel * 1000;
   const xpPercent = Math.min(100, Math.round((currentXp / targetXp) * 100));
 
-  // Generate a window of 11 days centered around activeDay
+  const startDay = useMemo(() => {
+    return Math.max(1, activeDay - pastDaysCount);
+  }, [activeDay, pastDaysCount]);
+
+  const endDay = useMemo(() => {
+    return activeDay + futureDaysCount;
+  }, [activeDay, futureDaysCount]);
+
+  // Generate nodes from startDay (down to 1) to endDay (extended as user wants)
   const nodes = useMemo(() => {
-    const startDay = Math.max(1, activeDay - 3);
-    const endDay = startDay + 10;
     const list = [];
     for (let d = startDay; d <= endDay; d++) {
       const isPast = d < activeDay;
@@ -54,10 +70,6 @@ export default function JourneyPage() {
       const isMilestone = d % 7 === 0;
 
       // Smooth serpentine wave pattern:
-      // cycle 0 (activeDay): Center
-      // cycle 1: Left
-      // cycle 2: Center
-      // cycle 3: Right
       const diff = d - activeDay;
       const cycle = ((diff % 4) + 4) % 4;
       const offset =
@@ -72,7 +84,7 @@ export default function JourneyPage() {
       list.push({ day: d, isPast, isCurrent, isMilestone, offset });
     }
     return list;
-  }, [activeDay]);
+  }, [startDay, endDay, activeDay]);
 
   // Compute smooth curved SVG paths that pass through the center of every icon
   const updatePath = useCallback(() => {
@@ -99,7 +111,6 @@ export default function JourneyPage() {
     if (points.length < 2) return;
 
     // Helper to generate cubic Bezier segment between (p0) and (p1)
-    // Vertical tangents ensure the line passes vertically through the center of each icon
     const buildSegment = (p0: { x: number; y: number }, p1: { x: number; y: number }) => {
       const dy = p1.y - p0.y;
       const cp1y = p0.y + dy * 0.5;
@@ -136,7 +147,6 @@ export default function JourneyPage() {
     const handleResize = () => updatePath();
     window.addEventListener("resize", handleResize);
 
-    // Short timeout to guarantee measurement after layout reflow
     const timer = setTimeout(updatePath, 60);
 
     let ro: ResizeObserver | null = null;
@@ -152,8 +162,59 @@ export default function JourneyPage() {
     };
   }, [updatePath, activeSession]);
 
+  // Smooth scroll to Today
+  const scrollToToday = useCallback((smooth: boolean = true) => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "center",
+      });
+    }
+  }, []);
+
+  // Center Today on initial arrival
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollToToday(false);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [scrollToToday]);
+
+  // Track if Today is in the user's viewport
+  useEffect(() => {
+    const target = todayRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsTodayInView(entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0.15,
+      }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [nodes]);
+
+  // Extend future days
+  const handleExtendJourney = () => {
+    setFutureDaysCount((prev) => prev + 7);
+  };
+
+  // Load earlier past days (steps of 7 or all the way to 1)
+  const handleLoadEarlierDays = () => {
+    setPastDaysCount((prev) => prev + 7);
+  };
+
+  const handleLoadAllEarlierDays = () => {
+    setPastDaysCount(activeDay - 1);
+  };
+
   return (
-    <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-16 pt-2 space-y-6">
+    <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-6">
       {/* Odyssey Progress Summary Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-surface-container p-5 border border-outline/10 shadow-xl space-y-4">
         <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
@@ -252,12 +313,49 @@ export default function JourneyPage() {
           )}
         </svg>
 
+        {/* Top Earlier Days Expanders */}
+        {startDay > 1 ? (
+          <div className="pb-8 flex flex-col items-center z-10 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleLoadEarlierDays}
+                className="px-4 py-2 rounded-full bg-surface-container-high border border-outline/20 hover:border-primary/50 text-xs font-mono font-semibold text-on-surface hover:text-primary shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                <ChevronUp className="w-4 h-4" />
+                <span>Earlier Days (+7)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleLoadAllEarlierDays}
+                className="px-4 py-2 rounded-full bg-surface-container-low border border-outline/15 hover:border-primary/40 text-xs font-mono text-on-surface-variant hover:text-primary transition-all active:scale-95 cursor-pointer"
+              >
+                <span>Back to Day 1</span>
+              </button>
+            </div>
+            <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1.5">
+              Viewing from Day {startDay} • Chain reaches back to Day 1
+            </span>
+          </div>
+        ) : (
+          <div className="pb-8 flex flex-col items-center z-10 animate-in fade-in duration-200">
+            <span className="px-3.5 py-1 rounded-full bg-surface-container-low border border-outline/15 text-[11px] font-mono text-on-surface-variant flex items-center gap-1.5 shadow-sm">
+              <span>🚀</span>
+              <span>Journey Origin • Day 1</span>
+            </span>
+          </div>
+        )}
+
         {/* Nodes Flow */}
         <div className="w-full flex flex-col items-center space-y-10 z-10">
           {nodes.map((node) => {
             if (node.isCurrent) {
               return (
-                <div key={node.day} className="relative flex flex-col items-center w-full">
+                <div
+                  key={node.day}
+                  ref={todayRef}
+                  className="relative flex flex-col items-center w-full"
+                >
                   {/* Today's Radiant Pulsing Beacon */}
                   <div className="relative flex items-center justify-center">
                     <div className="absolute w-20 h-20 rounded-full bg-primary/20 animate-ping" />
@@ -265,7 +363,7 @@ export default function JourneyPage() {
                     <button
                       data-journey-node={node.day}
                       onClick={() => setActiveSession(!activeSession)}
-                      className="relative w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary flex items-center justify-center shadow-lg shadow-primary/40 hover:scale-105 active:scale-95 transition-transform"
+                      className="relative w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary flex items-center justify-center shadow-lg shadow-primary/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                     >
                       <Bolt className="w-7 h-7 fill-current" />
                     </button>
@@ -292,7 +390,7 @@ export default function JourneyPage() {
 
                     <button
                       onClick={() => setActiveSession(!activeSession)}
-                      className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                      className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         activeSession
                           ? "bg-surface-container-highest text-primary"
                           : "bg-primary text-on-primary shadow-md shadow-primary/20 hover:opacity-95"
@@ -342,7 +440,42 @@ export default function JourneyPage() {
             );
           })}
         </div>
+
+        {/* Endless Expansion Button at Bottom */}
+        <div className="pt-10 pb-4 flex flex-col items-center z-10">
+          <button
+            type="button"
+            onClick={handleExtendJourney}
+            className="px-5 py-2.5 rounded-full bg-surface-container-high border border-outline/25 hover:border-primary/50 text-xs sm:text-sm font-mono font-semibold text-on-surface hover:text-primary shadow-lg flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span>Extend Journey (+7 Days)</span>
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1.5">
+            Chain extends endlessly • Plan as many days ahead as you want
+          </span>
+        </div>
       </div>
+
+      {/* Floating Quick Return to Today Button (Visible when scrolled away from Today) */}
+      {!isTodayInView && (
+        <button
+          type="button"
+          onClick={() => scrollToToday(true)}
+          className="fixed bottom-20 right-4 sm:right-6 z-40 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-highest/95 border border-primary/40 shadow-2xl text-primary font-mono text-xs font-bold backdrop-blur-md hover:scale-105 active:scale-95 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 group cursor-pointer"
+          title="Scroll to Today"
+        >
+          <div className="relative flex items-center justify-center">
+            <span className="w-2.5 h-2.5 rounded-full bg-primary/40 animate-ping absolute" />
+            <Zap className="w-4 h-4 fill-primary shrink-0" />
+          </div>
+          <span className="tracking-wide">Go to Today</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-bold">
+            Day {activeDay}
+          </span>
+        </button>
+      )}
     </div>
   );
 }
