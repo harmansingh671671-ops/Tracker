@@ -64,7 +64,7 @@ export function DistributionModal({
       });
     };
 
-    return [
+    const list = [
       {
         id: "focus",
         label: "Focus",
@@ -75,7 +75,6 @@ export function DistributionModal({
         cardBg: "bg-primary/5 border-primary/20",
         Icon: Brain,
         blocks: filterCatBlocks("focus"),
-        isZero: categoryStats.focusH === 0,
       },
       {
         id: "vitality",
@@ -87,7 +86,6 @@ export function DistributionModal({
         cardBg: "bg-emerald-950/20 border-emerald-500/20",
         Icon: Zap,
         blocks: filterCatBlocks("vitality"),
-        isZero: categoryStats.vitalityH === 0,
       },
       {
         id: "sync",
@@ -99,7 +97,6 @@ export function DistributionModal({
         cardBg: "bg-sky-950/20 border-sky-500/20",
         Icon: Users,
         blocks: filterCatBlocks("sync"),
-        isZero: categoryStats.syncH === 0,
       },
       {
         id: "renewal",
@@ -111,7 +108,6 @@ export function DistributionModal({
         cardBg: "bg-amber-950/20 border-amber-500/20",
         Icon: Coffee,
         blocks: filterCatBlocks("renewal"),
-        isZero: categoryStats.renewalH === 0,
       },
       {
         id: "sleep",
@@ -123,7 +119,6 @@ export function DistributionModal({
         cardBg: "bg-indigo-950/20 border-indigo-500/20",
         Icon: Moon,
         blocks: filterCatBlocks("sleep"),
-        isZero: categoryStats.restH === 0,
       },
       {
         id: "open",
@@ -135,9 +130,11 @@ export function DistributionModal({
         cardBg: "bg-surface-container-lowest/40 border-dashed border-outline/20",
         Icon: Clock,
         blocks: [],
-        isZero: openHours === 0,
       },
     ];
+
+    // Only show types that have > 0 hours for this day
+    return list.filter((item) => item.hours > 0);
   }, [categoryStats, blocks, openHours]);
 
   if (!isOpen) return null;
@@ -218,61 +215,68 @@ export function DistributionModal({
         </div>
 
         {/* 2-Column Grid Distribution Cards */}
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-          {items.map((item) => {
-            const IconComp = item.Icon;
-            return (
-              <div
-                key={item.id}
-                className={`p-3 rounded-2xl border transition-all flex flex-col justify-between ${
-                  item.isZero
-                    ? "bg-surface-container-low/40 border-outline/5 opacity-60"
-                    : item.cardBg
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${item.badge}`}>
-                      <IconComp className="w-4 h-4" />
-                    </div>
-                    <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border ${item.badge}`}>
-                      {item.hours}h
-                    </span>
-                  </div>
+        {items.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            {items.map((item, idx) => {
+              const IconComp = item.Icon;
+              const isLastOdd = items.length % 2 === 1 && idx === items.length - 1;
 
+              return (
+                <div
+                  key={item.id}
+                  className={`p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isLastOdd ? "col-span-2" : "col-span-1"
+                  } ${item.cardBg}`}
+                >
                   <div>
-                    <h4 className="text-xs font-bold text-on-surface truncate">{item.label}</h4>
-                    <p className="text-[10px] text-on-surface-variant truncate">{item.subtitle}</p>
-                    <span className="text-[10px] font-mono text-on-surface-variant/80 mt-0.5 block">
-                      {item.pct}% of day
-                    </span>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${item.badge}`}>
+                        <IconComp className="w-4 h-4" />
+                      </div>
+                      <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border ${item.badge}`}>
+                        {item.hours}h
+                      </span>
+                    </div>
 
-                {/* Task preview chips */}
-                {item.blocks.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-white/5 space-y-1">
-                    {item.blocks.slice(0, 2).map((b) => (
-                      <div
-                        key={b.id}
-                        className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container-high/80 text-on-surface truncate"
-                        title={`${b.startTime}: ${b.title}`}
-                      >
-                        <span className="text-on-surface-variant shrink-0">{b.startTime}</span>
-                        <span className="truncate">{b.title}</span>
-                      </div>
-                    ))}
-                    {item.blocks.length > 2 && (
-                      <div className="text-[9px] font-mono text-on-surface-variant px-1">
-                        +{item.blocks.length - 2} more
-                      </div>
-                    )}
+                    <div>
+                      <h4 className="text-xs font-bold text-on-surface truncate">{item.label}</h4>
+                      <p className="text-[10px] text-on-surface-variant truncate">{item.subtitle}</p>
+                      <span className="text-[10px] font-mono text-on-surface-variant/80 mt-0.5 block">
+                        {item.pct}% of day
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {/* Task preview chips */}
+                  {item.blocks.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-white/5 space-y-1">
+                      {item.blocks.slice(0, 2).map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container-high/80 text-on-surface truncate"
+                          title={`${b.startTime}: ${b.title}`}
+                        >
+                          <span className="text-on-surface-variant shrink-0">{b.startTime}</span>
+                          <span className="truncate">{b.title}</span>
+                        </div>
+                      ))}
+                      {item.blocks.length > 2 && (
+                        <div className="text-[9px] font-mono text-on-surface-variant px-1">
+                          +{item.blocks.length - 2} more
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-6 rounded-2xl bg-surface-container-low border border-outline/10 text-center space-y-1">
+            <p className="text-xs font-semibold text-on-surface">No hours planned</p>
+            <p className="text-[11px] text-on-surface-variant">Tap hours on the schedule to plan your day</p>
+          </div>
+        )}
 
         {/* Close Button */}
         <button
