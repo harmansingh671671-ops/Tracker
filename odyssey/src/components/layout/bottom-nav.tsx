@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Calendar, CheckCircle2, Compass, BarChart3, Store } from "lucide-react";
 
 const navItems = [
-  { path: "/planner", label: "Today", Icon: Calendar },
+  { path: "/planner", label: "Schedule", Icon: Calendar },
   { path: "/habits", label: "Habits", Icon: CheckCircle2 },
   { path: "/journey", label: "Journey", Icon: Compass },
   { path: "/stats", label: "Stats", Icon: BarChart3 },
