@@ -32,6 +32,7 @@ interface EditHabitModalProps {
       category: any;
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
+      targetDays?: number[];
       period?: "morning" | "afternoon" | "evening";
     }
   ) => void;
@@ -95,11 +96,15 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
       setName(habit.name || "");
       setIcon(habit.icon || "🧘");
       setDomain(habit.category || "Vitality & Fitness");
-      const target = habit.targetDaysPerWeek || 7;
-      if (target === 7) setSelectedDays([1, 2, 3, 4, 5, 6, 7]);
-      else if (target === 5) setSelectedDays([1, 2, 3, 4, 5]);
-      else if (target === 3) setSelectedDays([1, 3, 5]);
-      else setSelectedDays(Array.from({ length: target }, (_, i) => i + 1));
+      if (habit.targetDays && habit.targetDays.length > 0) {
+        setSelectedDays(habit.targetDays);
+      } else {
+        const target = habit.targetDaysPerWeek || 7;
+        if (target === 7) setSelectedDays([1, 2, 3, 4, 5, 6, 7]);
+        else if (target === 5) setSelectedDays([1, 2, 3, 4, 5]);
+        else if (target === 3) setSelectedDays([1, 3, 5]);
+        else setSelectedDays(Array.from({ length: target }, (_, i) => i + 1));
+      }
 
       if (habit.period) {
         setTimeOfDay(habit.period);
@@ -122,10 +127,22 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
     const dateForLabel = new Date(historyYear, historyMonth, 1);
     const monthLabel = dateForLabel.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
+    const effectiveScheduledDays = habit.targetDays && habit.targetDays.length > 0
+      ? habit.targetDays
+      : habit.targetDaysPerWeek === 5
+      ? [1, 2, 3, 4, 5]
+      : habit.targetDaysPerWeek === 3
+      ? [1, 3, 5]
+      : habit.targetDaysPerWeek && habit.targetDaysPerWeek < 7
+      ? Array.from({ length: habit.targetDaysPerWeek }, (_, i) => i + 1)
+      : [1, 2, 3, 4, 5, 6, 7];
+
     const list: Array<{
       dateStr: string;
       dayNumber: number;
       weekday: string;
+      dayOfWeek: number;
+      isScheduled: boolean;
       isToday: boolean;
       isFuture: boolean;
       isCompleted: boolean;
@@ -140,10 +157,16 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
       const isCompleted = !!historyLogs[habit.id]?.[dateStr];
 
       const dObj = new Date(historyYear, historyMonth, d);
+      const jsDay = dObj.getDay();
+      const dayOfWeek = jsDay === 0 ? 7 : jsDay;
+      const isScheduled = effectiveScheduledDays.includes(dayOfWeek);
+
       list.push({
         dateStr,
         dayNumber: d,
         weekday: dObj.toLocaleDateString("en-US", { weekday: "short" }),
+        dayOfWeek,
+        isScheduled,
         isToday,
         isFuture,
         isCompleted,
@@ -194,8 +217,8 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
     }
   };
 
-  const handleToggleHistoryDate = async (dateStr: string, isFuture: boolean) => {
-    if (isFuture || !user || !habit) return;
+  const handleToggleHistoryDate = async (dateStr: string, isFuture: boolean, isScheduled: boolean) => {
+    if (isFuture || !isScheduled || !user || !habit) return;
     await toggleHabitLog(user.id, habit.id, dateStr);
   };
 
@@ -224,6 +247,7 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
       category: domain,
       frequency: "daily",
       targetDaysPerWeek: selectedDays.length,
+      targetDays: selectedDays,
       period: timeOfDay === "anytime" ? undefined : timeOfDay,
     });
     onClose();
@@ -359,30 +383,42 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
 
               {/* 10-Column Calendar Matrix Starting at 1st of Month */}
               <div className="grid grid-cols-10 gap-1 sm:gap-1.5 w-full pt-1">
-                {historyCalendar.days.map((day) => (
-                  <button
-                    key={day.dateStr}
-                    type="button"
-                    onClick={() => handleToggleHistoryDate(day.dateStr, day.isFuture)}
-                    disabled={day.isFuture}
-                    title={`${day.dateStr} (${day.weekday}): ${
-                      day.isCompleted ? "Completed ✓" : day.isFuture ? "Upcoming" : "Not completed"
-                    }${day.isToday ? " • Today" : ""}`}
-                    className={`aspect-square rounded-md flex items-center justify-center text-[9px] font-mono transition-all select-none ${
-                      day.isCompleted
-                        ? `bg-primary text-on-primary font-bold shadow-xs shadow-primary/30 border border-primary/40 hover:brightness-110 active:scale-90 cursor-pointer ${
-                            day.isToday ? "ring-2 ring-primary/80 ring-offset-1 ring-offset-surface-container-low" : ""
-                          }`
-                        : day.isToday
-                        ? "bg-surface-container text-primary border-2 border-primary/80 font-bold hover:bg-surface-bright active:scale-90 cursor-pointer"
-                        : day.isFuture
-                        ? "bg-surface-container-lowest/40 text-on-surface-variant/20 border border-outline/5 cursor-default"
-                        : "bg-surface-container-lowest/80 text-on-surface-variant/40 border border-outline/10 hover:border-outline/30 hover:bg-surface-container/60 hover:text-on-surface-variant active:scale-90 cursor-pointer"
-                    }`}
-                  >
-                    <span className="leading-none">{day.dayNumber}</span>
-                  </button>
-                ))}
+                {historyCalendar.days.map((day) => {
+                  const isNotScheduled = !day.isScheduled;
+
+                  return (
+                    <button
+                      key={day.dateStr}
+                      type="button"
+                      onClick={() => handleToggleHistoryDate(day.dateStr, day.isFuture, day.isScheduled)}
+                      disabled={day.isFuture || (isNotScheduled && !day.isCompleted)}
+                      title={`${day.dateStr} (${day.weekday}): ${
+                        day.isCompleted
+                          ? "Completed ✓"
+                          : isNotScheduled
+                          ? "Rest Day (Not scheduled)"
+                          : day.isFuture
+                          ? "Upcoming"
+                          : "Not completed"
+                      }${day.isToday ? " • Today" : ""}`}
+                      className={`aspect-square rounded-md flex items-center justify-center text-[9px] font-mono transition-all select-none ${
+                        day.isCompleted
+                          ? `bg-primary text-on-primary font-bold shadow-xs shadow-primary/30 border border-primary/40 hover:brightness-110 active:scale-90 cursor-pointer ${
+                              day.isToday ? "ring-2 ring-primary/80 ring-offset-1 ring-offset-surface-container-low" : ""
+                            }`
+                          : isNotScheduled
+                          ? "bg-surface-container-lowest/30 text-on-surface-variant/20 border border-outline/5 opacity-35 cursor-not-allowed pointer-events-none"
+                          : day.isToday
+                          ? "bg-surface-container text-primary border-2 border-primary/80 font-bold hover:bg-surface-bright active:scale-90 cursor-pointer"
+                          : day.isFuture
+                          ? "bg-surface-container-lowest/40 text-on-surface-variant/20 border border-outline/5 cursor-default"
+                          : "bg-surface-container-lowest/80 text-on-surface-variant/40 border border-outline/10 hover:border-outline/30 hover:bg-surface-container/60 hover:text-on-surface-variant active:scale-90 cursor-pointer"
+                      }`}
+                    >
+                      <span className="leading-none">{day.dayNumber}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-1">

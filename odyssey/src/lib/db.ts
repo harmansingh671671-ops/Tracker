@@ -61,6 +61,7 @@ export interface Habit {
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
   targetDaysPerWeek?: number;
+  targetDays?: number[]; // [1..7] where 1=Mon, 2=Tue, ..., 7=Sun
   currentStreak: number;
   longestStreak: number;
   totalCompletions: number;

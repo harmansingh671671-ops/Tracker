@@ -83,6 +83,7 @@ export default function HabitsPage() {
       category: data.category as any,
       frequency: "daily",
       targetDaysPerWeek: data.targetDays?.length || 7,
+      targetDays: data.targetDays || [1, 2, 3, 4, 5, 6, 7],
       icon: data.icon,
       period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
       archivedAt: undefined,
@@ -99,6 +100,7 @@ export default function HabitsPage() {
       category: any;
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
+      targetDays?: number[];
       period?: "morning" | "afternoon" | "evening";
     }
   ) => {
@@ -363,6 +365,8 @@ export default function HabitsPage() {
                 {/* Heatmap Calendar with 10 columns covering ~month */}
                 <HabitHeatmap
                   habitId={h.id}
+                  targetDays={h.targetDays}
+                  targetDaysPerWeek={h.targetDaysPerWeek}
                   category={h.category}
                 />
               </div>
