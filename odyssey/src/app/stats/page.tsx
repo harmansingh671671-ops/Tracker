@@ -505,7 +505,7 @@ export default function StatsPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded bg-[#00E676] border border-[#69f0ae] inline-block shadow-[0_0_10px_rgba(0,230,118,0.7)]" />
-            <span>100% Done</span>
+            <span>100% Rev</span>
           </div>
         </div>
       </div>
@@ -686,7 +686,7 @@ export default function StatsPage() {
                 }`}
               >
                 {popupDayStats.status === "fully_completed"
-                  ? "100% Completed"
+                  ? "100% Reviewed"
                   : popupDayStats.status === "planned_unreviewed"
                   ? "Planned (0h Reviewed)"
                   : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
@@ -695,23 +695,43 @@ export default function StatsPage() {
               </span>
             </div>
 
-            {/* 4-Item Grid Metrics */}
-            <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
-              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
-                <span className="text-[10px] text-on-surface-variant block">Planned</span>
+            {/* Metrics Breakdown */}
+            <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block mb-0.5">Planned</span>
                 <span className="font-bold text-primary text-sm">{popupDayStats.plannedHours}h</span>
               </div>
-              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
-                <span className="text-[10px] text-on-surface-variant block">Reviewed</span>
-                <span className="font-bold text-secondary text-sm">{popupDayStats.reviewedHours}h</span>
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block mb-0.5">Reviewed</span>
+                <span className="font-bold text-[#00E676] text-sm">{popupDayStats.reviewedHours}h</span>
               </div>
-              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
-                <span className="text-[10px] text-on-surface-variant block">Done</span>
-                <span className="font-bold text-emerald-400 text-sm">{popupDayStats.completedHours}h</span>
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block mb-0.5">Unreviewed</span>
+                <span className="font-bold text-on-surface-variant text-sm">{popupDayStats.pendingHours}h</span>
               </div>
-              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
-                <span className="text-[10px] text-on-surface-variant block">Missed</span>
-                <span className="font-bold text-rose-400 text-sm">{popupDayStats.missedHours}h</span>
+            </div>
+
+            {/* Review Progress Bar */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="text-on-surface-variant">Review Progress</span>
+                <span className="text-[#00E676] font-bold">
+                  {popupDayStats.plannedHours > 0
+                    ? `${Math.round((popupDayStats.reviewedHours / popupDayStats.plannedHours) * 100)}%`
+                    : "0%"}
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+                <div
+                  className="h-full bg-[#00E676] rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,230,118,0.5)]"
+                  style={{
+                    width: `${
+                      popupDayStats.plannedHours > 0
+                        ? Math.min(100, (popupDayStats.reviewedHours / popupDayStats.plannedHours) * 100)
+                        : 0
+                    }%`,
+                  }}
+                />
               </div>
             </div>
 

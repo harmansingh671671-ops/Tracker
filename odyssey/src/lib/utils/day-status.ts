@@ -108,7 +108,7 @@ export function getHeatmapCellStyles(stats: DayCompletionStats, isSelected: bool
     textClass = "text-[#003319] font-black";
     borderClass = "border-[#69f0ae] ring-1 ring-[#69f0ae]";
     glowClass = "shadow-[0_0_14px_rgba(0,230,118,0.85)]";
-    label = `100% Completed (${stats.plannedHours}h/${stats.plannedHours}h Reviewed)`;
+    label = `100% Reviewed (${stats.plannedHours}h/${stats.plannedHours}h)`;
   } else if (stats.status === "mostly_reviewed") {
     bgClass = "bg-emerald-500 hover:bg-emerald-400";
     textClass = "text-[#002a14] font-bold";
