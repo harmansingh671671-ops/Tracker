@@ -772,9 +772,9 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val timelineEndY = nextY + cardH2
 
             // =========================================================================
-            // 4. HOBBIES & PASSIONS (Guaranteed display, fills remaining screen down to bottom)
+            // 4. HOBBIES & PASSIONS (Full-width horizontal rows, zero clipping)
             // =========================================================================
-            val hobGap = usableH * 0.015f
+            val hobGap = usableH * 0.018f
             val currentY = timelineEndY + hobGap
 
             if (userHabits.isEmpty()) {
@@ -799,126 +799,102 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             }
             canvas.drawText("$hobbiesCount ACTIVE $trackWord", cardPad + cardW - 12f, currentY + usableH * 0.010f, countBadgePaint)
 
-            val hobStartY = currentY + usableH * 0.014f
-            val hobFootnoteH = usableH * 0.025f
-            val hobAvailableH = (topMargin + usableH) - hobStartY - hobFootnoteH
-            val cardItemGap = 14f
+            val hobStartY = currentY + usableH * 0.018f
+            val hobItemGap = 14f
+            val hobCardH = if (hobbiesCount <= 2) usableH * 0.068f else usableH * 0.058f
 
-            val rows = (hobbiesCount + 1) / 2
-            if (rows == 1) {
-                // 1 row: 1 full-width card or 2 side-by-side cards with expansive height
-                val isSingle = hobbiesCount == 1
-                val hobCardW = if (isSingle) cardW else (cardW - cardItemGap) / 2f
-                val hobCardH = minOf(usableH * 0.130f, hobAvailableH)
+            val hobBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#D9131B2E".toColorInt()
+                style = Paint.Style.FILL
+            }
+            val hobBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = "#24FFFFFF".toColorInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 1.6f
+            }
 
-                for (idx in 0 until hobbiesCount) {
-                    val habit = userHabits[idx]
-                    val hX = if (isSingle) cardPad else cardPad + idx * (hobCardW + cardItemGap)
-                    val hY = hobStartY
-                    val hRect = RectF(hX, hY, hX + hobCardW, hY + hobCardH)
-                    canvas.drawRoundRect(hRect, 44f, 44f, cardBgPaint)
-                    canvas.drawRoundRect(hRect, 44f, 44f, cardBorderPaint)
+            for (idx in 0 until hobbiesCount) {
+                val habit = userHabits[idx]
+                val hY = hobStartY + idx * (hobCardH + hobItemGap)
+                val hRect = RectF(cardPad, hY, cardPad + cardW, hY + hobCardH)
+                canvas.drawRoundRect(hRect, 36f, 36f, hobBgPaint)
+                canvas.drawRoundRect(hRect, 36f, 36f, hobBorderPaint)
 
-                    // Emoji on left
-                    val emoji = resolveEmoji(habit.icon, habit.name)
-                    val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = width * 0.052f }
-                    canvas.drawText(emoji, hX + 22f, hY + hobCardH * 0.52f, emojiPaint)
-
-                    // Streak badge on right
-                    val streakText = "${habit.streak}d 🔥"
-                    val streakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        textAlign = Paint.Align.RIGHT
-                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                        textSize = width * 0.026f
-                        color = "#FBBF24".toColorInt()
-                    }
-                    val streakW = streakPaint.measureText(streakText) + 20f
-                    val streakH = hobCardH * 0.32f
-                    val streakX = hX + hobCardW - streakW - 18f
-                    val streakY = hY + hobCardH * 0.16f
-                    val streakRect = RectF(streakX, streakY, streakX + streakW, streakY + streakH)
-                    val streakBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = "#33F59E0B".toColorInt() }
-                    val streakBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = "#66F59E0B".toColorInt()
-                        style = Paint.Style.STROKE
-                        strokeWidth = 1.2f
-                    }
-                    canvas.drawRoundRect(streakRect, 14f, 14f, streakBg)
-                    canvas.drawRoundRect(streakRect, 14f, 14f, streakBorder)
-                    canvas.drawText(streakText, streakX + streakW - 10f, streakY + streakH * 0.72f, streakPaint)
-
-                    // Title & Category in middle
-                    val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                        textSize = width * 0.034f
-                        color = Color.WHITE
-                    }
-                    var hDisplayName = habit.name
-                    val maxNameW = hobCardW - streakW - 64f
-                    while (hDisplayName.length > 3 && hobNamePaint.measureText(hDisplayName) > maxNameW) {
-                        hDisplayName = hDisplayName.dropLast(1)
-                    }
-                    if (hDisplayName.length < habit.name.length) hDisplayName += "…"
-                    canvas.drawText(hDisplayName, hX + 22f, hY + hobCardH * 0.82f, hobNamePaint)
+                // Frosted Circle Container for Emoji on left
+                val iconSize = hobCardH * 0.64f
+                val iconX = cardPad + 20f
+                val iconY = hY + (hobCardH - iconSize) / 2f
+                val iconRect = RectF(iconX, iconY, iconX + iconSize, iconY + iconSize)
+                val iconBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = "#14FFFFFF".toColorInt() }
+                val iconBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = "#20FFFFFF".toColorInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1.2f
                 }
-            } else {
-                // 2 rows of 2 columns, filling available height evenly
-                val hobCardW = (cardW - cardItemGap) / 2f
-                val hobCardH = (hobAvailableH - cardItemGap) / 2f
+                canvas.drawRoundRect(iconRect, iconSize / 2f, iconSize / 2f, iconBg)
+                canvas.drawRoundRect(iconRect, iconSize / 2f, iconSize / 2f, iconBorder)
 
-                for (idx in 0 until hobbiesCount) {
-                    val habit = userHabits[idx]
-                    val r = idx / 2
-                    val c = idx % 2
-                    val hX = cardPad + c * (hobCardW + cardItemGap)
-                    val hY = hobStartY + r * (hobCardH + cardItemGap)
-
-                    val hRect = RectF(hX, hY, hX + hobCardW, hY + hobCardH)
-                    canvas.drawRoundRect(hRect, 38f, 38f, cardBgPaint)
-                    canvas.drawRoundRect(hRect, 38f, 38f, cardBorderPaint)
-
-                    // Emoji on left
-                    val emoji = resolveEmoji(habit.icon, habit.name)
-                    val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = width * 0.046f }
-                    canvas.drawText(emoji, hX + 18f, hY + hobCardH * 0.48f, emojiPaint)
-
-                    // Streak badge on right
-                    val streakText = "${habit.streak}d 🔥"
-                    val streakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        textAlign = Paint.Align.RIGHT
-                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                        textSize = width * 0.024f
-                        color = "#FBBF24".toColorInt()
-                    }
-                    val streakW = streakPaint.measureText(streakText) + 18f
-                    val streakH = hobCardH * 0.32f
-                    val streakX = hX + hobCardW - streakW - 14f
-                    val streakY = hY + hobCardH * 0.14f
-                    val streakRect = RectF(streakX, streakY, streakX + streakW, streakY + streakH)
-                    val streakBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = "#33F59E0B".toColorInt() }
-                    val streakBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = "#66F59E0B".toColorInt()
-                        style = Paint.Style.STROKE
-                        strokeWidth = 1.2f
-                    }
-                    canvas.drawRoundRect(streakRect, 12f, 12f, streakBg)
-                    canvas.drawRoundRect(streakRect, 12f, 12f, streakBorder)
-                    canvas.drawText(streakText, streakX + streakW - 8f, streakY + streakH * 0.72f, streakPaint)
-
-                    // Title
-                    val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                        textSize = width * 0.030f
-                        color = Color.WHITE
-                    }
-                    var hDisplayName = habit.name
-                    val maxNameW = hobCardW - 36f
-                    while (hDisplayName.length > 3 && hobNamePaint.measureText(hDisplayName) > maxNameW) {
-                        hDisplayName = hDisplayName.dropLast(1)
-                    }
-                    if (hDisplayName.length < habit.name.length) hDisplayName += "…"
-                    canvas.drawText(hDisplayName, hX + 18f, hY + hobCardH * 0.82f, hobNamePaint)
+                // Emoji
+                val emoji = resolveEmoji(habit.icon, habit.name)
+                val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textSize = iconSize * 0.58f
+                    textAlign = Paint.Align.CENTER
                 }
+                canvas.drawText(emoji, iconRect.centerX(), iconRect.centerY() + iconSize * 0.22f, emojiPaint)
+
+                // Right Streak Pill
+                val streakText = "${habit.streak}d 🔥"
+                val streakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textAlign = Paint.Align.RIGHT
+                    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                    textSize = width * 0.026f
+                    color = "#FBBF24".toColorInt()
+                }
+                val streakW = streakPaint.measureText(streakText) + 24f
+                val streakH = hobCardH * 0.40f
+                val streakX = cardPad + cardW - streakW - 18f
+                val streakY = hY + (hobCardH - streakH) / 2f
+                val streakRect = RectF(streakX, streakY, streakX + streakW, streakY + streakH)
+                val streakBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = "#33F59E0B".toColorInt() }
+                val streakBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = "#66F59E0B".toColorInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1.4f
+                }
+                canvas.drawRoundRect(streakRect, streakH / 2f, streakH / 2f, streakBg)
+                canvas.drawRoundRect(streakRect, streakH / 2f, streakH / 2f, streakBorder)
+                canvas.drawText(streakText, streakX + streakW - 10f, streakY + streakH * 0.70f, streakPaint)
+
+                // Middle Text: Title + Subtitle (Spacious horizontal space - zero clipping!)
+                val textX = iconX + iconSize + 18f
+                val maxTextW = streakX - textX - 16f
+
+                // Habit Title
+                val hobNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                    textSize = width * 0.034f
+                    color = Color.WHITE
+                }
+                var hDisplayName = habit.name
+                while (hDisplayName.length > 3 && hobNamePaint.measureText(hDisplayName) > maxTextW) {
+                    hDisplayName = hDisplayName.dropLast(1)
+                }
+                if (hDisplayName.length < habit.name.length) hDisplayName += "…"
+                canvas.drawText(hDisplayName, textX, hY + hobCardH * 0.48f, hobNamePaint)
+
+                // Habit Subtitle / Category
+                val hobSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+                    textSize = width * 0.024f
+                    color = "#94A3B8".toColorInt()
+                }
+                val categoryLabel = if (habit.category.isNotEmpty()) "${habit.category} • Active Track" else "Active Daily Habit"
+                var hDisplaySub = categoryLabel
+                while (hDisplaySub.length > 3 && hobSubPaint.measureText(hDisplaySub) > maxTextW) {
+                    hDisplaySub = hDisplaySub.dropLast(1)
+                }
+                if (hDisplaySub.length < categoryLabel.length) hDisplaySub += "…"
+                canvas.drawText(hDisplaySub, textX, hY + hobCardH * 0.80f, hobSubPaint)
             }
 
             // =========================================================================

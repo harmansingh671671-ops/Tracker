@@ -543,10 +543,8 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     ctx.fillText(truncateText(ctx, nextBlock.title, cardW - 64), cardPad + 32, nextY + 112);
   }
 
-  const timelineEndHeight = nextY + nextCardH;
-
-  // 7. HOBBIES & PASSIONS (Guaranteed display - fills remaining screen down to bottom)
-  let currentCardY = timelineEndHeight + Math.round(usableH * 0.015);
+  // 7. HOBBIES & PASSIONS (Full-width horizontal rows - no cramped clipping!)
+  const hobSectionStartY = nextY + nextCardH + Math.round(usableH * 0.020);
   const userHobbies = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
     ? data.habits.slice(0, 4)
     : [
@@ -555,7 +553,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
       ];
 
   if (userHobbies.length > 0) {
-    const hobHeaderY = currentCardY + Math.round(usableH * 0.010);
+    const hobHeaderY = hobSectionStartY;
     ctx.font = "700 24px 'JetBrains Mono', monospace";
     ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
     ctx.fillText("✦ HOBBIES & PASSIONS", cardPad + 14, hobHeaderY);
@@ -566,112 +564,92 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
     ctx.fillText(`${userHobbies.length} ACTIVE ${userHobbies.length === 1 ? "TRACK" : "TRACKS"}`, cardPad + cardW - 14, hobHeaderY);
     ctx.textAlign = "left";
 
-    const hobStartY = hobHeaderY + Math.round(usableH * 0.014);
-    const hobFootnoteH = Math.round(usableH * 0.025);
-    const hobAvailableH = (topSafeZone + usableH) - hobStartY - hobFootnoteH;
-    const isSingle = userHobbies.length === 1;
-    const rows = Math.ceil(userHobbies.length / 2);
+    const hobItemsStartY = hobHeaderY + 26;
+    const hobCount = userHobbies.length;
+    const hobGap = 14;
+    // Dynamic height based on item count to fill space harmoniously
+    const hobCardH = hobCount <= 2 ? 136 : 116;
 
-    if (rows === 1) {
-      // 1 Row: 1 full-width card or 2 side-by-side cards with expansive height
-      const hobGap = 16;
-      const hobW = isSingle ? cardW : (cardW - hobGap) / 2;
-      const hobH = Math.min(Math.round(usableH * 0.130), hobAvailableH);
+    userHobbies.forEach((h, idx) => {
+      const hY = hobItemsStartY + idx * (hobCardH + hobGap);
 
-      userHobbies.forEach((h, idx) => {
-        const hX = isSingle ? cardPad : cardPad + idx * (hobW + hobGap);
-        const hY = hobStartY;
+      // Card Background & Subtle Border
+      ctx.fillStyle = "rgba(19, 27, 46, 0.85)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.roundRect(cardPad, hY, cardW, hobCardH, 36);
+      ctx.fill();
+      ctx.stroke();
 
-        ctx.fillStyle = "rgba(19, 21, 29, 0.82)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(hX, hY, hobW, hobH, 44);
-        ctx.fill();
-        ctx.stroke();
+      // Left Emoji Icon Container (Frosted soft circle)
+      const iconSize = hobCount <= 2 ? 74 : 64;
+      const iconX = cardPad + 22;
+      const iconY = hY + (hobCardH - iconSize) / 2;
 
-        // Emoji
-        const emoji = resolveHobbyEmoji(h.icon, h.name);
-        ctx.font = "52px sans-serif";
-        ctx.fillText(emoji, hX + 24, hY + Math.round(hobH * 0.54));
+      ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect(iconX, iconY, iconSize, iconSize, iconSize / 2);
+      ctx.fill();
+      ctx.stroke();
 
-        // Streak flame pill on the right (18px rounded)
-        const streakText = `${h.currentStreak || 0}d 🔥`;
-        ctx.font = "700 26px 'JetBrains Mono', monospace";
-        const streakW = ctx.measureText(streakText).width + 24;
-        const streakX = hX + hobW - streakW - 20;
-        ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.4)";
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.roundRect(streakX, hY + 20, streakW, 46, 18);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = "#fbbf24";
-        ctx.fillText(streakText, streakX + 12, hY + 52);
+      // Emoji
+      const emoji = resolveHobbyEmoji(h.icon, h.name);
+      ctx.font = `${hobCount <= 2 ? 38 : 34}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(emoji, iconX + iconSize / 2, iconY + iconSize * 0.68);
+      ctx.textAlign = "left";
 
-        // Title and category
-        ctx.font = "700 32px 'Plus Jakarta Sans', sans-serif";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(truncateText(ctx, h.name, hobW - 40), hX + 24, hY + Math.round(hobH * 0.84));
-      });
-    } else {
-      // 2-Column Grid for multiple hobbies (38px rounded)
-      const hobGap = 16;
-      const hobW = (cardW - hobGap) / 2;
-      const hobH = Math.round((hobAvailableH - hobGap) / 2);
+      // Right Streak Pill
+      const streakText = `${h.currentStreak || 0}d 🔥`;
+      ctx.font = "700 24px 'JetBrains Mono', monospace";
+      const streakTextW = ctx.measureText(streakText).width;
+      const streakBadgeW = streakTextW + 28;
+      const streakBadgeH = hobCount <= 2 ? 46 : 40;
+      const streakBadgeX = cardPad + cardW - streakBadgeW - 22;
+      const streakBadgeY = hY + (hobCardH - streakBadgeH) / 2;
 
-      userHobbies.forEach((h, idx) => {
-        const row = Math.floor(idx / 2);
-        const col = idx % 2;
-        const hX = cardPad + col * (hobW + hobGap);
-        const hY = hobStartY + row * (hobH + hobGap);
+      ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.45)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(streakBadgeX, streakBadgeY, streakBadgeW, streakBadgeH, streakBadgeH / 2);
+      ctx.fill();
+      ctx.stroke();
 
-        ctx.fillStyle = "rgba(19, 21, 29, 0.8)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.roundRect(hX, hY, hobW, hobH, 38);
-        ctx.fill();
-        ctx.stroke();
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillText(streakText, streakBadgeX + 14, streakBadgeY + streakBadgeH * 0.68);
 
-        // Emoji
-        const emoji = resolveHobbyEmoji(h.icon, h.name);
-        ctx.font = "40px sans-serif";
-        ctx.fillText(emoji, hX + 22, hY + 75);
+      // Middle Title & Subtitle (Spacious horizontal layout - up to 680px width)
+      const textX = iconX + iconSize + 22;
+      const maxTextW = streakBadgeX - textX - 20;
 
-        // Streak flame badge
-        const streakText = `${h.currentStreak || 0}d 🔥`;
-        ctx.font = "700 20px 'JetBrains Mono', monospace";
-        const streakW = ctx.measureText(streakText).width + 20;
-        ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.4)";
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.roundRect(hX + hobW - streakW - 16, hY + 16, streakW, 36, 18);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = "#fbbf24";
-        ctx.fillText(streakText, hX + hobW - streakW - 6, hY + 41);
+      // Title
+      ctx.font = `700 ${hobCount <= 2 ? 32 : 28}px 'Plus Jakarta Sans', sans-serif`;
+      ctx.fillStyle = "#ffffff";
+      const titleY = hobCount <= 2 ? hY + 54 : hY + 48;
+      ctx.fillText(truncateText(ctx, h.name, maxTextW), textX, titleY);
 
-        // Name
-        ctx.font = "700 26px 'Plus Jakarta Sans', sans-serif";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(truncateText(ctx, h.name, hobW - 40), hX + 22, hY + 112);
-      });
-    }
+      // Subtitle
+      ctx.font = `500 ${hobCount <= 2 ? 22 : 19}px 'Plus Jakarta Sans', sans-serif`;
+      ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+      const subY = hobCount <= 2 ? hY + 96 : hY + 84;
+      const categoryLabel = h.category ? `${h.category} • Active Track` : "Active Daily Habit";
+      ctx.fillText(truncateText(ctx, categoryLabel, maxTextW), textX, subY);
+    });
   }
 
   // 8. BOTTOM SAFE ZONE (Clean space for in-display fingerprint scanner & shortcuts)
-  // Subtle brand mark only at the very bottom edge:
   ctx.textAlign = "center";
-  ctx.font = "600 15px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.font = "600 16px 'JetBrains Mono', monospace";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
   ctx.fillText("ODYSSEY LIVE LOCKSCREEN", width / 2, 2300);
 
-  ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
   ctx.beginPath();
-  ctx.roundRect((width - 320) / 2, 2295, 320, 6, 3);
+  ctx.roundRect((width - 280) / 2, 2314, 280, 5, 2.5);
   ctx.fill();
 
   return canvas;

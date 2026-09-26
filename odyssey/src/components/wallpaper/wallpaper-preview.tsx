@@ -388,7 +388,7 @@ export function WallpaperPreview({
         })()}
       </div>
 
-      {/* 5. HOBBIES & PASSIONS (Guaranteed Display - Always Visible, Full Width if single, 2x2 Grid if multiple) */}
+      {/* 5. HOBBIES & PASSIONS (Spacious Full-Width Horizontal Rows - Zero Text Clipping!) */}
       {data.includeHobbies !== false && (() => {
         const userHobbies = (data.habits && data.habits.length > 0)
           ? data.habits.slice(0, 4)
@@ -399,10 +399,10 @@ export function WallpaperPreview({
         const count = userHobbies.length;
 
         return (
-          <div className="px-4 pt-1 flex flex-col gap-1.5 z-10 animate-in fade-in duration-300">
+          <div className="px-4 pt-1 flex flex-col gap-2 z-10 animate-in fade-in duration-300">
             <div className="flex items-center justify-between px-0.5">
-              <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-amber-400" />
+              <span className="text-[10.5px] font-mono tracking-[0.18em] uppercase text-slate-300 font-bold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 HOBBIES &amp; PASSIONS
               </span>
               <span className="text-[9px] font-mono text-slate-400 font-medium">
@@ -410,24 +410,26 @@ export function WallpaperPreview({
               </span>
             </div>
 
-            <div className={count === 1 ? "grid grid-cols-1" : "grid grid-cols-2 gap-2"}>
+            <div className="flex flex-col gap-2">
               {userHobbies.map((h, hIdx) => (
                 <div
                   key={h.id || hIdx}
-                  className="rounded-[24px] p-3 bg-[#13151D]/85 border border-white/15 flex items-center justify-between gap-3 transition-all shadow-md"
+                  className="rounded-[24px] p-2.5 px-3.5 bg-[#131B2E]/90 border border-white/15 flex items-center justify-between gap-3 transition-all shadow-md"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xl shrink-0">{resolveHobbyEmoji(h.icon, h.name)}</span>
-                    <div className="min-w-0">
-                      <div className="text-[12.5px] font-bold text-white truncate">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-xl">
+                      {resolveHobbyEmoji(h.icon, h.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-bold text-white truncate" title={h.name}>
                         {h.name}
                       </div>
-                      <div className="text-[9.5px] text-slate-400 truncate">
-                        {h.category || "Habit Track"}
+                      <div className="text-[10px] text-slate-400 font-medium truncate">
+                        {h.category ? `${h.category} • Active Track` : "Active Daily Habit"}
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 font-bold shrink-0">
+                  <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/35 font-bold shrink-0 shadow-sm">
                     {h.currentStreak || 0}d 🔥
                   </span>
                 </div>
