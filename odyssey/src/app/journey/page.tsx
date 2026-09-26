@@ -54,10 +54,10 @@ export default function JourneyPage() {
     return getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0));
   }, [user?.militaryRank, user?.streak]);
 
-  const currentLevel = user?.level || 1;
-  const currentXp = user?.xp || 420;
-  const targetXp = currentLevel * 1000;
-  const xpPercent = Math.min(100, Math.round((currentXp / targetXp) * 100));
+  const currentLevel = user?.level || (Math.floor((user?.xp ?? 0) / 500) + 1);
+  const currentXp = user?.xp ?? 0;
+  const targetXp = currentLevel * 500;
+  const xpPercent = Math.min(100, Math.round(((currentXp % 500) / 500) * 100));
 
   const startDay = useMemo(() => {
     return Math.max(1, activeDay - pastDaysCount);

@@ -26,7 +26,7 @@ interface ShopItem {
 }
 
 export default function ShopPage() {
-  const { user, fetchUser, buyItem, addDiamonds } = useUserStore();
+  const { user, fetchUser, buyItem, addDiamonds, addXp } = useUserStore();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [toastMsg, setToastMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
@@ -93,20 +93,23 @@ export default function ShopPage() {
       showToast(`Need ${item.price - (user.diamonds ?? 0)} more diamonds. Complete habits!`, true);
       return;
     }
-    const success = await buyItem(item.id, item.price);
-    if (success) {
+    const res = await buyItem(item.id, item.price);
+    if (res.success) {
       showToast(`Equipped ${item.name}! -${item.price} 💎`);
+      await fetchUser();
     } else {
-      showToast("Purchase failed. Try again.", true);
+      showToast(res.message || "Purchase failed. Try again.", true);
     }
   };
 
-  const handleOpenChest = () => {
+  const handleOpenChest = async () => {
     if (chestClaimed) {
       showToast("Daily chest already claimed. Returns tomorrow!", true);
       return;
     }
-    addDiamonds(25);
+    await addDiamonds(25);
+    await addXp(50);
+    await fetchUser();
     setChestClaimed(true);
     localStorage.setItem(`odyssey_chest_${new Date().toISOString().split("T")[0]}`, "true");
     setIsCelebrationOpen(true);

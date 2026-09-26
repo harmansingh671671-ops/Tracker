@@ -139,9 +139,9 @@ export default function StatsPage() {
     };
   }, [completedDaysCount, userStreak, rankInfo.streak, nextRank]);
 
-  const currentLevel = user?.level || 1;
-  const currentXp = user?.xp || 420;
-  const targetXp = currentLevel * 1000;
+  const currentXp = user?.xp ?? 0;
+  const currentLevel = user?.level || (Math.floor(currentXp / 500) + 1);
+  const targetXp = currentLevel * 500;
 
   // Month options starting from the user's initial join month to current month
   const availableMonths = useMemo(() => {

@@ -209,7 +209,7 @@ const getTodayStr = () => {
 function DayScheduleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   const {
     blocks,
     fetchBlocksForDate,
@@ -513,9 +513,16 @@ function DayScheduleContent() {
         status: newStatus,
         completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
       });
+
+      if (newStatus === "completed") {
+        await addXp(10);
+      } else {
+        await addXp(-10);
+      }
+      await fetchUser();
       syncCurrentScheduleToNative();
     },
-    [updateBlock]
+    [updateBlock, addXp, fetchUser]
   );
 
   // Clear / delete block

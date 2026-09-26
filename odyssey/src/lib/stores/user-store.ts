@@ -8,7 +8,7 @@ interface UserState {
   updateUser: (updates: Partial<Profile>) => Promise<void>;
   addXp: (amount: number) => Promise<void>;
   addDiamonds: (amount: number) => Promise<void>;
-  buyItem: (name: string, cost: number) => Promise<{ success: boolean; message: string }>;
+  buyItem: (itemIdOrName: string, cost: number) => Promise<{ success: boolean; message: string }>;
   resetToZero: () => Promise<void>;
 }
 
@@ -21,7 +21,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     return user;
   },
   updateUser: async (updates) => {
-    const current = get().user;
+    const current = get().user || (await getOrCreateUser());
     if (!updates.militaryRank && updates.streak !== undefined) {
       const streak = updates.streak !== undefined ? updates.streak : (current?.streak ?? 0);
       const { calculateRank } = await import('../utils/gamification');
@@ -31,41 +31,43 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ user: updated });
   },
   addXp: async (amount) => {
-    const current = get().user;
-    if (!current) return;
-    const newXp = current.xp + amount;
+    const current = get().user || (await getOrCreateUser());
+    const currentXp = typeof current.xp === 'number' ? current.xp : 0;
+    const newXp = Math.max(0, currentXp + amount);
     const newLevel = Math.floor(newXp / 500) + 1;
     await get().updateUser({ xp: newXp, level: newLevel });
   },
   addDiamonds: async (amount) => {
-    const current = get().user;
-    if (!current) return;
-    await get().updateUser({ diamonds: current.diamonds + amount });
+    const current = get().user || (await getOrCreateUser());
+    const currentDiamonds = typeof current.diamonds === 'number' ? current.diamonds : 0;
+    const newDiamonds = Math.max(0, currentDiamonds + amount);
+    await get().updateUser({ diamonds: newDiamonds });
   },
-  buyItem: async (name, cost) => {
-    const current = get().user;
-    if (!current) return { success: false, message: 'User not loaded' };
-    if (current.diamonds < cost) {
-      return { success: false, message: `Insufficient diamonds! Need ${cost}, have ${current.diamonds}` };
+  buyItem: async (itemIdOrName, cost) => {
+    const current = get().user || (await getOrCreateUser());
+    const currentDiamonds = current.diamonds || 0;
+    if (currentDiamonds < cost) {
+      return { success: false, message: `Insufficient diamonds! Need ${cost}, have ${currentDiamonds}` };
     }
 
     const equipped = current.equippedItems || [];
+    const lower = itemIdOrName.toLowerCase();
     const updates: Partial<Profile> = {
-      diamonds: current.diamonds - cost,
-      equippedItems: Array.from(new Set([...equipped, name])),
+      diamonds: Math.max(0, currentDiamonds - cost),
+      equippedItems: Array.from(new Set([...equipped, itemIdOrName])),
     };
 
-    if (name.includes('Streak Freeze')) {
+    if (lower.includes('freeze') || lower.includes('shield')) {
       updates.streakFreezeActive = true;
       updates.streakFreezeCount = (current.streakFreezeCount || 0) + 1;
-    } else if (name.includes('100 Instant XP')) {
-      const newXp = current.xp + 100;
+    } else if (lower.includes('xp') || lower.includes('instant')) {
+      const newXp = (current.xp || 0) + 100;
       updates.xp = newXp;
       updates.level = Math.floor(newXp / 500) + 1;
     }
 
     await get().updateUser(updates);
-    return { success: true, message: `Acquired ${name}!` };
+    return { success: true, message: `Acquired ${itemIdOrName}!` };
   },
   resetToZero: async () => {
     const user = await resetAllDataToZero();

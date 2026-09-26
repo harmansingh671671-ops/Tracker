@@ -20,7 +20,7 @@ import {
 const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 export default function HabitsPage() {
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   const {
     habits,
     todayLogs,
@@ -64,7 +64,15 @@ export default function HabitsPage() {
     if (!user) return;
     const isNowCompleted = await toggleHabitLog(user.id, habitId, today);
     if (isNowCompleted) {
-      showToast("Habit completed! +15 XP • +1 💎 Vaulted");
+      await addXp(15);
+      await addDiamonds(1);
+      await fetchUser();
+      showToast("Habit completed! +15 XP • +1 💎");
+    } else {
+      await addXp(-15);
+      await addDiamonds(-1);
+      await fetchUser();
+      showToast("Habit reverted.");
     }
   };
 
@@ -88,6 +96,9 @@ export default function HabitsPage() {
       period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
       archivedAt: undefined,
     });
+    await addXp(30);
+    await addDiamonds(5);
+    await fetchUser();
     await fetchHabits(user.id, today);
     showToast("New habit created! +30 XP • +5 💎 added");
   };

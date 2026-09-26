@@ -99,10 +99,10 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
 
   if (!isOpen) return null;
 
-  const currentLevel = user?.level ?? 1;
-  const currentXp = user?.xp ?? 420;
-  const targetXp = currentLevel * 1000;
-  const xpPercent = Math.min(100, Math.round((currentXp / targetXp) * 100));
+  const currentXp = user?.xp ?? 0;
+  const currentLevel = user?.level ?? (Math.floor(currentXp / 500) + 1);
+  const targetXp = currentLevel * 500;
+  const xpPercent = Math.min(100, Math.round(((currentXp % 500) / 500) * 100));
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200">
