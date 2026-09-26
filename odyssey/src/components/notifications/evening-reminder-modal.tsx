@@ -107,7 +107,7 @@ export function EveningReminderModal() {
   const handleOpenSchedulePage = () => {
     handleDismiss();
     const tomorrowDayNum = getJourneyDayNumber(user?.createdAt) + 1;
-    router.push(`/planner?date=${tomorrowDateStr}&day=${tomorrowDayNum}`);
+    router.push(`/day-schedule?date=${tomorrowDateStr}&day=${tomorrowDayNum}`);
   };
 
   if (!isOpen) return null;
