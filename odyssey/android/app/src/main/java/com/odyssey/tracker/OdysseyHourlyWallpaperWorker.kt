@@ -11,7 +11,10 @@ import android.graphics.*
 import android.os.Build
 import android.util.Log
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * OdysseyHourlyWallpaperWorker
