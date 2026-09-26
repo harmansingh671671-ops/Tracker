@@ -59,38 +59,11 @@ export default function PlannerPage() {
     return `${year}-${month}-${day}`;
   };
 
-  const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      const d = p.get("date");
-      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-
-      try {
-        const saved = localStorage.getItem("odyssey_planner_selected_date");
-        if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
-      } catch {}
-    }
-    return getLocalDateStr();
-  });
+  const [currentHour, setCurrentHour] = useState<number>(0);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
-
-  // Frame-0 synchronous initial blocks load from cache
-  const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => {
-    const initDate = (() => {
-      if (typeof window !== "undefined") {
-        const p = new URLSearchParams(window.location.search);
-        const d = p.get("date");
-        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-        try {
-          const saved = localStorage.getItem("odyssey_planner_selected_date");
-          if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
-        } catch {}
-      }
-      return getLocalDateStr();
-    })();
-    return getCachedBlocks(initDate);
-  });
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
@@ -135,6 +108,39 @@ export default function PlannerPage() {
     }));
   };
 
+  // Mount initialization: restore query date or localStorage cache safely on client only
+  useEffect(() => {
+    setIsMounted(true);
+    const now = new Date();
+    setCurrentHour(now.getHours());
+    const today = getLocalDateStr(now);
+    setTodayStr(today);
+
+    let initialDate = today;
+    const p = new URLSearchParams(window.location.search);
+    const qDate = p.get("date");
+    if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) {
+      initialDate = qDate;
+      try {
+        localStorage.setItem("odyssey_planner_selected_date", qDate);
+        window.history.replaceState(null, "", window.location.pathname);
+      } catch {}
+    } else {
+      try {
+        const saved = localStorage.getItem("odyssey_planner_selected_date");
+        if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) {
+          initialDate = saved;
+        }
+      } catch {}
+    }
+
+    setSelectedDate(initialDate);
+    const cached = getCachedBlocks(initialDate);
+    if (cached.length > 0) {
+      setBlocks(cached);
+    }
+  }, []);
+
   // Persist selectedDate to localStorage whenever changed and keep ref updated
   const selectedDateRef = useRef(selectedDate);
   useEffect(() => {
@@ -145,22 +151,6 @@ export default function PlannerPage() {
       } catch {}
     }
   }, [selectedDate]);
-
-  // Consume incoming ?date= from Journey page or notifications on initial load
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      const d = p.get("date");
-      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        setSelectedDate(d);
-        try {
-          localStorage.setItem("odyssey_planner_selected_date", d);
-          // Clean URL so the query param doesn't lock future date switching
-          window.history.replaceState(null, "", window.location.pathname);
-        } catch {}
-      }
-    }
-  }, []);
 
   // Restore previously opened date when app is reopened/resumed from minimized state
   useEffect(() => {
@@ -798,13 +788,13 @@ export default function PlannerPage() {
             <span>Daily Schedule</span>
           </span>
           <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
-            <span>Scheduled: {categoryStats.plannedTotal} Hours</span>
+            <span suppressHydrationWarning>Scheduled: {categoryStats.plannedTotal} Hours</span>
             <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
           </div>
         </div>
 
         {/* Proportional Balance Bar */}
-        <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
+        <div suppressHydrationWarning className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
           {categoryStats.plannedTotal > 0 ? (
             <>
               <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
