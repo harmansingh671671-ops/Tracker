@@ -792,6 +792,15 @@ function DayScheduleContent() {
               >
                 <CheckCircle2 className="w-5 h-5" />
               </button>
+            ) : slot.status === "missed" ? (
+              <button
+                type="button"
+                onClick={() => handleToggleComplete(slot.block, slot.hour)}
+                title="Missed (tap to mark completed)"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
             ) : (
               <button
                 type="button"

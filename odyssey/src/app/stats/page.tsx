@@ -278,10 +278,10 @@ export default function StatsPage() {
         };
       }
 
-      const isReviewed = block.status === "completed" || block.status === "missed";
+      // All planned blocks (whether ticked, crossed, or neither) count as reviewed
       return {
         hour,
-        status: isReviewed ? ("reviewed" as const) : ("planned_unreviewed" as const),
+        status: "reviewed" as const,
         block,
       };
     });
@@ -717,11 +717,13 @@ export default function StatsPage() {
                   if (item.status === "reviewed") {
                     bgClass =
                       "bg-[#00E676] text-[#002f18] font-black border-[#69f0ae] shadow-[0_0_6px_rgba(0,230,118,0.45)]";
-                    statusTitle = `Reviewed: ${item.block?.title || "Completed"}`;
-                  } else if (item.status === "planned_unreviewed") {
-                    bgClass =
-                      "bg-amber-500 text-white font-bold border-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.4)]";
-                    statusTitle = `Planned (Unreviewed): ${item.block?.title || "Pending"}`;
+                    const statusPrefix =
+                      item.block?.status === "completed"
+                        ? "Done"
+                        : item.block?.status === "missed"
+                        ? "Missed"
+                        : "Scheduled";
+                    statusTitle = `Reviewed (${statusPrefix}): ${item.block?.title || "Focus"}`;
                   }
 
                   return (
@@ -738,10 +740,6 @@ export default function StatsPage() {
 
               {/* Hourly Heatmap Legend */}
               <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-outline/10 text-[9px] font-mono text-on-surface-variant">
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2 rounded-[2px] bg-amber-500 border border-amber-400 inline-block shadow-xs" />
-                  <span>Planned</span>
-                </div>
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-xs" />
                   <span>Reviewed</span>
