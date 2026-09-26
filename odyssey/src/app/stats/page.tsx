@@ -527,16 +527,9 @@ export default function StatsPage() {
               <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-primary transition-colors truncate">
                 Wallpaper Studio
               </h3>
-              <div className="flex items-center gap-2 text-xs font-mono text-on-surface-variant whitespace-nowrap">
-                <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                  <span>Live 60 FPS</span>
-                </span>
-                <span className="text-outline/40">•</span>
-                <span className="inline-flex items-center gap-1 text-on-surface-variant truncate">
-                  <span>Schedule Lockscreen</span>
-                </span>
-              </div>
+              <p className="text-xs font-mono text-on-surface-variant truncate">
+                Schedule Lockscreen
+              </p>
             </div>
           </div>
 
