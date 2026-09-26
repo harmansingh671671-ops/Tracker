@@ -15,16 +15,13 @@ import {
   clearNativeLockscreen,
   launchLiveWallpaperPicker,
   syncScheduleDataToNative,
-  triggerNativeTestNotification,
   setCustomTargetWallpaper,
   saveNativeCustomWallpaper,
   getNativeCustomWallpaper,
   clearNativeCustomWallpaper,
   applyNativeCustomWallpaper,
-  openSystemWallpaperChooser,
   pickNativeCustomWallpaperPhoto,
   isAndroidApp,
-  sendTestNotificationToAndroid,
 } from "@/lib/utils/android-bridge";
 import {
   Sparkles,
@@ -38,7 +35,6 @@ import {
   EyeOff,
   ShieldCheck,
   RefreshCw,
-  Bell,
   Loader2,
   Trash2,
 } from "lucide-react";
@@ -84,7 +80,7 @@ export default function WallpaperPage() {
       if (e.detail?.base64) {
         setCustomWallpaper(e.detail.base64);
         saveNativeCustomWallpaper(e.detail.base64);
-        showToast("Custom wallpaper stored! It will automatically replace Odyssey when turned off.");
+        showToast("Alternate wallpaper stored! It will automatically replace Odyssey when turned off.");
       }
     };
     window.addEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected);
@@ -216,7 +212,7 @@ export default function WallpaperPage() {
       if (base64) {
         saveNativeCustomWallpaper(base64);
         setCustomWallpaper(base64);
-        showToast("Custom wallpaper stored! It will automatically replace Odyssey when turned off.");
+        showToast("Alternate wallpaper stored! It will automatically replace Odyssey when turned off.");
       }
     } catch (err) {
       console.error("Failed to process photo:", err);
@@ -235,15 +231,15 @@ export default function WallpaperPage() {
     e.stopPropagation();
     clearNativeCustomWallpaper();
     setCustomWallpaper(null);
-    showToast("Custom restoration wallpaper removed.");
+    showToast("Alternate wallpaper removed.");
   };
 
   const handleApplyNow = () => {
     if (customWallpaper) {
       applyNativeCustomWallpaper("both");
-      showToast("Applied custom wallpaper to both Lock & Home screens.");
+      showToast("Applied alternate wallpaper to both Lock & Home screens.");
     } else {
-      showToast("No custom wallpaper stored yet. Tap to pick one first.");
+      showToast("No alternate wallpaper stored yet. Tap to pick one first.");
     }
   };
 
@@ -265,12 +261,6 @@ export default function WallpaperPage() {
     } else {
       showToast("Schedule wallpaper turned off.");
     }
-  };
-
-  const handleSendTestNotification = () => {
-    triggerNativeTestNotification();
-    sendTestNotificationToAndroid("NOW", "Deep Monotasking Sprint", "Focus");
-    showToast("Sent XX:57 Heads-Up test alert via Android notification engine.");
   };
 
   return (
@@ -313,9 +303,6 @@ export default function WallpaperPage() {
             className="w-full"
           />
         </div>
-        <p className="text-[11px] font-mono text-on-surface-variant text-center mt-2.5">
-          Live 2-Task Preview • Current & Upcoming Only
-        </p>
       </div>
 
       {/* Interactive Controls & Settings Deck */}
@@ -345,9 +332,6 @@ export default function WallpaperPage() {
                     RECOMMENDED
                   </span>
                 </div>
-                <p className="text-[11px] text-on-surface-variant mt-0.5 leading-tight">
-                  Smooth breathing aura, real-time minute beacon
-                </p>
               </div>
             </button>
 
@@ -364,9 +348,6 @@ export default function WallpaperPage() {
               </div>
               <div className="min-w-0">
                 <span className="text-xs font-bold text-on-surface">🖼️ Static Hourly</span>
-                <p className="text-[11px] text-on-surface-variant mt-0.5 leading-tight">
-                  Updates lockscreen canvas every hour in background
-                </p>
               </div>
             </button>
           </div>
@@ -415,14 +396,11 @@ export default function WallpaperPage() {
           </div>
         </div>
 
-        {/* 3. Unified Custom Restoration Wallpaper Section */}
+        {/* 3. Alternate Wallpaper Section */}
         <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-on-surface">Custom Restoration Wallpaper</h3>
-              <p className="text-xs text-on-surface-variant">
-                Stored wallpaper that replaces Odyssey on both Lock & Home screens when turning off
-              </p>
+              <h3 className="text-base font-bold text-on-surface">Alternate Wallpaper</h3>
             </div>
           </div>
 
@@ -463,7 +441,7 @@ export default function WallpaperPage() {
                   <>
                     <img
                       src={customWallpaper}
-                      alt="Custom restoration wallpaper"
+                      alt="Alternate wallpaper"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
@@ -525,32 +503,9 @@ export default function WallpaperPage() {
                 <span className="text-xs font-bold text-on-surface group-hover:text-primary transition-colors block">
                   {isProcessing ? "Processing Photo..." : "Open System Wallpaper Picker"}
                 </span>
-                <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 max-w-xs mx-auto">
-                  Select your custom photo from Gallery or Google Photos to be stored and restored when turning off Odyssey
-                </p>
               </div>
             </button>
           )}
-
-          {/* Quick Option: Open Android Device Wallpaper Settings */}
-          <div className="flex items-center justify-between pt-1 text-xs">
-            <span className="text-[11px] font-mono text-on-surface-variant">Device Wallpaper Settings:</span>
-            <button
-              type="button"
-              onClick={() => {
-                const res = openSystemWallpaperChooser();
-                if (res) {
-                  showToast("Opening Android System Wallpaper Chooser...");
-                } else {
-                  showToast("Android Wallpaper Chooser triggered.");
-                }
-              }}
-              className="text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Open Device Chooser</span>
-            </button>
-          </div>
         </div>
 
         {/* 4. Primary Activation Buttons */}
@@ -571,15 +526,6 @@ export default function WallpaperPage() {
           >
             <RefreshCw className="w-4 h-4 text-primary" />
             <span>Turn Off Wallpaper (Restore Selected Wallpaper)</span>
-          </button>
-
-          {/* Tertiary Test Notification Button */}
-          <button
-            onClick={handleSendTestNotification}
-            className="w-full py-2.5 px-4 rounded-xl bg-surface-container-low hover:bg-surface-container text-tertiary text-xs font-mono font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Bell className="w-4 h-4" />
-            <span>Send Test XX:57 Heads-Up Notification</span>
           </button>
         </div>
 
