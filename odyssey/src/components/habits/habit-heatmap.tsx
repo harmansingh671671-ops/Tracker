@@ -144,7 +144,7 @@ export function HabitHeatmap({
                   ? "Upcoming"
                   : "Not completed"
               }${day.isToday ? " • Today" : ""}`}
-              className={`aspect-[1.35/1] rounded-[5px] flex items-center justify-center text-[9px] font-mono transition-all select-none ${
+              className={`aspect-[1.15/1] sm:aspect-[1.2/1] min-h-[25px] sm:min-h-[28px] rounded-[5px] flex items-center justify-center text-[10px] font-mono transition-all select-none ${
                 day.isCompleted
                   ? `bg-primary text-on-primary font-bold shadow-xs shadow-primary/30 border border-primary/40 hover:brightness-110 active:scale-90 cursor-pointer ${
                       day.isToday ? "ring-2 ring-primary/80 ring-offset-1 ring-offset-surface-container" : ""
