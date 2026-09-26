@@ -880,7 +880,83 @@ function DayScheduleContent() {
           </div>
         ) : (
           <div className="flex flex-col space-y-1">
-            {full24Hours.map((slot) => renderHourSlot(slot))}
+            {hourGroups.map((group) => {
+              const isSleep = group.type === "sleep";
+              const isRecentlySaved =
+                recentlySavedHour !== null &&
+                (group.hours.includes(recentlySavedHour) || group.startHour === recentlySavedHour);
+              const isExpanded =
+                expandedGroupIds[group.id] !== undefined
+                  ? expandedGroupIds[group.id]
+                  : isRecentlySaved;
+              const cat = getCatStyle(group.category, group.isCustom);
+
+              // 1. Multiple Sleep Hours: Minimized to 1st hour by default with clean expand/collapse toggle
+              if (isSleep && group.hours.length > 1) {
+                return (
+                  <div
+                    key={group.id}
+                    className={`rounded-3xl border border-indigo-500/35 bg-indigo-950/20 p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                      isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
+                    }`}
+                  >
+                    {/* Render the 1st sleep hour slot */}
+                    {renderHourSlot(group.slots[0], { isInsideGroup: true, groupType: "sleep" })}
+
+                    {/* Minimized expand toggle */}
+                    {!isExpanded && (
+                      <button
+                        type="button"
+                        onClick={() => toggleGroupExpand(group.id, true)}
+                        className="w-full py-1.5 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none"
+                      >
+                        <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>
+                          +{group.hours.length - 1} more sleep hours ({String(group.slots[1].hour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00)
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {/* Expanded state: render remaining sleep slots and collapse toggle */}
+                    {isExpanded && (
+                      <>
+                        {group.slots.slice(1).map((slot) =>
+                          renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" })
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupExpand(group.id, false)}
+                          className="w-full py-1 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer select-none"
+                        >
+                          <span>Minimize sleep hours</span>
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+
+              // 2. Multi-hour same-category tasks: Grouped in same background with NO extra summary/duration banner!
+              if (group.isCustom && group.hours.length > 1) {
+                return (
+                  <div
+                    key={group.id}
+                    className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                      isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
+                    }`}
+                  >
+                    {group.slots.map((slot) =>
+                      renderHourSlot(slot, { isInsideGroup: true, groupType: group.type })
+                    )}
+                  </div>
+                );
+              }
+
+              // 3. Single Hour Slot
+              return renderHourSlot(group.slots[0]);
+            })}
           </div>
         )}
 
