@@ -406,7 +406,7 @@ export default function JourneyPage() {
                 <div
                   key={node.day}
                   ref={todayRef}
-                  className="relative flex flex-col items-center w-full"
+                  className={`relative flex flex-col items-center ${node.offset} transition-transform`}
                 >
                   {/* Today's Radiant Pulsing Beacon */}
                   <div className="relative flex items-center justify-center">
@@ -423,27 +423,13 @@ export default function JourneyPage() {
                     </button>
                   </div>
 
-                  {/* Attached Active Day Card */}
-                  <div className="w-full max-w-sm mt-3 bg-surface-container rounded-2xl p-4 shadow-xl border border-primary/30 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1 pr-2">
-                        <span className="text-[10px] font-mono uppercase text-primary font-bold">TODAY'S ANCHOR</span>
-                        <h3 className="text-base font-bold text-on-surface truncate">
-                          {dayName ? dayName : `Day ${node.day} Exploration`}
-                        </h3>
-                      </div>
-                      <span className="text-2xl shrink-0">🌱</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-mono font-semibold">
-                        +50 XP
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-secondary/10 text-secondary text-xs font-mono font-semibold">
-                        +10 💎
-                      </span>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDaySchedule(node.day)}
+                    className="mt-2 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 text-xs font-mono font-bold transition-colors cursor-pointer shadow-sm"
+                  >
+                    {dayName ? `${dayName} (Day ${node.day})` : `Day ${node.day} • Today`}
+                  </button>
                 </div>
               );
             }
