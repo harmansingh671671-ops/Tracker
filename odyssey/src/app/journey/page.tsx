@@ -215,7 +215,7 @@ export default function JourneyPage() {
 
   const handleOpenDaySchedule = (dayNum: number) => {
     const dateStr = getDateForJourneyDay(dayNum, user?.createdAt);
-    router.push(`/planner?date=${dateStr}&day=${dayNum}`);
+    router.push(`/day-schedule?date=${dateStr}&day=${dayNum}`);
   };
 
   return (

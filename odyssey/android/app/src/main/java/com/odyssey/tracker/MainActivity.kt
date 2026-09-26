@@ -169,12 +169,13 @@ class MainActivity : AppCompatActivity() {
                     this@MainActivity.filePathCallback?.onReceiveValue(null)
                     this@MainActivity.filePathCallback = filePathCallback
                     val intent = try {
-                        fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                        val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
                             type = "image/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
+                        Intent.createChooser(pickIntent, "Choose Wallpaper Image")
                     } catch (e: Exception) {
-                        Intent(Intent.ACTION_GET_CONTENT).apply {
+                        fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
                             type = "image/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }

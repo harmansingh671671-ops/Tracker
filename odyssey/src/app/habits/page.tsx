@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
+import { EditHabitModal } from "@/components/habits/edit-habit-modal";
+import { HabitHeatmap } from "@/components/habits/habit-heatmap";
 import { HabitIcon } from "@/components/habits/habit-icon";
+import { type Habit } from "@/lib/db";
 import {
   Plus,
   Flame,
@@ -12,8 +15,6 @@ import {
   Sparkles,
   Lock,
   CheckCircle2,
-  Trash2,
-  Clock,
 } from "lucide-react";
 
 const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -27,13 +28,20 @@ export default function HabitsPage() {
     fetchHabits,
     toggleHabitLog,
     addHabit,
+    updateHabit,
     deleteHabit,
   } = useHabitStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  // Long press / tap-and-hold timer refs
+  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef<boolean>(false);
+  const pressStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
     fetchUser().then((u) => {
@@ -83,10 +91,67 @@ export default function HabitsPage() {
     showToast("New habit created! +30 XP • +5 💎 added");
   };
 
-  const handleDeleteHabit = async (e: React.MouseEvent, habitId: string) => {
-    e.stopPropagation();
+  const handleUpdateHabit = async (
+    habitId: string,
+    updates: {
+      name: string;
+      icon: string;
+      category: any;
+      frequency: "daily" | "weekly";
+      targetDaysPerWeek: number;
+      period?: "morning" | "afternoon" | "evening";
+    }
+  ) => {
+    await updateHabit(habitId, updates);
+    if (user) await fetchHabits(user.id, today);
+    showToast("Habit updated.");
+  };
+
+  const handleDeleteHabit = async (habitId: string) => {
     await deleteHabit(habitId);
+    if (user) await fetchHabits(user.id, today);
     showToast("Habit deleted.");
+  };
+
+  // Long press gesture listeners
+  const startPress = (habit: Habit, e: React.TouchEvent | React.MouseEvent) => {
+    isLongPressRef.current = false;
+    if ("touches" in e) {
+      pressStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else {
+      pressStartPosRef.current = { x: e.clientX, y: e.clientY };
+    }
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setEditingHabit(habit);
+    }, 500);
+  };
+
+  const movePress = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!pressTimerRef.current) return;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const dist = Math.hypot(clientX - pressStartPosRef.current.x, clientY - pressStartPosRef.current.y);
+    if (dist > 12) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const endPress = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const handleCardClick = (habit: Habit) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    handleToggle(habit.id);
   };
 
   // Today's day index (0=Mon, 6=Sun)
@@ -197,7 +262,7 @@ export default function HabitsPage() {
       </div>
 
       {/* Habits List */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {habits.length === 0 ? (
           <div className="p-8 rounded-2xl bg-surface-container-low border border-outline/10 text-center space-y-3">
             <span className="text-3xl">🎯</span>
@@ -218,77 +283,88 @@ export default function HabitsPage() {
             return (
               <div
                 key={h.id}
-                onClick={() => handleToggle(h.id)}
-                className={`group flex items-center justify-between p-3.5 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border ${
+                onTouchStart={(e) => startPress(h, e)}
+                onTouchMove={movePress}
+                onTouchEnd={endPress}
+                onTouchCancel={endPress}
+                onMouseDown={(e) => startPress(h, e)}
+                onMouseMove={movePress}
+                onMouseUp={endPress}
+                onMouseLeave={endPress}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setEditingHabit(h);
+                }}
+                onClick={() => handleCardClick(h)}
+                className={`group flex flex-col p-4 rounded-2xl cursor-pointer transition-all duration-200 select-none border active:scale-[0.99] ${
                   isCompleted
-                    ? "bg-surface-container-low/80 border-primary/40 shadow-sm"
+                    ? "bg-surface-container-low/90 border-primary/40 shadow-sm"
                     : "bg-surface-container hover:bg-surface-container-high border-outline/10"
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Habit Icon Avatar */}
-                  <div
-                    className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-transform ${
-                      isCompleted
-                        ? "bg-primary/20 border border-primary/30"
-                        : "bg-surface-container-high group-hover:scale-105"
-                    }`}
-                  >
-                    <HabitIcon icon={h.icon} name={h.name} className="w-5 h-5 text-primary" />
+                {/* Main Card Header */}
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Habit Icon Avatar */}
+                    <div
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-transform ${
+                        isCompleted
+                          ? "bg-primary/20 border border-primary/30"
+                          : "bg-surface-container-high group-hover:scale-105"
+                      }`}
+                    >
+                      <HabitIcon icon={h.icon} name={h.name} className="w-5 h-5 text-primary" />
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4
+                          className={`text-sm font-semibold truncate ${
+                            isCompleted ? "text-on-surface line-through opacity-80" : "text-white"
+                          }`}
+                        >
+                          {h.name}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
+                        <span className="text-primary font-medium">{h.category || "Routine"}</span>
+                        <span>•</span>
+                        <span className="text-amber-400 flex items-center gap-0.5">
+                          <Flame className="w-3 h-3" />
+                          {h.currentStreak || 1}d
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4
-                        className={`text-sm font-semibold truncate ${
-                          isCompleted ? "text-on-surface line-through opacity-80" : "text-white"
-                        }`}
-                      >
-                        {h.name}
-                      </h4>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
-                      <span className="text-primary font-medium">{h.category || "Routine"}</span>
-                      <span>•</span>
-                      <span className="text-amber-400 flex items-center gap-0.5">
-                        <Flame className="w-3 h-3" />
-                        {h.currentStreak || 1}d
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                    <span className="text-[11px] font-mono text-primary font-bold hidden sm:inline">
+                      +15 XP
+                    </span>
+
+                    {/* Toggle Checkmark Circle Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggle(h.id);
+                      }}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                        isCompleted
+                          ? "bg-primary text-on-primary shadow-md shadow-primary/30"
+                          : "bg-surface-container-high text-on-surface-variant hover:text-on-surface border border-outline/15"
+                      }`}
+                    >
+                      <Check className={`w-5 h-5 font-bold ${isCompleted ? "stroke-[3]" : ""}`} />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 shrink-0 ml-2">
-                  <span className="text-[11px] font-mono text-primary font-bold hidden sm:inline">
-                    +15 XP
-                  </span>
-
-                  {/* Toggle Checkmark Circle Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggle(h.id);
-                    }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 ${
-                      isCompleted
-                        ? "bg-primary text-on-primary shadow-md shadow-primary/30"
-                        : "bg-surface-container-high text-on-surface-variant hover:text-on-surface border border-outline/15"
-                    }`}
-                  >
-                    <Check className={`w-5 h-5 font-bold ${isCompleted ? "stroke-[3]" : ""}`} />
-                  </button>
-
-                  {/* Delete Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteHabit(e, h.id)}
-                    className="p-1 text-on-surface-variant/40 hover:text-error transition-colors"
-                    title="Delete habit"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                {/* Heatmap Calendar with 10 columns covering ~month */}
+                <HabitHeatmap
+                  habitId={h.id}
+                  category={h.category}
+                />
               </div>
             );
           })
@@ -309,6 +385,16 @@ export default function HabitsPage() {
         onClose={() => setIsCreateModalOpen(false)}
         onSave={handleCreateHabit}
       />
+
+      {/* Edit Habit Modal */}
+      <EditHabitModal
+        habit={editingHabit}
+        isOpen={!!editingHabit}
+        onClose={() => setEditingHabit(null)}
+        onSave={handleUpdateHabit}
+        onDelete={handleDeleteHabit}
+      />
     </div>
   );
 }
+

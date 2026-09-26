@@ -18,12 +18,14 @@ export interface TemporaryWallet {
 interface HabitState {
   habits: Habit[];
   todayLogs: Record<string, HabitLog>; // habitId -> HabitLog
+  historyLogs: Record<string, Record<string, boolean>>; // habitId -> date -> completed boolean
   loading: boolean;
   temporaryWallet: TemporaryWallet;
   fetchHabits: (userId: string, date: string) => Promise<void>;
   fetchTemporaryWallet: (userId: string, today: string) => Promise<void>;
   claimTemporaryWallet: (userId: string, today: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'currentStreak' | 'longestStreak' | 'totalCompletions'>) => Promise<Habit>;
+  updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitLog: (userId: string, habitId: string, date: string) => Promise<boolean>;
   deleteHabit: (id: string) => Promise<void>;
   clearAllHabits: (userId: string) => Promise<void>;
@@ -40,6 +42,7 @@ const initialWallet: TemporaryWallet = {
 export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
   todayLogs: {},
+  historyLogs: {},
   loading: false,
   temporaryWallet: initialWallet,
 
@@ -58,15 +61,25 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         .toArray();
     }
 
-    const logs = await db.habitLogs
-      .where('[userId+date]')
-      .equals([userId, date])
+    const allUserLogs = await db.habitLogs
+      .where('userId')
+      .equals(userId)
       .toArray();
 
     const logsMap: Record<string, HabitLog> = {};
-    logs.forEach(l => { logsMap[l.habitId] = l; });
+    const historyMap: Record<string, Record<string, boolean>> = {};
 
-    set({ habits, todayLogs: logsMap, loading: false });
+    allUserLogs.forEach(l => {
+      if (l.date === date) {
+        logsMap[l.habitId] = l;
+      }
+      if (!historyMap[l.habitId]) {
+        historyMap[l.habitId] = {};
+      }
+      historyMap[l.habitId][l.date] = l.completed;
+    });
+
+    set({ habits, todayLogs: logsMap, historyLogs: historyMap, loading: false });
     await get().fetchTemporaryWallet(userId, date);
   },
 
@@ -170,8 +183,19 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     return newHabit;
   },
 
+  updateHabit: async (id, updates) => {
+    await db.habits.update(id, updates);
+    set((state) => ({
+      habits: state.habits.map((h) => (h.id === id ? { ...h, ...updates } : h)),
+    }));
+  },
+
   toggleHabitLog: async (userId, habitId, date) => {
-    const existingLog = get().todayLogs[habitId];
+    const existingLogs = await db.habitLogs
+      .where('[habitId+date]')
+      .equals([habitId, date])
+      .toArray();
+    const existingLog = existingLogs[0];
     const isCompleted = !(existingLog?.completed);
 
     if (existingLog) {
@@ -179,12 +203,6 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         completed: isCompleted,
         loggedAt: new Date().toISOString()
       });
-      set((state) => ({
-        todayLogs: {
-          ...state.todayLogs,
-          [habitId]: { ...existingLog, completed: isCompleted }
-        }
-      }));
     } else {
       const newLog: HabitLog = {
         id: uuidv4(),
@@ -195,13 +213,41 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         loggedAt: new Date().toISOString()
       };
       await db.habitLogs.add(newLog);
-      set((state) => ({
-        todayLogs: {
-          ...state.todayLogs,
-          [habitId]: newLog
-        }
-      }));
     }
+
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    set((state) => {
+      const updatedToday = { ...state.todayLogs };
+      if (date === todayStr) {
+        if (existingLog) {
+          updatedToday[habitId] = { ...existingLog, completed: isCompleted };
+        } else {
+          updatedToday[habitId] = {
+            id: uuidv4(),
+            habitId,
+            userId,
+            date,
+            completed: true,
+            loggedAt: new Date().toISOString()
+          };
+        }
+      }
+
+      const updatedHistory = { ...state.historyLogs };
+      if (!updatedHistory[habitId]) {
+        updatedHistory[habitId] = {};
+      }
+      updatedHistory[habitId] = {
+        ...updatedHistory[habitId],
+        [date]: isCompleted,
+      };
+
+      return {
+        todayLogs: updatedToday,
+        historyLogs: updatedHistory,
+      };
+    });
 
     // Update streak for this habit
     const habit = get().habits.find(h => h.id === habitId);
@@ -226,10 +272,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       }));
     }
 
-    // Note: Rewards are NOT awarded immediately to user.xp / user.diamonds.
-    // They accrue in today's escrow and move to the temporary wallet when the day ends!
     await get().fetchTemporaryWallet(userId, date);
-
     return isCompleted;
   },
 

@@ -675,7 +675,10 @@ export function applyNativeAlternateWallpaper(target: "lock" | "home" | "both" =
       return Boolean(window.Android.applyAlternateWallpaper(target));
     } catch {}
   }
-  return false;
+  // In web browser mode, verify that the photo is safely stored in local preferences
+  const checkTarget = target === "both" ? "lock" : target;
+  const saved = getNativeAlternateWallpaper(checkTarget);
+  return Boolean(saved && saved.length > 0);
 }
 
 export interface AppUpdateCheckResult {

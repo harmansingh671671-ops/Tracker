@@ -72,6 +72,17 @@ export default function WallpaperPage() {
   const [isProcessingLock, setIsProcessingLock] = useState(false);
   const [isProcessingHome, setIsProcessingHome] = useState(false);
 
+  const lockFileInputRef = useRef<HTMLInputElement>(null);
+  const homeFileInputRef = useRef<HTMLInputElement>(null);
+
+  const triggerPhotoPicker = (target: "lock" | "home") => {
+    const input = target === "lock" ? lockFileInputRef.current : homeFileInputRef.current;
+    if (input) {
+      input.value = "";
+      input.click();
+    }
+  };
+
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
 
   useEffect(() => {
@@ -161,31 +172,38 @@ export default function WallpaperPage() {
         }
 
         const img = new Image();
-        img.onerror = () => reject(new Error("Failed to decode image"));
+        img.onerror = () => {
+          // Fallback to raw base64 if canvas decoding fails
+          resolve(rawResult);
+        };
         img.onload = () => {
-          const MAX_WIDTH = 1440;
-          const MAX_HEIGHT = 2560;
-          let width = img.width;
-          let height = img.height;
+          try {
+            const MAX_WIDTH = 1440;
+            const MAX_HEIGHT = 2560;
+            let width = img.width;
+            let height = img.height;
 
-          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
-          }
+            if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+              const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
 
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(rawResult);
+              return;
+            }
+
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL("image/jpeg", 0.85);
+            resolve(compressed);
+          } catch {
             resolve(rawResult);
-            return;
           }
-
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL("image/jpeg", 0.85);
-          resolve(compressed);
         };
         img.src = rawResult;
       };
@@ -212,7 +230,11 @@ export default function WallpaperPage() {
       console.error("Failed to process photo:", err);
       showToast("Could not process photo. Please choose a different image.");
     } finally {
-      e.target.value = "";
+      if (e?.target) {
+        try {
+          e.target.value = "";
+        } catch {}
+      }
       if (target === "lock") setIsProcessingLock(false);
       else setIsProcessingHome(false);
     }
@@ -429,6 +451,22 @@ export default function WallpaperPage() {
             </div>
           </div>
 
+          {/* Hidden Native File Inputs */}
+          <input
+            ref={lockFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handlePhotoUpload(e, "lock")}
+          />
+          <input
+            ref={homeFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handlePhotoUpload(e, "home")}
+          />
+
           {/* Dual Thumbnail Upload Pickers */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {/* Lock Screen Photo Card */}
@@ -445,14 +483,18 @@ export default function WallpaperPage() {
               </div>
 
               {/* Clickable Image Box */}
-              <div className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handlePhotoUpload(e, "lock")}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                />
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => triggerPhotoPicker("lock")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    triggerPhotoPicker("lock");
+                  }
+                }}
+                className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none"
+              >
                 {isProcessingLock ? (
                   <div className="flex flex-col items-center gap-1.5 text-primary">
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -460,14 +502,18 @@ export default function WallpaperPage() {
                   </div>
                 ) : altLockPhoto ? (
                   <>
-                    <img src={altLockPhoto} alt="Lock screen alternate" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10 pointer-events-none">
+                    <img
+                      src={altLockPhoto}
+                      alt="Lock screen alternate"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
                       <Upload className="w-3.5 h-3.5" />
                       <span>Tap to change</span>
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors pointer-events-none">
+                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
                     <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
                     <span className="text-[10px] font-mono">Tap to choose photo</span>
                   </div>
@@ -476,21 +522,19 @@ export default function WallpaperPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <div className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => handlePhotoUpload(e, "lock")}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                  />
+                <button
+                  type="button"
+                  onClick={() => triggerPhotoPicker("lock")}
+                  disabled={isProcessingLock}
+                  className="flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 disabled:opacity-50"
+                >
                   {isProcessingLock ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary pointer-events-none" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5 pointer-events-none" />
+                    <Upload className="w-3.5 h-3.5" />
                   )}
-                  <span className="pointer-events-none">{isProcessingLock ? "Processing..." : "Change Photo"}</span>
-                </div>
+                  <span>{isProcessingLock ? "Processing..." : "Change Photo"}</span>
+                </button>
 
                 {altLockPhoto && (
                   <button
@@ -526,14 +570,18 @@ export default function WallpaperPage() {
               </div>
 
               {/* Clickable Image Box */}
-              <div className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handlePhotoUpload(e, "home")}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                />
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => triggerPhotoPicker("home")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    triggerPhotoPicker("home");
+                  }
+                }}
+                className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none"
+              >
                 {isProcessingHome ? (
                   <div className="flex flex-col items-center gap-1.5 text-primary">
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -541,14 +589,18 @@ export default function WallpaperPage() {
                   </div>
                 ) : altHomePhoto ? (
                   <>
-                    <img src={altHomePhoto} alt="Home screen alternate" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10 pointer-events-none">
+                    <img
+                      src={altHomePhoto}
+                      alt="Home screen alternate"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
                       <Upload className="w-3.5 h-3.5" />
                       <span>Tap to change</span>
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors pointer-events-none">
+                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
                     <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
                     <span className="text-[10px] font-mono">Tap to choose photo</span>
                   </div>
@@ -557,21 +609,19 @@ export default function WallpaperPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <div className="relative flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => handlePhotoUpload(e, "home")}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                  />
+                <button
+                  type="button"
+                  onClick={() => triggerPhotoPicker("home")}
+                  disabled={isProcessingHome}
+                  className="flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 disabled:opacity-50"
+                >
                   {isProcessingHome ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary pointer-events-none" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5 pointer-events-none" />
+                    <Upload className="w-3.5 h-3.5" />
                   )}
-                  <span className="pointer-events-none">{isProcessingHome ? "Processing..." : "Change Photo"}</span>
-                </div>
+                  <span>{isProcessingHome ? "Processing..." : "Change Photo"}</span>
+                </button>
 
                 {altHomePhoto && (
                   <button
