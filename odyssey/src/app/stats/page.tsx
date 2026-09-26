@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -23,12 +23,10 @@ import {
   Activity,
   Smartphone,
   ArrowRight,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Sparkles,
-  AlertCircle,
+  X,
 } from "lucide-react";
 
 const MONTH_NAMES = [
@@ -71,12 +69,12 @@ export default function StatsPage() {
 
   const [viewYear, setViewYear] = useState<number>(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState<number>(() => new Date().getMonth());
-  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
-    const y = new Date().getFullYear();
-    const m = String(new Date().getMonth() + 1).padStart(2, "0");
-    const d = String(new Date().getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  });
+  const [popupDate, setPopupDate] = useState<string | null>(null);
+
+  // Long press / tap-and-hold timer refs
+  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef<boolean>(false);
+  const pressStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
     fetchUser();
@@ -246,18 +244,61 @@ export default function StatsPage() {
     return cells;
   }, [viewYear, viewMonth, dayStatsByDate, allBlocks, user?.createdAt]);
 
-  const selectedDayStats = useMemo(() => {
-    if (!selectedDate) return null;
-    const jDay = getJourneyDayNumberForDate(selectedDate, user?.createdAt);
+  const popupDayStats = useMemo(() => {
+    if (!popupDate) return null;
+    const jDay = getJourneyDayNumberForDate(popupDate, user?.createdAt);
     return (
-      dayStatsByDate[selectedDate] ||
+      dayStatsByDate[popupDate] ||
       evaluateDayCompletion(
-        allBlocks.filter((b) => b.date === selectedDate),
-        selectedDate,
+        allBlocks.filter((b) => b.date === popupDate),
+        popupDate,
         jDay
       )
     );
-  }, [selectedDate, dayStatsByDate, allBlocks, user?.createdAt]);
+  }, [popupDate, dayStatsByDate, allBlocks, user?.createdAt]);
+
+  // Tap & hold (long press) gesture handlers
+  const startPress = (cell: (typeof monthCells)[0], e: React.TouchEvent | React.MouseEvent) => {
+    if (cell.isPad) return;
+    isLongPressRef.current = false;
+    if ("touches" in e) {
+      pressStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else {
+      pressStartPosRef.current = { x: e.clientX, y: e.clientY };
+    }
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setPopupDate(cell.dateStr);
+    }, 450);
+  };
+
+  const movePress = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!pressTimerRef.current) return;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const dist = Math.hypot(clientX - pressStartPosRef.current.x, clientY - pressStartPosRef.current.y);
+    if (dist > 10) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const endPress = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const handleCellClick = (cell: (typeof monthCells)[0]) => {
+    if (cell.isPad) return;
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    router.push(`/day-schedule?date=${cell.dateStr}&day=${cell.journeyDay}`);
+  };
 
   const weekBars = [
     { day: "M", hours: 6.8, heightPct: 78, primaryPct: 60, secPct: 40 },
@@ -408,16 +449,27 @@ export default function StatsPage() {
                 return <div key={`pad-${idx}`} className="w-full aspect-square" />;
               }
 
-              const isSelected = selectedDate === cell.dateStr;
               const isToday = cell.dateStr === todayStr;
-              const styles = getHeatmapCellStyles(cell.stats, isSelected, isToday);
+              const styles = getHeatmapCellStyles(cell.stats, false, isToday);
 
               return (
                 <button
                   key={cell.dateStr}
                   type="button"
-                  onClick={() => setSelectedDate(cell.dateStr)}
-                  title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}`}
+                  onTouchStart={(e) => startPress(cell, e)}
+                  onTouchMove={movePress}
+                  onTouchEnd={endPress}
+                  onTouchCancel={endPress}
+                  onMouseDown={(e) => startPress(cell, e)}
+                  onMouseMove={movePress}
+                  onMouseUp={endPress}
+                  onMouseLeave={endPress}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setPopupDate(cell.dateStr);
+                  }}
+                  onClick={() => handleCellClick(cell)}
+                  title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap to open schedule • Hold for overview`}
                   className={`w-full aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
                 >
                   <span className="leading-none">{cell.dayNumber}</span>
@@ -456,73 +508,6 @@ export default function StatsPage() {
             <span>100% Done</span>
           </div>
         </div>
-
-        {/* Selected Day Inspection & Schedule Jump */}
-        {selectedDayStats && (
-          <div className="mt-3 p-3.5 rounded-2xl bg-surface-container-lowest/80 border border-outline/15 space-y-2.5 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-primary uppercase">
-                  Day {selectedDayStats.dayNumber} Overview
-                </span>
-                <h4 className="text-xs font-bold text-on-surface">
-                  {selectedDayStats.date}
-                </h4>
-              </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                  selectedDayStats.status === "fully_completed"
-                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                    : selectedDayStats.status === "planned_unreviewed"
-                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                    : selectedDayStats.status === "mostly_reviewed" || selectedDayStats.status === "partially_reviewed"
-                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                    : "bg-surface-container text-on-surface-variant border-outline/10"
-                }`}
-              >
-                {selectedDayStats.status === "fully_completed"
-                  ? "100% Completed"
-                  : selectedDayStats.status === "planned_unreviewed"
-                  ? "Planned (0h Reviewed)"
-                  : selectedDayStats.status === "mostly_reviewed" || selectedDayStats.status === "partially_reviewed"
-                  ? `${selectedDayStats.reviewedHours}/${selectedDayStats.plannedHours}h Reviewed`
-                  : "Not Planned"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-mono">
-              <div className="p-1.5 rounded-xl bg-surface-container-low border border-outline/10">
-                <span className="text-[9px] text-on-surface-variant block">Planned</span>
-                <span className="font-bold text-primary">{selectedDayStats.plannedHours}h</span>
-              </div>
-              <div className="p-1.5 rounded-xl bg-surface-container-low border border-outline/10">
-                <span className="text-[9px] text-on-surface-variant block">Reviewed</span>
-                <span className="font-bold text-secondary">{selectedDayStats.reviewedHours}h</span>
-              </div>
-              <div className="p-1.5 rounded-xl bg-surface-container-low border border-outline/10">
-                <span className="text-[9px] text-on-surface-variant block">Completed</span>
-                <span className="font-bold text-emerald-400">{selectedDayStats.completedHours}h</span>
-              </div>
-              <div className="p-1.5 rounded-xl bg-surface-container-low border border-outline/10">
-                <span className="text-[9px] text-on-surface-variant block">Missed</span>
-                <span className="font-bold text-rose-400">{selectedDayStats.missedHours}h</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  `/day-schedule?date=${selectedDayStats.date}&day=${selectedDayStats.dayNumber}`
-                )
-              }
-              className="w-full py-2 px-3 rounded-xl bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
-            >
-              <span>Open Day {selectedDayStats.dayNumber} Schedule</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
       </div>
 
       {/* WALLPAPER STUDIO GATEWAY CARD */}
@@ -656,6 +641,97 @@ export default function StatsPage() {
           ))}
         </div>
       </div>
+
+      {/* Day Overview Pop-up Modal (Opens on Tap & Hold) */}
+      {popupDate && popupDayStats && (
+        <div
+          onClick={() => setPopupDate(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-sm rounded-3xl bg-surface-container border border-outline/20 p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider block">
+                  Day {popupDayStats.dayNumber} Overview
+                </span>
+                <h3 className="text-base font-bold text-on-surface truncate">
+                  {popupDayStats.date}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPopupDate(null)}
+                aria-label="Close Overview"
+                className="w-8 h-8 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Status Pill */}
+            <div>
+              <span
+                className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
+                  popupDayStats.status === "fully_completed"
+                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-[0_0_8px_rgba(52,211,153,0.3)]"
+                    : popupDayStats.status === "planned_unreviewed"
+                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
+                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                    : "bg-surface-container-low text-on-surface-variant border-outline/10"
+                }`}
+              >
+                {popupDayStats.status === "fully_completed"
+                  ? "100% Completed"
+                  : popupDayStats.status === "planned_unreviewed"
+                  ? "Planned (0h Reviewed)"
+                  : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
+                  ? `${popupDayStats.reviewedHours}/${popupDayStats.plannedHours}h Reviewed`
+                  : "Not Planned"}
+              </span>
+            </div>
+
+            {/* 4-Item Grid Metrics */}
+            <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
+              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block">Planned</span>
+                <span className="font-bold text-primary text-sm">{popupDayStats.plannedHours}h</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block">Reviewed</span>
+                <span className="font-bold text-secondary text-sm">{popupDayStats.reviewedHours}h</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block">Done</span>
+                <span className="font-bold text-emerald-400 text-sm">{popupDayStats.completedHours}h</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-surface-container-low border border-outline/10">
+                <span className="text-[10px] text-on-surface-variant block">Missed</span>
+                <span className="font-bold text-rose-400 text-sm">{popupDayStats.missedHours}h</span>
+              </div>
+            </div>
+
+            {/* Open Day Schedule Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setPopupDate(null);
+                router.push(
+                  `/day-schedule?date=${popupDayStats.date}&day=${popupDayStats.dayNumber}`
+                );
+              }}
+              className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary-container text-on-primary text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"
+            >
+              <span>Open Day {popupDayStats.dayNumber} Schedule</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
