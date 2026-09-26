@@ -518,7 +518,11 @@ export default function PlannerPage() {
 
   const renderHourSlot = (
     slot: (typeof full24Hours)[0],
-    options?: { isInsideGroup?: boolean; groupType?: string }
+    options?: {
+      isInsideGroup?: boolean;
+      groupType?: string;
+      expandToggle?: { isExpanded: boolean; onToggle: () => void };
+    }
   ) => {
     const isPastHour =
       selectedDate < todayStr ||
@@ -653,8 +657,26 @@ export default function PlannerPage() {
             </div>
           </div>
 
-          {/* Right Status: Tick / Cross for completed / missed hours */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right Status: Tick / Cross for completed / missed hours & Top-right Expand Arrow */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {options?.expandToggle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  options.expandToggle!.onToggle();
+                }}
+                aria-label={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
+                title={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
+                className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/25 flex items-center justify-center text-indigo-300 hover:text-white transition-all cursor-pointer"
+              >
+                {options.expandToggle.isExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+            )}
             {slot.status === "completed" ? (
               <button
                 type="button"
@@ -811,7 +833,7 @@ export default function PlannerPage() {
           const cat = getCatStyle(group.category, group.isCustom);
           const CatIcon = cat.Icon;
 
-          // 1. Multiple Sleep Hours: Minimized to 1st hour by default with clean expand/collapse toggle
+          // 1. Multiple Sleep Hours: Minimized to 1st hour by default with top-right arrow toggle
           if (isSleep && group.hours.length > 1) {
             return (
               <div
@@ -820,39 +842,21 @@ export default function PlannerPage() {
                   isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
                 }`}
               >
-                {/* Render the 1st sleep hour slot */}
-                {renderHourSlot(group.slots[0], { isInsideGroup: true, groupType: "sleep" })}
+                {/* Render the 1st sleep hour slot with down/up arrow toggle on top right */}
+                {renderHourSlot(group.slots[0], {
+                  isInsideGroup: true,
+                  groupType: "sleep",
+                  expandToggle: {
+                    isExpanded,
+                    onToggle: () => toggleGroupExpand(group.id),
+                  },
+                })}
 
-                {/* Minimized expand toggle */}
-                {!isExpanded && (
-                  <button
-                    type="button"
-                    onClick={() => toggleGroupExpand(group.id, true)}
-                    className="w-full py-1.5 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none"
-                  >
-                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>
-                      +{group.hours.length - 1} more sleep hours ({String(group.slots[1].hour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00)
-                    </span>
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </button>
-                )}
-
-                {/* Expanded state: render remaining sleep slots and collapse toggle */}
+                {/* Expanded state: render remaining sleep slots */}
                 {isExpanded && (
-                  <>
-                    {group.slots.slice(1).map((slot) =>
-                      renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" })
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleGroupExpand(group.id, false)}
-                      className="w-full py-1 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer select-none"
-                    >
-                      <span>Minimize sleep hours</span>
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    </button>
-                  </>
+                  group.slots.slice(1).map((slot) =>
+                    renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" })
+                  )
                 )}
               </div>
             );
