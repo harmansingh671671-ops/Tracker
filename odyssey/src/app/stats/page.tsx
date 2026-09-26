@@ -20,7 +20,6 @@ import {
   Clock,
   ShieldCheck,
   Award,
-  Activity,
   Smartphone,
   ArrowRight,
   ChevronLeft,
@@ -346,13 +345,9 @@ export default function StatsPage() {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
-      {/* Title & Filter */}
-      <div className="flex items-center justify-between pt-1">
+      {/* Title */}
+      <div className="pt-1">
         <h2 className="text-xl font-bold tracking-tight text-on-surface">Analytics &amp; Stats</h2>
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high text-secondary text-xs font-mono font-semibold border border-outline/10 shrink-0">
-          <Activity className="w-3.5 h-3.5" />
-          <span>Active</span>
-        </div>
       </div>
 
       {/* Hero Rank Card */}
