@@ -477,7 +477,7 @@ export default function StatsPage() {
           <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
             {monthCells.map((cell, idx) => {
               if (cell.isPad) {
-                return <div key={`pad-${idx}`} className="w-full aspect-[4/3] sm:aspect-square" />;
+                return <div key={`pad-${idx}`} className="w-full aspect-[1.35/1]" />;
               }
 
               const isToday = cell.dateStr === todayStr;
@@ -501,7 +501,7 @@ export default function StatsPage() {
                   }}
                   onClick={() => handleCellClick(cell)}
                   title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap to open schedule • Hold for overview`}
-                  className={`w-full aspect-[4/3] sm:aspect-square rounded-md flex flex-col items-center justify-center text-xs font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
+                  className={`w-full aspect-[1.35/1] rounded-[5px] flex flex-col items-center justify-center text-xs font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
                 >
                   <span className="leading-none">{cell.dayNumber}</span>
                 </button>
@@ -730,7 +730,7 @@ export default function StatsPage() {
                     <div
                       key={item.hour}
                       title={`${hourFormatted}:00 - ${nextHourFormatted}:00: ${statusTitle}`}
-                      className={`h-7 sm:h-8 rounded-md flex flex-col items-center justify-center text-[10px] font-mono border transition-all duration-150 select-none ${bgClass}`}
+                      className={`aspect-[1.5/1] rounded-[5px] flex flex-col items-center justify-center text-[10px] font-mono border transition-all duration-150 select-none ${bgClass}`}
                     >
                       <span className="leading-none">{hourFormatted}</span>
                     </div>
