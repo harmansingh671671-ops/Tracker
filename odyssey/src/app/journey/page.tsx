@@ -297,40 +297,16 @@ export default function JourneyPage() {
 
       {/* Gamified Winding Journey Road Canvas */}
       <div ref={containerRef} className="relative w-full flex flex-col items-center py-6">
-        {/* Fluid Curved Path Background SVG passing through the exact center of every icon */}
+        {/* Fluid Curved Path Background SVG passing through the exact center of every icon (No glow) */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
           fill="none"
         >
-          <defs>
-            <linearGradient id="journeyCompletedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#34d399" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="1" />
-            </linearGradient>
-            <filter id="journeyGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3.5" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-
-          {/* Completed Track Outer Glow */}
+          {/* Completed Solid Track */}
           {curvePaths.completedPath && (
             <path
               d={curvePaths.completedPath}
-              stroke="#10b981"
-              strokeWidth="8"
-              strokeOpacity="0.25"
-              strokeLinecap="round"
-              fill="none"
-              filter="url(#journeyGlow)"
-            />
-          )}
-
-          {/* Completed Vibrant Track */}
-          {curvePaths.completedPath && (
-            <path
-              d={curvePaths.completedPath}
-              stroke="url(#journeyCompletedGrad)"
+              stroke="#00E676"
               strokeWidth="4"
               strokeLinecap="round"
               fill="none"
@@ -341,9 +317,9 @@ export default function JourneyPage() {
           {curvePaths.upcomingPath && (
             <path
               d={curvePaths.upcomingPath}
-              stroke="rgba(148, 163, 184, 0.4)"
-              strokeWidth="3.5"
-              strokeDasharray="7 7"
+              stroke="#64748b"
+              strokeWidth="3"
+              strokeDasharray="6 6"
               strokeLinecap="round"
               fill="none"
             />
@@ -421,7 +397,7 @@ export default function JourneyPage() {
             }
 
             if (node.isPast) {
-              // Day completion styling based on schedule & review status
+              // Day completion styling with 100% solid opacity colors
               return (
                 <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform`}>
                   <button
@@ -430,23 +406,23 @@ export default function JourneyPage() {
                     onClick={() => handleOpenDaySchedule(node.day)}
                     className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 ${
                       dayStat.status === "fully_completed"
-                        ? "bg-primary text-on-primary shadow-primary/25 hover:ring-primary/40 ring-1 ring-emerald-300"
+                        ? "bg-[#00E676] text-[#002f18] font-black border-2 border-[#69f0ae] shadow-emerald-500/30 hover:ring-primary/40"
                         : dayStat.status === "planned_unreviewed"
-                        ? "bg-amber-500/20 border-2 border-amber-500 text-amber-400 shadow-amber-500/20 hover:ring-amber-400/40"
+                        ? "bg-amber-500 text-white font-bold border-2 border-amber-400 shadow-amber-500/30 hover:ring-amber-400/40"
                         : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed"
-                        ? "bg-emerald-800/40 border-2 border-emerald-500/70 text-emerald-400 shadow-emerald-500/20 hover:ring-emerald-400/40"
-                        : "bg-surface-container border-2 border-outline/30 text-on-surface-variant/50 hover:border-outline/50 hover:text-on-surface hover:ring-outline/40"
+                        ? "bg-emerald-600 text-white font-bold border-2 border-emerald-400 shadow-emerald-600/30 hover:ring-emerald-400/40"
+                        : "bg-surface-container-high border-2 border-outline/30 text-on-surface-variant hover:border-outline/50 hover:text-on-surface hover:ring-outline/40"
                     }`}
                     title={`Open Day ${node.day} Schedule (${dayStat.status})`}
                   >
                     {dayStat.status === "fully_completed" ? (
-                      <Check className="w-6 h-6 stroke-[3] group-hover:scale-110 transition-transform" />
+                      <Check className="w-6 h-6 stroke-[3] text-[#002f18] group-hover:scale-110 transition-transform" />
                     ) : dayStat.status === "planned_unreviewed" ? (
-                      <Clock className="w-5 h-5 group-hover:scale-110 transition-transform text-amber-400" />
+                      <Clock className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                     ) : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed" ? (
-                      <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform text-emerald-400" />
+                      <Sparkles className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                     ) : (
-                      <CircleDot className="w-5 h-5 group-hover:scale-110 transition-transform text-on-surface-variant/50" />
+                      <CircleDot className="w-5 h-5 text-on-surface-variant group-hover:scale-110 transition-transform" />
                     )}
                   </button>
                   <button
@@ -454,12 +430,12 @@ export default function JourneyPage() {
                     onClick={() => handleOpenDaySchedule(node.day)}
                     className={`mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-colors cursor-pointer border ${
                       dayStat.status === "fully_completed"
-                        ? "bg-surface-container hover:bg-surface-container-high text-emerald-400 border-emerald-500/20"
+                        ? "bg-surface-container hover:bg-surface-container-high text-[#00E676] border-[#00E676]/30 font-bold"
                         : dayStat.status === "planned_unreviewed"
-                        ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
+                        ? "bg-surface-container hover:bg-surface-container-high text-amber-400 border-amber-500/30 font-bold"
                         : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed"
-                        ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/20"
-                        : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant/70 border-outline/10"
+                        ? "bg-surface-container hover:bg-surface-container-high text-emerald-400 border-emerald-500/30 font-bold"
+                        : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant border-outline/10"
                     }`}
                   >
                     {customDayName ? (
@@ -480,28 +456,28 @@ export default function JourneyPage() {
 
             // Upcoming Node
             return (
-              <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform opacity-80 hover:opacity-100`}>
+              <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform opacity-100`}>
                 <button
                   type="button"
                   data-journey-node={node.day}
                   onClick={() => handleOpenDaySchedule(node.day)}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center border hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40 ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center border-2 hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40 ${
                     node.isMilestone
-                      ? "bg-secondary-container/60 border-secondary text-secondary shadow-md hover:bg-secondary-container"
-                      : "bg-surface-container border-outline/20 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                      ? "bg-secondary text-on-secondary border-secondary-container shadow-md hover:bg-secondary/90"
+                      : "bg-surface-container-high border-outline/30 text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
                   }`}
                   title={`Plan Day ${node.day} Schedule`}
                 >
                   {node.isMilestone ? (
-                    <Gift className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                    <Gift className="w-6 h-6 text-on-secondary group-hover:scale-110 transition-transform" />
                   ) : (
-                    <Lock className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    <Lock className="w-5 h-5 text-on-surface-variant group-hover:scale-110 transition-transform" />
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleOpenDaySchedule(node.day)}
-                  className="mt-1 px-2.5 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-mono transition-colors cursor-pointer"
+                  className="mt-1 px-2.5 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-mono transition-colors cursor-pointer border border-outline/10"
                 >
                   {customDayName
                     ? customDayName
