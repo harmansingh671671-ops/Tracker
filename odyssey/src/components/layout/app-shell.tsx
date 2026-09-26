@@ -10,9 +10,14 @@ import { usePathname } from "next/navigation";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
-  // Hide shell on root page and day-schedule (has its own header + back nav)
+  // Hide shell header/bottom-nav on root page and day-schedule (has its own header + back nav)
   if (pathname === "/" || pathname === "/day-schedule") {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        <AppUpdateModal />
+      </>
+    );
   }
 
   return (

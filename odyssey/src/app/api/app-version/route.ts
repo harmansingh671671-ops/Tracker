@@ -19,17 +19,17 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 5,
-    versionName: "1.3.0",
+    versionCode: 6,
+    versionName: "1.3.1",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
-    releaseDate: "2026-09-22",
+    releaseDate: "2026-09-26",
     mandatory: false,
     changelog: [
-      "2-Task Live Wallpaper: Redesigned wallpaper displaying strictly Current Task (NOW) & Upcoming Task (NEXT) with breathing pulse beacon",
-      "Mindful Rhythm App Redesign: Fluid obsidian slate aesthetic with Plus Jakarta Sans & JetBrains Mono typography",
-      "Chrono Stream Planner: Complete 24h timeline with inline hour editing modal and instant Dexie DB binding",
-      "Wallpaper Studio: Interactive 19.5:9 phone preview, clock overlay simulator, and dual alternate photo managers",
-      "Habit Vault: Redesigned daily habits with reward vault and streak multiplier preservation",
+      "2-Task Live Wallpaper 1:1 Parity: Perfectly aligned native lockscreen & live wallpaper with Wallpaper Studio preview",
+      "Breathing Beacon & Glowing Ring: Smooth pulse indicator on the active task and 24h spectrum timeline",
+      "Dynamic Schedule Sync: Instant background broadcast updates whenever tasks or habits change",
+      "ColorOS / Oppo & Multi-vendor Compatibility: Streamlined wallpaper picker and dual-screen restoration fallback",
+      "Bugfixes & Performance: Zero-drain background wake locks and optimized canvas rendering",
     ],
   };
 

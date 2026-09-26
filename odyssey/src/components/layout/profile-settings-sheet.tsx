@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
-import { sendTestNotificationToAndroid } from "@/lib/utils/android-bridge";
-import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck } from "lucide-react";
+import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk } from "@/lib/utils/android-bridge";
+import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw } from "lucide-react";
 
 interface ProfileSettingsSheetProps {
   isOpen: boolean;
@@ -269,6 +269,52 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           </div>
         </div>
 
+        {/* App Version & APK Updates */}
+        <div className="rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-on-surface">Odyssey Native App</h4>
+                <p className="text-xs text-on-surface-variant font-mono">v1.3.1 (Latest APK Release)</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-semibold">
+              Live OTA Ready
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              onClick={async () => {
+                showToast("Checking for newest release...");
+                const res = await checkForAppUpdate();
+                if (res && res.hasUpdate) {
+                  window.dispatchEvent(new CustomEvent("odyssey:check-update-modal", { detail: res }));
+                } else {
+                  showToast("You have the latest update (v1.3.1)!");
+                }
+              }}
+              className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-primary" />
+              <span>Check Updates</span>
+            </button>
+            <button
+              onClick={() => {
+                showToast("Downloading APK directly...");
+                downloadAndInstallNativeApk("/downloads/odyssey-latest.apk");
+              }}
+              className="py-2.5 px-3 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-primary/20"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download APK</span>
+            </button>
+          </div>
+        </div>
+
         {/* Engine Diagnostics */}
         <div className="rounded-xl bg-surface-container-lowest p-3 border border-outline/5 text-xs text-on-surface-variant leading-relaxed">
           <div className="flex items-center gap-2 mb-1">
@@ -276,7 +322,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
             <span className="font-mono font-bold uppercase text-[11px] text-on-surface">Odyssey Engine Status</span>
           </div>
           <p className="font-mono text-[11px]">
-            Hybrid Shell v1.0 • Vercel Instant Live Deployed • Battery Impact &lt;0.8%/day
+            Hybrid Shell v1.3.1 • Vercel Instant Live Deployed • Battery Impact &lt;0.8%/day
           </p>
         </div>
 
