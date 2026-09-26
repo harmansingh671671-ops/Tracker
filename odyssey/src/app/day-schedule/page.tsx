@@ -722,55 +722,31 @@ function DayScheduleContent() {
           />
           <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
             <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
-            <span className="text-on-surface-variant/30">•</span>
-            <span className="text-on-surface-variant/50">
-              {slot.startTime} → {formatHour((slot.hour + 1) % 24)}
-            </span>
           </div>
         </div>
 
-        {/* Right Status: Tick / Cross for completed / pending hours */}
+        {/* Right Status: Tick for completed / pending hours */}
         <div className="flex items-center gap-1.5 shrink-0">
           {slot.block ? (
-            <>
-              {isCompleted ? (
-                <button
-                  type="button"
-                  onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                  title="Completed (tap to revert)"
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                  title="Tap to mark completed"
-                  className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-              )}
-
+            isCompleted ? (
               <button
                 type="button"
-                onClick={() => handleClearBlock(slot.hour)}
-                title="Clear this block"
-                className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant/30 hover:text-error hover:bg-error-container/20 transition-colors cursor-pointer"
+                onClick={() => handleToggleComplete(slot.block, slot.hour)}
+                title="Completed (tap to revert)"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
               >
-                <Trash2 size={13} />
+                <CheckCircle2 className="w-5 h-5" />
               </button>
-            </>
-          ) : inputValue.trim().length > 0 ? (
-            <button
-              type="button"
-              onClick={() => handleClearBlock(slot.hour)}
-              title="Clear input"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant/30 hover:text-error transition-colors cursor-pointer"
-            >
-              <Trash2 size={13} />
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleToggleComplete(slot.block, slot.hour)}
+                title="Tap to mark completed"
+                className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+            )
           ) : (
             <div className="w-7 h-7" />
           )}
