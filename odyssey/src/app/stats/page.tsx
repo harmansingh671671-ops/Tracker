@@ -509,30 +509,6 @@ export default function StatsPage() {
             })}
           </div>
         </div>
-
-        {/* Heatmap Legend */}
-        <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-outline/10 text-[10px] font-mono text-on-surface-variant">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-[2px] bg-surface-container-highest/30 border border-outline/15 inline-block" />
-            <span>Empty</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-[2px] bg-amber-500 border border-amber-400 inline-block shadow-sm" />
-            <span>Planned (0 Rev)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-[2px] bg-emerald-700 border border-emerald-500/60 inline-block shadow-sm" />
-            <span>1h+ Rev</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-[2px] bg-emerald-500 border border-emerald-400 inline-block shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
-            <span>50%+ Rev</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-[0_0_10px_rgba(0,230,118,0.7)]" />
-            <span>100% Rev</span>
-          </div>
-        </div>
       </div>
 
       {/* WALLPAPER STUDIO GATEWAY CARD */}
