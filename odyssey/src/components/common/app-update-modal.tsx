@@ -17,49 +17,26 @@ export function AppUpdateModal() {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   useEffect(() => {
-    // 1. Strictly ignore regular Web Browser users (zero network request & zero delay)
-    if (!isAndroidNativeApp()) return;
-
-    let mounted = true;
-
-    async function check() {
-      try {
-        const result = await checkForAppUpdate();
-        if (!mounted || !result || !result.hasUpdate) return;
-
-        // Check if dismissed in this session
-        const dismissed = sessionStorage.getItem(`odyssey_dismissed_update_${result.latestVersionCode}`);
-        if (dismissed && !result.mandatory) {
-          return;
-        }
-
-        setUpdateInfo(result);
-        setIsOpen(true);
-      } catch {}
-    }
-
-    // Run in idle background time without stalling app load
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      (window as any).requestIdleCallback(() => check(), { timeout: 2000 });
-    } else {
-      setTimeout(check, 1000);
-    }
-
-    // Listen for custom trigger event (e.g. from Settings "Check for Updates")
-    const handleManualCheck = (e: Event) => {
+    // Listen for manual trigger event (e.g. from Settings "Check for Updates")
+    const handleManualCheck = async (e: Event) => {
       const customEvent = e as CustomEvent<AppUpdateCheckResult>;
       if (customEvent.detail) {
         setUpdateInfo(customEvent.detail);
         setIsOpen(true);
       } else {
-        check();
+        try {
+          const result = await checkForAppUpdate();
+          if (result && result.hasUpdate) {
+            setUpdateInfo(result);
+            setIsOpen(true);
+          }
+        } catch {}
       }
     };
 
     window.addEventListener("odyssey:check-update-modal", handleManualCheck);
 
     return () => {
-      mounted = false;
       window.removeEventListener("odyssey:check-update-modal", handleManualCheck);
     };
   }, []);
@@ -79,7 +56,9 @@ export function AppUpdateModal() {
   };
 
   const handleDismiss = () => {
-    sessionStorage.setItem(`odyssey_dismissed_update_${updateInfo.latestVersionCode}`, "true");
+    try {
+      localStorage.setItem(`odyssey_dismissed_update_${updateInfo.latestVersionCode}`, "true");
+    } catch {}
     setIsOpen(false);
   };
 
