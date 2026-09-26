@@ -557,14 +557,17 @@ function PlannerContent() {
         return;
       }
       handleOpenHour(slot.hour, slot.block, slot.hour + 1);
-    };
-
-    const handleTouchStart = () => {
+    };    const handleTouchStart = () => {
       if (!isPastHour) return;
       isLongPressTriggeredRef.current = false;
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = setTimeout(() => {
         isLongPressTriggeredRef.current = true;
+        if (typeof window !== "undefined" && window.getSelection) {
+          try {
+            window.getSelection()?.removeAllRanges();
+          } catch {}
+        }
         try {
           if (typeof window !== "undefined" && navigator?.vibrate) {
             navigator.vibrate(40);
@@ -594,6 +597,11 @@ function PlannerContent() {
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = setTimeout(() => {
         isLongPressTriggeredRef.current = true;
+        if (typeof window !== "undefined" && window.getSelection) {
+          try {
+            window.getSelection()?.removeAllRanges();
+          } catch {}
+        }
         handleOpenHour(slot.hour, slot.block, slot.hour + 1);
       }, 450);
     };
@@ -617,7 +625,7 @@ function PlannerContent() {
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onContextMenu={(e) => { if (isPastHour) e.preventDefault(); }}
+          onContextMenu={(e) => e.preventDefault()}
           className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${
             options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
           } my-1 shadow-sm ${
@@ -673,7 +681,7 @@ function PlannerContent() {
           </div>
 
           {/* Right Status: Tick / Cross for completed / missed hours & Top-right Expand Arrow */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {options?.expandToggle && (
               <button
                 type="button"
@@ -746,7 +754,7 @@ function PlannerContent() {
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onContextMenu={(e) => { if (isPastHour) e.preventDefault(); }}
+        onContextMenu={(e) => e.preventDefault()}
         className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
           isRecentlySaved
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"

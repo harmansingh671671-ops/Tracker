@@ -2,6 +2,23 @@
 @config "../../tailwind.config.ts";
 
 @layer base {
+  *,
+  *::before,
+  *::after {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  .selectable-text {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
+
   html,
   body {
     width: 100%;

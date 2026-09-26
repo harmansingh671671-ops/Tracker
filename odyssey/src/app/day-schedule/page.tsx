@@ -630,7 +630,8 @@ function DayScheduleContent() {
       <div
         key={`slot-${slot.hour}`}
         id={`hour-row-${slot.hour}`}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border ${
+        onContextMenu={(e) => e.preventDefault()}
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border select-none ${
           options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
         } ${cat.cardBorder} my-1 shadow-sm ${
           isRecentlySaved

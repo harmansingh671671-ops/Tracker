@@ -100,6 +100,11 @@ export function EditHourModal({
 
   useEffect(() => {
     if (isOpen) {
+      if (typeof window !== "undefined" && window.getSelection) {
+        try {
+          window.getSelection()?.removeAllRanges();
+        } catch {}
+      }
       setShouldRender(true);
       setIsClosing(false);
     } else if (shouldRender) {
@@ -143,18 +148,20 @@ export function EditHourModal({
   return (
     <div
       onClick={handleClose}
-      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md cursor-pointer ${
+      onContextMenu={(e) => e.preventDefault()}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md cursor-pointer select-none ${
         isClosing ? "modal-backdrop-out" : "modal-backdrop-in"
       }`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-lg bg-surface-container rounded-t-[28px] sm:rounded-[28px] border border-outline/15 shadow-2xl p-4 sm:p-5 space-y-3.5 cursor-default ${
+        onContextMenu={(e) => e.preventDefault()}
+        className={`w-full max-w-lg bg-surface-container rounded-t-[28px] sm:rounded-[28px] border border-outline/15 shadow-2xl p-4 sm:p-5 space-y-3.5 cursor-default select-none ${
           isClosing ? "modal-sheet-out" : "modal-sheet-in"
         }`}
       >
         {/* Header with Drag Handle & Close */}
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center select-none">
           <div className="w-10 h-1 rounded-full bg-outline/20 mb-2 sm:hidden" />
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -177,7 +184,7 @@ export function EditHourModal({
         <form onSubmit={handleSubmit} className="space-y-3.5">
           {/* Task Title Field - Empty by default */}
           <div className="space-y-1">
-            <label className="text-[11px] font-mono text-on-surface-variant font-medium tracking-wide">TASK TITLE</label>
+            <label className="text-[11px] font-mono text-on-surface-variant font-medium tracking-wide select-none block">TASK TITLE</label>
             <input
               type="text"
               value={title}

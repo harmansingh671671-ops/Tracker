@@ -299,6 +299,16 @@ export default function StatsPage() {
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
+      if (typeof window !== "undefined" && window.getSelection) {
+        try {
+          window.getSelection()?.removeAllRanges();
+        } catch {}
+      }
+      try {
+        if (typeof window !== "undefined" && navigator?.vibrate) {
+          navigator.vibrate(40);
+        }
+      } catch {}
       setPopupDate(cell.dateStr);
     }, 450);
   };

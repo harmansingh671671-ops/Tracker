@@ -94,6 +94,11 @@ export function DayScheduleModal({
 
   useEffect(() => {
     if (isOpen) {
+      if (typeof window !== "undefined" && window.getSelection) {
+        try {
+          window.getSelection()?.removeAllRanges();
+        } catch {}
+      }
       loadBlocks();
     }
   }, [isOpen, date, userId]);
@@ -303,8 +308,11 @@ export function DayScheduleModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg max-h-[92vh] flex flex-col bg-surface-container-high border border-outline/25 rounded-2xl shadow-2xl overflow-hidden">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none"
+    >
+      <div className="relative w-full max-w-lg max-h-[92vh] flex flex-col bg-surface-container-high border border-outline/25 rounded-2xl shadow-2xl overflow-hidden select-none">
         {/* Modal Top Header */}
         <div className="p-4 border-b border-outline/15 flex items-center justify-between shrink-0 bg-surface-container">
           <div className="flex flex-col min-w-0">
