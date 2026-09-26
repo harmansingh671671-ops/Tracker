@@ -275,16 +275,6 @@ export default function WallpaperPage() {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-12 pt-2 space-y-6">
-      {/* Sub-Header & Live Status Banner */}
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
-          <span className="text-xs font-mono font-bold text-on-surface">60 FPS Native Pipeline</span>
-        </div>
-        <span className="text-xs font-mono text-on-surface-variant">
-          Engine: {activeEngine === "live" ? "Dynamic Live" : "Static Lockscreen"}
-        </span>
-      </div>
 
       {/* Simulation Environment Mode Bar */}
       <div className="flex items-center justify-center">
