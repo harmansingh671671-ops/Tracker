@@ -474,10 +474,10 @@ export default function StatsPage() {
           </div>
 
           {/* Month Days Grid */}
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 w-full min-w-0">
             {monthCells.map((cell, idx) => {
               if (cell.isPad) {
-                return <div key={`pad-${idx}`} className="w-full aspect-[1.65/1] sm:aspect-[1.55/1]" />;
+                return <div key={`pad-${idx}`} className="w-full min-w-0 aspect-[1.35/1] sm:aspect-[1.3/1]" />;
               }
 
               const isToday = cell.dateStr === todayStr;
@@ -501,7 +501,7 @@ export default function StatsPage() {
                   }}
                   onClick={() => handleCellClick(cell)}
                   title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap to open schedule • Hold for overview`}
-                  className={`w-full aspect-[1.65/1] sm:aspect-[1.55/1] rounded-[4px] flex flex-col items-center justify-center text-[11px] font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
+                  className={`w-full min-w-0 aspect-[1.35/1] sm:aspect-[1.3/1] rounded-[4px] flex flex-col items-center justify-center text-[10.5px] font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
                 >
                   <span className="leading-none">{cell.dayNumber}</span>
                 </button>
@@ -707,7 +707,7 @@ export default function StatsPage() {
               </div>
 
               {/* 4x6 Grid of Rectangles with slightly curved edges */}
-              <div className="grid grid-cols-6 gap-1 w-full">
+              <div className="grid grid-cols-6 gap-1 w-full min-w-0">
                 {popupHourlyBlocks.map((item) => {
                   const hourFormatted = String(item.hour).padStart(2, "0");
                   const nextHourFormatted = String((item.hour + 1) % 24).padStart(2, "0");
@@ -730,7 +730,7 @@ export default function StatsPage() {
                     <div
                       key={item.hour}
                       title={`${hourFormatted}:00 - ${nextHourFormatted}:00: ${statusTitle}`}
-                      className={`aspect-[1.75/1] rounded-[4px] flex flex-col items-center justify-center text-[9.5px] font-mono border transition-all duration-150 select-none ${bgClass}`}
+                      className={`w-full min-w-0 aspect-[1.4/1] rounded-[4px] flex flex-col items-center justify-center text-[9.5px] font-mono border transition-all duration-150 select-none ${bgClass}`}
                     >
                       <span className="leading-none">{hourFormatted}</span>
                     </div>

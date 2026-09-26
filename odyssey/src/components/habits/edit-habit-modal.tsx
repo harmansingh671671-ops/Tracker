@@ -382,7 +382,7 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
               </div>
 
               {/* 10-Column Calendar Matrix Starting at 1st of Month */}
-              <div className="grid grid-cols-10 gap-1 sm:gap-1.5 w-full pt-1">
+              <div className="grid grid-cols-10 gap-1 w-full min-w-0 pt-1">
                 {historyCalendar.days.map((day) => {
                   const isNotScheduled = !day.isScheduled;
 
@@ -401,7 +401,7 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
                           ? "Upcoming"
                           : "Not completed"
                       }${day.isToday ? " • Today" : ""}`}
-                      className={`aspect-[1.15/1] sm:aspect-[1.2/1] min-h-[25px] sm:min-h-[28px] rounded-[5px] flex items-center justify-center text-[10px] font-mono transition-all select-none ${
+                      className={`w-full min-w-0 aspect-[1.15/1] rounded-[4px] flex items-center justify-center text-[9.5px] font-mono transition-all select-none ${
                         day.isCompleted
                           ? `bg-primary text-on-primary font-bold shadow-xs shadow-primary/30 border border-primary/40 hover:brightness-110 active:scale-90 cursor-pointer ${
                               day.isToday ? "ring-2 ring-primary/80 ring-offset-1 ring-offset-surface-container-low" : ""
