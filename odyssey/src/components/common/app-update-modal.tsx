@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles, Download, X, ArrowUpCircle, CheckCircle2, RefreshCw, Smartphone } from "lucide-react";
-import { checkForAppUpdate, downloadAndInstallNativeApk, AppUpdateCheckResult } from "@/lib/utils/android-bridge";
+import { checkForAppUpdate, downloadAndInstallNativeApk, isAndroidNativeApp, AppUpdateCheckResult } from "@/lib/utils/android-bridge";
 
 /**
  * AppUpdateModal
  *
- * Automatically detects newer APK releases from /api/app-version and displays
- * a sleek Obsidian update card with changelog highlights and direct download action.
+ * Checks for newer APK releases in the background strictly inside the native Android APK.
+ * Never runs or displays on regular web browsers.
  */
 export function AppUpdateModal() {
   const [updateInfo, setUpdateInfo] = useState<AppUpdateCheckResult | null>(null);
@@ -17,29 +17,33 @@ export function AppUpdateModal() {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   useEffect(() => {
+    // 1. Strictly ignore regular Web Browser users (zero network request & zero delay)
+    if (!isAndroidNativeApp()) return;
+
     let mounted = true;
 
     async function check() {
-      // Allow a brief moment after app load
-      await new Promise((r) => setTimeout(r, 1200));
-      if (!mounted) return;
+      try {
+        const result = await checkForAppUpdate();
+        if (!mounted || !result || !result.hasUpdate) return;
 
-      const result = await checkForAppUpdate();
-      if (!result || !result.hasUpdate) return;
+        // Check if dismissed in this session
+        const dismissed = sessionStorage.getItem(`odyssey_dismissed_update_${result.latestVersionCode}`);
+        if (dismissed && !result.mandatory) {
+          return;
+        }
 
-      // Check if dismissed in this browser session
-      const dismissed = sessionStorage.getItem(`odyssey_dismissed_update_${result.latestVersionCode}`);
-      if (dismissed && !result.mandatory) {
-        return;
-      }
-
-      if (mounted) {
         setUpdateInfo(result);
         setIsOpen(true);
-      }
+      } catch {}
     }
 
-    check();
+    // Run in idle background time without stalling app load
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(() => check(), { timeout: 2000 });
+    } else {
+      setTimeout(check, 1000);
+    }
 
     // Listen for custom trigger event (e.g. from Settings "Check for Updates")
     const handleManualCheck = (e: Event) => {

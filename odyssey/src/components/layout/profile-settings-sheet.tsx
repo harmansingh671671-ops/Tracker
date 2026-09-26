@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
-import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk } from "@/lib/utils/android-bridge";
+import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion, isAndroidNativeApp } from "@/lib/utils/android-bridge";
 import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw } from "lucide-react";
 
 interface ProfileSettingsSheetProps {
@@ -17,10 +17,16 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
   const [totalBlocks, setTotalBlocks] = useState(0);
   const [totalHabits, setTotalHabits] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [nativeVersion, setNativeVersion] = useState<{ versionCode: number; versionName: string; isNative: boolean }>({
+    versionCode: 0,
+    versionName: "Web",
+    isNative: false,
+  });
 
   useEffect(() => {
     if (isOpen) {
       fetchUser();
+      setNativeVersion(getNativeAppVersion());
       const saved = localStorage.getItem("odyssey_hourly_alerts");
       if (saved !== null) {
         setHourlyAlertsEnabled(saved === "true");
@@ -277,8 +283,14 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
                 <Smartphone className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-on-surface">Odyssey Native App</h4>
-                <p className="text-xs text-on-surface-variant font-mono">v1.3.1 (Latest APK Release)</p>
+                <h4 className="text-sm font-semibold text-on-surface">
+                  {nativeVersion.isNative ? "Odyssey Android App" : "Odyssey Web App"}
+                </h4>
+                <p className="text-xs text-on-surface-variant font-mono">
+                  {nativeVersion.isNative
+                    ? `Installed: v${nativeVersion.versionName} (Release v1.3.1)`
+                    : "v1.3.1 (Live Cloud Synced)"}
+                </p>
               </div>
             </div>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-semibold">
@@ -294,7 +306,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
                 if (res && res.hasUpdate) {
                   window.dispatchEvent(new CustomEvent("odyssey:check-update-modal", { detail: res }));
                 } else {
-                  showToast("You have the latest update (v1.3.1)!");
+                  showToast("You are on the latest version (v1.3.1)!");
                 }
               }}
               className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"

@@ -772,27 +772,37 @@ export interface AppUpdateCheckResult {
 }
 
 /**
+ * Checks whether the app is running inside the native Android APK wrapper.
+ */
+export function isAndroidNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(window.OdysseyAndroid || window.Android);
+}
+
+/**
  * Returns the currently installed native APK version info.
  */
-export function getNativeAppVersion(): { versionCode: number; versionName: string } {
-  if (typeof window === "undefined") return { versionCode: 1, versionName: "1.0" };
+export function getNativeAppVersion(): { versionCode: number; versionName: string; isNative: boolean } {
+  if (typeof window === "undefined") return { versionCode: 0, versionName: "Web", isNative: false };
 
   try {
     if (window.OdysseyAndroid?.getAppVersionCode) {
       return {
         versionCode: window.OdysseyAndroid.getAppVersionCode() || 1,
         versionName: window.OdysseyAndroid.getAppVersionName?.() || "1.0",
+        isNative: true,
       };
     }
     if (window.Android?.getAppVersionCode) {
       return {
         versionCode: window.Android.getAppVersionCode() || 1,
         versionName: window.Android.getAppVersionName?.() || "1.0",
+        isNative: true,
       };
     }
   } catch {}
 
-  return { versionCode: 1, versionName: "1.0" };
+  return { versionCode: 0, versionName: "Web", isNative: false };
 }
 
 /**
@@ -828,19 +838,29 @@ export function downloadAndInstallNativeApk(apkUrl: string): boolean {
 
 /**
  * Checks Vercel API for newer APK releases.
+ * Only returns hasUpdate=true for installed Android APKs running an older versionCode.
+ * Strictly returns null/false for regular Web Browser users.
  */
 export async function checkForAppUpdate(): Promise<AppUpdateCheckResult | null> {
   if (typeof window === "undefined") return null;
+
+  // 1. Strictly ignore regular Web Browser users
+  const current = getNativeAppVersion();
+  if (!current.isNative) {
+    return null;
+  }
 
   try {
     const res = await fetch("/api/app-version", { cache: "no-store" });
     if (!res.ok) return null;
 
     const data = await res.json();
-    const current = getNativeAppVersion();
+
+    // 2. Only show update if current native versionCode is strictly LOWER than latest release
+    const hasUpdate = Boolean(data.versionCode && data.versionCode > current.versionCode);
 
     return {
-      hasUpdate: data.versionCode > current.versionCode,
+      hasUpdate,
       currentVersionCode: current.versionCode,
       currentVersionName: current.versionName,
       latestVersionCode: data.versionCode,
