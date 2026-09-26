@@ -496,15 +496,15 @@ export default function StatsPage() {
             <span>Planned (0 Rev)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-800/60 border border-emerald-700/50 inline-block" />
+            <span className="w-2.5 h-2.5 rounded bg-emerald-700 border border-emerald-500/60 inline-block shadow-sm" />
             <span>1h+ Rev</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-600/80 border border-emerald-500/50 inline-block" />
+            <span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-400 inline-block shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
             <span>50%+ Rev</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-400 border border-emerald-300 inline-block shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
+            <span className="w-2.5 h-2.5 rounded bg-[#00E676] border border-[#69f0ae] inline-block shadow-[0_0_10px_rgba(0,230,118,0.7)]" />
             <span>100% Done</span>
           </div>
         </div>
@@ -677,11 +677,11 @@ export default function StatsPage() {
               <span
                 className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
                   popupDayStats.status === "fully_completed"
-                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-[0_0_8px_rgba(52,211,153,0.3)]"
+                    ? "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 shadow-[0_0_10px_rgba(0,230,118,0.3)]"
                     : popupDayStats.status === "planned_unreviewed"
                     ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
                     : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
-                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                     : "bg-surface-container-low text-on-surface-variant border-outline/10"
                 }`}
               >

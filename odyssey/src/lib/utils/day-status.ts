@@ -104,22 +104,22 @@ export function getHeatmapCellStyles(stats: DayCompletionStats, isSelected: bool
     glowClass = "shadow-[0_0_8px_rgba(245,158,11,0.45)]";
     label = `${stats.plannedHours}h Planned • Needs Review`;
   } else if (stats.status === "fully_completed") {
-    bgClass = "bg-emerald-400 hover:bg-emerald-300";
-    textClass = "text-[#003825] font-extrabold";
-    borderClass = "border-emerald-300 ring-1 ring-emerald-300";
-    glowClass = "shadow-[0_0_12px_rgba(52,211,153,0.7)]";
+    bgClass = "bg-[#00E676] hover:bg-[#39ef7d]";
+    textClass = "text-[#003319] font-black";
+    borderClass = "border-[#69f0ae] ring-1 ring-[#69f0ae]";
+    glowClass = "shadow-[0_0_14px_rgba(0,230,118,0.85)]";
     label = `100% Completed (${stats.plannedHours}h/${stats.plannedHours}h Reviewed)`;
   } else if (stats.status === "mostly_reviewed") {
-    bgClass = "bg-emerald-600/80 hover:bg-emerald-600";
-    textClass = "text-emerald-50 font-bold";
-    borderClass = "border-emerald-500/50";
-    glowClass = "shadow-[0_0_8px_rgba(16,185,129,0.35)]";
+    bgClass = "bg-emerald-500 hover:bg-emerald-400";
+    textClass = "text-[#002a14] font-bold";
+    borderClass = "border-emerald-400";
+    glowClass = "shadow-[0_0_8px_rgba(16,185,129,0.5)]";
     label = `${Math.round(stats.reviewRatio * 100)}% Reviewed (${stats.reviewedHours}h/${stats.plannedHours}h)`;
   } else if (stats.status === "partially_reviewed") {
-    bgClass = "bg-emerald-800/60 hover:bg-emerald-800/80";
-    textClass = "text-emerald-300 font-semibold";
-    borderClass = "border-emerald-700/50";
-    glowClass = "";
+    bgClass = "bg-emerald-700 hover:bg-emerald-600";
+    textClass = "text-emerald-100 font-bold";
+    borderClass = "border-emerald-500/60";
+    glowClass = "shadow-[0_0_6px_rgba(5,150,105,0.35)]";
     label = `${Math.round(stats.reviewRatio * 100)}% Reviewed (${stats.reviewedHours}h/${stats.plannedHours}h)`;
   }
 
