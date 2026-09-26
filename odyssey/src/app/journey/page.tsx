@@ -3,8 +3,10 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
+import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
+import { evaluateDayCompletion, type DayCompletionStats } from "@/lib/utils/day-status";
 import {
   Check,
   Bolt,
@@ -15,6 +17,8 @@ import {
   ChevronUp,
   Sparkles,
   Zap,
+  Clock,
+  CircleDot,
 } from "lucide-react";
 
 export default function JourneyPage() {
@@ -23,6 +27,7 @@ export default function JourneyPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
   const [isTodayInView, setIsTodayInView] = useState(true);
+  const [allBlocks, setAllBlocks] = useState<ScheduleBlock[]>([]);
 
   // Dynamic day range: allows extending infinitely forward and scrolling back to Day 1
   const [pastDaysCount, setPastDaysCount] = useState<number>(3);
@@ -38,6 +43,7 @@ export default function JourneyPage() {
 
   useEffect(() => {
     fetchUser();
+    db.scheduleBlocks.toArray().then(setAllBlocks);
   }, [fetchUser]);
 
   const activeDay = useMemo(() => {
@@ -53,34 +59,6 @@ export default function JourneyPage() {
   const targetXp = currentLevel * 1000;
   const xpPercent = Math.min(100, Math.round((currentXp / targetXp) * 100));
 
-  const [dayName, setDayName] = useState<string>("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const dateStr = getDateForJourneyDay(activeDay, user?.createdAt);
-        const saved =
-          localStorage.getItem(`odyssey_day_name_day_${activeDay}`) ||
-          (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
-          "";
-        setDayName(saved);
-      } catch {}
-    }
-  }, [activeDay, user?.createdAt]);
-
-  const handleUpdateDayName = (newName: string) => {
-    setDayName(newName);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(`odyssey_day_name_day_${activeDay}`, newName);
-        const dateStr = getDateForJourneyDay(activeDay, user?.createdAt);
-        if (dateStr) {
-          localStorage.setItem(`odyssey_day_name_${dateStr}`, newName);
-        }
-      } catch {}
-    }
-  };
-
   const startDay = useMemo(() => {
     return Math.max(1, activeDay - pastDaysCount);
   }, [activeDay, pastDaysCount]);
@@ -88,6 +66,17 @@ export default function JourneyPage() {
   const endDay = useMemo(() => {
     return activeDay + futureDaysCount;
   }, [activeDay, futureDaysCount]);
+
+  // Map of completion statistics for every day in range
+  const dayStatsMap = useMemo(() => {
+    const map: Record<number, DayCompletionStats> = {};
+    for (let d = startDay; d <= endDay; d++) {
+      const dateStr = getDateForJourneyDay(d, user?.createdAt);
+      const blocksForDay = allBlocks.filter((b) => b.date === dateStr);
+      map[d] = evaluateDayCompletion(blocksForDay, dateStr, d);
+    }
+    return map;
+  }, [allBlocks, startDay, endDay, user?.createdAt]);
 
   // Generate nodes from startDay (down to 1) to endDay (extended as user wants)
   const nodes = useMemo(() => {
@@ -246,6 +235,19 @@ export default function JourneyPage() {
     router.push(`/day-schedule?date=${dateStr}&day=${dayNum}`);
   };
 
+  const getSavedDayName = (dayNum: number, dateStr?: string) => {
+    if (typeof window === "undefined") return "";
+    try {
+      return (
+        localStorage.getItem(`odyssey_day_name_day_${dayNum}`) ||
+        (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
+        ""
+      );
+    } catch {
+      return "";
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-6">
       {/* Odyssey Progress Summary Banner */}
@@ -289,26 +291,6 @@ export default function JourneyPage() {
                 style={{ width: `${xpPercent}%` }}
               />
             </div>
-          </div>
-
-          {/* Quick Editing: Day Focus & Theme */}
-          <div className="pt-2 border-t border-outline/10 space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-primary" />
-                Day {activeDay} Focus &amp; Title
-              </span>
-              {dayName && (
-                <span className="text-[10px] font-mono text-emerald-400 font-semibold">Saved</span>
-              )}
-            </div>
-            <input
-              type="text"
-              value={dayName}
-              onChange={(e) => handleUpdateDayName(e.target.value)}
-              placeholder="e.g. Improve English, Be Happy, Enjoy Holidays..."
-              className="w-full py-2 px-3 rounded-xl bg-surface-container-low border border-outline/15 text-xs text-on-surface font-semibold focus:border-primary/50 focus:ring-1 focus:ring-primary/40 focus:outline-none placeholder:text-on-surface-variant/40 transition-all"
-            />
           </div>
         </div>
       </div>
@@ -401,6 +383,10 @@ export default function JourneyPage() {
         {/* Nodes Flow */}
         <div className="w-full flex flex-col items-center space-y-10 z-10">
           {nodes.map((node) => {
+            const dateStr = getDateForJourneyDay(node.day, user?.createdAt);
+            const dayStat = dayStatsMap[node.day] || evaluateDayCompletion([], dateStr, node.day);
+            const customDayName = getSavedDayName(node.day, dateStr);
+
             if (node.isCurrent) {
               return (
                 <div
@@ -428,30 +414,65 @@ export default function JourneyPage() {
                     onClick={() => handleOpenDaySchedule(node.day)}
                     className="mt-2 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 text-xs font-mono font-bold transition-colors cursor-pointer shadow-sm"
                   >
-                    {dayName ? `${dayName} (Day ${node.day})` : `Day ${node.day} • Today`}
+                    {customDayName ? `${customDayName} (Day ${node.day})` : `Day ${node.day} • Today`}
                   </button>
                 </div>
               );
             }
 
             if (node.isPast) {
+              // Day completion styling based on schedule & review status
               return (
                 <div key={node.day} className={`flex flex-col items-center ${node.offset} transition-transform`}>
                   <button
                     type="button"
                     data-journey-node={node.day}
                     onClick={() => handleOpenDaySchedule(node.day)}
-                    className="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md shadow-primary/20 hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40"
-                    title={`Open Day ${node.day} Schedule`}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 ${
+                      dayStat.status === "fully_completed"
+                        ? "bg-primary text-on-primary shadow-primary/25 hover:ring-primary/40 ring-1 ring-emerald-300"
+                        : dayStat.status === "planned_unreviewed"
+                        ? "bg-amber-500/20 border-2 border-amber-500 text-amber-400 shadow-amber-500/20 hover:ring-amber-400/40"
+                        : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed"
+                        ? "bg-emerald-800/40 border-2 border-emerald-500/70 text-emerald-400 shadow-emerald-500/20 hover:ring-emerald-400/40"
+                        : "bg-surface-container border-2 border-outline/30 text-on-surface-variant/50 hover:border-outline/50 hover:text-on-surface hover:ring-outline/40"
+                    }`}
+                    title={`Open Day ${node.day} Schedule (${dayStat.status})`}
                   >
-                    <Check className="w-6 h-6 stroke-[3] group-hover:scale-110 transition-transform" />
+                    {dayStat.status === "fully_completed" ? (
+                      <Check className="w-6 h-6 stroke-[3] group-hover:scale-110 transition-transform" />
+                    ) : dayStat.status === "planned_unreviewed" ? (
+                      <Clock className="w-5 h-5 group-hover:scale-110 transition-transform text-amber-400" />
+                    ) : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed" ? (
+                      <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform text-emerald-400" />
+                    ) : (
+                      <CircleDot className="w-5 h-5 group-hover:scale-110 transition-transform text-on-surface-variant/50" />
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleOpenDaySchedule(node.day)}
-                    className="mt-1 px-2.5 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-mono transition-colors cursor-pointer"
+                    className={`mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-colors cursor-pointer border ${
+                      dayStat.status === "fully_completed"
+                        ? "bg-surface-container hover:bg-surface-container-high text-emerald-400 border-emerald-500/20"
+                        : dayStat.status === "planned_unreviewed"
+                        ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
+                        : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed"
+                        ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/20"
+                        : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant/70 border-outline/10"
+                    }`}
                   >
-                    Day {node.day} Completed
+                    {customDayName ? (
+                      customDayName
+                    ) : dayStat.status === "fully_completed" ? (
+                      `Day ${node.day} Completed`
+                    ) : dayStat.status === "planned_unreviewed" ? (
+                      `Day ${node.day} Needs Review`
+                    ) : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed" ? (
+                      `Day ${node.day} (${dayStat.reviewedHours}/${dayStat.plannedHours}h)`
+                    ) : (
+                      `Day ${node.day} Incomplete`
+                    )}
                   </button>
                 </div>
               );
@@ -482,7 +503,11 @@ export default function JourneyPage() {
                   onClick={() => handleOpenDaySchedule(node.day)}
                   className="mt-1 px-2.5 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-mono transition-colors cursor-pointer"
                 >
-                  {node.isMilestone ? `Day ${node.day} Milestone Chest` : `Day ${node.day}`}
+                  {customDayName
+                    ? customDayName
+                    : node.isMilestone
+                    ? `Day ${node.day} Milestone Chest`
+                    : `Day ${node.day}`}
                 </button>
               </div>
             );

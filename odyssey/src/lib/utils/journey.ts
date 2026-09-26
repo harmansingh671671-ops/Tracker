@@ -63,3 +63,17 @@ export function getDateForJourneyDay(dayNum: number, createdAt?: string): string
   const d = String(targetDate.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+export function getJourneyDayNumberForDate(dateStr: string, createdAt?: string): number {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return 1;
+  const startStr = getJourneyStartDate(createdAt);
+  const [sy, sm, sd] = startStr.split("-").map(Number);
+  const startDateMidnight = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+
+  const [ty, tm, td] = dateStr.split("-").map(Number);
+  const targetDateMidnight = new Date(ty, tm - 1, td, 0, 0, 0, 0);
+
+  const diffMs = targetDateMidnight.getTime() - startDateMidnight.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 ? diffDays + 1 : 1;
+}

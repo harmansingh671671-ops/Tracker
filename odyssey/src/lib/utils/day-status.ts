@@ -1,0 +1,141 @@
+import { type ScheduleBlock } from "@/lib/db";
+
+export type DayReviewStatus =
+  | "empty" // No schedule planned (0 hours)
+  | "planned_unreviewed" // Schedule planned, but 0 hours reviewed (Orange)
+  | "partially_reviewed" // 1+ hours reviewed, <50% reviewed (Dim Green)
+  | "mostly_reviewed" // 50%+ reviewed, <100% or <18h (Medium Green)
+  | "fully_completed"; // Completely filled (>=18h) & 100% reviewed (Brightest Green)
+
+export interface DayCompletionStats {
+  date: string;
+  dayNumber: number;
+  plannedHours: number;
+  reviewedHours: number;
+  completedHours: number;
+  missedHours: number;
+  pendingHours: number;
+  reviewRatio: number;
+  isFullyFilled: boolean;
+  isFullyReviewed: boolean;
+  isCompletelyDone: boolean;
+  hasSchedule: boolean;
+  status: DayReviewStatus;
+}
+
+/**
+ * Evaluates the schedule planning & review status for a given calendar day.
+ * - If 0 blocks planned -> 'empty'
+ * - If blocks planned but 0 reviewed (all pending) -> 'planned_unreviewed' (Orange)
+ * - If at least 1 hour reviewed -> Green, where brightness scales:
+ *    * 'fully_completed' (>=18h planned and 100% reviewed) -> Brightest Emerald
+ *    * 'mostly_reviewed' (>=50% reviewed) -> Medium Green
+ *    * 'partially_reviewed' (1h to <50% reviewed) -> Dim Green
+ */
+export function evaluateDayCompletion(
+  blocksForDay: ScheduleBlock[] | undefined | null,
+  dateStr: string,
+  dayNumber: number
+): DayCompletionStats {
+  const blocks = blocksForDay || [];
+  const plannedHours = blocks.length;
+  const completedHours = blocks.filter((b) => b.status === "completed").length;
+  const missedHours = blocks.filter((b) => b.status === "missed").length;
+  const pendingHours = blocks.filter((b) => b.status === "pending" || !b.status).length;
+  const reviewedHours = completedHours + missedHours;
+
+  const hasSchedule = plannedHours > 0;
+  const reviewRatio = hasSchedule ? reviewedHours / plannedHours : 0;
+  // A day is considered fully filled if there are at least 18 planned hours (standard 24h schedule with sleep & wake blocks)
+  const isFullyFilled = plannedHours >= 18;
+  const isFullyReviewed = hasSchedule && reviewedHours === plannedHours;
+  const isCompletelyDone = isFullyFilled && isFullyReviewed;
+
+  let status: DayReviewStatus = "empty";
+  if (!hasSchedule) {
+    status = "empty";
+  } else if (reviewedHours === 0) {
+    status = "planned_unreviewed";
+  } else if (isCompletelyDone || (hasSchedule && isFullyReviewed && plannedHours >= 14)) {
+    status = "fully_completed";
+  } else if (reviewRatio >= 0.5) {
+    status = "mostly_reviewed";
+  } else {
+    status = "partially_reviewed";
+  }
+
+  return {
+    date: dateStr,
+    dayNumber,
+    plannedHours,
+    reviewedHours,
+    completedHours,
+    missedHours,
+    pendingHours,
+    reviewRatio,
+    isFullyFilled,
+    isFullyReviewed,
+    isCompletelyDone,
+    hasSchedule,
+    status,
+  };
+}
+
+/**
+ * Returns the CSS styling classes for the heatmap grid cell based on day status.
+ */
+export function getHeatmapCellStyles(stats: DayCompletionStats, isSelected: boolean = false, isToday: boolean = false): {
+  bgClass: string;
+  textClass: string;
+  borderClass: string;
+  glowClass: string;
+  label: string;
+} {
+  let bgClass = "bg-surface-container-highest/20";
+  let textClass = "text-on-surface-variant/40";
+  let borderClass = "border-outline/10";
+  let glowClass = "";
+  let label = "No Schedule Planned";
+
+  if (stats.status === "planned_unreviewed") {
+    bgClass = "bg-amber-500/90 hover:bg-amber-500";
+    textClass = "text-white font-bold";
+    borderClass = "border-amber-400";
+    glowClass = "shadow-[0_0_8px_rgba(245,158,11,0.45)]";
+    label = `${stats.plannedHours}h Planned • Needs Review`;
+  } else if (stats.status === "fully_completed") {
+    bgClass = "bg-emerald-400 hover:bg-emerald-300";
+    textClass = "text-[#003825] font-extrabold";
+    borderClass = "border-emerald-300 ring-1 ring-emerald-300";
+    glowClass = "shadow-[0_0_12px_rgba(52,211,153,0.7)]";
+    label = `100% Completed (${stats.plannedHours}h/${stats.plannedHours}h Reviewed)`;
+  } else if (stats.status === "mostly_reviewed") {
+    bgClass = "bg-emerald-600/80 hover:bg-emerald-600";
+    textClass = "text-emerald-50 font-bold";
+    borderClass = "border-emerald-500/50";
+    glowClass = "shadow-[0_0_8px_rgba(16,185,129,0.35)]";
+    label = `${Math.round(stats.reviewRatio * 100)}% Reviewed (${stats.reviewedHours}h/${stats.plannedHours}h)`;
+  } else if (stats.status === "partially_reviewed") {
+    bgClass = "bg-emerald-800/60 hover:bg-emerald-800/80";
+    textClass = "text-emerald-300 font-semibold";
+    borderClass = "border-emerald-700/50";
+    glowClass = "";
+    label = `${Math.round(stats.reviewRatio * 100)}% Reviewed (${stats.reviewedHours}h/${stats.plannedHours}h)`;
+  }
+
+  if (isToday) {
+    borderClass += " ring-2 ring-primary ring-offset-1 ring-offset-surface-container-low";
+  }
+
+  if (isSelected) {
+    borderClass += " ring-2 ring-white";
+  }
+
+  return {
+    bgClass,
+    textClass,
+    borderClass,
+    glowClass,
+    label,
+  };
+}
