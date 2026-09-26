@@ -565,121 +565,82 @@ export default function StatsPage() {
       {/* 2x2 KPI Matrix */}
       <div className="grid grid-cols-2 gap-3">
         {/* Completed Days */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2 overflow-hidden">
-          <div className="flex items-center justify-between text-xs whitespace-nowrap">
-            <span className="font-semibold text-amber-400 flex items-center gap-1">
-              <Flame className="w-4 h-4 shrink-0" />
-              <span>Streak</span>
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-400 font-bold">
-              Active
-            </span>
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+            <Flame className="w-4 h-4 shrink-0" />
+            <span>Streak</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-bold font-mono text-on-surface">{completedDaysCount}</span>
-              <span className="text-xs text-on-surface-variant">days done</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{completedDaysCount}</span>
+              <span className="text-xs text-on-surface-variant font-mono">days</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-on-surface-variant mt-1 whitespace-nowrap truncate">
-              <CheckCircle2 className="w-3 h-3 text-amber-400 shrink-0" />
-              <span className="truncate">Reviewed &amp; Filled</span>
-            </div>
+            <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
+              Completed
+            </p>
           </div>
         </div>
 
         {/* Diamonds */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2 overflow-hidden">
-          <div className="flex items-center justify-between text-xs whitespace-nowrap">
-            <span className="font-semibold text-primary flex items-center gap-1">
-              <Gem className="w-4 h-4 shrink-0" />
-              <span>Diamonds</span>
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/15 text-primary font-bold">
-              +35 wk
-            </span>
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+            <Gem className="w-4 h-4 shrink-0" />
+            <span>Diamonds</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-bold font-mono text-on-surface">{user?.diamonds || 0}</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{user?.diamonds || 0}</span>
               <span className="text-xs text-on-surface-variant">💎</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-on-surface-variant mt-1 whitespace-nowrap truncate">
-              <Gem className="w-3 h-3 text-primary shrink-0" />
-              <span className="truncate">Armory Vault</span>
-            </div>
+            <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
+              Armory Vault
+            </p>
           </div>
         </div>
 
         {/* Total XP */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2 overflow-hidden">
-          <div className="flex items-center justify-between text-xs whitespace-nowrap">
-            <span className="font-semibold text-secondary flex items-center gap-1">
-              <Zap className="w-4 h-4 shrink-0" />
-              <span>Total XP</span>
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold">
-              Lv. {currentLevel}
-            </span>
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-secondary">
+            <Zap className="w-4 h-4 shrink-0" />
+            <span>Total XP</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-bold font-mono text-on-surface">{currentXp}</span>
-              <span className="text-xs text-on-surface-variant">XP</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{currentXp}</span>
+              <span className="text-xs text-on-surface-variant font-mono">XP</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-on-surface-variant mt-1 whitespace-nowrap truncate">
-              <Zap className="w-3 h-3 text-secondary shrink-0" />
-              <span className="truncate">+{Math.max(0, targetXp - currentXp)} to Lv.{currentLevel + 1}</span>
-            </div>
+            <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
+              Level {currentLevel}
+            </p>
           </div>
         </div>
 
         {/* Adherence */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2 overflow-hidden">
-          <div className="flex items-center justify-between text-xs whitespace-nowrap">
-            <span className="font-semibold text-emerald-400 flex items-center gap-1">
-              <TrendingUp className="w-4 h-4 shrink-0" />
-              <span>Adherence</span>
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-400/15 text-emerald-400 font-bold">
-              Optimal
-            </span>
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+            <TrendingUp className="w-4 h-4 shrink-0" />
+            <span>Adherence</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-bold font-mono text-on-surface">93%</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">93%</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-on-surface-variant mt-1 whitespace-nowrap truncate">
-              <Clock className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span className="truncate">{totalPlannedHours}h Structured</span>
-            </div>
+            <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
+              {totalPlannedHours}h Planned
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Weekly Rhythm Adherence Chart */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low border border-outline/10 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-sm font-bold text-on-surface truncate">Weekly Rhythm Adherence</h3>
-            <div className="flex items-center gap-2 text-xs font-mono text-on-surface-variant mt-0.5 whitespace-nowrap">
-              <span className="inline-flex items-center gap-1 text-primary">
-                <Clock className="w-3.5 h-3.5 shrink-0" />
-                <span>46.5h / 50.0h</span>
-              </span>
-              <span className="text-outline/40">•</span>
-              <span className="inline-flex items-center gap-1 text-emerald-400">
-                <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-                <span>93% Adherence</span>
-              </span>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-surface-container text-primary font-mono text-xs font-bold border border-primary/20 shrink-0">
-            93% Goal
-          </span>
+      {/* Weekly Rhythm Chart */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low border border-outline/10 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-on-surface">Weekly Rhythm</h3>
+          <span className="text-xs font-mono text-primary font-bold">46.5h / 50h</span>
         </div>
 
         {/* Stacked Bars */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-end h-36 pt-2 pb-1">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-end h-32 pt-2 pb-1">
           {weekBars.map((bar, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1.5 h-full justify-end">
               <span className="text-[9px] font-mono text-on-surface-variant whitespace-nowrap">{bar.hours}h</span>
