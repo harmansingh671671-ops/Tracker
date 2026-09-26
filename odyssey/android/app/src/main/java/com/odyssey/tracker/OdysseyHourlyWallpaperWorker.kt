@@ -74,29 +74,6 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         Log.d(TAG, "Successfully refreshed lockscreen wallpaper for current hour!")
     }
 
-    data class BlockItem(
-        val startHour: Int,
-        val endHour: Int,
-        val startTime: String,
-        val endTime: String,
-        val title: String,
-        val category: String
-    )
-
-    data class HabitItem(
-        val name: String,
-        val icon: String,
-        val streak: Int,
-        val category: String
-    )
-
-    private data class CategoryBadge(
-        val label: String,
-        val textColor: Int,
-        val bgColor: Int,
-        val borderColor: Int
-    )
-
     private fun resolveEmoji(icon: String, name: String): String {
         val trimmed = icon.trim()
         if (trimmed.length in 1..4 && !trimmed.all { it.isLetterOrDigit() || it == '_' || it == '-' }) {
@@ -125,19 +102,19 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         }
     }
 
-    private fun getCategoryBadge(cat: String, h: Int): CategoryBadge {
+    private fun getCategoryBadge(cat: String, h: Int): WallpaperCategoryBadge {
         val c = cat.lowercase()
         return when {
             c.contains("sleep") || c.contains("rest") || (c.isEmpty() && (h < 6 || h >= 23)) ->
-                CategoryBadge("Rest", "#A5B4FC".toColorInt(), "#331E1B4B".toColorInt(), "#66818CF8".toColorInt())
+                WallpaperCategoryBadge("Rest", "#A5B4FC".toColorInt(), "#331E1B4B".toColorInt(), "#66818CF8".toColorInt())
             c.contains("habit") || c.contains("vitality") || c.contains("gym") || (c.isEmpty() && h in 6..7) ->
-                CategoryBadge("Vitality", "#34D399".toColorInt(), "#2610B981".toColorInt(), "#6610B981".toColorInt())
+                WallpaperCategoryBadge("Vitality", "#34D399".toColorInt(), "#2610B981".toColorInt(), "#6610B981".toColorInt())
             c.contains("sync") || c.contains("meeting") || (c.isEmpty() && h in 17..18) ->
-                CategoryBadge("Sync", "#38BDF8".toColorInt(), "#260284C7".toColorInt(), "#660284C7".toColorInt())
+                WallpaperCategoryBadge("Sync", "#38BDF8".toColorInt(), "#260284C7".toColorInt(), "#660284C7".toColorInt())
             c.contains("buffer") || c.contains("break") || c.contains("renewal") || (c.isEmpty() && h in 12..13) ->
-                CategoryBadge("Renewal", "#FCD34D".toColorInt(), "#26F59E0B".toColorInt(), "#66F59E0B".toColorInt())
+                WallpaperCategoryBadge("Renewal", "#FCD34D".toColorInt(), "#26F59E0B".toColorInt(), "#66F59E0B".toColorInt())
             else ->
-                CategoryBadge("Deep Focus", "#818CF8".toColorInt(), "#266366F1".toColorInt(), "#666366F1".toColorInt())
+                WallpaperCategoryBadge("Deep Focus", "#818CF8".toColorInt(), "#266366F1".toColorInt(), "#666366F1".toColorInt())
         }
     }
 
@@ -151,7 +128,7 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         val userStreak = json.optInt("userStreak", activeDay)
 
         // Parse user blocks
-        val userBlocks = mutableListOf<BlockItem>()
+        val userBlocks = mutableListOf<ScheduleBlockItem>()
         val savedDateStr = json.optString("dateStr", "")
         val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val isDateCurrent = savedDateStr.isEmpty() || savedDateStr == todayDateStr
@@ -169,12 +146,12 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
                 var eH = eTime.split(":").firstOrNull()?.toIntOrNull() ?: (sH + 1)
                 if (eTime == "24:00" || (eH == 0 && sH > 0)) eH = 24
 
-                userBlocks.add(BlockItem(sH, eH, sTime, eTime, title, category))
+                userBlocks.add(ScheduleBlockItem(sH, eH, sTime, eTime, title, category))
             }
         }
 
         // Parse user habits/hobbies
-        val userHabits = mutableListOf<HabitItem>()
+        val userHabits = mutableListOf<HobbyItem>()
         val habitsArr = json.optJSONArray("habits")
         if (habitsArr != null) {
             for (i in 0 until habitsArr.length()) {
@@ -183,7 +160,7 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
                 val hIcon = h.optString("icon", "🎯")
                 val hStreak = h.optInt("currentStreak", 1)
                 val hCategory = h.optString("category", "Habit Track")
-                userHabits.add(HabitItem(hName, hIcon, hStreak, hCategory))
+                userHabits.add(HobbyItem(hName, hIcon, hStreak, hCategory))
             }
         }
 
@@ -628,8 +605,8 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         val currentY = timelineEndY + hobGap
 
         if (userHabits.isEmpty()) {
-            userHabits.add(HabitItem("Mindful Focus", "🧘", userStreak, "Habit Track"))
-            userHabits.add(HabitItem("Daily Hydration", "💧", userStreak, "Vitality Track"))
+            userHabits.add(HobbyItem("Mindful Focus", "🧘", userStreak, "Habit Track"))
+            userHabits.add(HobbyItem("Daily Hydration", "💧", userStreak, "Vitality Track"))
         }
 
         val hobbiesCount = minOf(4, userHabits.size)

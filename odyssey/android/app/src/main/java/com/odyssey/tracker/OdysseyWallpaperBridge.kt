@@ -203,8 +203,8 @@ class OdysseyWallpaperBridge(
                     }
                     wallpaperManager.setBitmap(bitmap, null, true, flag)
                     if (targetScreen.lowercase() == "both") {
-                        try { wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
-                        try { wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM) } catch (_: Exception) {}
+                        try { wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK) } catch (e: Exception) {}
+                        try { wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM) } catch (e: Exception) {}
                     }
                 } else {
                     wallpaperManager.setBitmap(bitmap)
@@ -266,7 +266,7 @@ class OdysseyWallpaperBridge(
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(intent)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {}
 
             // 1. Check if user configured a custom restoration wallpaper
             val file = File(context.filesDir, "custom_restoration_wallpaper.png")
@@ -314,8 +314,8 @@ class OdysseyWallpaperBridge(
                         if (backupBitmap != null) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                                 wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
-                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
-                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_SYSTEM) } catch (_: Exception) {}
+                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK) } catch (e: Exception) {}
+                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_SYSTEM) } catch (e: Exception) {}
                             } else {
                                 wallpaperManager.setBitmap(backupBitmap)
                             }
@@ -332,8 +332,8 @@ class OdysseyWallpaperBridge(
             // 3. Fallback: Clear to system default
             if (!restored) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    try { wallpaperManager.clear(WallpaperManager.FLAG_LOCK) } catch (_: Exception) {}
-                    try { wallpaperManager.clear(WallpaperManager.FLAG_SYSTEM) } catch (_: Exception) {}
+                    try { wallpaperManager.clear(WallpaperManager.FLAG_LOCK) } catch (e: Exception) {}
+                    try { wallpaperManager.clear(WallpaperManager.FLAG_SYSTEM) } catch (e: Exception) {}
                 } else {
                     wallpaperManager.clear()
                 }

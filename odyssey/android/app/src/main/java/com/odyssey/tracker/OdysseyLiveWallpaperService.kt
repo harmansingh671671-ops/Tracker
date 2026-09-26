@@ -37,6 +37,13 @@ data class HobbyItem(
     val category: String,
 )
 
+data class WallpaperCategoryBadge(
+    val label: String,
+    val textColor: Int,
+    val bgColor: Int,
+    val borderColor: Int,
+)
+
 /**
  * OdysseyLiveWallpaperService
  * 
@@ -115,7 +122,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             handler.removeCallbacks(pulseRunnable)
             try {
                 unregisterReceiver(updateReceiver)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {}
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
@@ -173,26 +180,19 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             }
         }
 
-        private data class CategoryBadge(
-            val label: String,
-            val textColor: Int,
-            val bgColor: Int,
-            val borderColor: Int
-        )
-
-        private fun getCategoryBadge(cat: String, h: Int): CategoryBadge {
+        private fun getCategoryBadge(cat: String, h: Int): WallpaperCategoryBadge {
             val c = cat.lowercase()
             return when {
                 c.contains("sleep") || c.contains("rest") || (c.isEmpty() && (h < 6 || h >= 23)) ->
-                    CategoryBadge("Rest", "#A5B4FC".toColorInt(), "#331E1B4B".toColorInt(), "#66818CF8".toColorInt())
+                    WallpaperCategoryBadge("Rest", "#A5B4FC".toColorInt(), "#331E1B4B".toColorInt(), "#66818CF8".toColorInt())
                 c.contains("habit") || c.contains("vitality") || c.contains("gym") || (c.isEmpty() && h in 6..7) ->
-                    CategoryBadge("Vitality", "#34D399".toColorInt(), "#2610B981".toColorInt(), "#6610B981".toColorInt())
+                    WallpaperCategoryBadge("Vitality", "#34D399".toColorInt(), "#2610B981".toColorInt(), "#6610B981".toColorInt())
                 c.contains("sync") || c.contains("meeting") || (c.isEmpty() && h in 17..18) ->
-                    CategoryBadge("Sync", "#38BDF8".toColorInt(), "#260284C7".toColorInt(), "#660284C7".toColorInt())
+                    WallpaperCategoryBadge("Sync", "#38BDF8".toColorInt(), "#260284C7".toColorInt(), "#660284C7".toColorInt())
                 c.contains("buffer") || c.contains("break") || c.contains("renewal") || (c.isEmpty() && h in 12..13) ->
-                    CategoryBadge("Renewal", "#FCD34D".toColorInt(), "#26F59E0B".toColorInt(), "#66F59E0B".toColorInt())
+                    WallpaperCategoryBadge("Renewal", "#FCD34D".toColorInt(), "#26F59E0B".toColorInt(), "#66F59E0B".toColorInt())
                 else ->
-                    CategoryBadge("Deep Focus", "#818CF8".toColorInt(), "#266366F1".toColorInt(), "#666366F1".toColorInt())
+                    WallpaperCategoryBadge("Deep Focus", "#818CF8".toColorInt(), "#266366F1".toColorInt(), "#666366F1".toColorInt())
             }
         }
 
