@@ -15,6 +15,13 @@ import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+
 /**
  * MainActivity: Smart Native Hybrid Shell for Odyssey.
  *
@@ -39,6 +46,17 @@ class MainActivity : AppCompatActivity() {
     private var pendingOpenHour: Int = -1
     private var filePathCallback: android.webkit.ValueCallback<Array<Uri>>? = null
 
+    private val photoPickerLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val uri = result.data?.data ?: result.data?.clipData?.getItemAt(0)?.uri
+            if (uri != null) {
+                handleSelectedPhotoUri(uri)
+            }
+        }
+    }
+
     private val fileChooserLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -57,6 +75,78 @@ class MainActivity : AppCompatActivity() {
             filePathCallback?.onReceiveValue(uris)
             filePathCallback = null
         }
+    }
+
+    fun launchPhotoPicker() {
+        val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "image/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        val chooser = Intent.createChooser(pickIntent, "Select Wallpaper Photo")
+        try {
+            photoPickerLauncher.launch(chooser)
+        } catch (e: Exception) {
+            try {
+                val galleryIntent = Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                photoPickerLauncher.launch(galleryIntent)
+            } catch (e2: Exception) {
+                android.util.Log.e("OdysseyNative", "Could not launch photo picker: ${e2.message}")
+            }
+        }
+    }
+
+    private fun handleSelectedPhotoUri(uri: Uri) {
+        Thread {
+            try {
+                val inputStream = contentResolver.openInputStream(uri) ?: return@Thread
+                val originalBitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                if (originalBitmap == null) return@Thread
+
+                // Scale to max 1440x2560 maintaining aspect ratio
+                val maxW = 1440
+                val maxH = 2560
+                val width = originalBitmap.width
+                val height = originalBitmap.height
+                val scaledBitmap = if (width > maxW || height > maxH) {
+                    val ratio = Math.min(maxW.toFloat() / width, maxH.toFloat() / height)
+                    val newW = (width * ratio).toInt()
+                    val newH = (height * ratio).toInt()
+                    Bitmap.createScaledBitmap(originalBitmap, newW, newH, true)
+                } else {
+                    originalBitmap
+                }
+
+                // Save to internal app storage custom_restoration_wallpaper.png
+                val file = File(filesDir, "custom_restoration_wallpaper.png")
+                FileOutputStream(file).use { out ->
+                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                }
+
+                // Convert to Base64
+                val baos = ByteArrayOutputStream()
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos)
+                val base64Bytes = baos.toByteArray()
+                val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(base64Bytes, Base64.NO_WRAP)
+
+                val prefs = getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("saved_custom_wallpaper", base64Str)
+                    .putString("alternate_lock_wallpaper", base64Str)
+                    .putString("alternate_home_wallpaper", base64Str)
+                    .commit()
+
+                // Notify WebView JavaScript
+                runOnUiThread {
+                    val escapedBase64 = base64Str.replace("'", "\\'")
+                    val js = "(function(){ window.dispatchEvent(new CustomEvent('odyssey:custom-wallpaper-selected', { detail: { base64: '$escapedBase64' } })); })();"
+                    webView.evaluateJavascript(js, null)
+                }
+                android.util.Log.d("OdysseyNative", "Successfully selected and stored custom restoration wallpaper")
+            } catch (e: Exception) {
+                android.util.Log.e("OdysseyNative", "Error processing selected wallpaper uri: ${e.message}", e)
+            }
+        }.start()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -110,7 +200,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Injects Odyssey Wallpaper Bridge into window.OdysseyAndroid and window.Android
-            val bridge = OdysseyWallpaperBridge(this@MainActivity)
+            val bridge = OdysseyWallpaperBridge(this@MainActivity, this@MainActivity)
             addJavascriptInterface(bridge, "OdysseyAndroid")
             addJavascriptInterface(bridge, "Android")
 

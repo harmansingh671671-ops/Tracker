@@ -30,6 +30,7 @@ declare global {
       getCustomWallpaper?: () => string;
       clearCustomWallpaper?: () => boolean;
       applyCustomWallpaper?: (targetScreen: string) => boolean;
+      pickCustomWallpaperPhoto?: () => boolean;
       saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
       getAlternateWallpaper?: (targetScreen: string) => string;
       applyAlternateWallpaper?: (targetScreen: string) => boolean;
@@ -59,6 +60,7 @@ declare global {
       getCustomWallpaper?: () => string;
       clearCustomWallpaper?: () => boolean;
       applyCustomWallpaper?: (targetScreen: string) => boolean;
+      pickCustomWallpaperPhoto?: () => boolean;
       saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
       getAlternateWallpaper?: (targetScreen: string) => string;
       applyAlternateWallpaper?: (targetScreen: string) => boolean;
@@ -493,6 +495,25 @@ export function triggerNativeTestNotification(): boolean {
   if (window.Android?.triggerTestNotification) {
     try {
       return Boolean(window.Android.triggerTestNotification());
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Opens the native Android Photo / Gallery picker to directly select
+ * and store a custom restoration wallpaper.
+ */
+export function pickNativeCustomWallpaperPhoto(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.pickCustomWallpaperPhoto) {
+    try {
+      return Boolean(window.OdysseyAndroid.pickCustomWallpaperPhoto());
+    } catch {}
+  }
+  if (window.Android?.pickCustomWallpaperPhoto) {
+    try {
+      return Boolean(window.Android.pickCustomWallpaperPhoto());
     } catch {}
   }
   return false;

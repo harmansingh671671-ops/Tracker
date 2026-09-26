@@ -71,8 +71,12 @@ class OdysseyLiveWallpaperService : WallpaperService() {
         private val pulseRunnable = object : Runnable {
             override fun run() {
                 if (visible) {
+                    val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
+                    val isEnabled = prefs.getBoolean("wallpaper_enabled", true)
                     drawFrame()
-                    handler.postDelayed(this, 33) // ~30 FPS silky-smooth organic breathing
+                    if (isEnabled) {
+                        handler.postDelayed(this, 33) // ~30 FPS silky-smooth organic breathing
+                    }
                 }
             }
         }
@@ -160,6 +164,39 @@ class OdysseyLiveWallpaperService : WallpaperService() {
         private fun renderWallpaper(canvas: Canvas) {
             val width = canvas.width.toFloat()
             val height = canvas.height.toFloat()
+
+            val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
+            val isEnabled = prefs.getBoolean("wallpaper_enabled", true)
+
+            // When user turned off Odyssey wallpaper, restore custom photo or render sleek clean canvas
+            if (!isEnabled) {
+                val customFile = java.io.File(filesDir, "custom_restoration_wallpaper.png")
+                val customBitmap = if (customFile.exists()) {
+                    BitmapFactory.decodeFile(customFile.absolutePath)
+                } else null
+
+                if (customBitmap != null) {
+                    val canvasRatio = width / height
+                    val bitmapRatio = customBitmap.width.toFloat() / customBitmap.height.toFloat()
+                    val cropSrc = if (bitmapRatio > canvasRatio) {
+                        val newSrcW = (customBitmap.height * canvasRatio).toInt()
+                        val srcX = (customBitmap.width - newSrcW) / 2
+                        Rect(srcX, 0, srcX + newSrcW, customBitmap.height)
+                    } else {
+                        val newSrcH = (customBitmap.width / canvasRatio).toInt()
+                        val srcY = (customBitmap.height - newSrcH) / 2
+                        Rect(0, srcY, customBitmap.width, srcY + newSrcH)
+                    }
+                    val dstRect = RectF(0f, 0f, width, height)
+                    val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                    canvas.drawBitmap(customBitmap, cropSrc, dstRect, p)
+                    return
+                }
+
+                // If no custom photo is stored, render clean dark OLED canvas
+                canvas.drawColor("#090A0F".toColorInt())
+                return
+            }
 
             // 1. OLED Pure Dark Background
             canvas.drawColor("#090A0F".toColorInt())

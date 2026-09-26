@@ -22,6 +22,7 @@ import {
   clearNativeCustomWallpaper,
   applyNativeCustomWallpaper,
   openSystemWallpaperChooser,
+  pickNativeCustomWallpaperPhoto,
   isAndroidApp,
   sendTestNotificationToAndroid,
 } from "@/lib/utils/android-bridge";
@@ -56,7 +57,11 @@ export default function WallpaperPage() {
 
   const customFileInputRef = useRef<HTMLInputElement>(null);
 
-  const triggerSystemPicker = () => {
+  const handleOpenPhotoPicker = () => {
+    if (isAndroidApp()) {
+      const launched = pickNativeCustomWallpaperPhoto();
+      if (launched) return;
+    }
     if (customFileInputRef.current) {
       customFileInputRef.current.value = "";
       customFileInputRef.current.click();
@@ -74,6 +79,19 @@ export default function WallpaperPage() {
 
     const saved = getNativeCustomWallpaper();
     if (saved) setCustomWallpaper(saved);
+
+    const onNativePhotoSelected = (e: any) => {
+      if (e.detail?.base64) {
+        setCustomWallpaper(e.detail.base64);
+        saveNativeCustomWallpaper(e.detail.base64);
+        showToast("Custom wallpaper stored! It will automatically replace Odyssey when turned off.");
+      }
+    };
+    window.addEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected);
+
+    return () => {
+      window.removeEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected);
+    };
   }, [fetchUser, fetchHabits, user?.id]);
 
   const showToast = (msg: string) => {
@@ -418,6 +436,15 @@ export default function WallpaperPage() {
             </div>
           </div>
 
+          {/* Hidden HTML File Input for Web Browser fallback */}
+          <input
+            ref={customFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+
           {customWallpaper ? (
             /* Saved Wallpaper Preview & Control */
             <div className="p-3 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/10">
@@ -432,18 +459,11 @@ export default function WallpaperPage() {
                 </span>
               </div>
 
-              {/* Image Preview Box - Tappable Label for direct OS photo picker */}
-              <label
-                htmlFor="wallpaper-file-input"
+              {/* Image Preview Box - Tappable for direct OS photo picker */}
+              <div
+                onClick={handleOpenPhotoPicker}
                 className="relative w-full h-44 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/15 hover:border-primary/50 transition-all select-none block"
               >
-                <input
-                  id="wallpaper-file-input"
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={handlePhotoUpload}
-                />
                 {isProcessing ? (
                   <div className="flex flex-col items-center gap-2 text-primary">
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -462,28 +482,22 @@ export default function WallpaperPage() {
                     </div>
                   </>
                 )}
-              </label>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 pt-0.5">
-                <label
-                  htmlFor="wallpaper-file-input-change"
+                <button
+                  type="button"
+                  onClick={handleOpenPhotoPicker}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 text-center select-none"
                 >
-                  <input
-                    id="wallpaper-file-input-change"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handlePhotoUpload}
-                  />
                   {isProcessing ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   ) : (
                     <Upload className="w-3.5 h-3.5 text-primary" />
                   )}
                   <span>{isProcessing ? "Processing..." : "Change Wallpaper"}</span>
-                </label>
+                </button>
 
                 <button
                   type="button"
@@ -504,18 +518,12 @@ export default function WallpaperPage() {
               </div>
             </div>
           ) : (
-            /* No Wallpaper Selected: Clean System Wallpaper Picker Card - Direct Native Label */
-            <label
-              htmlFor="wallpaper-file-input-empty"
-              className="relative p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center block"
+            /* No Wallpaper Selected: Clean System Wallpaper Picker Card */
+            <button
+              type="button"
+              onClick={handleOpenPhotoPicker}
+              className="w-full p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center block"
             >
-              <input
-                id="wallpaper-file-input-empty"
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={handlePhotoUpload}
-              />
               <div className="w-12 h-12 rounded-2xl bg-surface-container-high group-hover:bg-primary/20 flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-all mx-auto">
                 {isProcessing ? (
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -531,7 +539,7 @@ export default function WallpaperPage() {
                   Select your custom photo from Gallery or Google Photos to be stored and restored when turning off Odyssey
                 </p>
               </div>
-            </label>
+            </button>
           )}
 
           {/* Quick Option: Open Android Device Wallpaper Settings */}

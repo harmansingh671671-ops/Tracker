@@ -447,29 +447,24 @@ function DayScheduleContent() {
 
         const nextHour = hour + 1;
         if (nextHour < 24) {
-          // Auto-expand next group if it's sleep
-          const nextS = formatHour(nextHour);
-          const nextBlock = blocks.find((b) => b.startTime === nextS);
-          const nextCat = hourCategories[nextHour] || normalizeCategory(nextBlock?.category, nextHour);
-          if (nextCat === "sleep") {
-            setExpandedGroupIds((prev) => ({ ...prev, [`group-${nextHour}-sleep`]: true }));
-          }
-
+          focusedHourRef.current = nextHour;
           setTimeout(() => {
             if (inputRefs.current[nextHour]) {
               inputRefs.current[nextHour]!.focus();
             }
-          }, 50);
+          }, 30);
         }
       }
     },
-    [handleSaveBlock, blocks, hourCategories]
+    [handleSaveBlock]
   );
 
   // Handle blur: save on loss of focus
   const handleBlur = useCallback(
     (hour: number, value: string) => {
-      focusedHourRef.current = null;
+      if (focusedHourRef.current === hour) {
+        focusedHourRef.current = null;
+      }
       handleSaveBlock(hour, value);
     },
     [handleSaveBlock]
@@ -901,7 +896,7 @@ function DayScheduleContent() {
           </div>
         </section>
 
-        {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks & Accordion Groups */}
+        {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-7 h-7 text-primary animate-spin" />
@@ -909,154 +904,7 @@ function DayScheduleContent() {
           </div>
         ) : (
           <div className="flex flex-col space-y-1">
-            {hourGroups.map((group) => {
-              const isSleep = group.type === "sleep";
-              const isRecentlySaved =
-                recentlySavedHour !== null &&
-                (group.hours.includes(recentlySavedHour) || group.startHour === recentlySavedHour);
-              const isExpanded =
-                expandedGroupIds[group.id] !== undefined
-                  ? expandedGroupIds[group.id]
-                  : isRecentlySaved;
-              const cat = getCatStyle(group.category, group.isCustom);
-              const CatIcon = cat.Icon;
-
-              // Sleep Group Handling - Minimized by default, expands on tap to show all individual hours!
-              if (isSleep) {
-                // Minimized Sleep Group
-                if (!isExpanded) {
-                  return (
-                    <div
-                      key={group.id}
-                      onClick={() => toggleGroupExpand(group.id, true)}
-                      className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all duration-300 cursor-pointer shadow-sm select-none my-0.5 ${
-                        isRecentlySaved
-                          ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#11192e]"
-                          : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                          <Moon className="w-4 h-4" />
-                        </div>
-                        <div className="flex flex-col justify-center min-w-0">
-                          <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
-                            <span className="text-xs font-mono font-bold text-on-surface whitespace-nowrap shrink-0">
-                              {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
-                            </span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25 whitespace-nowrap shrink-0">
-                              {group.hours.length}h Sleep
-                            </span>
-                            {isRecentlySaved && (
-                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse whitespace-nowrap shrink-0">
-                                SAVED
-                              </span>
-                            )}
-                          </div>
-                          {group.title && group.title !== "Sleep" && (
-                            <p className="text-[11px] font-mono text-indigo-200/70 truncate mt-0.5">
-                              {group.title}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                        <div className="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
-                          <ChevronDown className="w-4 h-4" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Expanded Sleep Group - Shows header with ChevronUp + all editable sleep hour slots!
-                return (
-                  <div
-                    key={group.id}
-                    className={`rounded-3xl border border-indigo-500/35 bg-[#090e1d]/90 p-2.5 my-2 space-y-2 shadow-lg transition-all duration-300 ${
-                      isRecentlySaved
-                        ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]"
-                        : ""
-                    }`}
-                  >
-                    <div
-                      onClick={() => toggleGroupExpand(group.id, false)}
-                      className="flex items-center justify-between px-3 py-2 rounded-2xl bg-indigo-950/60 border border-indigo-500/25 hover:border-indigo-500/40 cursor-pointer transition-all"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                          <Moon className="w-4 h-4" />
-                        </div>
-                        <div className="flex flex-col justify-center min-w-0">
-                          <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
-                            <span className="text-xs font-mono font-bold text-white whitespace-nowrap shrink-0">
-                              {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
-                            </span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30 whitespace-nowrap shrink-0">
-                              {group.hours.length}h Sleep
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleGroupExpand(group.id, false);
-                        }}
-                        aria-label="Minimize"
-                        className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0 ml-2"
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-1">
-                      {group.slots.map((slot) => renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" }))}
-                    </div>
-                  </div>
-                );
-              }
-
-              // Multi-Hour Non-Sleep Group (Work, Vitality, Sync, Renewal)
-              if (group.isCustom && group.hours.length > 1) {
-                return (
-                  <div
-                    key={group.id}
-                    className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2.5 my-2 space-y-2 shadow-lg transition-all duration-300 ${
-                      isRecentlySaved
-                        ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container-low/70 border border-outline/10">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
-                          <CatIcon className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-mono font-bold text-white truncate">
-                            {group.title || cat.label}
-                          </span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-semibold border border-outline/10 shrink-0 whitespace-nowrap">
-                            {group.hours.length} Hours ({String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      {group.slots.map((slot) => renderHourSlot(slot, { isInsideGroup: true, groupType: group.type }))}
-                    </div>
-                  </div>
-                );
-              }
-
-              // Single Hour Block Slot
-              return renderHourSlot(group.slots[0]);
-            })}
+            {full24Hours.map((slot) => renderHourSlot(slot))}
           </div>
         )}
 

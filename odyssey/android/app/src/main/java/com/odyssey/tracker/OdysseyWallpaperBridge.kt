@@ -24,9 +24,32 @@ import java.io.FileOutputStream
  * Provides zero-friction, privacy-safe 1-tap lockscreen wallpaper updates
  * using Android's standard WallpaperManager (Install-time normal permission, 0 runtime popups).
  */
-class OdysseyWallpaperBridge(private val context: Context) {
+class OdysseyWallpaperBridge(
+    private val context: Context,
+    private val activity: MainActivity? = null
+) {
 
     private val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+
+    /**
+     * Directly launches native Android Photo / Gallery picker on UI thread.
+     */
+    @JavascriptInterface
+    fun pickCustomWallpaperPhoto(): Boolean {
+        return try {
+            if (activity != null) {
+                activity.runOnUiThread {
+                    activity.launchPhotoPicker()
+                }
+                true
+            } else {
+                openSystemWallpaperChooser()
+            }
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to launch photo picker: ${e.message}", e)
+            false
+        }
+    }
 
     private fun backupCurrentWallpaperIfNeeded(wallpaperManager: WallpaperManager) {
         try {
@@ -228,13 +251,22 @@ class OdysseyWallpaperBridge(private val context: Context) {
 
     /**
      * Clears custom schedule wallpaper and completely replaces Odyssey on BOTH Lock and Home screens
-     * with the user's saved custom wallpaper (or backup/defaults).
+     * with the user's saved custom wallpaper (or clean default).
      */
     @JavascriptInterface
     fun clearLockscreenWallpaper(): Boolean {
         return try {
             val wallpaperManager = WallpaperManager.getInstance(context)
             var restored = false
+
+            // Mark wallpaper as disabled in preferences & broadcast to Live Wallpaper Service immediately
+            prefs.edit().putBoolean("wallpaper_enabled", false).commit()
+            try {
+                val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
+                    setPackage(context.packageName)
+                }
+                context.sendBroadcast(intent)
+            } catch (_: Exception) {}
 
             // 1. Check if user configured a custom restoration wallpaper
             val file = File(context.filesDir, "custom_restoration_wallpaper.png")
@@ -324,7 +356,10 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun syncSchedule(scheduleJson: String): Boolean {
         return try {
-            val success = prefs.edit().putString("latest_schedule_json", scheduleJson).commit()
+            val success = prefs.edit()
+                .putString("latest_schedule_json", scheduleJson)
+                .putBoolean("wallpaper_enabled", true)
+                .commit()
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service for instant canvas redraw
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
@@ -333,7 +368,6 @@ class OdysseyWallpaperBridge(private val context: Context) {
                 context.sendBroadcast(intent)
 
                 // 2. Only refresh static lockscreen if Live Wallpaper is NOT currently running!
-                // If Live Wallpaper is active, calling setBitmap will kill and freeze the live engine.
                 val wallpaperManager = WallpaperManager.getInstance(context)
                 val isLiveActive = wallpaperManager.wallpaperInfo?.packageName == context.packageName
                 if (!isLiveActive && OdysseyHourlyWallpaperWorker.isScheduled(context)) {
@@ -375,7 +409,10 @@ class OdysseyWallpaperBridge(private val context: Context) {
             val habitsCount = obj.optJSONArray("habits")?.length() ?: 0
             val streak = obj.optInt("userStreak", obj.optInt("activeDay", 1))
 
-            val success = prefs.edit().putString("latest_schedule_json", scheduleJson).commit()
+            val success = prefs.edit()
+                .putString("latest_schedule_json", scheduleJson)
+                .putBoolean("wallpaper_enabled", true)
+                .commit()
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
@@ -445,6 +482,7 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun launchLiveWallpaperPicker() {
         try {
+            prefs.edit().putBoolean("wallpaper_enabled", true).commit()
             val wallpaperManager = WallpaperManager.getInstance(context)
             backupCurrentWallpaperIfNeeded(wallpaperManager)
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
@@ -475,6 +513,7 @@ class OdysseyWallpaperBridge(private val context: Context) {
     @JavascriptInterface
     fun enableHourlyAutoUpdate(): Boolean {
         return try {
+            prefs.edit().putBoolean("wallpaper_enabled", true).commit()
             OdysseyHourlyWallpaperWorker.scheduleNextHourlyUpdate(context)
             Log.d("OdysseyWallpaper", "Hourly auto-update enabled successfully")
             true
@@ -576,20 +615,25 @@ class OdysseyWallpaperBridge(private val context: Context) {
     }
 
     /**
-     * Opens Android's system wallpaper picker so the user can easily re-select
-     * their custom gallery or default wallpaper when clearing the schedule wallpaper.
+     * Opens Android's system wallpaper / photo picker so the user can select
+     * their custom gallery or default wallpaper when configuring restoration wallpaper.
      */
     @JavascriptInterface
     fun openSystemWallpaperChooser(): Boolean {
+        if (activity != null) {
+            activity.runOnUiThread {
+                activity.launchPhotoPicker()
+            }
+            return true
+        }
+
         val intentsToTry = listOf(
-            Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                putExtra(
-                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                    ComponentName(context, OdysseyLiveWallpaperService::class.java)
-                )
+            Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "image/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
             },
+            Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI),
             Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
-            Intent(Intent.ACTION_SET_WALLPAPER),
             Intent("android.settings.WALLPAPER_SETTINGS"),
             Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)
         )
