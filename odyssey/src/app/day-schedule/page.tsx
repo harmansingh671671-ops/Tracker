@@ -269,9 +269,6 @@ function DayScheduleContent() {
   // Track which hour's category picker popup is currently open
   const [openCategoryHour, setOpenCategoryHour] = useState<number | null>(null);
 
-  // Expanded group states (e.g. sleep group)
-  const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
-
   // Recently saved hour for pulsing feedback
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
 
@@ -320,24 +317,35 @@ function DayScheduleContent() {
       }
     }
 
-    setEditingValues((prev) => ({ ...prev, ...newValues }));
+    setEditingValues((prev) => {
+      const updated = { ...prev };
+      let changed = false;
+      for (let h = 0; h < 24; h++) {
+        if (focusedHourRef.current !== h && updated[h] !== newValues[h]) {
+          updated[h] = newValues[h];
+          changed = true;
+        }
+      }
+      return changed ? updated : prev;
+    });
     setHourCategories((prev) => ({ ...prev, ...newCats }));
   }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to current hour on initial load
+  // Ensure page always starts at top when opened, never auto-scrolling to bottom or restoring previous page scroll
   useEffect(() => {
-    if (!loading) {
-      const currentHourEl = document.getElementById(`hour-row-${currentHour}`);
-      if (currentHourEl) {
-        setTimeout(() => {
-          currentHourEl.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }, 300);
+    if (typeof window !== "undefined") {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
       }
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
-  }, [loading, currentHour]);
+  }, [dateStr]);
+
+  useEffect(() => {
+    if (!loading && typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+  }, [loading]);
 
   // Helper to find existing block for an hour
   const getBlockForHour = useCallback(
@@ -357,7 +365,6 @@ function DayScheduleContent() {
       const match = blocks.find((b) => b.startTime === sTime);
       const typedTitle = editingValues[h] ?? match?.title ?? "";
       const catKey = hourCategories[h] || normalizeCategory(match?.category, h);
-      const hasCustom = !!match || typedTitle.trim().length > 0;
 
       return {
         hour: h,
@@ -366,7 +373,7 @@ function DayScheduleContent() {
         block: match || null,
         title: typedTitle,
         category: catKey,
-        isCustom: hasCustom,
+        isCustom: !!match,
         status: match?.status || "pending",
       };
     });
@@ -381,7 +388,8 @@ function DayScheduleContent() {
     let restH = 0;
 
     full24Hours.forEach((h) => {
-      if (!h.isCustom) return;
+      const hasContent = !!h.block || (h.title || "").trim().length > 0;
+      if (!hasContent) return;
       const c = (h.category || "").toLowerCase();
       if (c.includes("sleep") || c.includes("rest")) restH++;
       else if (c.includes("vitality") || c.includes("habit") || c.includes("health")) vitalityH++;
@@ -538,84 +546,8 @@ function DayScheduleContent() {
     [getBlockForHour, deleteBlock]
   );
 
-  // Group adjacent custom blocks of the same type together (matching Planner layout)
-  interface HourGroup {
-    id: string;
-    type: string;
-    isCustom: boolean;
-    startHour: number;
-    endHour: number;
-    hours: number[];
-    slots: typeof full24Hours;
-    title: string;
-    category: string;
-    primaryBlock?: ScheduleBlock | null;
-  }
-
-  const hourGroups = useMemo(() => {
-    const groups: HourGroup[] = [];
-    let currentGroup: HourGroup | null = null;
-
-    full24Hours.forEach((slot) => {
-      const type = normalizeCategory(slot.category, slot.hour);
-      const isCustom = slot.isCustom;
-
-      // Merge adjacent if both are custom, same category type, and consecutive
-      const canMerge =
-        currentGroup &&
-        currentGroup.isCustom &&
-        isCustom &&
-        currentGroup.type === type;
-
-      if (canMerge && currentGroup) {
-        currentGroup.endHour = slot.hour + 1;
-        currentGroup.hours.push(slot.hour);
-        currentGroup.slots.push(slot);
-        if (!currentGroup.title && slot.title) {
-          currentGroup.title = slot.title;
-        }
-      } else {
-        if (currentGroup) {
-          groups.push(currentGroup);
-        }
-        currentGroup = {
-          id: `group-${slot.hour}-${type}`,
-          type,
-          isCustom,
-          startHour: slot.hour,
-          endHour: slot.hour + 1,
-          hours: [slot.hour],
-          slots: [slot],
-          title: slot.title || "",
-          category: slot.category || "",
-          primaryBlock: slot.block || null,
-        };
-      }
-    });
-
-    if (currentGroup) {
-      groups.push(currentGroup);
-    }
-
-    return groups;
-  }, [full24Hours]);
-
-  const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
-    setExpandedGroupIds((prev) => ({
-      ...prev,
-      [groupId]: explicitState !== undefined ? explicitState : !prev[groupId],
-    }));
-  };
-
   // Render a single hour block slot (styled identically to the Schedule tab!)
-  const renderHourSlot = (
-    slot: (typeof full24Hours)[0],
-    options?: {
-      isInsideGroup?: boolean;
-      groupType?: string;
-      expandToggle?: { isExpanded: boolean; onToggle: () => void };
-    }
-  ) => {
+  const renderHourSlot = (slot: (typeof full24Hours)[0]) => {
     const isPastHour = isSelectedToday && slot.hour < currentHour;
     const isCurrent = isSelectedToday && currentHour === slot.hour;
     const isRecentlySaved = recentlySavedHour === slot.hour;
@@ -632,7 +564,7 @@ function DayScheduleContent() {
         id={`hour-row-${slot.hour}`}
         onContextMenu={(e) => e.preventDefault()}
         className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border select-none ${
-          options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
+          cat.cardBg
         } ${cat.cardBorder} my-1 shadow-sm ${
           isRecentlySaved
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
@@ -742,6 +674,7 @@ function DayScheduleContent() {
             }}
             onChange={(e) => {
               const val = e.target.value;
+              focusedHourRef.current = slot.hour;
               setEditingValues((prev) => ({
                 ...prev,
                 [slot.hour]: val,
@@ -762,27 +695,8 @@ function DayScheduleContent() {
           </div>
         </div>
 
-        {/* Right Status: Tick for completed / pending hours & Top-right Expand Arrow */}
+        {/* Right Status: Tick for completed / pending hours */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {options?.expandToggle && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                options.expandToggle!.onToggle();
-              }}
-              aria-label={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
-              title={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
-              className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/25 flex items-center justify-center text-indigo-300 hover:text-white transition-all cursor-pointer"
-            >
-              {options.expandToggle.isExpanded ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </button>
-          )}
-
           {slot.block ? (
             isCompleted ? (
               <button
@@ -812,9 +726,9 @@ function DayScheduleContent() {
                 <Check className="w-3.5 h-3.5" />
               </button>
             )
-          ) : !options?.expandToggle ? (
+          ) : (
             <div className="w-7 h-7" />
-          ) : null}
+          )}
         </div>
       </div>
     );
@@ -966,65 +880,7 @@ function DayScheduleContent() {
           </div>
         ) : (
           <div className="flex flex-col space-y-1">
-            {hourGroups.map((group) => {
-              const isSleep = group.type === "sleep";
-              const isRecentlySaved =
-                recentlySavedHour !== null &&
-                (group.hours.includes(recentlySavedHour) || group.startHour === recentlySavedHour);
-              const isExpanded =
-                expandedGroupIds[group.id] !== undefined
-                  ? expandedGroupIds[group.id]
-                  : isRecentlySaved;
-              const cat = getCatStyle(group.category, group.isCustom);
-
-              // 1. Multiple Sleep Hours: Minimized to 1st hour by default with top-right arrow toggle
-              if (isSleep && group.hours.length > 1) {
-                return (
-                  <div
-                    key={group.id}
-                    className={`rounded-3xl border border-indigo-500/35 bg-indigo-950/20 p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
-                      isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
-                    }`}
-                  >
-                    {/* Render the 1st sleep hour slot with down/up arrow toggle on top right */}
-                    {renderHourSlot(group.slots[0], {
-                      isInsideGroup: true,
-                      groupType: "sleep",
-                      expandToggle: {
-                        isExpanded,
-                        onToggle: () => toggleGroupExpand(group.id),
-                      },
-                    })}
-
-                    {/* Expanded state: render remaining sleep slots */}
-                    {isExpanded && (
-                      group.slots.slice(1).map((slot) =>
-                        renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" })
-                      )
-                    )}
-                  </div>
-                );
-              }
-
-              // 2. Multi-hour same-category tasks: Grouped in same background with NO extra summary/duration banner!
-              if (group.isCustom && group.hours.length > 1) {
-                return (
-                  <div
-                    key={group.id}
-                    className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
-                      isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
-                    }`}
-                  >
-                    {group.slots.map((slot) =>
-                      renderHourSlot(slot, { isInsideGroup: true, groupType: group.type })
-                    )}
-                  </div>
-                );
-              }
-
-              // 3. Single Hour Slot
-              return renderHourSlot(group.slots[0]);
-            })}
+            {full24Hours.map((slot) => renderHourSlot(slot))}
           </div>
         )}
 
