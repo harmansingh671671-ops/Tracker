@@ -53,6 +53,34 @@ export default function JourneyPage() {
   const targetXp = currentLevel * 1000;
   const xpPercent = Math.min(100, Math.round((currentXp / targetXp) * 100));
 
+  const [dayName, setDayName] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const dateStr = getDateForJourneyDay(activeDay, user?.createdAt);
+        const saved =
+          localStorage.getItem(`odyssey_day_name_day_${activeDay}`) ||
+          (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
+          "";
+        setDayName(saved);
+      } catch {}
+    }
+  }, [activeDay, user?.createdAt]);
+
+  const handleUpdateDayName = (newName: string) => {
+    setDayName(newName);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`odyssey_day_name_day_${activeDay}`, newName);
+        const dateStr = getDateForJourneyDay(activeDay, user?.createdAt);
+        if (dateStr) {
+          localStorage.setItem(`odyssey_day_name_${dateStr}`, newName);
+        }
+      } catch {}
+    }
+  };
+
   const startDay = useMemo(() => {
     return Math.max(1, activeDay - pastDaysCount);
   }, [activeDay, pastDaysCount]);
@@ -237,7 +265,7 @@ export default function JourneyPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-on-surface">Endless Odyssey Trail</h2>
+            <h2 className="text-xl font-bold tracking-tight text-on-surface">Odyssey Trail</h2>
             <div className="flex items-center gap-2 mt-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface text-xs font-mono font-semibold border border-outline/10">
                 <span>{rankInfo.badge}</span>
@@ -247,11 +275,13 @@ export default function JourneyPage() {
             </div>
           </div>
 
-          {/* XP Gauge */}
+          {/* XP Gauge - Single Line Without Line Break */}
           <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-on-surface-variant">Progression to Level {currentLevel + 1}</span>
-              <span className="text-primary font-bold">{currentXp} / {targetXp} XP ({xpPercent}%)</span>
+            <div className="flex items-center justify-between text-xs font-mono whitespace-nowrap overflow-hidden">
+              <span className="truncate">
+                <span className="text-on-surface-variant">From Level {currentLevel}: </span>
+                <span className="text-primary font-bold">{currentXp} / {targetXp} XP ({xpPercent}%)</span>
+              </span>
             </div>
             <div className="w-full h-2.5 rounded-full bg-surface-container-lowest overflow-hidden p-0.5 border border-outline/10">
               <div
@@ -259,6 +289,26 @@ export default function JourneyPage() {
                 style={{ width: `${xpPercent}%` }}
               />
             </div>
+          </div>
+
+          {/* Quick Editing: Day Focus & Theme */}
+          <div className="pt-2 border-t border-outline/10 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                Day {activeDay} Focus &amp; Title
+              </span>
+              {dayName && (
+                <span className="text-[10px] font-mono text-emerald-400 font-semibold">Saved</span>
+              )}
+            </div>
+            <input
+              type="text"
+              value={dayName}
+              onChange={(e) => handleUpdateDayName(e.target.value)}
+              placeholder="e.g. Improve English, Be Happy, Enjoy Holidays..."
+              className="w-full py-2 px-3 rounded-xl bg-surface-container-low border border-outline/15 text-xs text-on-surface font-semibold focus:border-primary/50 focus:ring-1 focus:ring-primary/40 focus:outline-none placeholder:text-on-surface-variant/40 transition-all"
+            />
           </div>
         </div>
       </div>
@@ -338,9 +388,6 @@ export default function JourneyPage() {
                 <span>Back to Day 1</span>
               </button>
             </div>
-            <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1.5">
-              Viewing from Day {startDay} • Chain reaches back to Day 1
-            </span>
           </div>
         ) : (
           <div className="pb-8 flex flex-col items-center z-10 animate-in fade-in duration-200">
@@ -379,11 +426,13 @@ export default function JourneyPage() {
                   {/* Attached Active Day Card */}
                   <div className="w-full max-w-sm mt-3 bg-surface-container rounded-2xl p-4 shadow-xl border border-primary/30 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="min-w-0 flex-1 pr-2">
                         <span className="text-[10px] font-mono uppercase text-primary font-bold">TODAY'S ANCHOR</span>
-                        <h3 className="text-base font-bold text-on-surface">Day {node.day} Exploration</h3>
+                        <h3 className="text-base font-bold text-on-surface truncate">
+                          {dayName ? dayName : `Day ${node.day} Exploration`}
+                        </h3>
                       </div>
-                      <span className="text-2xl">🌱</span>
+                      <span className="text-2xl shrink-0">🌱</span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -454,7 +503,7 @@ export default function JourneyPage() {
           })}
         </div>
 
-        {/* Endless Expansion Button at Bottom */}
+        {/* Expansion Button at Bottom */}
         <div className="pt-10 pb-4 flex flex-col items-center z-10">
           <button
             type="button"
@@ -466,7 +515,7 @@ export default function JourneyPage() {
             <ChevronDown className="w-4 h-4" />
           </button>
           <span className="text-[10px] font-mono text-on-surface-variant/60 mt-1.5">
-            Chain extends endlessly • Plan as many days ahead as you want
+            Plan as many days ahead as you want
           </span>
         </div>
       </div>

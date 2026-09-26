@@ -223,6 +223,33 @@ function DayScheduleContent() {
   const dateStr = paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate) ? paramDate : getTodayStr();
   const dayNum = searchParams.get("day") ? parseInt(searchParams.get("day")!, 10) : null;
 
+  const displayDay = dayNum || (user?.createdAt ? getJourneyDayNumber(user.createdAt) : 1);
+  const [dayName, setDayName] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved =
+          localStorage.getItem(`odyssey_day_name_day_${displayDay}`) ||
+          (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
+          "";
+        setDayName(saved);
+      } catch {}
+    }
+  }, [displayDay, dateStr]);
+
+  const handleUpdateDayName = (newName: string) => {
+    setDayName(newName);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`odyssey_day_name_day_${displayDay}`, newName);
+        if (dateStr) {
+          localStorage.setItem(`odyssey_day_name_${dateStr}`, newName);
+        }
+      } catch {}
+    }
+  };
+
   const [loading, setLoading] = useState(true);
 
   // Controlled input values for every hour (0..23)
@@ -573,8 +600,6 @@ function DayScheduleContent() {
     }));
   };
 
-  const displayDay = dayNum || (user?.createdAt ? getJourneyDayNumber(user.createdAt) : 1);
-
   // Render a single hour block slot (styled identically to the Schedule tab!)
   const renderHourSlot = (
     slot: (typeof full24Hours)[0],
@@ -797,10 +822,11 @@ function DayScheduleContent() {
             <div className="flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_rgba(90,240,179,0.6)]" />
               <h1 className="text-base sm:text-lg font-bold text-on-surface tracking-tight truncate">
-                Day {displayDay} Schedule
+                {dayName ? dayName : `Day ${displayDay} Schedule`}
               </h1>
             </div>
             <p className="text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5 font-mono">
+              {dayName && <span className="text-primary font-semibold">Day {displayDay} • </span>}
               <span>{dateStr ? formatDateDisplay(dateStr) : ""}</span>
               <span className="text-outline">•</span>
               <span className="text-primary font-semibold">
@@ -849,6 +875,26 @@ function DayScheduleContent() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 pt-3 space-y-4">
+        {/* Quick Day Naming / Focus Input */}
+        <section className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              Day {displayDay} Focus &amp; Title
+            </span>
+            {dayName && (
+              <span className="text-[10px] text-emerald-400 font-semibold">Saved</span>
+            )}
+          </div>
+          <input
+            type="text"
+            value={dayName}
+            onChange={(e) => handleUpdateDayName(e.target.value)}
+            placeholder="e.g. Improve English, Be Happy, Enjoy Holidays..."
+            className="w-full py-1.5 px-3 rounded-xl bg-surface-container-lowest border border-outline/15 text-xs text-on-surface font-semibold focus:border-primary/50 focus:ring-1 focus:ring-primary/40 focus:outline-none placeholder:text-on-surface-variant/40 transition-all"
+          />
+        </section>
+
         {/* 24-HOUR CATEGORY DISTRIBUTION BOX (Matching Planner Page) */}
         <section className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5 shadow-sm">
           <div className="flex items-center justify-between text-xs">
