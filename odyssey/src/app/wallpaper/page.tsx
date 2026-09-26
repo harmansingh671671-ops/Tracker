@@ -316,37 +316,35 @@ export default function WallpaperPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-1.5 bg-surface-container-low rounded-2xl border border-outline/10">
             <button
               onClick={() => handleEngineChange("live")}
-              className={`p-3 rounded-xl flex items-start gap-3 text-left transition-all ${
+              className={`p-3 rounded-xl flex items-center gap-3 text-left transition-all ${
                 activeEngine === "live"
                   ? "bg-surface-container shadow-md border border-primary/30"
                   : "bg-transparent hover:bg-surface-container/40"
               }`}
             >
-              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 <Sparkles className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-on-surface">✨ Dynamic Live</span>
-                  <span className="px-1.5 py-0.2 rounded-full bg-primary/20 text-primary text-[10px] font-mono font-bold">
-                    RECOMMENDED
-                  </span>
-                </div>
+              <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-on-surface">✨ Dynamic Live</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-primary/20 text-primary text-[10px] font-mono font-bold">
+                  RECOMMENDED
+                </span>
               </div>
             </button>
 
             <button
               onClick={() => handleEngineChange("static")}
-              className={`p-3 rounded-xl flex items-start gap-3 text-left transition-all ${
+              className={`p-3 rounded-xl flex items-center gap-3 text-left transition-all ${
                 activeEngine === "static"
                   ? "bg-surface-container shadow-md border border-secondary/30"
                   : "bg-transparent hover:bg-surface-container/40"
               }`}
             >
-              <div className="w-8 h-8 rounded-lg bg-surface-container-high text-on-surface-variant flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-8 h-8 rounded-lg bg-surface-container-high text-on-surface-variant flex items-center justify-center shrink-0">
                 <ImageIcon className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex items-center">
                 <span className="text-xs font-bold text-on-surface">🖼️ Static Hourly</span>
               </div>
             </button>
