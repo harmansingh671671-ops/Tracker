@@ -19,17 +19,16 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 6,
-    versionName: "1.3.1",
+    versionCode: 7,
+    versionName: "1.3.2",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
     releaseDate: "2026-09-26",
     mandatory: false,
     changelog: [
-      "2-Task Live Wallpaper 1:1 Parity: Perfectly aligned native lockscreen & live wallpaper with Wallpaper Studio preview",
-      "Breathing Beacon & Glowing Ring: Smooth pulse indicator on the active task and 24h spectrum timeline",
-      "Dynamic Schedule Sync: Instant background broadcast updates whenever tasks or habits change",
-      "ColorOS / Oppo & Multi-vendor Compatibility: Streamlined wallpaper picker and dual-screen restoration fallback",
-      "Bugfixes & Performance: Zero-drain background wake locks and optimized canvas rendering",
+      "Redesigned Live Wallpaper: Full-width horizontal habit cards with large emojis and zero text clipping",
+      "Stitch OLED Dark Obsidian Styling: Radiant 24h spectrum beacon and elevated active task cards",
+      "Streamlined Experience: Exactly-once update notification with instant 1-tap download",
+      "Performance & Fluidity: Zero startup delay and optimized lockscreen canvas rendering",
     ],
   };
 

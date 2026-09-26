@@ -17,7 +17,38 @@ export function AppUpdateModal() {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   useEffect(() => {
-    // Listen for manual trigger event (e.g. from Settings "Check for Updates")
+    // 1. Strictly ignore web browser users (zero network calls / zero popups)
+    if (!isAndroidNativeApp()) return;
+
+    let mounted = true;
+
+    async function checkOnceOnLaunch() {
+      try {
+        const result = await checkForAppUpdate();
+        if (!mounted || !result || !result.hasUpdate) return;
+
+        // Check if user has already been notified of this release
+        const alreadyNotified = localStorage.getItem(`odyssey_update_notified_${result.latestVersionCode}`);
+        if (alreadyNotified) {
+          return;
+        }
+
+        // Mark as notified so it NEVER pops up again on future app launches
+        localStorage.setItem(`odyssey_update_notified_${result.latestVersionCode}`, "true");
+
+        setUpdateInfo(result);
+        setIsOpen(true);
+      } catch {}
+    }
+
+    // Run in idle background time without delaying startup
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(() => checkOnceOnLaunch(), { timeout: 3000 });
+    } else {
+      setTimeout(checkOnceOnLaunch, 1500);
+    }
+
+    // Listen for manual trigger event from Profile & Settings ("Check for Updates")
     const handleManualCheck = async (e: Event) => {
       const customEvent = e as CustomEvent<AppUpdateCheckResult>;
       if (customEvent.detail) {
@@ -37,6 +68,7 @@ export function AppUpdateModal() {
     window.addEventListener("odyssey:check-update-modal", handleManualCheck);
 
     return () => {
+      mounted = false;
       window.removeEventListener("odyssey:check-update-modal", handleManualCheck);
     };
   }, []);
@@ -57,7 +89,7 @@ export function AppUpdateModal() {
 
   const handleDismiss = () => {
     try {
-      localStorage.setItem(`odyssey_dismissed_update_${updateInfo.latestVersionCode}`, "true");
+      localStorage.setItem(`odyssey_update_notified_${updateInfo.latestVersionCode}`, "true");
     } catch {}
     setIsOpen(false);
   };
