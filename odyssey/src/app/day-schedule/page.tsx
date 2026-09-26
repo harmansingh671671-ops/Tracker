@@ -10,6 +10,8 @@ import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import {
   ChevronLeft,
   ChevronDown,
+  ChevronUp,
+  ChevronRight,
   Moon,
   Coffee,
   Brain,
@@ -17,6 +19,7 @@ import {
   MessageSquare,
   Check,
   CheckCircle2,
+  XCircle,
   Clock,
   Trash2,
   Loader2,
@@ -39,77 +42,128 @@ export default function DaySchedulePage() {
 
 export type CategoryKey = "work" | "vitality" | "sync" | "renewal" | "sleep";
 
-export interface CategoryDef {
-  key: CategoryKey;
-  label: string;
-  shortLabel: string;
-  Icon: React.ComponentType<{ className?: string; size?: number }>;
-  color: string;
-  badgeBg: string;
-  cardBorder: string;
-  cardBg: string;
-  dotClass: string;
-}
-
-export const CATEGORIES: CategoryDef[] = [
+export const CATEGORY_OPTIONS = [
   {
-    key: "work",
-    label: "Deep Focus",
+    id: "work" as const,
+    label: "Deep Work",
     shortLabel: "Focus",
     Icon: Brain,
     color: "text-primary",
-    badgeBg: "bg-primary/15 border border-primary/30 text-primary",
-    cardBorder: "border-primary/25 hover:border-primary/45",
-    cardBg: "bg-[#0d1d24]/80 hover:bg-[#12252e]",
-    dotClass: "bg-primary shadow-[0_0_8px_rgba(90,240,179,0.5)]",
+    badgeBg: "bg-primary/15 border-primary/30 text-primary",
   },
   {
-    key: "vitality",
-    label: "Vitality & Routine",
+    id: "vitality" as const,
+    label: "Vitality",
     shortLabel: "Vitality",
     Icon: Heart,
     color: "text-emerald-400",
-    badgeBg: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400",
-    cardBorder: "border-emerald-500/25 hover:border-emerald-500/45",
-    cardBg: "bg-[#0c1f18]/80 hover:bg-[#102920]",
-    dotClass: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]",
+    badgeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
   },
   {
-    key: "sync",
-    label: "Sync & Connect",
+    id: "sync" as const,
+    label: "Active Sync",
     shortLabel: "Sync",
     Icon: MessageSquare,
     color: "text-sky-400",
-    badgeBg: "bg-sky-500/15 border border-sky-500/30 text-sky-400",
-    cardBorder: "border-sky-500/25 hover:border-sky-500/45",
-    cardBg: "bg-[#0c1a29]/80 hover:bg-[#102236]",
-    dotClass: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]",
+    badgeBg: "bg-sky-500/15 border-sky-500/30 text-sky-400",
   },
   {
-    key: "renewal",
-    label: "Renewal & Break",
+    id: "renewal" as const,
+    label: "Renewal",
     shortLabel: "Renewal",
     Icon: Coffee,
     color: "text-amber-400",
-    badgeBg: "bg-amber-500/15 border border-amber-500/30 text-amber-400",
-    cardBorder: "border-amber-500/25 hover:border-amber-500/45",
-    cardBg: "bg-[#211a0c]/80 hover:bg-[#2b2210]",
-    dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]",
+    badgeBg: "bg-amber-500/15 border-amber-500/30 text-amber-400",
   },
   {
-    key: "sleep",
+    id: "sleep" as const,
     label: "Rest & Sleep",
     shortLabel: "Sleep",
     Icon: Moon,
     color: "text-indigo-400",
-    badgeBg: "bg-indigo-500/15 border border-indigo-500/30 text-indigo-400",
-    cardBorder: "border-indigo-500/25 hover:border-indigo-500/45",
-    cardBg: "bg-[#13152c]/80 hover:bg-[#1a1d3b]",
-    dotClass: "bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]",
+    badgeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-400",
   },
 ];
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+export const getCatStyle = (cat?: string, isCustom?: boolean) => {
+  if (!isCustom || !cat) {
+    return {
+      key: "open" as const,
+      label: "Open Slot",
+      shortLabel: "Open",
+      Icon: Clock,
+      color: "text-on-surface-variant/40",
+      badgeBg: "bg-surface-container-lowest border border-outline/10 text-on-surface-variant/40",
+      cardBorder: "border-dashed border-outline/15 hover:border-primary/40",
+      cardBg: "bg-surface-container-lowest/30 hover:bg-surface-container-lowest/70",
+      dotClass: "bg-surface-container-highest",
+    };
+  }
+  const c = cat.toLowerCase();
+  if (c.includes("sleep") || c.includes("rest")) {
+    return {
+      key: "sleep" as const,
+      label: "Rest & Sleep",
+      shortLabel: "Sleep",
+      Icon: Moon,
+      color: "text-indigo-400",
+      badgeBg: "bg-indigo-500/15 border border-indigo-500/30 text-indigo-400",
+      cardBorder: "border-indigo-500/35 hover:border-indigo-500/60",
+      cardBg: "bg-indigo-950/25 hover:bg-indigo-950/35",
+      dotClass: "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]",
+    };
+  }
+  if (c.includes("vitality") || c.includes("habit") || c.includes("health")) {
+    return {
+      key: "vitality" as const,
+      label: "Vitality",
+      shortLabel: "Vitality",
+      Icon: Heart,
+      color: "text-emerald-400",
+      badgeBg: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400",
+      cardBorder: "border-emerald-500/35 hover:border-emerald-500/60",
+      cardBg: "bg-emerald-950/25 hover:bg-emerald-950/35",
+      dotClass: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]",
+    };
+  }
+  if (c.includes("sync") || c.includes("meeting") || c.includes("social") || c.includes("admin")) {
+    return {
+      key: "sync" as const,
+      label: "Active Sync",
+      shortLabel: "Sync",
+      Icon: MessageSquare,
+      color: "text-sky-400",
+      badgeBg: "bg-sky-500/15 border border-sky-500/30 text-sky-400",
+      cardBorder: "border-sky-500/35 hover:border-sky-500/60",
+      cardBg: "bg-sky-950/25 hover:bg-sky-950/35",
+      dotClass: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]",
+    };
+  }
+  if (c.includes("renewal") || c.includes("buffer") || c.includes("leisure")) {
+    return {
+      key: "renewal" as const,
+      label: "Renewal",
+      shortLabel: "Renewal",
+      Icon: Coffee,
+      color: "text-amber-400",
+      badgeBg: "bg-amber-500/15 border border-amber-500/30 text-amber-400",
+      cardBorder: "border-amber-500/35 hover:border-amber-500/60",
+      cardBg: "bg-amber-950/25 hover:bg-amber-950/35",
+      dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]",
+    };
+  }
+  return {
+    key: "work" as const,
+    label: "Deep Work",
+    shortLabel: "Deep Work",
+    Icon: Brain,
+    color: "text-primary",
+    badgeBg: "bg-primary/15 border border-primary/30 text-primary",
+    cardBorder: "border-primary/35 hover:border-primary/60",
+    cardBg: "bg-[#0d1d24] hover:bg-[#12252e]",
+    dotClass: "bg-primary shadow-[0_0_8px_rgba(90,240,179,0.5)]",
+  };
+};
 
 export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
   if (!cat) {
@@ -127,10 +181,6 @@ export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
   if (c.includes("sync") || c.includes("meet") || c.includes("social") || c.includes("admin")) return "sync";
   if (c.includes("renewal") || c.includes("buffer") || c.includes("leisure")) return "renewal";
   return "work";
-}
-
-export function getCategoryDef(key: CategoryKey): CategoryDef {
-  return CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
 }
 
 function formatHour(h: number): string {
@@ -174,7 +224,7 @@ function DayScheduleContent() {
   const dayNum = searchParams.get("day") ? parseInt(searchParams.get("day")!, 10) : null;
 
   const [loading, setLoading] = useState(true);
-  
+
   // Controlled input values for every hour (0..23)
   const [editingValues, setEditingValues] = useState<Record<number, string>>(() => {
     const init: Record<number, string> = {};
@@ -189,18 +239,20 @@ function DayScheduleContent() {
     return init;
   });
 
-  // Active default category for newly created slots
-  const [activeDefaultCategory, setActiveDefaultCategory] = useState<CategoryKey>("work");
-
   // Track which hour's category picker popup is currently open
   const [openCategoryHour, setOpenCategoryHour] = useState<number | null>(null);
 
-  // Saving state tracker for instant spinner feedback
-  const [savingHours, setSavingHours] = useState<Set<number>>(new Set());
+  // Expanded group states (e.g. sleep group)
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
+
+  // Recently saved hour for pulsing feedback
+  const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
 
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const focusedHourRef = useRef<number | null>(null);
   const currentHour = new Date().getHours();
+  const todayStr = getTodayStr();
+  const isSelectedToday = dateStr === todayStr;
 
   // Fetch user profile on mount
   useEffect(() => {
@@ -225,7 +277,6 @@ function DayScheduleContent() {
       const match = blocks.find((b) => b.startTime === sTime);
 
       if (match) {
-        // If the user is actively typing in this input, don't clobber what they're typing
         if (focusedHourRef.current === h) {
           newValues[h] = editingValues[h] ?? match.title;
         } else {
@@ -270,33 +321,54 @@ function DayScheduleContent() {
     [blocks]
   );
 
-  // Compute 24h category allocation statistics
-  const allocationStats = useMemo(() => {
-    const catHours: Record<CategoryKey, number> = {
-      work: 0,
-      vitality: 0,
-      sync: 0,
-      renewal: 0,
-      sleep: 0,
-    };
-
-    let filledCount = 0;
-
-    for (let h = 0; h < 24; h++) {
+  // Build full 24 hours array matching schedule tab structure
+  const full24Hours = useMemo(() => {
+    return Array.from({ length: 24 }, (_, h) => {
       const sTime = formatHour(h);
-      const block = blocks.find((b) => b.startTime === sTime);
-      if (block && block.title.trim().length > 0) {
-        const cat = normalizeCategory(block.category, h);
-        catHours[cat] = (catHours[cat] || 0) + 1;
-        filledCount++;
-      }
-    }
+      const endH = (h + 1) % 24 === 0 ? 24 : h + 1;
+      const eTime = formatHour(endH % 24);
+      const match = blocks.find((b) => b.startTime === sTime);
+      const typedTitle = editingValues[h] ?? match?.title ?? "";
+      const catKey = hourCategories[h] || normalizeCategory(match?.category, h);
+      const hasCustom = !!match || typedTitle.trim().length > 0;
 
-    const remaining = Math.max(0, 24 - filledCount);
-    return { catHours, filled: filledCount, remaining };
-  }, [blocks]);
+      return {
+        hour: h,
+        startTime: sTime,
+        endTime: eTime,
+        block: match || null,
+        title: typedTitle,
+        category: catKey,
+        isCustom: hasCustom,
+        status: match?.status || "pending",
+      };
+    });
+  }, [blocks, editingValues, hourCategories]);
 
-  const progressPct = Math.round((allocationStats.filled / 24) * 100);
+  // Compute 24h category allocation statistics
+  const categoryStats = useMemo(() => {
+    let focusH = 0;
+    let vitalityH = 0;
+    let syncH = 0;
+    let renewalH = 0;
+    let restH = 0;
+
+    full24Hours.forEach((h) => {
+      if (!h.isCustom) return;
+      const c = (h.category || "").toLowerCase();
+      if (c.includes("sleep") || c.includes("rest")) restH++;
+      else if (c.includes("vitality") || c.includes("habit") || c.includes("health")) vitalityH++;
+      else if (c.includes("sync") || c.includes("meet") || c.includes("social")) syncH++;
+      else if (c.includes("renewal") || c.includes("buffer") || c.includes("leisure")) renewalH++;
+      else focusH++;
+    });
+
+    const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
+    const remaining = Math.max(0, 24 - plannedTotal);
+    return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal, remaining };
+  }, [full24Hours]);
+
+  const progressPct = Math.round((categoryStats.plannedTotal / 24) * 100);
 
   // Save / Update / Delete block for a given hour
   const handleSaveBlock = useCallback(
@@ -304,18 +376,15 @@ function DayScheduleContent() {
       if (!user?.id || !dateStr) return;
       const block = getBlockForHour(hour);
       const titleToSave = (explicitTitle !== undefined ? explicitTitle : (editingValues[hour] ?? "")).trim();
-      const catToSave = explicitCat || hourCategories[hour] || activeDefaultCategory || normalizeCategory(undefined, hour);
+      const catToSave = explicitCat || hourCategories[hour] || normalizeCategory(undefined, hour);
 
       const sTime = formatHour(hour);
       const endH = hour + 1;
       const eTime = formatHour(endH === 24 ? 0 : endH);
 
-      setSavingHours((prev) => new Set(prev).add(hour));
-
       try {
         if (block) {
           if (!titleToSave) {
-            // Deleted task
             await deleteBlock(block.id);
           } else {
             await updateBlock(block.id, {
@@ -324,7 +393,6 @@ function DayScheduleContent() {
             });
           }
         } else if (titleToSave) {
-          // Created new task
           await addBlock({
             userId: user.id,
             date: dateStr,
@@ -336,28 +404,18 @@ function DayScheduleContent() {
             isCommitted: true,
           });
         }
+
+        setRecentlySavedHour(hour);
+        setTimeout(() => {
+          setRecentlySavedHour((curr) => (curr === hour ? null : curr));
+        }, 2500);
+
         syncCurrentScheduleToNative();
       } catch (err) {
         console.error("Error saving block:", err);
-      } finally {
-        setSavingHours((prev) => {
-          const next = new Set(prev);
-          next.delete(hour);
-          return next;
-        });
       }
     },
-    [
-      user?.id,
-      dateStr,
-      getBlockForHour,
-      editingValues,
-      hourCategories,
-      activeDefaultCategory,
-      deleteBlock,
-      updateBlock,
-      addBlock,
-    ]
+    [user?.id, dateStr, getBlockForHour, editingValues, hourCategories, deleteBlock, updateBlock, addBlock]
   );
 
   // Change category of a specific hour block
@@ -370,19 +428,9 @@ function DayScheduleContent() {
       const currentTitle = (editingValues[hour] ?? "").trim();
 
       if (block) {
-        setSavingHours((prev) => new Set(prev).add(hour));
-        try {
-          await updateBlock(block.id, { category: newCat as any });
-          syncCurrentScheduleToNative();
-        } finally {
-          setSavingHours((prev) => {
-            const next = new Set(prev);
-            next.delete(hour);
-            return next;
-          });
-        }
+        await updateBlock(block.id, { category: newCat as any });
+        syncCurrentScheduleToNative();
       } else if (currentTitle) {
-        // If user already typed text in this empty hour slot, save it with new category
         handleSaveBlock(hour, currentTitle, newCat);
       }
     },
@@ -397,14 +445,25 @@ function DayScheduleContent() {
         const value = e.currentTarget.value;
         handleSaveBlock(hour, value);
 
-        // Advance focus to next hour seamlessly
         const nextHour = hour + 1;
-        if (nextHour < 24 && inputRefs.current[nextHour]) {
-          inputRefs.current[nextHour]!.focus();
+        if (nextHour < 24) {
+          // Auto-expand next group if it's sleep
+          const nextS = formatHour(nextHour);
+          const nextBlock = blocks.find((b) => b.startTime === nextS);
+          const nextCat = hourCategories[nextHour] || normalizeCategory(nextBlock?.category, nextHour);
+          if (nextCat === "sleep") {
+            setExpandedGroupIds((prev) => ({ ...prev, [`group-${nextHour}-sleep`]: true }));
+          }
+
+          setTimeout(() => {
+            if (inputRefs.current[nextHour]) {
+              inputRefs.current[nextHour]!.focus();
+            }
+          }, 50);
         }
       }
     },
-    [handleSaveBlock]
+    [handleSaveBlock, blocks, hourCategories]
   );
 
   // Handle blur: save on loss of focus
@@ -425,7 +484,8 @@ function DayScheduleContent() {
 
   // Toggle completion status
   const handleToggleComplete = useCallback(
-    async (block: ScheduleBlock) => {
+    async (block: ScheduleBlock | null, hour: number) => {
+      if (!block) return;
       const newStatus = block.status === "completed" ? "pending" : "completed";
       await updateBlock(block.id, {
         status: newStatus,
@@ -449,18 +509,291 @@ function DayScheduleContent() {
     [getBlockForHour, deleteBlock]
   );
 
+  // Group adjacent custom blocks of the same type together (matching Planner layout)
+  interface HourGroup {
+    id: string;
+    type: string;
+    isCustom: boolean;
+    startHour: number;
+    endHour: number;
+    hours: number[];
+    slots: typeof full24Hours;
+    title: string;
+    category: string;
+    primaryBlock?: ScheduleBlock | null;
+  }
+
+  const hourGroups = useMemo(() => {
+    const groups: HourGroup[] = [];
+    let currentGroup: HourGroup | null = null;
+
+    full24Hours.forEach((slot) => {
+      const type = normalizeCategory(slot.category, slot.hour);
+      const isCustom = slot.isCustom;
+
+      // Merge adjacent if both are custom, same category type, and consecutive
+      const canMerge =
+        currentGroup &&
+        currentGroup.isCustom &&
+        isCustom &&
+        currentGroup.type === type;
+
+      if (canMerge && currentGroup) {
+        currentGroup.endHour = slot.hour + 1;
+        currentGroup.hours.push(slot.hour);
+        currentGroup.slots.push(slot);
+        if (!currentGroup.title && slot.title) {
+          currentGroup.title = slot.title;
+        }
+      } else {
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentGroup = {
+          id: `group-${slot.hour}-${type}`,
+          type,
+          isCustom,
+          startHour: slot.hour,
+          endHour: slot.hour + 1,
+          hours: [slot.hour],
+          slots: [slot],
+          title: slot.title || "",
+          category: slot.category || "",
+          primaryBlock: slot.block || null,
+        };
+      }
+    });
+
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  }, [full24Hours]);
+
+  const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
+    setExpandedGroupIds((prev) => ({
+      ...prev,
+      [groupId]: explicitState !== undefined ? explicitState : !prev[groupId],
+    }));
+  };
+
   const displayDay = dayNum || (user?.createdAt ? getJourneyDayNumber(user.createdAt) : 1);
 
+  // Render a single hour block slot (styled identically to the Schedule tab!)
+  const renderHourSlot = (
+    slot: (typeof full24Hours)[0],
+    options?: { isInsideGroup?: boolean; groupType?: string }
+  ) => {
+    const isPastHour = isSelectedToday && slot.hour < currentHour;
+    const isCurrent = isSelectedToday && currentHour === slot.hour;
+    const isRecentlySaved = recentlySavedHour === slot.hour;
+    const cat = getCatStyle(slot.category, slot.isCustom);
+    const CatIcon = cat.Icon;
+    const isCategoryPickerOpen = openCategoryHour === slot.hour;
+    const isCompleted = slot.status === "completed";
+    const inputValue = editingValues[slot.hour] ?? slot.title ?? "";
+    const hasContent = inputValue.trim().length > 0 || !!slot.block;
+
+    return (
+      <div
+        key={`slot-${slot.hour}`}
+        id={`hour-row-${slot.hour}`}
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border ${
+          options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
+        } ${cat.cardBorder} my-1 shadow-sm ${
+          isRecentlySaved
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+            : isCurrent
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.25)] bg-[#172033] relative z-20"
+            : ""
+        }`}
+      >
+        {/* Time Indicator on Left */}
+        <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center select-none">
+          <span
+            className={`text-xs font-mono font-bold leading-tight ${
+              isCurrent ? "text-primary font-extrabold" : "text-on-surface"
+            }`}
+          >
+            {slot.startTime}
+          </span>
+          <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
+            {formatHour((slot.hour + 1) % 24)}
+          </span>
+          {isRecentlySaved ? (
+            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
+              SAVED
+            </span>
+          ) : isCurrent ? (
+            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
+              NOW
+            </span>
+          ) : null}
+        </div>
+
+        {/* Category Icon & Interactive Type Switcher Pill */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenCategoryHour(isCategoryPickerOpen ? null : slot.hour);
+            }}
+            title="Click to change block type"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} hover:brightness-110 active:scale-95 transition-all cursor-pointer`}
+          >
+            <CatIcon className="w-4 h-4" />
+          </button>
+
+          {/* Category Selection Dropdown Popup */}
+          {isCategoryPickerOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenCategoryHour(null);
+                }}
+              />
+              <div
+                className="absolute left-0 top-full mt-1.5 z-50 w-52 p-1.5 rounded-2xl bg-surface-container border border-outline/25 shadow-2xl space-y-1 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-2.5 py-1 text-[10px] font-mono text-on-surface-variant font-bold uppercase tracking-wider">
+                  Select Block Type
+                </div>
+                {CATEGORY_OPTIONS.map((opt) => {
+                  const isSelected = normalizeCategory(slot.category, slot.hour) === opt.id;
+                  const OptIcon = opt.Icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleCategoryChange(slot.hour, opt.id)}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isSelected
+                          ? `${opt.badgeBg} font-bold shadow-sm ring-1 ring-current/30`
+                          : "text-on-surface hover:bg-surface-container-high"
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${opt.badgeBg}`}>
+                        <OptIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="flex-1 text-left truncate">{opt.label}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Input & Details */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <input
+            ref={(el) => {
+              inputRefs.current[slot.hour] = el;
+            }}
+            type="text"
+            placeholder={
+              isCurrent
+                ? "What are you conquering now?"
+                : isPastHour
+                ? "Schedule past slot..."
+                : "Add task / focus..."
+            }
+            value={inputValue}
+            onFocus={() => {
+              focusedHourRef.current = slot.hour;
+            }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setEditingValues((prev) => ({
+                ...prev,
+                [slot.hour]: val,
+              }));
+            }}
+            onKeyDown={(e) => handleKeyDown(e, slot.hour)}
+            onBlur={(e) => handleBlur(slot.hour, e.target.value)}
+            className={`w-full bg-transparent border-0 p-0 text-sm font-semibold focus:ring-0 focus:outline-none truncate placeholder:text-on-surface-variant/35 placeholder:font-normal transition-colors ${
+              isCompleted
+                ? "line-through text-on-surface-variant/50"
+                : hasContent
+                ? "text-white font-bold"
+                : "text-on-surface-variant font-medium"
+            }`}
+          />
+          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
+            <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
+            <span className="text-on-surface-variant/30">•</span>
+            <span className="text-on-surface-variant/50">
+              {slot.startTime} → {formatHour((slot.hour + 1) % 24)}
+            </span>
+          </div>
+        </div>
+
+        {/* Right Status: Tick / Cross for completed / pending hours */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {slot.block ? (
+            <>
+              {isCompleted ? (
+                <button
+                  type="button"
+                  onClick={() => handleToggleComplete(slot.block, slot.hour)}
+                  title="Completed (tap to revert)"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleToggleComplete(slot.block, slot.hour)}
+                  title="Tap to mark completed"
+                  className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleClearBlock(slot.hour)}
+                title="Clear this block"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant/30 hover:text-error hover:bg-error-container/20 transition-colors cursor-pointer"
+              >
+                <Trash2 size={13} />
+              </button>
+            </>
+          ) : inputValue.trim().length > 0 ? (
+            <button
+              type="button"
+              onClick={() => handleClearBlock(slot.hour)}
+              title="Clear input"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant/30 hover:text-error transition-colors cursor-pointer"
+            >
+              <Trash2 size={13} />
+            </button>
+          ) : (
+            <div className="w-7 h-7" />
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-background text-on-surface pb-12">
+    <div className="min-h-screen bg-background text-on-surface pb-16">
       {/* HEADER — back to journey, title, progress ring */}
       <header className="sticky top-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md px-4 py-2.5 transition-all duration-200 border-b border-outline/10">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
           {/* Back Button */}
           <button
             onClick={() => router.push("/journey")}
             aria-label="Back to Journey"
-            className="w-10 h-10 rounded-xl bg-surface-container-low border border-outline/10 flex items-center justify-center text-on-surface-variant hover:text-primary active:scale-95 transition-all"
+            className="w-10 h-10 rounded-xl bg-surface-container-low border border-outline/10 flex items-center justify-center text-on-surface-variant hover:text-primary active:scale-95 transition-all cursor-pointer"
           >
             <ChevronLeft size={22} />
           </button>
@@ -470,14 +803,14 @@ function DayScheduleContent() {
             <div className="flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_rgba(90,240,179,0.6)]" />
               <h1 className="text-base sm:text-lg font-bold text-on-surface tracking-tight truncate">
-                Day {displayDay} Quick Schedule
+                Day {displayDay} Schedule
               </h1>
             </div>
             <p className="text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5 font-mono">
               <span>{dateStr ? formatDateDisplay(dateStr) : ""}</span>
               <span className="text-outline">•</span>
               <span className="text-primary font-semibold">
-                {allocationStats.filled}/24 Hours
+                {categoryStats.plannedTotal}/24 Hours
               </span>
             </p>
           </div>
@@ -510,7 +843,7 @@ function DayScheduleContent() {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="font-mono text-[11px] font-bold text-primary leading-none">
-                  {allocationStats.filled}
+                  {categoryStats.plannedTotal}
                 </span>
                 <span className="text-[8px] font-mono text-outline leading-none mt-0.5">
                   /24h
@@ -521,313 +854,213 @@ function DayScheduleContent() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-3 sm:px-4 pt-3 space-y-3.5">
-        {/* TIME ALLOCATION CARD */}
-        <section className="bg-surface-container-low border border-outline/10 rounded-2xl p-3.5 sm:p-4 flex flex-col gap-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                <Clock className="w-4 h-4" />
-              </div>
-              <span className="text-sm font-bold text-on-surface tracking-tight">
-                Daily Time Allocation
-              </span>
+      <main className="max-w-xl mx-auto px-4 pt-3 space-y-4">
+        {/* 24-HOUR CATEGORY DISTRIBUTION BOX (Matching Planner Page) */}
+        <section className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5 shadow-sm">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-on-surface flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-primary" />
+              <span>Daily Allocation</span>
+            </span>
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span className="text-on-surface-variant">Scheduled: {categoryStats.plannedTotal}h</span>
+              <button
+                type="button"
+                onClick={handleAutoFillSleep}
+                className="px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-semibold flex items-center gap-1 hover:bg-indigo-500/25 active:scale-95 transition-all cursor-pointer"
+              >
+                <Moon size={12} className="text-indigo-400" />
+                <span>Auto-fill Sleep</span>
+              </button>
             </div>
-            <button
-              onClick={handleAutoFillSleep}
-              className="px-3 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 hover:bg-indigo-500/25 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
-            >
-              <Moon size={13} className="text-indigo-400" />
-              <span>Auto-fill Sleep</span>
-            </button>
           </div>
 
-          {/* Segmented allocation bar */}
-          <div className="space-y-2">
-            <div className="w-full h-2.5 rounded-full bg-surface-container-highest overflow-hidden flex gap-0.5">
-              {CATEGORIES.map((cat) => {
-                const hrs = allocationStats.catHours[cat.key] || 0;
-                if (hrs === 0) return null;
-                const widthPct = (hrs / 24) * 100;
-                return (
-                  <div
-                    key={cat.key}
-                    className={`h-full ${cat.dotClass}`}
-                    style={{ width: `${widthPct}%` }}
-                    title={`${cat.label}: ${hrs}h`}
-                  />
-                );
-              })}
-            </div>
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant pt-0.5">
-              {CATEGORIES.map((cat) => {
-                const hrs = allocationStats.catHours[cat.key] || 0;
-                if (hrs === 0) return null;
-                return (
-                  <span key={cat.key} className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${cat.dotClass} inline-block`} />
-                    <span className={cat.color}>{cat.shortLabel}: {hrs}h</span>
-                  </span>
-                );
-              })}
-              {allocationStats.remaining > 0 && (
-                <span className="text-outline font-semibold">
-                  {allocationStats.remaining}h Open
-                </span>
-              )}
-            </div>
+          {/* Proportional Balance Bar */}
+          <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
+            {categoryStats.plannedTotal > 0 ? (
+              <>
+                <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
+                <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
+                <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
+                <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
+                <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
+              </>
+            ) : (
+              <div className="w-full h-full bg-surface-container-highest/60" />
+            )}
+          </div>
+
+          {/* Category Hours Legend */}
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant pt-0.5">
+            {categoryStats.focusH > 0 && <span className="text-primary font-semibold">Focus: {categoryStats.focusH}h</span>}
+            {categoryStats.vitalityH > 0 && <span className="text-emerald-400 font-semibold">Vitality: {categoryStats.vitalityH}h</span>}
+            {categoryStats.syncH > 0 && <span className="text-sky-400 font-semibold">Sync: {categoryStats.syncH}h</span>}
+            {categoryStats.renewalH > 0 && <span className="text-amber-400 font-semibold">Renewal: {categoryStats.renewalH}h</span>}
+            {categoryStats.restH > 0 && <span className="text-indigo-400 font-semibold">Sleep: {categoryStats.restH}h</span>}
+            {categoryStats.remaining > 0 && <span className="text-outline font-semibold">{categoryStats.remaining}h Open</span>}
           </div>
         </section>
 
-        {/* DEFAULT CATEGORY CHIPS */}
-        <section className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 px-0.5">
-          <span className="text-[11px] font-mono text-outline shrink-0 font-medium">
-            Default Type:
-          </span>
-          <div className="flex items-center gap-1.5">
-            {CATEGORIES.map((cat) => {
-              const isSelected = activeDefaultCategory === cat.key;
-              const IconComp = cat.Icon;
-              return (
-                <button
-                  key={cat.key}
-                  onClick={() => setActiveDefaultCategory(cat.key)}
-                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
-                    isSelected
-                      ? `${cat.badgeBg} ring-1 ring-current/40 shadow-sm font-bold scale-[1.02]`
-                      : "bg-surface-container-low hover:bg-surface-container text-on-surface-variant border border-outline/10 opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  <IconComp className="w-3.5 h-3.5" />
-                  <span>{cat.shortLabel}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 24-HOUR INTERACTIVE STREAM */}
+        {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks & Accordion Groups */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-7 h-7 text-primary animate-spin" />
-            <span className="text-xs font-mono text-on-surface-variant">Loading day schedule...</span>
+            <span className="text-xs font-mono text-on-surface-variant">Loading schedule blocks...</span>
           </div>
         ) : (
-          <section className="space-y-2 relative">
-            {/* Background vertical rail */}
-            <div
-              className="absolute left-[23px] top-4 bottom-4 w-0.5 z-0"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(90,240,179,0.3) 0%, rgba(34,42,61,0.6) 50%, rgba(90,240,179,0.3) 100%)",
-              }}
-            />
+          <div className="flex flex-col space-y-1">
+            {hourGroups.map((group) => {
+              const isSleep = group.type === "sleep";
+              const isRecentlySaved =
+                recentlySavedHour !== null &&
+                (group.hours.includes(recentlySavedHour) || group.startHour === recentlySavedHour);
+              const isExpanded =
+                expandedGroupIds[group.id] !== undefined
+                  ? expandedGroupIds[group.id]
+                  : isRecentlySaved;
+              const cat = getCatStyle(group.category, group.isCustom);
+              const CatIcon = cat.Icon;
 
-            {HOURS.map((hour) => {
-              const block = getBlockForHour(hour);
-              const currentCatKey = hourCategories[hour] || (block ? normalizeCategory(block.category, hour) : activeDefaultCategory);
-              const catDef = getCategoryDef(currentCatKey);
-              const CatIcon = catDef.Icon;
-
-              const isCurrentHour = hour === currentHour;
-              const isPast = hour < currentHour;
-              const isCompleted = block?.status === "completed";
-              const isSaving = savingHours.has(hour);
-              const isCategoryPickerOpen = openCategoryHour === hour;
-
-              const inputValue = editingValues[hour] ?? block?.title ?? "";
-              const hasContent = inputValue.trim().length > 0 || !!block;
-
-              return (
-                <div
-                  key={hour}
-                  id={`hour-row-${hour}`}
-                  className={`relative z-10 flex items-center gap-2.5 sm:gap-3 rounded-2xl p-2.5 sm:p-3 border transition-all duration-200 ${
-                    hasContent ? catDef.cardBg : "bg-surface-container-low/60 hover:bg-surface-container-low"
-                  } ${
-                    isCurrentHour
-                      ? "ring-2 ring-primary border-primary shadow-[0_0_20px_rgba(90,240,179,0.25)] bg-[#102028]"
-                      : hasContent
-                      ? catDef.cardBorder
-                      : "border-outline/10 hover:border-outline/25"
-                  }`}
-                >
-                  {/* Left Column: Time & Status */}
-                  <div className="flex flex-col items-center justify-center shrink-0 w-12 sm:w-14 text-center select-none">
-                    <span
-                      className={`font-mono text-xs font-bold leading-tight ${
-                        isCurrentHour
-                          ? "text-primary font-extrabold"
-                          : isPast
-                          ? "text-on-surface-variant/60"
-                          : "text-on-surface"
+              // Sleep Group Handling - Minimized by default, expands on tap to show all individual hours!
+              if (isSleep) {
+                // Minimized Sleep Group
+                if (!isExpanded) {
+                  return (
+                    <div
+                      key={group.id}
+                      onClick={() => toggleGroupExpand(group.id, true)}
+                      className={`group flex items-center justify-between p-3 rounded-2xl bg-[#0a0f1d]/90 border border-indigo-500/25 hover:border-indigo-500/45 transition-all duration-300 cursor-pointer shadow-sm select-none my-0.5 ${
+                        isRecentlySaved
+                          ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#11192e]"
+                          : ""
                       }`}
                     >
-                      {formatHour(hour)}
-                    </span>
-                    <span className="font-mono text-[10px] text-on-surface-variant/40 leading-tight">
-                      {formatHour((hour + 1) % 24)}
-                    </span>
-                    {isCurrentHour && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-extrabold mt-1 shadow-sm animate-pulse">
-                        NOW
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Interactive Category Selector Pill */}
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenCategoryHour(isCategoryPickerOpen ? null : hour);
-                      }}
-                      title="Click to change block type"
-                      className={`px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
-                        catDef.badgeBg
-                      } hover:brightness-110`}
-                    >
-                      <CatIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span className="hidden sm:inline">{catDef.shortLabel}</span>
-                      <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
-                    </button>
-
-                    {/* Category Selection Dropdown Popup */}
-                    {isCategoryPickerOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenCategoryHour(null);
-                          }}
-                        />
-                        <div
-                          className="absolute left-0 top-full mt-1.5 z-50 w-52 p-1.5 rounded-2xl bg-surface-container border border-outline/25 shadow-2xl space-y-1 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="px-2.5 py-1 text-[10px] font-mono text-on-surface-variant font-bold uppercase tracking-wider">
-                            Change Block Type
-                          </div>
-                          {CATEGORIES.map((cat) => {
-                            const isSelected = currentCatKey === cat.key;
-                            const CatOptionIcon = cat.Icon;
-                            return (
-                              <button
-                                key={cat.key}
-                                type="button"
-                                onClick={() => handleCategoryChange(hour, cat.key)}
-                                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                                  isSelected
-                                    ? `${cat.badgeBg} font-bold shadow-sm ring-1 ring-current/30`
-                                    : "text-on-surface hover:bg-surface-container-high"
-                                }`}
-                              >
-                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${cat.badgeBg}`}>
-                                  <CatOptionIcon className="w-3.5 h-3.5" />
-                                </div>
-                                <span className="flex-1 text-left truncate">{cat.label}</span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
-                              </button>
-                            );
-                          })}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                          <Moon className="w-4 h-4" />
                         </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Main Input Field - Controlled by editingValues[hour] for 100% instant typing */}
-                  <div className="flex-1 min-w-0">
-                    <input
-                      ref={(el) => {
-                        inputRefs.current[hour] = el;
-                      }}
-                      type="text"
-                      placeholder={
-                        isCurrentHour
-                          ? "What are you conquering now?"
-                          : isPast
-                          ? "Schedule past slot..."
-                          : "Add task / focus..."
-                      }
-                      value={inputValue}
-                      onFocus={() => {
-                        focusedHourRef.current = hour;
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setEditingValues((prev) => ({
-                          ...prev,
-                          [hour]: val,
-                        }));
-                      }}
-                      onKeyDown={(e) => handleKeyDown(e, hour)}
-                      onBlur={(e) => handleBlur(hour, e.target.value)}
-                      className={`w-full bg-transparent border-0 p-0 text-sm font-medium focus:ring-0 focus:outline-none truncate placeholder:text-on-surface-variant/35 placeholder:font-normal transition-colors ${
-                        isCompleted
-                          ? "line-through text-on-surface-variant/50"
-                          : hasContent
-                          ? "text-on-surface font-semibold"
-                          : "text-on-surface-variant"
-                      }`}
-                    />
-                  </div>
-
-                  {/* Right Actions: Completion Check & Clear/Delete */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Saving Spinner Indicator */}
-                    {isSaving ? (
-                      <div className="w-7 h-7 flex items-center justify-center text-primary">
-                        <Loader2 size={15} className="animate-spin" />
+                        <div className="flex flex-col justify-center min-w-0">
+                          <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+                            <span className="text-xs font-mono font-bold text-on-surface whitespace-nowrap shrink-0">
+                              {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25 whitespace-nowrap shrink-0">
+                              {group.hours.length}h Sleep
+                            </span>
+                            {isRecentlySaved && (
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold animate-pulse whitespace-nowrap shrink-0">
+                                SAVED
+                              </span>
+                            )}
+                          </div>
+                          {group.title && group.title !== "Sleep" && (
+                            <p className="text-[11px] font-mono text-indigo-200/70 truncate mt-0.5">
+                              {group.title}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    ) : block ? (
-                      <>
-                        {/* Toggle Complete Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleComplete(block)}
-                          aria-label={isCompleted ? "Mark as pending" : "Mark as completed"}
-                          title={isCompleted ? "Completed (tap to revert)" : "Tap to complete"}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                            isCompleted
-                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
-                              : "border border-outline/20 hover:border-emerald-400 text-on-surface-variant/40 hover:text-emerald-400 hover:bg-emerald-500/10"
-                          }`}
-                        >
-                          {isCompleted ? <CheckCircle2 size={16} /> : <Check size={14} />}
-                        </button>
 
-                        {/* Quick Delete / Clear Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleClearBlock(hour)}
-                          aria-label="Delete block"
-                          title="Clear this block"
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant/30 hover:text-error hover:bg-error-container/20 transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </>
-                    ) : inputValue.trim().length > 0 ? (
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <div className="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Expanded Sleep Group - Shows header with ChevronUp + all editable sleep hour slots!
+                return (
+                  <div
+                    key={group.id}
+                    className={`rounded-3xl border border-indigo-500/35 bg-[#090e1d]/90 p-2.5 my-2 space-y-2 shadow-lg transition-all duration-300 ${
+                      isRecentlySaved
+                        ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      onClick={() => toggleGroupExpand(group.id, false)}
+                      className="flex items-center justify-between px-3 py-2 rounded-2xl bg-indigo-950/60 border border-indigo-500/25 hover:border-indigo-500/40 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                          <Moon className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col justify-center min-w-0">
+                          <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+                            <span className="text-xs font-mono font-bold text-white whitespace-nowrap shrink-0">
+                              {String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30 whitespace-nowrap shrink-0">
+                              {group.hours.length}h Sleep
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => handleClearBlock(hour)}
-                        aria-label="Clear input"
-                        title="Clear"
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant/30 hover:text-error transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleGroupExpand(group.id, false);
+                        }}
+                        aria-label="Minimize"
+                        className="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0 ml-2"
                       >
-                        <Trash2 size={13} />
+                        <ChevronUp className="w-4 h-4" />
                       </button>
-                    ) : null}
+                    </div>
+
+                    <div className="space-y-1">
+                      {group.slots.map((slot) => renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" }))}
+                    </div>
                   </div>
-                </div>
-              );
+                );
+              }
+
+              // Multi-Hour Non-Sleep Group (Work, Vitality, Sync, Renewal)
+              if (group.isCustom && group.hours.length > 1) {
+                return (
+                  <div
+                    key={group.id}
+                    className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2.5 my-2 space-y-2 shadow-lg transition-all duration-300 ${
+                      isRecentlySaved
+                        ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container-low/70 border border-outline/10">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
+                          <CatIcon className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-mono font-bold text-white truncate">
+                            {group.title || cat.label}
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-semibold border border-outline/10 shrink-0 whitespace-nowrap">
+                            {group.hours.length} Hours ({String(group.startHour).padStart(2, "0")}:00 → {String(group.endHour).padStart(2, "0")}:00)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      {group.slots.map((slot) => renderHourSlot(slot, { isInsideGroup: true, groupType: group.type }))}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Single Hour Block Slot
+              return renderHourSlot(group.slots[0]);
             })}
-          </section>
+          </div>
         )}
 
-        {/* Safe padding for mobile bottom bar */}
+        {/* Bottom padding for mobile safe area */}
         <div className="h-12" />
       </main>
     </div>
