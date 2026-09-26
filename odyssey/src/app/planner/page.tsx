@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
@@ -49,6 +50,16 @@ const setCachedBlocks = (dateStr: string, blocksList: ScheduleBlock[]) => {
 };
 
 export default function PlannerPage() {
+  return (
+    <Suspense fallback={null}>
+      <PlannerContent />
+    </Suspense>
+  );
+}
+
+function PlannerContent() {
+  const searchParams = useSearchParams();
+  const queryDate = searchParams ? searchParams.get("date") : null;
   const { user, fetchUser } = useUserStore();
   const { habits, fetchHabits } = useHabitStore();
 
@@ -108,6 +119,20 @@ export default function PlannerPage() {
     }));
   };
 
+  const loadBlocks = useCallback(async (dateStr: string) => {
+    try {
+      const cached = getCachedBlocks(dateStr);
+      if (cached.length > 0) {
+        setBlocks((prev) => (prev.length === 0 ? cached : prev));
+      }
+      const dayBlocks = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
+      setBlocks(dayBlocks);
+      setCachedBlocks(dateStr, dayBlocks);
+    } catch (err) {
+      console.error("Failed to load blocks:", err);
+    }
+  }, []);
+
   // Mount initialization: restore query date or localStorage cache safely on client only
   useEffect(() => {
     setIsMounted(true);
@@ -123,7 +148,6 @@ export default function PlannerPage() {
       initialDate = qDate;
       try {
         localStorage.setItem("odyssey_planner_selected_date", qDate);
-        window.history.replaceState(null, "", window.location.pathname);
       } catch {}
     } else {
       try {
@@ -140,6 +164,21 @@ export default function PlannerPage() {
       setBlocks(cached);
     }
   }, []);
+
+  // Reactively switch schedule date whenever query parameter changes
+  useEffect(() => {
+    if (queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)) {
+      setSelectedDate(queryDate);
+      try {
+        localStorage.setItem("odyssey_planner_selected_date", queryDate);
+      } catch {}
+      const cached = getCachedBlocks(queryDate);
+      if (cached.length > 0) {
+        setBlocks(cached);
+      }
+      loadBlocks(queryDate);
+    }
+  }, [queryDate, loadBlocks]);
 
   // Persist selectedDate to localStorage whenever changed and keep ref updated
   const selectedDateRef = useRef(selectedDate);
@@ -190,20 +229,6 @@ export default function PlannerPage() {
       setTodayStr(getLocalDateStr(now));
     }, 15000);
     return () => clearInterval(timer);
-  }, []);
-
-  const loadBlocks = useCallback(async (dateStr: string) => {
-    try {
-      const cached = getCachedBlocks(dateStr);
-      if (cached.length > 0) {
-        setBlocks((prev) => (prev.length === 0 ? cached : prev));
-      }
-      const dayBlocks = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
-      setBlocks(dayBlocks);
-      setCachedBlocks(dateStr, dayBlocks);
-    } catch (err) {
-      console.error("Failed to load blocks:", err);
-    }
   }, []);
 
   // Fetch user once on mount

@@ -328,7 +328,10 @@ export default function StatsPage() {
       isLongPressRef.current = false;
       return;
     }
-    router.push(`/day-schedule?date=${cell.dateStr}&day=${cell.journeyDay}`);
+    try {
+      localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
+    } catch {}
+    router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
   };
 
   const weekBars = [
@@ -799,10 +802,13 @@ export default function StatsPage() {
             <button
               type="button"
               onClick={() => {
+                const targetDate = popupDayStats.date;
+                const targetDay = popupDayStats.dayNumber;
                 setPopupDate(null);
-                router.push(
-                  `/day-schedule?date=${popupDayStats.date}&day=${popupDayStats.dayNumber}`
-                );
+                try {
+                  localStorage.setItem("odyssey_planner_selected_date", targetDate);
+                } catch {}
+                router.push(`/planner?date=${targetDate}&day=${targetDay}`);
               }}
               className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary-container text-on-primary text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"
             >
