@@ -26,6 +26,10 @@ declare global {
     OdysseyAndroid?: {
       setLockscreenWallpaper?: (base64Image: string) => boolean;
       setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+      saveCustomWallpaper?: (base64Image: string) => boolean;
+      getCustomWallpaper?: () => string;
+      clearCustomWallpaper?: () => boolean;
+      applyCustomWallpaper?: (targetScreen: string) => boolean;
       saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
       getAlternateWallpaper?: (targetScreen: string) => string;
       applyAlternateWallpaper?: (targetScreen: string) => boolean;
@@ -51,6 +55,10 @@ declare global {
     Android?: {
       setWallpaper?: (base64Image: string) => void;
       setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+      saveCustomWallpaper?: (base64Image: string) => boolean;
+      getCustomWallpaper?: () => string;
+      clearCustomWallpaper?: () => boolean;
+      applyCustomWallpaper?: (targetScreen: string) => boolean;
       saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
       getAlternateWallpaper?: (targetScreen: string) => string;
       applyAlternateWallpaper?: (targetScreen: string) => boolean;
@@ -587,98 +595,148 @@ export function setCustomTargetWallpaper(base64Image: string, target: "lock" | "
 }
 
 /**
- * Saves the user's custom alternate wallpaper in local & native storage.
+ * Saves the user's custom restoration wallpaper in local & native storage.
  */
-export function saveNativeAlternateWallpaper(base64Image: string, target: "lock" | "home"): boolean {
+export function saveNativeCustomWallpaper(base64Image: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    localStorage.setItem(`odyssey_alt_wallpaper_${target}`, base64Image);
+    localStorage.setItem("odyssey_custom_restoration_wallpaper", base64Image);
+    localStorage.setItem("odyssey_alt_wallpaper_lock", base64Image);
+    localStorage.setItem("odyssey_alt_wallpaper_home", base64Image);
   } catch (e) {
-    console.warn("localStorage quota or error saving alternate wallpaper:", e);
+    console.warn("localStorage quota or error saving custom wallpaper:", e);
   }
 
   let nativeSuccess = false;
-  if (window.OdysseyAndroid?.saveAlternateWallpaper) {
+  if (window.OdysseyAndroid?.saveCustomWallpaper) {
     try {
-      nativeSuccess = Boolean(window.OdysseyAndroid.saveAlternateWallpaper(base64Image, target));
+      nativeSuccess = Boolean(window.OdysseyAndroid.saveCustomWallpaper(base64Image));
     } catch (e) {
-      console.warn("OdysseyAndroid.saveAlternateWallpaper error:", e);
+      console.warn("OdysseyAndroid.saveCustomWallpaper error:", e);
     }
-  }
-  if (window.Android?.saveAlternateWallpaper) {
+  } else if (window.OdysseyAndroid?.saveAlternateWallpaper) {
     try {
-      nativeSuccess = Boolean(window.Android.saveAlternateWallpaper(base64Image, target));
+      window.OdysseyAndroid.saveAlternateWallpaper(base64Image, "lock");
+      window.OdysseyAndroid.saveAlternateWallpaper(base64Image, "home");
+      nativeSuccess = true;
+    } catch {}
+  }
+
+  if (window.Android?.saveCustomWallpaper) {
+    try {
+      nativeSuccess = Boolean(window.Android.saveCustomWallpaper(base64Image));
     } catch (e) {
-      console.warn("Android.saveAlternateWallpaper error:", e);
+      console.warn("Android.saveCustomWallpaper error:", e);
     }
   }
   return nativeSuccess || true;
 }
 
 /**
- * Retrieves the user's saved alternate wallpaper from native or local storage.
+ * Retrieves the user's saved custom restoration wallpaper.
  */
-export function getNativeAlternateWallpaper(target: "lock" | "home"): string {
+export function getNativeCustomWallpaper(): string {
   if (typeof window === "undefined") return "";
-  if (window.OdysseyAndroid?.getAlternateWallpaper) {
+  if (window.OdysseyAndroid?.getCustomWallpaper) {
     try {
-      const val = window.OdysseyAndroid.getAlternateWallpaper(target);
+      const val = window.OdysseyAndroid.getCustomWallpaper();
       if (val && val.length > 0) return val;
     } catch {}
   }
-  if (window.Android?.getAlternateWallpaper) {
+  if (window.Android?.getCustomWallpaper) {
     try {
-      const val = window.Android.getAlternateWallpaper(target);
+      const val = window.Android.getCustomWallpaper();
+      if (val && val.length > 0) return val;
+    } catch {}
+  }
+  if (window.OdysseyAndroid?.getAlternateWallpaper) {
+    try {
+      const val = window.OdysseyAndroid.getAlternateWallpaper("lock") || window.OdysseyAndroid.getAlternateWallpaper("home");
       if (val && val.length > 0) return val;
     } catch {}
   }
   try {
-    const local = localStorage.getItem(`odyssey_alt_wallpaper_${target}`);
+    const local = localStorage.getItem("odyssey_custom_restoration_wallpaper") ||
+      localStorage.getItem("odyssey_alt_wallpaper_lock") ||
+      localStorage.getItem("odyssey_alt_wallpaper_home");
     if (local) return local;
   } catch {}
   return "";
 }
 
 /**
- * Clears the user's saved alternate wallpaper from local & native storage.
+ * Clears the user's saved custom restoration wallpaper.
  */
-export function clearNativeAlternateWallpaper(target: "lock" | "home"): boolean {
+export function clearNativeCustomWallpaper(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    localStorage.removeItem(`odyssey_alt_wallpaper_${target}`);
+    localStorage.removeItem("odyssey_custom_restoration_wallpaper");
+    localStorage.removeItem("odyssey_alt_wallpaper_lock");
+    localStorage.removeItem("odyssey_alt_wallpaper_home");
   } catch {}
-  if (window.OdysseyAndroid?.saveAlternateWallpaper) {
+  if (window.OdysseyAndroid?.clearCustomWallpaper) {
     try {
-      window.OdysseyAndroid.saveAlternateWallpaper("", target);
+      window.OdysseyAndroid.clearCustomWallpaper();
     } catch {}
   }
-  if (window.Android?.saveAlternateWallpaper) {
+  if (window.Android?.clearCustomWallpaper) {
     try {
-      window.Android.saveAlternateWallpaper("", target);
+      window.Android.clearCustomWallpaper();
     } catch {}
   }
   return true;
 }
 
 /**
- * Applies the user's saved alternate wallpaper directly to lock, home, or both.
+ * Applies the user's saved custom restoration wallpaper directly to lock, home, or both.
  */
-export function applyNativeAlternateWallpaper(target: "lock" | "home" | "both" = "both"): boolean {
+export function applyNativeCustomWallpaper(target: "lock" | "home" | "both" = "both"): boolean {
   if (typeof window === "undefined") return false;
+  if (window.OdysseyAndroid?.applyCustomWallpaper) {
+    try {
+      return Boolean(window.OdysseyAndroid.applyCustomWallpaper(target));
+    } catch {}
+  }
+  if (window.Android?.applyCustomWallpaper) {
+    try {
+      return Boolean(window.Android.applyCustomWallpaper(target));
+    } catch {}
+  }
   if (window.OdysseyAndroid?.applyAlternateWallpaper) {
     try {
       return Boolean(window.OdysseyAndroid.applyAlternateWallpaper(target));
     } catch {}
   }
-  if (window.Android?.applyAlternateWallpaper) {
-    try {
-      return Boolean(window.Android.applyAlternateWallpaper(target));
-    } catch {}
-  }
-  // In web browser mode, verify that the photo is safely stored in local preferences
-  const checkTarget = target === "both" ? "lock" : target;
-  const saved = getNativeAlternateWallpaper(checkTarget);
+  const saved = getNativeCustomWallpaper();
   return Boolean(saved && saved.length > 0);
+}
+
+/**
+ * Saves the user's custom alternate wallpaper in local & native storage (legacy).
+ */
+export function saveNativeAlternateWallpaper(base64Image: string, target: "lock" | "home"): boolean {
+  return saveNativeCustomWallpaper(base64Image);
+}
+
+/**
+ * Retrieves the user's saved alternate wallpaper from native or local storage (legacy).
+ */
+export function getNativeAlternateWallpaper(target: "lock" | "home"): string {
+  return getNativeCustomWallpaper();
+}
+
+/**
+ * Clears the user's saved alternate wallpaper from local & native storage (legacy).
+ */
+export function clearNativeAlternateWallpaper(target: "lock" | "home"): boolean {
+  return clearNativeCustomWallpaper();
+}
+
+/**
+ * Applies the user's saved alternate wallpaper directly to lock, home, or both (legacy).
+ */
+export function applyNativeAlternateWallpaper(target: "lock" | "home" | "both" = "both"): boolean {
+  return applyNativeCustomWallpaper(target);
 }
 
 export interface AppUpdateCheckResult {

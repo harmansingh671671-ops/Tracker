@@ -3,13 +3,11 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useUserStore } from "@/lib/stores/user-store";
-import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
-import { db, type ScheduleBlock, type Habit } from "@/lib/db";
+import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
 import {
-  build24HourlyBlocks,
   type WallpaperData,
 } from "@/lib/utils/wallpaper-generator";
 import { WallpaperPreview } from "@/components/wallpaper/wallpaper-preview";
@@ -19,40 +17,27 @@ import {
   syncScheduleDataToNative,
   triggerNativeTestNotification,
   setCustomTargetWallpaper,
-  saveNativeAlternateWallpaper,
-  getNativeAlternateWallpaper,
-  clearNativeAlternateWallpaper,
-  applyNativeAlternateWallpaper,
+  saveNativeCustomWallpaper,
+  getNativeCustomWallpaper,
+  clearNativeCustomWallpaper,
+  applyNativeCustomWallpaper,
   openSystemWallpaperChooser,
   isAndroidApp,
   sendTestNotificationToAndroid,
 } from "@/lib/utils/android-bridge";
 import {
   Sparkles,
-  Layers,
   Smartphone,
   CheckCircle2,
-  Clock,
-  Send,
   Zap,
-  PowerOff,
   Image as ImageIcon,
-  Compass,
-  Flame,
-  ArrowRight,
   Eye,
-  Sliders,
-  ChevronRight,
   Lock,
-  Home,
-  Check,
   Upload,
-  ArrowLeft,
   EyeOff,
   ShieldCheck,
   RefreshCw,
   Bell,
-  HelpCircle,
   Loader2,
   Trash2,
 } from "lucide-react";
@@ -64,22 +49,17 @@ export default function WallpaperPage() {
   const [activeEngine, setActiveEngine] = useState<"live" | "static">("live");
   const [screenTarget, setScreenTarget] = useState<"lock" | "home" | "both">("both");
   const [simMode, setSimMode] = useState<"clean" | "guide">("clean");
-  const [selectedHour, setSelectedHour] = useState<number>(new Date().getHours());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [altLockPhoto, setAltLockPhoto] = useState<string | null>(null);
-  const [altHomePhoto, setAltHomePhoto] = useState<string | null>(null);
-  const [isProcessingLock, setIsProcessingLock] = useState(false);
-  const [isProcessingHome, setIsProcessingHome] = useState(false);
+  const [customWallpaper, setCustomWallpaper] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const lockFileInputRef = useRef<HTMLInputElement>(null);
-  const homeFileInputRef = useRef<HTMLInputElement>(null);
+  const customFileInputRef = useRef<HTMLInputElement>(null);
 
-  const triggerPhotoPicker = (target: "lock" | "home") => {
-    const input = target === "lock" ? lockFileInputRef.current : homeFileInputRef.current;
-    if (input) {
-      input.value = "";
-      input.click();
+  const triggerSystemPicker = () => {
+    if (customFileInputRef.current) {
+      customFileInputRef.current.value = "";
+      customFileInputRef.current.click();
     }
   };
 
@@ -92,11 +72,8 @@ export default function WallpaperPage() {
 
     db.scheduleBlocks.where("date").equals(todayStr).toArray().then(setBlocks);
 
-    const savedLock = getNativeAlternateWallpaper("lock");
-    if (savedLock) setAltLockPhoto(savedLock);
-
-    const savedHome = getNativeAlternateWallpaper("home");
-    if (savedHome) setAltHomePhoto(savedHome);
+    const saved = getNativeCustomWallpaper();
+    if (saved) setCustomWallpaper(saved);
   }, [fetchUser, fetchHabits, user?.id]);
 
   const showToast = (msg: string) => {
@@ -173,7 +150,6 @@ export default function WallpaperPage() {
 
         const img = new Image();
         img.onerror = () => {
-          // Fallback to raw base64 if canvas decoding fails
           resolve(rawResult);
         };
         img.onload = () => {
@@ -199,7 +175,7 @@ export default function WallpaperPage() {
             }
 
             ctx.drawImage(img, 0, 0, width, height);
-            const compressed = canvas.toDataURL("image/jpeg", 0.85);
+            const compressed = canvas.toDataURL("image/jpeg", 0.9);
             resolve(compressed);
           } catch {
             resolve(rawResult);
@@ -211,20 +187,18 @@ export default function WallpaperPage() {
     });
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "lock" | "home") => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (target === "lock") setIsProcessingLock(true);
-    else setIsProcessingHome(true);
+    setIsProcessing(true);
 
     try {
       const base64 = await compressImageForWallpaper(file);
       if (base64) {
-        saveNativeAlternateWallpaper(base64, target);
-        if (target === "lock") setAltLockPhoto(base64);
-        else setAltHomePhoto(base64);
-        showToast(`${target === "lock" ? "Lock" : "Home"} Screen photo saved! Tap Apply to set it.`);
+        saveNativeCustomWallpaper(base64);
+        setCustomWallpaper(base64);
+        showToast("Custom wallpaper stored! It will automatically replace Odyssey when turned off.");
       }
     } catch (err) {
       console.error("Failed to process photo:", err);
@@ -235,34 +209,23 @@ export default function WallpaperPage() {
           e.target.value = "";
         } catch {}
       }
-      if (target === "lock") setIsProcessingLock(false);
-      else setIsProcessingHome(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleRemovePhoto = (e: React.MouseEvent, target: "lock" | "home") => {
+  const handleRemoveCustom = (e: React.MouseEvent) => {
     e.stopPropagation();
-    clearNativeAlternateWallpaper(target);
-    if (target === "lock") setAltLockPhoto(null);
-    else setAltHomePhoto(null);
-    showToast(`${target === "lock" ? "Lock" : "Home"} Screen custom photo removed.`);
+    clearNativeCustomWallpaper();
+    setCustomWallpaper(null);
+    showToast("Custom restoration wallpaper removed.");
   };
 
-  const handleApplyAlternate = (target: "lock" | "home") => {
-    const applied = applyNativeAlternateWallpaper(target);
-    if (applied) {
-      showToast(`${target === "lock" ? "Lock" : "Home"} Screen alternate wallpaper applied.`);
+  const handleApplyNow = () => {
+    if (customWallpaper) {
+      applyNativeCustomWallpaper("both");
+      showToast("Applied custom wallpaper to both Lock & Home screens.");
     } else {
-      showToast("No custom photo saved yet. Tap Change Photo first.");
-    }
-  };
-
-  const handleOpenSystemWallpaperChooser = () => {
-    const opened = openSystemWallpaperChooser();
-    if (opened) {
-      showToast("Opening Android System Wallpaper Chooser...");
-    } else {
-      showToast("System wallpaper chooser opened.");
+      showToast("No custom wallpaper stored yet. Tap to pick one first.");
     }
   };
 
@@ -278,8 +241,12 @@ export default function WallpaperPage() {
 
   const handleTurnOffWallpaper = () => {
     clearNativeLockscreen();
-    applyNativeAlternateWallpaper("both");
-    showToast("Schedule wallpaper removed. Restored alternate wallpapers.");
+    applyNativeCustomWallpaper("both");
+    if (customWallpaper) {
+      showToast("Schedule wallpaper turned off. Restored your selected wallpaper to both Lock & Home screens!");
+    } else {
+      showToast("Schedule wallpaper turned off.");
+    }
   };
 
   const handleSendTestNotification = () => {
@@ -329,7 +296,7 @@ export default function WallpaperPage() {
         </div>
       </div>
 
-      {/* Center Stage: Phone Simulator (19.5:9 ratio mockup previewing 2-Task Preview) */}
+      {/* Center Stage: Phone Simulator */}
       <div className="flex flex-col items-center">
         <div className="relative w-full max-w-[340px] shadow-2xl rounded-[48px] border-4 border-surface-container-highest/60 overflow-hidden bg-surface-container-lowest">
           <WallpaperPreview
@@ -440,225 +407,126 @@ export default function WallpaperPage() {
           </div>
         </div>
 
-        {/* 3. Alternate Wallpaper System Card */}
-        <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-4">
+        {/* 3. Unified Custom Restoration Wallpaper Section */}
+        <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-on-surface">Alternate Wallpapers</h3>
+              <h3 className="text-base font-bold text-on-surface">Custom Restoration Wallpaper</h3>
               <p className="text-xs text-on-surface-variant">
-                Custom fallback photos restored when turning off the schedule wallpaper
+                Stored wallpaper that replaces Odyssey on both Lock & Home screens when turning off
               </p>
             </div>
           </div>
 
-          {/* Hidden Native File Inputs */}
+          {/* Hidden Native File Input */}
           <input
-            ref={lockFileInputRef}
+            ref={customFileInputRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(e) => handlePhotoUpload(e, "lock")}
-          />
-          <input
-            ref={homeFileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => handlePhotoUpload(e, "home")}
+            onChange={handlePhotoUpload}
           />
 
-          {/* Dual Thumbnail Upload Pickers */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {/* Lock Screen Photo Card */}
-            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/5">
+          {customWallpaper ? (
+            /* Saved Wallpaper Preview & Control */
+            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/10">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-on-surface flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-on-surface-variant" />
-                  Lock Screen
+                  <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                  Selected Wallpaper
                 </span>
-                <span className="font-mono text-primary flex items-center gap-0.5">
+                <span className="font-mono text-primary flex items-center gap-1 text-[11px] font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  {altLockPhoto ? "Saved" : "Default"}
+                  Stored & Ready
                 </span>
               </div>
 
-              {/* Clickable Image Box */}
+              {/* Image Preview Box */}
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => triggerPhotoPicker("lock")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    triggerPhotoPicker("lock");
-                  }
-                }}
-                className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none"
+                onClick={triggerSystemPicker}
+                className="relative w-full h-44 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/15 hover:border-primary/50 transition-all select-none"
               >
-                {isProcessingLock ? (
-                  <div className="flex flex-col items-center gap-1.5 text-primary">
+                {isProcessing ? (
+                  <div className="flex flex-col items-center gap-2 text-primary">
                     <Loader2 className="w-6 h-6 animate-spin" />
-                    <span className="text-[10px] font-mono font-medium">Processing photo...</span>
+                    <span className="text-xs font-mono font-medium">Processing wallpaper...</span>
                   </div>
-                ) : altLockPhoto ? (
+                ) : (
                   <>
                     <img
-                      src={altLockPhoto}
-                      alt="Lock screen alternate"
+                      src={customWallpaper}
+                      alt="Custom restoration wallpaper"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Tap to change</span>
+                      <Upload className="w-4 h-4" />
+                      <span>Tap to choose another photo</span>
                     </div>
                   </>
-                ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
-                    <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
-                    <span className="text-[10px] font-mono">Tap to choose photo</span>
-                  </div>
                 )}
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-0.5">
                 <button
                   type="button"
-                  onClick={() => triggerPhotoPicker("lock")}
-                  disabled={isProcessingLock}
-                  className="flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 disabled:opacity-50"
+                  onClick={triggerSystemPicker}
+                  disabled={isProcessing}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 disabled:opacity-50"
                 >
-                  {isProcessingLock ? (
+                  {isProcessing ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5" />
+                    <Upload className="w-3.5 h-3.5 text-primary" />
                   )}
-                  <span>{isProcessingLock ? "Processing..." : "Change Photo"}</span>
+                  <span>{isProcessing ? "Processing..." : "Change Wallpaper"}</span>
                 </button>
-
-                {altLockPhoto && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleRemovePhoto(e, "lock")}
-                    title="Remove custom photo"
-                    className="p-2 rounded-lg bg-surface-container-high hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
 
                 <button
                   type="button"
-                  onClick={() => handleApplyAlternate("lock")}
-                  className="py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={handleApplyNow}
+                  className="py-2.5 px-4 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary text-xs font-semibold transition-colors cursor-pointer border border-primary/20"
                 >
-                  Apply
+                  Apply Now
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveCustom}
+                  title="Remove saved wallpaper"
+                  className="p-2.5 rounded-xl bg-surface-container-high hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors cursor-pointer border border-outline/10"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
-
-            {/* Home Screen Photo Card */}
-            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-on-surface flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-on-surface-variant" />
-                  Home Screen
-                </span>
-                <span className="font-mono text-on-surface-variant flex items-center gap-0.5">
-                  {altHomePhoto ? "Saved" : "Default"}
-                </span>
-              </div>
-
-              {/* Clickable Image Box */}
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => triggerPhotoPicker("home")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    triggerPhotoPicker("home");
-                  }
-                }}
-                className="relative w-full h-32 rounded-lg overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/10 hover:border-primary/40 transition-all select-none"
-              >
-                {isProcessingHome ? (
-                  <div className="flex flex-col items-center gap-1.5 text-primary">
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    <span className="text-[10px] font-mono font-medium">Processing photo...</span>
-                  </div>
-                ) : altHomePhoto ? (
-                  <>
-                    <img
-                      src={altHomePhoto}
-                      alt="Home screen alternate"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Tap to change</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-on-surface-variant group-hover:text-primary transition-colors">
-                    <ImageIcon className="w-6 h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
-                    <span className="text-[10px] font-mono">Tap to choose photo</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => triggerPhotoPicker("home")}
-                  disabled={isProcessingHome}
-                  className="flex-1 py-2 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 disabled:opacity-50"
-                >
-                  {isProcessingHome ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                  ) : (
-                    <Upload className="w-3.5 h-3.5" />
-                  )}
-                  <span>{isProcessingHome ? "Processing..." : "Change Photo"}</span>
-                </button>
-
-                {altHomePhoto && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleRemovePhoto(e, "home")}
-                    title="Remove custom photo"
-                    className="p-2 rounded-lg bg-surface-container-high hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => handleApplyAlternate("home")}
-                  className="py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Android System Wallpaper Picker Bridge Button */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={handleOpenSystemWallpaperChooser}
-              className="w-full py-2.5 px-4 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-outline/10 shadow-sm active:scale-[0.99] cursor-pointer"
+          ) : (
+            /* No Wallpaper Selected: Clean System Wallpaper Picker Card */
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={triggerSystemPicker}
+              className="p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center"
             >
-              <ImageIcon className="w-4 h-4 text-primary" />
-              <span>Open Android System Wallpaper Picker</span>
-            </button>
-            <p className="text-[10px] font-mono text-on-surface-variant/70 text-center mt-1">
-              Directly launches Android's native wallpaper chooser / Google Photos / Gallery
-            </p>
-          </div>
+              <div className="w-12 h-12 rounded-2xl bg-surface-container-high group-hover:bg-primary/20 flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-all">
+                {isProcessing ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                ) : (
+                  <ImageIcon className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <span className="text-xs font-bold text-on-surface group-hover:text-primary transition-colors block">
+                  {isProcessing ? "Processing Photo..." : "Open System Wallpaper Picker"}
+                </span>
+                <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 max-w-xs">
+                  Select your custom photo from Gallery or Google Photos to be stored and restored when turning off Odyssey
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 4. Primary Activation Buttons */}
@@ -666,7 +534,7 @@ export default function WallpaperPage() {
           {/* Big Glowing Emerald Activation Button */}
           <button
             onClick={handleLaunchLiveWallpaper}
-            className="relative w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-bold text-base flex items-center justify-center gap-2.5 shadow-lg shadow-primary/25 hover:scale-[0.99] active:scale-[0.97] transition-all"
+            className="relative w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-bold text-base flex items-center justify-center gap-2.5 shadow-lg shadow-primary/25 hover:scale-[0.99] active:scale-[0.97] transition-all cursor-pointer"
           >
             <Sparkles className="w-5 h-5" />
             <span>Launch Native Live Wallpaper Service</span>
@@ -675,16 +543,16 @@ export default function WallpaperPage() {
           {/* Secondary Ghost Reset Button */}
           <button
             onClick={handleTurnOffWallpaper}
-            className="w-full py-3 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer border border-outline/10"
           >
-            <RefreshCw className="w-4 h-4" />
-            <span>Turn Off Wallpaper (Restore Alternate Photos)</span>
+            <RefreshCw className="w-4 h-4 text-primary" />
+            <span>Turn Off Wallpaper (Restore Selected Wallpaper)</span>
           </button>
 
           {/* Tertiary Test Notification Button */}
           <button
             onClick={handleSendTestNotification}
-            className="w-full py-2.5 px-4 rounded-xl bg-surface-container-low hover:bg-surface-container text-tertiary text-xs font-mono font-medium transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-surface-container-low hover:bg-surface-container text-tertiary text-xs font-mono font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <Bell className="w-4 h-4" />
             <span>Send Test XX:57 Heads-Up Notification</span>
@@ -709,3 +577,4 @@ export default function WallpaperPage() {
     </div>
   );
 }
+
