@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Shield, Flame, Gem } from "lucide-react";
+import { Shield, Flame } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { ProfileSettingsSheet } from "./profile-settings-sheet";
 
@@ -54,17 +54,6 @@ export function Header() {
               <Flame className="w-3 h-3 text-amber-400 shrink-0" />
               <span className="text-[11px] font-bold font-mono leading-none">
                 {user?.streak ?? 0}d
-              </span>
-            </div>
-
-            {/* 3. Diamond / Gems */}
-            <div
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-primary"
-              title={`Diamonds: ${user?.diamonds ?? 0}`}
-            >
-              <Gem className="w-3 h-3 text-primary shrink-0" />
-              <span className="text-[11px] font-bold font-mono leading-none">
-                {user?.diamonds ?? 0}
               </span>
             </div>
 
