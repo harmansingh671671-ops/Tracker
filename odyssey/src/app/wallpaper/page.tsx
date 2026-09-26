@@ -418,15 +418,6 @@ export default function WallpaperPage() {
             </div>
           </div>
 
-          {/* Hidden Native File Input */}
-          <input
-            ref={customFileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handlePhotoUpload}
-          />
-
           {customWallpaper ? (
             /* Saved Wallpaper Preview & Control */
             <div className="p-3 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/10">
@@ -441,13 +432,18 @@ export default function WallpaperPage() {
                 </span>
               </div>
 
-              {/* Image Preview Box */}
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={triggerSystemPicker}
-                className="relative w-full h-44 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/15 hover:border-primary/50 transition-all select-none"
+              {/* Image Preview Box - Tappable Label for direct OS photo picker */}
+              <label
+                htmlFor="wallpaper-file-input"
+                className="relative w-full h-44 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/15 hover:border-primary/50 transition-all select-none block"
               >
+                <input
+                  id="wallpaper-file-input"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handlePhotoUpload}
+                />
                 {isProcessing ? (
                   <div className="flex flex-col items-center gap-2 text-primary">
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -466,23 +462,28 @@ export default function WallpaperPage() {
                     </div>
                   </>
                 )}
-              </div>
+              </label>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={triggerSystemPicker}
-                  disabled={isProcessing}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 disabled:opacity-50"
+                <label
+                  htmlFor="wallpaper-file-input-change"
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 text-center select-none"
                 >
+                  <input
+                    id="wallpaper-file-input-change"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handlePhotoUpload}
+                  />
                   {isProcessing ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   ) : (
                     <Upload className="w-3.5 h-3.5 text-primary" />
                   )}
                   <span>{isProcessing ? "Processing..." : "Change Wallpaper"}</span>
-                </button>
+                </label>
 
                 <button
                   type="button"
@@ -503,14 +504,19 @@ export default function WallpaperPage() {
               </div>
             </div>
           ) : (
-            /* No Wallpaper Selected: Clean System Wallpaper Picker Card */
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={triggerSystemPicker}
-              className="p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center"
+            /* No Wallpaper Selected: Clean System Wallpaper Picker Card - Direct Native Label */
+            <label
+              htmlFor="wallpaper-file-input-empty"
+              className="relative p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center block"
             >
-              <div className="w-12 h-12 rounded-2xl bg-surface-container-high group-hover:bg-primary/20 flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-all">
+              <input
+                id="wallpaper-file-input-empty"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handlePhotoUpload}
+              />
+              <div className="w-12 h-12 rounded-2xl bg-surface-container-high group-hover:bg-primary/20 flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-all mx-auto">
                 {isProcessing ? (
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 ) : (
@@ -521,12 +527,32 @@ export default function WallpaperPage() {
                 <span className="text-xs font-bold text-on-surface group-hover:text-primary transition-colors block">
                   {isProcessing ? "Processing Photo..." : "Open System Wallpaper Picker"}
                 </span>
-                <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 max-w-xs">
+                <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 max-w-xs mx-auto">
                   Select your custom photo from Gallery or Google Photos to be stored and restored when turning off Odyssey
                 </p>
               </div>
-            </div>
+            </label>
           )}
+
+          {/* Quick Option: Open Android Device Wallpaper Settings */}
+          <div className="flex items-center justify-between pt-1 text-xs">
+            <span className="text-[11px] font-mono text-on-surface-variant">Device Wallpaper Settings:</span>
+            <button
+              type="button"
+              onClick={() => {
+                const res = openSystemWallpaperChooser();
+                if (res) {
+                  showToast("Opening Android System Wallpaper Chooser...");
+                } else {
+                  showToast("Android Wallpaper Chooser triggered.");
+                }
+              }}
+              className="text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Open Device Chooser</span>
+            </button>
+          </div>
         </div>
 
         {/* 4. Primary Activation Buttons */}

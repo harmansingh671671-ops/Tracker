@@ -168,25 +168,28 @@ class MainActivity : AppCompatActivity() {
                 ): Boolean {
                     this@MainActivity.filePathCallback?.onReceiveValue(null)
                     this@MainActivity.filePathCallback = filePathCallback
-                    val intent = try {
-                        val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+
+                    val chooserIntent = try {
+                        val pickIntent = Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
                             type = "image/*"
-                            addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                        Intent.createChooser(pickIntent, "Choose Wallpaper Image")
+                        Intent.createChooser(pickIntent, "Select Wallpaper Photo")
                     } catch (e: Exception) {
                         fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
                             type = "image/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
                     }
+
                     return try {
-                        fileChooserLauncher.launch(intent)
+                        fileChooserLauncher.launch(chooserIntent)
                         true
                     } catch (e: Exception) {
                         try {
-                            val pickIntent = Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-                            fileChooserLauncher.launch(pickIntent)
+                            val fallbackIntent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                                type = "image/*"
+                            }
+                            fileChooserLauncher.launch(fallbackIntent)
                             true
                         } catch (e2: Exception) {
                             this@MainActivity.filePathCallback?.onReceiveValue(null)

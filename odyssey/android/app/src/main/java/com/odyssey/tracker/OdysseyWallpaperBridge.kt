@@ -581,18 +581,30 @@ class OdysseyWallpaperBridge(private val context: Context) {
      */
     @JavascriptInterface
     fun openSystemWallpaperChooser(): Boolean {
-        return try {
-            val intent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intentsToTry = listOf(
+            Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                putExtra(
+                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                    ComponentName(context, OdysseyLiveWallpaperService::class.java)
+                )
+            },
+            Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
+            Intent(Intent.ACTION_SET_WALLPAPER),
+            Intent("android.settings.WALLPAPER_SETTINGS"),
+            Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)
+        )
+
+        for (intent in intentsToTry) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                Log.d("OdysseyWallpaper", "Launched wallpaper intent: ${intent.action}")
+                return true
+            } catch (e: Exception) {
+                Log.w("OdysseyWallpaper", "Intent failed (${intent.action}): ${e.message}")
             }
-            context.startActivity(Intent.createChooser(intent, "Choose Wallpaper").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
-            true
-        } catch (e: Exception) {
-            Log.e("OdysseyWallpaper", "Failed to open system wallpaper chooser: ${e.message}", e)
-            false
         }
+        return false
     }
 
     /**
