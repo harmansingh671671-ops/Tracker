@@ -257,6 +257,37 @@ export default function StatsPage() {
     );
   }, [popupDate, dayStatsByDate, allBlocks, user?.createdAt]);
 
+  // 24-Hour hourly breakdown (0..23) for popup date in a 4x6 grid
+  const popupHourlyBlocks = useMemo(() => {
+    if (!popupDate) return [];
+    const dayBlocks = allBlocks.filter((b) => b.date === popupDate);
+
+    return Array.from({ length: 24 }, (_, hour) => {
+      const block = dayBlocks.find((b) => {
+        const sH = parseInt(b.startTime.split(":")[0], 10);
+        let eH = parseInt(b.endTime.split(":")[0], 10);
+        if (eH === 0 && b.endTime === "24:00") eH = 24;
+        if (isNaN(eH) || eH <= sH) eH = sH + 1;
+        return hour >= sH && hour < eH;
+      });
+
+      if (!block) {
+        return {
+          hour,
+          status: "empty" as const,
+          block: null,
+        };
+      }
+
+      const isReviewed = block.status === "completed" || block.status === "missed";
+      return {
+        hour,
+        status: isReviewed ? ("reviewed" as const) : ("planned_unreviewed" as const),
+        block,
+      };
+    });
+  }, [popupDate, allBlocks]);
+
   // Tap & hold (long press) gesture handlers
   const startPress = (cell: (typeof monthCells)[0], e: React.TouchEvent | React.MouseEvent) => {
     if (cell.isPad) return;
@@ -446,7 +477,7 @@ export default function StatsPage() {
           <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
             {monthCells.map((cell, idx) => {
               if (cell.isPad) {
-                return <div key={`pad-${idx}`} className="w-full aspect-square" />;
+                return <div key={`pad-${idx}`} className="w-full aspect-[4/3] sm:aspect-square" />;
               }
 
               const isToday = cell.dateStr === todayStr;
@@ -470,15 +501,9 @@ export default function StatsPage() {
                   }}
                   onClick={() => handleCellClick(cell)}
                   title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap to open schedule • Hold for overview`}
-                  className={`w-full aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
+                  className={`w-full aspect-[4/3] sm:aspect-square rounded-md flex flex-col items-center justify-center text-xs font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
                 >
                   <span className="leading-none">{cell.dayNumber}</span>
-                  {cell.stats.status === "fully_completed" && (
-                    <span className="w-1 h-1 rounded-full bg-[#003825] mt-0.5" />
-                  )}
-                  {cell.stats.status === "planned_unreviewed" && (
-                    <span className="w-1 h-1 rounded-full bg-white mt-0.5" />
-                  )}
                 </button>
               );
             })}
@@ -488,23 +513,23 @@ export default function StatsPage() {
         {/* Heatmap Legend */}
         <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-outline/10 text-[10px] font-mono text-on-surface-variant">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-surface-container-highest/30 border border-outline/15 inline-block" />
+            <span className="w-3 h-2 rounded-[2px] bg-surface-container-highest/30 border border-outline/15 inline-block" />
             <span>Empty</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-amber-500 border border-amber-400 inline-block shadow-sm" />
+            <span className="w-3 h-2 rounded-[2px] bg-amber-500 border border-amber-400 inline-block shadow-sm" />
             <span>Planned (0 Rev)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-700 border border-emerald-500/60 inline-block shadow-sm" />
+            <span className="w-3 h-2 rounded-[2px] bg-emerald-700 border border-emerald-500/60 inline-block shadow-sm" />
             <span>1h+ Rev</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-400 inline-block shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+            <span className="w-3 h-2 rounded-[2px] bg-emerald-500 border border-emerald-400 inline-block shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
             <span>50%+ Rev</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-[#00E676] border border-[#69f0ae] inline-block shadow-[0_0_10px_rgba(0,230,118,0.7)]" />
+            <span className="w-3 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-[0_0_10px_rgba(0,230,118,0.7)]" />
             <span>100% Rev</span>
           </div>
         </div>
@@ -693,6 +718,65 @@ export default function StatsPage() {
                   ? `${popupDayStats.reviewedHours}/${popupDayStats.plannedHours}h Reviewed`
                   : "Not Planned"}
               </span>
+            </div>
+
+            {/* 4 Rows x 6 Columns Hourly Heatmap */}
+            <div className="space-y-2 p-3.5 rounded-2xl bg-surface-container-low border border-outline/10">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold text-on-surface flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-primary" />
+                  <span>24-Hour Schedule Heatmap</span>
+                </span>
+                <span className="text-[10px] font-mono text-on-surface-variant">4×6 Grid</span>
+              </div>
+
+              {/* 4x6 Grid of Rectangles with slightly curved edges */}
+              <div className="grid grid-cols-6 gap-1.5 w-full">
+                {popupHourlyBlocks.map((item) => {
+                  const hourFormatted = String(item.hour).padStart(2, "0");
+                  const nextHourFormatted = String((item.hour + 1) % 24).padStart(2, "0");
+
+                  let bgClass =
+                    "bg-surface-container-highest/20 text-on-surface-variant/40 border-outline/10";
+                  let statusTitle = "Nothing (Empty)";
+
+                  if (item.status === "reviewed") {
+                    bgClass =
+                      "bg-[#00E676] text-[#002f18] font-black border-[#69f0ae] shadow-[0_0_6px_rgba(0,230,118,0.45)]";
+                    statusTitle = `Reviewed: ${item.block?.title || "Completed"}`;
+                  } else if (item.status === "planned_unreviewed") {
+                    bgClass =
+                      "bg-amber-500 text-white font-bold border-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.4)]";
+                    statusTitle = `Planned (Unreviewed): ${item.block?.title || "Pending"}`;
+                  }
+
+                  return (
+                    <div
+                      key={item.hour}
+                      title={`${hourFormatted}:00 - ${nextHourFormatted}:00: ${statusTitle}`}
+                      className={`h-7 sm:h-8 rounded-md flex flex-col items-center justify-center text-[10px] font-mono border transition-all duration-150 select-none ${bgClass}`}
+                    >
+                      <span className="leading-none">{hourFormatted}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Hourly Heatmap Legend */}
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-outline/10 text-[9px] font-mono text-on-surface-variant">
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2 rounded-[2px] bg-amber-500 border border-amber-400 inline-block shadow-xs" />
+                  <span>Planned</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-xs" />
+                  <span>Reviewed</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2 rounded-[2px] bg-surface-container-highest/30 border border-outline/15 inline-block" />
+                  <span>Nothing</span>
+                </div>
+              </div>
             </div>
 
             {/* Metrics Breakdown */}
