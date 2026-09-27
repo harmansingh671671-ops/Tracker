@@ -7,19 +7,17 @@ import { useHabitStore } from "@/lib/stores/habit-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
-import {
-  type WallpaperData,
-} from "@/lib/utils/wallpaper-generator";
+import { type WallpaperData } from "@/lib/utils/wallpaper-generator";
 import { WallpaperPreview } from "@/components/wallpaper/wallpaper-preview";
 import {
   clearNativeLockscreen,
   launchLiveWallpaperPicker,
   syncScheduleDataToNative,
   setCustomTargetWallpaper,
-  saveNativeCustomWallpaper,
-  getNativeCustomWallpaper,
-  clearNativeCustomWallpaper,
-  applyNativeCustomWallpaper,
+  saveNativeAlternateWallpaper,
+  getNativeAlternateWallpaper,
+  clearNativeAlternateWallpaper,
+  applyNativeAlternateWallpaper,
   pickNativeCustomWallpaperPhoto,
   isAndroidApp,
 } from "@/lib/utils/android-bridge";
@@ -37,6 +35,7 @@ import {
   RefreshCw,
   Loader2,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function WallpaperPage() {
@@ -44,18 +43,21 @@ export default function WallpaperPage() {
   const { habits, fetchHabits } = useHabitStore();
 
   const [activeEngine, setActiveEngine] = useState<"live" | "static">("live");
-  const [screenTarget, setScreenTarget] = useState<"lock" | "home" | "both">("both");
+  const [screenTarget, setScreenTarget] = useState<"lock" | "home">("lock");
   const [simMode, setSimMode] = useState<"clean" | "guide">("clean");
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
-  const [customWallpaper, setCustomWallpaper] = useState<string | null>(null);
+  // Independent Lock Screen vs Home Screen Alternate Wallpapers
+  const [selectedAltTab, setSelectedAltTab] = useState<"lock" | "home">("lock");
+  const [lockWallpaper, setLockWallpaper] = useState<string | null>(null);
+  const [homeWallpaper, setHomeWallpaper] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const customFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenPhotoPicker = () => {
+  const handleOpenPhotoPicker = (targetScreen: "lock" | "home" = selectedAltTab) => {
     if (isAndroidApp()) {
-      const launched = pickNativeCustomWallpaperPhoto();
+      const launched = pickNativeCustomWallpaperPhoto(targetScreen);
       if (launched) return;
     }
     if (customFileInputRef.current) {
@@ -73,14 +75,24 @@ export default function WallpaperPage() {
 
     db.scheduleBlocks.where("date").equals(todayStr).toArray().then(setBlocks);
 
-    const saved = getNativeCustomWallpaper();
-    if (saved) setCustomWallpaper(saved);
+    // Load separate Lock & Home wallpapers
+    const savedLock = getNativeAlternateWallpaper("lock");
+    if (savedLock) setLockWallpaper(savedLock);
+
+    const savedHome = getNativeAlternateWallpaper("home");
+    if (savedHome) setHomeWallpaper(savedHome);
 
     const onNativePhotoSelected = (e: any) => {
       if (e.detail?.base64) {
-        setCustomWallpaper(e.detail.base64);
-        saveNativeCustomWallpaper(e.detail.base64);
-        showToast("Alternate wallpaper stored! It will automatically replace Odyssey when turned off.");
+        const target: "lock" | "home" = e.detail.target === "home" ? "home" : "lock";
+        if (target === "home") {
+          setHomeWallpaper(e.detail.base64);
+          saveNativeAlternateWallpaper(e.detail.base64, "home");
+        } else {
+          setLockWallpaper(e.detail.base64);
+          saveNativeAlternateWallpaper(e.detail.base64, "lock");
+        }
+        showToast(`Alternate ${target === "home" ? "Home" : "Lock"} Screen wallpaper stored successfully!`);
       }
     };
     window.addEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected);
@@ -90,9 +102,9 @@ export default function WallpaperPage() {
     };
   }, [fetchUser, fetchHabits, user?.id]);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (text: string, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => setToastMessage(null), 3800);
   };
 
   const activeDay = useMemo(() => {
@@ -144,11 +156,10 @@ export default function WallpaperPage() {
     );
   };
 
-  const handleTargetChange = (target: "lock" | "home" | "both") => {
+  const handleTargetChange = (target: "lock" | "home") => {
     setScreenTarget(target);
-    setCustomTargetWallpaper(target);
-    const labels = { lock: "Lock Screen", home: "Home Screen", both: "Both Screens" };
-    showToast(`Target configured: ${labels[target]}`);
+    setCustomTargetWallpaper("", target);
+    showToast(`Target configured: ${target === "home" ? "Home Screen" : "Lock Screen"}`);
   };
 
   const compressImageForWallpaper = (file: File): Promise<string> => {
@@ -210,13 +221,18 @@ export default function WallpaperPage() {
     try {
       const base64 = await compressImageForWallpaper(file);
       if (base64) {
-        saveNativeCustomWallpaper(base64);
-        setCustomWallpaper(base64);
-        showToast("Alternate wallpaper stored! It will automatically replace Odyssey when turned off.");
+        const target = selectedAltTab;
+        saveNativeAlternateWallpaper(base64, target);
+        if (target === "home") {
+          setHomeWallpaper(base64);
+        } else {
+          setLockWallpaper(base64);
+        }
+        showToast(`Alternate ${target === "home" ? "Home" : "Lock"} Screen wallpaper stored!`);
       }
     } catch (err) {
       console.error("Failed to process photo:", err);
-      showToast("Could not process photo. Please choose a different image.");
+      showToast("Could not process photo. Please choose a different image.", true);
     } finally {
       if (e?.target) {
         try {
@@ -227,19 +243,27 @@ export default function WallpaperPage() {
     }
   };
 
-  const handleRemoveCustom = (e: React.MouseEvent) => {
+  const handleRemoveCustom = (target: "lock" | "home", e: React.MouseEvent) => {
     e.stopPropagation();
-    clearNativeCustomWallpaper();
-    setCustomWallpaper(null);
-    showToast("Alternate wallpaper removed.");
+    clearNativeAlternateWallpaper(target);
+    if (target === "home") {
+      setHomeWallpaper(null);
+      showToast("Home screen alternate wallpaper removed.");
+    } else {
+      setLockWallpaper(null);
+      showToast("Lock screen alternate wallpaper removed.");
+    }
   };
 
-  const handleApplyNow = () => {
-    if (customWallpaper) {
-      applyNativeCustomWallpaper("both");
-      showToast("Applied alternate wallpaper to both Lock & Home screens.");
+  const handleApplyNow = (target: "lock" | "home") => {
+    const wallpaper = target === "home" ? homeWallpaper : lockWallpaper;
+    const label = target === "home" ? "Home Screen" : "Lock Screen";
+
+    if (wallpaper) {
+      applyNativeAlternateWallpaper(target);
+      showToast(`Applied alternate wallpaper directly to ${label}.`);
     } else {
-      showToast("No alternate wallpaper stored yet. Tap to pick one first.");
+      showToast(`No alternate wallpaper stored for ${label} yet. Tap to pick one first.`, true);
     }
   };
 
@@ -254,14 +278,32 @@ export default function WallpaperPage() {
   };
 
   const handleTurnOffWallpaper = () => {
-    clearNativeLockscreen();
-    applyNativeCustomWallpaper("both");
-    if (customWallpaper) {
-      showToast("Schedule wallpaper turned off. Restored your selected wallpaper to both Lock & Home screens!");
-    } else {
-      showToast("Schedule wallpaper turned off.");
+    // Validation: Require both Lock and Home alternate wallpapers before turning off
+    if (!lockWallpaper && !homeWallpaper) {
+      showToast("⚠️ Please select alternate wallpapers for both Lock Screen and Home Screen before turning off.", true);
+      setSelectedAltTab("lock");
+      return;
     }
+    if (!lockWallpaper) {
+      setSelectedAltTab("lock");
+      showToast("⚠️ Please select an alternate wallpaper for your Lock Screen first.", true);
+      return;
+    }
+    if (!homeWallpaper) {
+      setSelectedAltTab("home");
+      showToast("⚠️ Please select an alternate wallpaper for your Home Screen first.", true);
+      return;
+    }
+
+    // Both are present -> Turn off Odyssey schedule & restore custom wallpapers
+    clearNativeLockscreen();
+    applyNativeAlternateWallpaper("lock");
+    applyNativeAlternateWallpaper("home");
+    showToast("✨ Schedule wallpaper turned off. Restored your custom Lock & Home wallpapers!");
   };
+
+  const currentAltWallpaper = selectedAltTab === "home" ? homeWallpaper : lockWallpaper;
+  const currentAltLabel = selectedAltTab === "home" ? "Home Screen" : "Lock Screen";
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-12 pt-2 space-y-6">
@@ -351,16 +393,16 @@ export default function WallpaperPage() {
           </div>
         </div>
 
-        {/* 2. Screen Target Selector */}
+        {/* 2. Target Screen Destination Selector (Lock vs Home) */}
         <div className="space-y-2">
           <label className="text-sm font-semibold text-on-surface flex items-center gap-2">
             <Smartphone className="w-4 h-4 text-secondary" />
             <span>Target Screen Destination</span>
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleTargetChange("lock")}
-              className={`py-2.5 px-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+              className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
                 screenTarget === "lock"
                   ? "bg-secondary-container text-on-secondary-container shadow-md font-bold"
                   : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
@@ -371,7 +413,7 @@ export default function WallpaperPage() {
             </button>
             <button
               onClick={() => handleTargetChange("home")}
-              className={`py-2.5 px-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+              className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
                 screenTarget === "home"
                   ? "bg-secondary-container text-on-secondary-container shadow-md font-bold"
                   : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
@@ -380,26 +422,55 @@ export default function WallpaperPage() {
               <Smartphone className="w-4 h-4" />
               <span>Home Screen</span>
             </button>
-            <button
-              onClick={() => handleTargetChange("both")}
-              className={`py-2.5 px-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
-                screenTarget === "both"
-                  ? "bg-secondary-container text-on-secondary-container shadow-md font-bold"
-                  : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Both Screens</span>
-            </button>
           </div>
         </div>
 
-        {/* 3. Alternate Wallpaper Section */}
-        <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-3.5">
-          <div className="flex items-start justify-between gap-3">
+        {/* 3. Alternate Wallpaper Section (Independent Lock vs Home Screen) */}
+        <div className="p-4 rounded-2xl bg-surface-container border border-outline/10 space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-on-surface">Alternate Wallpaper</h3>
+              <h3 className="text-base font-bold text-on-surface">Alternate Wallpapers</h3>
+              <p className="text-xs text-on-surface-variant">Restored individually when turning off Odyssey</p>
             </div>
+          </div>
+
+          {/* Screen Selection Tabs (Lock Screen vs Home Screen) */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-surface-container-low rounded-xl border border-outline/10">
+            <button
+              type="button"
+              onClick={() => setSelectedAltTab("lock")}
+              className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                selectedAltTab === "lock"
+                  ? "bg-surface-container text-on-surface font-bold shadow-sm border border-outline/15"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Lock Screen</span>
+              <span
+                className={`w-2 h-2 rounded-full ml-0.5 ${
+                  lockWallpaper ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-amber-400/60"
+                }`}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedAltTab("home")}
+              className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                selectedAltTab === "home"
+                  ? "bg-surface-container text-on-surface font-bold shadow-sm border border-outline/15"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Home Screen</span>
+              <span
+                className={`w-2 h-2 rounded-full ml-0.5 ${
+                  homeWallpaper ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-amber-400/60"
+                }`}
+              />
+            </button>
           </div>
 
           {/* Hidden HTML File Input for Web Browser fallback */}
@@ -411,23 +482,23 @@ export default function WallpaperPage() {
             onChange={handlePhotoUpload}
           />
 
-          {customWallpaper ? (
-            /* Saved Wallpaper Preview & Control */
-            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/10">
+          {currentAltWallpaper ? (
+            /* Saved Wallpaper Preview & Control for Selected Screen */
+            <div className="p-3.5 rounded-xl bg-surface-container-low flex flex-col space-y-3 border border-outline/10 animate-in fade-in duration-200">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-on-surface flex items-center gap-1.5">
                   <ImageIcon className="w-3.5 h-3.5 text-primary" />
-                  Selected Wallpaper
+                  {currentAltLabel} Picture
                 </span>
-                <span className="font-mono text-primary flex items-center gap-1 text-[11px] font-semibold">
+                <span className="font-mono text-emerald-400 flex items-center gap-1 text-[11px] font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  Stored & Ready
+                  Saved & Isolated
                 </span>
               </div>
 
-              {/* Image Preview Box - Tappable for direct OS photo picker */}
+              {/* Image Preview Box */}
               <div
-                onClick={handleOpenPhotoPicker}
+                onClick={() => handleOpenPhotoPicker(selectedAltTab)}
                 className="relative w-full h-44 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center cursor-pointer group border border-outline/15 hover:border-primary/50 transition-all select-none block"
               >
                 {isProcessing ? (
@@ -438,13 +509,13 @@ export default function WallpaperPage() {
                 ) : (
                   <>
                     <img
-                      src={customWallpaper}
-                      alt="Alternate wallpaper"
+                      src={currentAltWallpaper}
+                      alt={`${currentAltLabel} wallpaper`}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1.5 z-10">
                       <Upload className="w-4 h-4" />
-                      <span>Tap to choose another photo</span>
+                      <span>Tap to choose another photo for {currentAltLabel}</span>
                     </div>
                   </>
                 )}
@@ -454,7 +525,7 @@ export default function WallpaperPage() {
               <div className="flex items-center gap-2 pt-0.5">
                 <button
                   type="button"
-                  onClick={handleOpenPhotoPicker}
+                  onClick={() => handleOpenPhotoPicker(selectedAltTab)}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-bright active:scale-95 text-on-surface text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm border border-outline/10 text-center select-none"
                 >
                   {isProcessing ? (
@@ -462,21 +533,21 @@ export default function WallpaperPage() {
                   ) : (
                     <Upload className="w-3.5 h-3.5 text-primary" />
                   )}
-                  <span>{isProcessing ? "Processing..." : "Change Wallpaper"}</span>
+                  <span>{isProcessing ? "Processing..." : "Change Picture"}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleApplyNow}
-                  className="py-2.5 px-4 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary text-xs font-semibold transition-colors cursor-pointer border border-primary/20"
+                  onClick={() => handleApplyNow(selectedAltTab)}
+                  className="py-2.5 px-3.5 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary text-xs font-semibold transition-colors cursor-pointer border border-primary/20"
                 >
-                  Apply Now
+                  Apply to {selectedAltTab === "home" ? "Home" : "Lock"}
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleRemoveCustom}
-                  title="Remove saved wallpaper"
+                  onClick={(e) => handleRemoveCustom(selectedAltTab, e)}
+                  title={`Delete only ${currentAltLabel} wallpaper`}
                   className="p-2.5 rounded-xl bg-surface-container-high hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors cursor-pointer border border-outline/10"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -484,11 +555,11 @@ export default function WallpaperPage() {
               </div>
             </div>
           ) : (
-            /* No Wallpaper Selected: Clean System Wallpaper Picker Card */
+            /* No Wallpaper Selected for this screen */
             <button
               type="button"
-              onClick={handleOpenPhotoPicker}
-              className="w-full p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center block"
+              onClick={() => handleOpenPhotoPicker(selectedAltTab)}
+              className="w-full p-6 rounded-xl bg-surface-container-low border-2 border-dashed border-outline/20 hover:border-primary/50 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer group select-none text-center block animate-in fade-in duration-200"
             >
               <div className="w-12 h-12 rounded-2xl bg-surface-container-high group-hover:bg-primary/20 flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-all mx-auto">
                 {isProcessing ? (
@@ -499,11 +570,37 @@ export default function WallpaperPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-on-surface group-hover:text-primary transition-colors block">
-                  {isProcessing ? "Processing Photo..." : "Open System Wallpaper Picker"}
+                  {isProcessing ? "Processing Photo..." : `Select ${currentAltLabel} Picture`}
+                </span>
+                <span className="text-[11px] text-on-surface-variant mt-0.5 block">
+                  Tap to choose from Gallery or Camera
                 </span>
               </div>
             </button>
           )}
+
+          {/* Status summary of both screens */}
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono">
+            <div className={`p-2 rounded-lg border flex items-center justify-between ${
+              lockWallpaper ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+            }`}>
+              <span className="flex items-center gap-1.5">
+                <Lock className="w-3 h-3" />
+                Lock Screen:
+              </span>
+              <span className="font-bold">{lockWallpaper ? "Configured" : "Not Set"}</span>
+            </div>
+
+            <div className={`p-2 rounded-lg border flex items-center justify-between ${
+              homeWallpaper ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+            }`}>
+              <span className="flex items-center gap-1.5">
+                <Smartphone className="w-3 h-3" />
+                Home Screen:
+              </span>
+              <span className="font-bold">{homeWallpaper ? "Configured" : "Not Set"}</span>
+            </div>
+          </div>
         </div>
 
         {/* 4. Primary Activation Buttons */}
@@ -523,15 +620,25 @@ export default function WallpaperPage() {
             className="w-full py-3.5 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer border border-outline/10"
           >
             <RefreshCw className="w-4 h-4 text-primary" />
-            <span>Turn Off Wallpaper (Restore Selected Wallpaper)</span>
+            <span>Turn Off Wallpaper (Restore Selected Wallpapers)</span>
           </button>
         </div>
 
         {/* Toast Feedback */}
         {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-primary-container text-on-primary-container text-xs font-semibold flex items-center gap-2.5 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>{toastMessage}</span>
+          <div
+            className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              toastMessage.isError
+                ? "bg-error-container text-on-error-container border border-error/20"
+                : "bg-primary-container text-on-primary-container"
+            }`}
+          >
+            {toastMessage.isError ? (
+              <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            )}
+            <span>{toastMessage.text}</span>
           </div>
         )}
 
@@ -545,4 +652,3 @@ export default function WallpaperPage() {
     </div>
   );
 }
-

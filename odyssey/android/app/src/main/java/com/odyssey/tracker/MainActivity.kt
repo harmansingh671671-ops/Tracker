@@ -77,12 +77,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun launchPhotoPicker() {
+    private var pendingPhotoTarget: String = "lock"
+
+    fun launchPhotoPicker(target: String = "lock") {
+        pendingPhotoTarget = if (target.lowercase() == "home") "home" else "lock"
         val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "image/*"
             addCategory(Intent.CATEGORY_OPENABLE)
         }
-        val chooser = Intent.createChooser(pickIntent, "Select Wallpaper Photo")
+        val chooser = Intent.createChooser(pickIntent, "Select ${if (pendingPhotoTarget == "home") "Home" else "Lock"} Screen Wallpaper")
         try {
             photoPickerLauncher.launch(chooser)
         } catch (e: Exception) {
@@ -96,6 +99,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleSelectedPhotoUri(uri: Uri) {
+        val target = pendingPhotoTarget
         Thread {
             try {
                 val inputStream = contentResolver.openInputStream(uri) ?: return@Thread
@@ -117,8 +121,8 @@ class MainActivity : AppCompatActivity() {
                     originalBitmap
                 }
 
-                // Save to internal app storage custom_restoration_wallpaper.png
-                val file = File(filesDir, "custom_restoration_wallpaper.png")
+                // Save to internal app storage specifically for target screen
+                val file = File(filesDir, "custom_restoration_wallpaper_${target}.png")
                 FileOutputStream(file).use { out ->
                     scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
                 }
@@ -130,19 +134,18 @@ class MainActivity : AppCompatActivity() {
                 val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(base64Bytes, Base64.NO_WRAP)
 
                 val prefs = getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+                val key = if (target == "home") "alternate_home_wallpaper" else "alternate_lock_wallpaper"
                 prefs.edit()
-                    .putString("saved_custom_wallpaper", base64Str)
-                    .putString("alternate_lock_wallpaper", base64Str)
-                    .putString("alternate_home_wallpaper", base64Str)
+                    .putString(key, base64Str)
                     .commit()
 
-                // Notify WebView JavaScript
+                // Notify WebView JavaScript with target screen info
                 runOnUiThread {
                     val escapedBase64 = base64Str.replace("'", "\\'")
-                    val js = "(function(){ window.dispatchEvent(new CustomEvent('odyssey:custom-wallpaper-selected', { detail: { base64: '$escapedBase64' } })); })();"
+                    val js = "(function(){ window.dispatchEvent(new CustomEvent('odyssey:custom-wallpaper-selected', { detail: { base64: '$escapedBase64', target: '$target' } })); })();"
                     webView.evaluateJavascript(js, null)
                 }
-                android.util.Log.d("OdysseyNative", "Successfully selected and stored custom restoration wallpaper")
+                android.util.Log.d("OdysseyNative", "Successfully selected and stored custom restoration wallpaper for $target")
             } catch (e: Exception) {
                 android.util.Log.e("OdysseyNative", "Error processing selected wallpaper uri: ${e.message}", e)
             }
