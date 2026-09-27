@@ -356,10 +356,21 @@ class OdysseyWallpaperBridge(
     @JavascriptInterface
     fun syncSchedule(scheduleJson: String): Boolean {
         return try {
-            val success = prefs.edit()
-                .putString("latest_schedule_json", scheduleJson)
-                .putBoolean("wallpaper_enabled", true)
-                .commit()
+            val dateStr = try {
+                org.json.JSONObject(scheduleJson).optString("dateStr", "")
+            } catch (e: Exception) { "" }
+            val todayDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+
+            val editor = prefs.edit()
+            if (dateStr.isNotBlank()) {
+                editor.putString("schedule_json_$dateStr", scheduleJson)
+            }
+            if (dateStr.isBlank() || dateStr == todayDateStr) {
+                editor.putString("latest_schedule_json", scheduleJson)
+            }
+            editor.putBoolean("wallpaper_enabled", true)
+            val success = editor.commit()
+
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service for instant canvas redraw
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
@@ -385,7 +396,7 @@ class OdysseyWallpaperBridge(
                     Log.w("OdysseyWallpaper", "Could not arm cadence notification: ${e.message}")
                 }
 
-                Log.d("OdysseyWallpaper", "Synced schedule data to native preferences, updated wallpapers & armed cadence notification")
+                Log.d("OdysseyWallpaper", "Synced schedule data ($dateStr) to native preferences, updated wallpapers & armed cadence notification")
             }
             success
         } catch (e: Exception) {
@@ -408,11 +419,19 @@ class OdysseyWallpaperBridge(
             val blocksCount = obj.optJSONArray("blocks")?.length() ?: 0
             val habitsCount = obj.optJSONArray("habits")?.length() ?: 0
             val streak = obj.optInt("userStreak", obj.optInt("activeDay", 1))
+            val dateStr = obj.optString("dateStr", "")
+            val todayDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
 
-            val success = prefs.edit()
-                .putString("latest_schedule_json", scheduleJson)
-                .putBoolean("wallpaper_enabled", true)
-                .commit()
+            val editor = prefs.edit()
+            if (dateStr.isNotBlank()) {
+                editor.putString("schedule_json_$dateStr", scheduleJson)
+            }
+            if (dateStr.isBlank() || dateStr == todayDateStr) {
+                editor.putString("latest_schedule_json", scheduleJson)
+            }
+            editor.putBoolean("wallpaper_enabled", true)
+            val success = editor.commit()
+
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
@@ -438,8 +457,8 @@ class OdysseyWallpaperBridge(
                     Log.w("OdysseyWallpaper", "Could not arm cadence notification: ${e.message}")
                 }
 
-                Log.d("OdysseyWallpaper", "Verified & synced $blocksCount blocks and $habitsCount habits to native preferences")
-                "{\"success\":true,\"blockCount\":$blocksCount,\"habitCount\":$habitsCount,\"streak\":$streak,\"message\":\"Verified: $blocksCount tasks & $habitsCount hobbies saved to Android Live Wallpaper\"}"
+                Log.d("OdysseyWallpaper", "Verified & synced $blocksCount blocks for date $dateStr to native preferences")
+                "{\"success\":true,\"blockCount\":$blocksCount,\"habitCount\":$habitsCount,\"streak\":$streak,\"date\":\"$dateStr\",\"message\":\"Verified: $blocksCount tasks saved to Android Live Wallpaper\"}"
             } else {
                 "{\"success\":false,\"error\":\"SharedPreferences commit failed\"}"
             }
@@ -454,6 +473,9 @@ class OdysseyWallpaperBridge(
      */
     @JavascriptInterface
     fun getSyncedSchedule(): String {
+        val todayDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val todayJson = prefs.getString("schedule_json_$todayDateStr", null)
+        if (!todayJson.isNullOrBlank()) return todayJson
         return prefs.getString("latest_schedule_json", "") ?: ""
     }
 

@@ -1,14 +1,35 @@
 "use client";
 
+import { useEffect } from "react";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import { EveningReminderModal } from "@/components/notifications/evening-reminder-modal";
 import { FloatingFeedbackButton } from "@/components/feedback/feedback-modal";
 import { AppUpdateModal } from "@/components/common/app-update-modal";
 import { usePathname } from "next/navigation";
+import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  // Keep native Android widgets & notifications always up-to-date with live schedule
+  useEffect(() => {
+    syncCurrentScheduleToNative();
+
+    const handleFocusSync = () => {
+      if (document.visibilityState === "visible") {
+        syncCurrentScheduleToNative();
+      }
+    };
+
+    window.addEventListener("focus", handleFocusSync);
+    document.addEventListener("visibilitychange", handleFocusSync);
+
+    return () => {
+      window.removeEventListener("focus", handleFocusSync);
+      document.removeEventListener("visibilitychange", handleFocusSync);
+    };
+  }, []);
   
   // Hide shell header/bottom-nav on root page and day-schedule (has its own header + back nav)
   if (pathname === "/" || pathname === "/day-schedule") {

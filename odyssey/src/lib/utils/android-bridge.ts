@@ -882,7 +882,7 @@ let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
  * This ensures the lockscreen & live wallpapers refresh immediately
  * whenever any task is added, edited, deleted, or auto-filled!
  */
-export async function syncCurrentScheduleToNative(): Promise<boolean> {
+export async function syncCurrentScheduleToNative(targetDateStr?: string): Promise<boolean> {
   if (typeof window === "undefined") return false;
 
   return new Promise((resolve) => {
@@ -904,10 +904,12 @@ export async function syncCurrentScheduleToNative(): Promise<boolean> {
         const mm = String(now.getMonth() + 1).padStart(2, "0");
         const dd = String(now.getDate()).padStart(2, "0");
         const todayStr = `${yyyy}-${mm}-${dd}`;
+        const activeDateStr =
+          targetDateStr && /^\d{4}-\d{2}-\d{2}$/.test(targetDateStr) ? targetDateStr : todayStr;
 
         const blocks = await db.scheduleBlocks
           .where("[userId+date]")
-          .equals([user.id, todayStr])
+          .equals([user.id, activeDateStr])
           .toArray();
 
         // Sort blocks by start time
@@ -923,6 +925,9 @@ export async function syncCurrentScheduleToNative(): Promise<boolean> {
         const activeDay = user.streak > 0 ? user.streak : 1;
         const activeChapter = Math.ceil(activeDay / 7);
 
+        const [y, m, d] = activeDateStr.split("-").map(Number);
+        const dateObj = new Date(y, m - 1, d);
+
         const wallpaperData: WallpaperData = {
           chapter: activeChapter,
           activeDay,
@@ -931,8 +936,8 @@ export async function syncCurrentScheduleToNative(): Promise<boolean> {
           userLevel: user.level ?? 1,
           userStreak: user.streak ?? 1,
           plannedHours,
-          dateStr: todayStr,
-          formattedDate: now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+          dateStr: activeDateStr,
+          formattedDate: dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
           blocks,
           habits,
           showClockGuide: false,
@@ -940,6 +945,25 @@ export async function syncCurrentScheduleToNative(): Promise<boolean> {
         };
 
         const res = await syncScheduleDataToNative(wallpaperData);
+
+        // If target was for tomorrow or another day, ALSO ensure today's live schedule is synced
+        if (activeDateStr !== todayStr) {
+          const todayBlocks = await db.scheduleBlocks
+            .where("[userId+date]")
+            .equals([user.id, todayStr])
+            .toArray();
+          todayBlocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+          const todayWallpaperData: WallpaperData = {
+            ...wallpaperData,
+            plannedHours: todayBlocks.length,
+            dateStr: todayStr,
+            formattedDate: now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+            blocks: todayBlocks,
+          };
+          await syncScheduleDataToNative(todayWallpaperData);
+        }
+
         resolve(res);
       } catch (err) {
         console.warn("syncCurrentScheduleToNative failed:", err);

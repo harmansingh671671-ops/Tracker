@@ -55,7 +55,8 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         }
 
         val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
-        val rawJson = prefs.getString("latest_schedule_json", null) ?: return
+        val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val rawJson = prefs.getString("schedule_json_$todayDateStr", null) ?: prefs.getString("latest_schedule_json", null) ?: return
 
         val width = 1080
         val height = 2340

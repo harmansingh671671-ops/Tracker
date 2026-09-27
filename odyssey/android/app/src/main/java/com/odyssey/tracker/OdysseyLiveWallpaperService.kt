@@ -273,7 +273,8 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val breathPhase = ((sin(elapsed / 1200.0 * Math.PI) + 1.0) / 2.0).toFloat()
 
             // Load Synced Schedule Data from SharedPreferences
-            val rawJson = prefs.getString("latest_schedule_json", null)
+            val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val rawJson = prefs.getString("schedule_json_$todayDateStr", null) ?: prefs.getString("latest_schedule_json", null)
             var chapter = 1
             var activeDay = 1
             var rankName = "Beginner"
@@ -296,7 +297,6 @@ class OdysseyLiveWallpaperService : WallpaperService() {
 
                     // Ensure we do NOT loop previous day's schedule into today
                     val savedDateStr = obj.optString("dateStr", "")
-                    val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     val isDateCurrent = savedDateStr.isEmpty() || savedDateStr == todayDateStr
 
                     // Parse real user blocks only if for today

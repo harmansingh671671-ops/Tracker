@@ -163,11 +163,37 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
 
     private fun processAndDispatchNotification(context: Context, forceTest: Boolean = false) {
         val now = Calendar.getInstance()
-        val nextHour = (now.get(Calendar.HOUR_OF_DAY) + 1) % 24
+        val currentH = now.get(Calendar.HOUR_OF_DAY)
+        val nextHour = (currentH + 1) % 24
         val nextHourEnd = (nextHour + 1) % 24
 
+        // If it's 23:57, the upcoming hour (00:00) belongs to tomorrow's date!
+        val targetCal = Calendar.getInstance()
+        if (currentH == 23) {
+            targetCal.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        val targetDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(targetCal.time)
+
         val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
-        val rawJson = prefs.getString("latest_schedule_json", null)
+
+        // 1. Try date-specific schedule first, fallback to latest_schedule_json ONLY if date matches target date
+        var rawJson: String? = prefs.getString("schedule_json_$targetDateStr", null)
+        if (rawJson.isNullOrBlank()) {
+            val fallbackJson = prefs.getString("latest_schedule_json", null)
+            if (!fallbackJson.isNullOrBlank()) {
+                try {
+                    val fallbackObj = JSONObject(fallbackJson)
+                    val savedDateStr = fallbackObj.optString("dateStr", "")
+                    if (savedDateStr == targetDateStr || (savedDateStr.isEmpty() && currentH != 23)) {
+                        rawJson = fallbackJson
+                    } else {
+                        Log.d(TAG, "latest_schedule_json has date '$savedDateStr' which does not match target date '$targetDateStr'. Skipping stale schedule.")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error checking fallback JSON date: ${e.message}")
+                }
+            }
+        }
 
         var blockTitle = ""
         var blockCategory = ""

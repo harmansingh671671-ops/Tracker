@@ -445,7 +445,7 @@ function DayScheduleContent() {
           setRecentlySavedHour((curr) => (curr === hour ? null : curr));
         }, 2500);
 
-        syncCurrentScheduleToNative();
+        syncCurrentScheduleToNative(dateStr);
       } catch (err) {
         console.error("Error saving block:", err);
       }
@@ -464,12 +464,12 @@ function DayScheduleContent() {
 
       if (block) {
         await updateBlock(block.id, { category: newCat as any });
-        syncCurrentScheduleToNative();
+        syncCurrentScheduleToNative(dateStr);
       } else if (currentTitle) {
         handleSaveBlock(hour, currentTitle, newCat);
       }
     },
-    [getBlockForHour, editingValues, handleSaveBlock, updateBlock]
+    [getBlockForHour, editingValues, handleSaveBlock, updateBlock, dateStr]
   );
 
   // Handle Enter / Line-break key on mobile/desktop
@@ -509,7 +509,7 @@ function DayScheduleContent() {
   const handleAutoFillSleep = useCallback(async () => {
     if (!user?.id || !dateStr) return;
     await autoFillSleep(user.id, dateStr);
-    syncCurrentScheduleToNative();
+    syncCurrentScheduleToNative(dateStr);
   }, [user?.id, dateStr, autoFillSleep]);
 
   // Toggle completion status
@@ -528,9 +528,9 @@ function DayScheduleContent() {
         await addXp(-10);
       }
       await fetchUser();
-      syncCurrentScheduleToNative();
+      syncCurrentScheduleToNative(dateStr);
     },
-    [updateBlock, addXp, fetchUser]
+    [updateBlock, addXp, fetchUser, dateStr]
   );
 
   // Clear / delete block
@@ -540,10 +540,10 @@ function DayScheduleContent() {
       const block = getBlockForHour(hour);
       if (block) {
         await deleteBlock(block.id);
-        syncCurrentScheduleToNative();
+        syncCurrentScheduleToNative(dateStr);
       }
     },
-    [getBlockForHour, deleteBlock]
+    [getBlockForHour, deleteBlock, dateStr]
   );
 
   // Render a single hour block slot (styled identically to the Schedule tab!)

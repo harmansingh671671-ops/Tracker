@@ -133,7 +133,7 @@ function PlannerContent() {
     }
   }, []);
 
-  // Mount initialization: restore query date or localStorage cache safely on client only
+  // Mount initialization: always default to today unless explicit queryDate is provided
   useEffect(() => {
     setIsMounted(true);
     const now = new Date();
@@ -146,16 +146,6 @@ function PlannerContent() {
     const qDate = p.get("date");
     if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) {
       initialDate = qDate;
-      try {
-        localStorage.setItem("odyssey_planner_selected_date", qDate);
-      } catch {}
-    } else {
-      try {
-        const saved = localStorage.getItem("odyssey_planner_selected_date");
-        if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) {
-          initialDate = saved;
-        }
-      } catch {}
     }
 
     setSelectedDate(initialDate);
@@ -163,51 +153,56 @@ function PlannerContent() {
     if (cached.length > 0) {
       setBlocks(cached);
     }
-  }, []);
+    loadBlocks(initialDate);
+    syncCurrentScheduleToNative(initialDate);
+  }, [loadBlocks]);
 
   // Reactively switch schedule date whenever query parameter changes
   useEffect(() => {
     if (queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)) {
       setSelectedDate(queryDate);
-      try {
-        localStorage.setItem("odyssey_planner_selected_date", queryDate);
-      } catch {}
       const cached = getCachedBlocks(queryDate);
       if (cached.length > 0) {
         setBlocks(cached);
       }
       loadBlocks(queryDate);
+      syncCurrentScheduleToNative(queryDate);
     }
   }, [queryDate, loadBlocks]);
 
-  // Persist selectedDate to localStorage whenever changed and keep ref updated
+  // Keep selectedDate ref updated
   const selectedDateRef = useRef(selectedDate);
   useEffect(() => {
     selectedDateRef.current = selectedDate;
-    if (typeof window !== "undefined" && selectedDate) {
-      try {
-        localStorage.setItem("odyssey_planner_selected_date", selectedDate);
-      } catch {}
-    }
   }, [selectedDate]);
 
-  // Restore previously opened date when app is reopened/resumed from minimized state
+  // When app is reopened/resumed from background, ensure today's live date is updated and synced
   useEffect(() => {
     const handleReopen = () => {
       if (document.visibilityState === "visible") {
-        try {
-          const saved = localStorage.getItem("odyssey_planner_selected_date");
-          if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && saved !== selectedDateRef.current) {
-            setSelectedDate(saved);
-            const cached = getCachedBlocks(saved);
-            if (cached.length > 0) setBlocks(cached);
-          }
-        } catch {}
-      } else if (document.visibilityState === "hidden") {
-        if (selectedDateRef.current) {
-          try {
-            localStorage.setItem("odyssey_planner_selected_date", selectedDateRef.current);
-          } catch {}
+        const now = new Date();
+        const latestToday = getLocalDateStr(now);
+        setTodayStr(latestToday);
+        setCurrentHour(now.getHours());
+
+        const p = new URLSearchParams(window.location.search);
+        const qDate = p.get("date");
+
+        // If no explicit query date and previously viewed date is yesterday/past, advance to today
+        if (!qDate) {
+          setSelectedDate((curr) => {
+            if (!curr || curr < latestToday) {
+              loadBlocks(latestToday);
+              syncCurrentScheduleToNative(latestToday);
+              return latestToday;
+            }
+            loadBlocks(curr);
+            syncCurrentScheduleToNative(curr);
+            return curr;
+          });
+        } else {
+          loadBlocks(qDate);
+          syncCurrentScheduleToNative(qDate);
         }
       }
     };
@@ -219,7 +214,7 @@ function PlannerContent() {
       document.removeEventListener("visibilitychange", handleReopen);
       window.removeEventListener("focus", handleReopen);
     };
-  }, []);
+  }, [loadBlocks]);
 
   // Live timer for current minute, hour, and date change
   useEffect(() => {
