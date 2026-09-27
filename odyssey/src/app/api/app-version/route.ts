@@ -19,16 +19,16 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 7,
-    versionName: "1.3.2",
+    versionCode: 8,
+    versionName: "1.3.3",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
-    releaseDate: "2026-09-26",
+    releaseDate: "2026-09-27",
     mandatory: false,
     changelog: [
-      "Redesigned Live Wallpaper: Full-width horizontal habit cards with large emojis and zero text clipping",
-      "Stitch OLED Dark Obsidian Styling: Radiant 24h spectrum beacon and elevated active task cards",
-      "Streamlined Experience: Exactly-once update notification with instant 1-tap download",
-      "Performance & Fluidity: Zero startup delay and optimized lockscreen canvas rendering",
+      "Smart Live Date Engine: Automatically opens today's live schedule on app start and midnight rollover",
+      "Date-Specific Native Notifications: XX:57 background task cadence alerts strictly target today's live tasks",
+      "Multi-Day Native Sync: Tomorrow's evening planning automatically synchronizes with native lockscreen and live wallpapers",
+      "Smooth Quick Schedule Stream: Stable 24h inline hourly editing without focus interruptions",
     ],
   };
 
