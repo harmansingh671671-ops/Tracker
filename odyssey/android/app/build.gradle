@@ -3,6 +3,19 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def getAppVersion() {
+    try {
+        def versionFile = file('../../version.json')
+        if (versionFile.exists()) {
+            def parsed = new groovy.json.JsonSlurper().parseText(versionFile.text)
+            return [code: (parsed.versionCode ?: 8) as int, name: (parsed.versionName ?: "1.3.3") as String]
+        }
+    } catch (Exception e) {}
+    return [code: 8, name: "1.3.3"]
+}
+
+def appVer = getAppVersion()
+
 android {
     namespace 'com.odyssey.tracker'
     compileSdk 34
@@ -11,8 +24,8 @@ android {
         applicationId "com.odyssey.tracker"
         minSdk 24
         targetSdk 34
-        versionCode 8
-        versionName "1.3.3"
+        versionCode appVer.code
+        versionName appVer.name
     }
 
     buildTypes {

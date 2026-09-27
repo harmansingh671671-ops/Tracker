@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import versionConfig from "../../../../version.json";
 
 export interface AppVersionInfo {
   versionCode: number;
@@ -19,12 +20,12 @@ export async function GET(request: Request) {
   } catch {}
 
   const versionData: AppVersionInfo = {
-    versionCode: 8,
-    versionName: "1.3.3",
+    versionCode: versionConfig.versionCode || 8,
+    versionName: versionConfig.versionName || "1.3.3",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
-    releaseDate: "2026-09-27",
-    mandatory: false,
-    changelog: [
+    releaseDate: versionConfig.releaseDate || new Date().toISOString().split("T")[0],
+    mandatory: Boolean(versionConfig.mandatory),
+    changelog: Array.isArray(versionConfig.changelog) ? versionConfig.changelog : [
       "Smart Live Date Engine: Automatically opens today's live schedule on app start and midnight rollover",
       "Date-Specific Native Notifications: XX:57 background task cadence alerts strictly target today's live tasks",
       "Multi-Day Native Sync: Tomorrow's evening planning automatically synchronizes with native lockscreen and live wallpapers",
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json(versionData, {
     headers: {
-      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
     },
   });
 }

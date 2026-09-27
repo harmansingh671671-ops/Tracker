@@ -1,6 +1,8 @@
 package com.odyssey.tracker
 
+import android.app.DownloadManager
 import android.app.WallpaperManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -10,10 +12,12 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 
@@ -671,6 +675,92 @@ class OdysseyWallpaperBridge(
             }
         }
         return false
+    }
+
+    /**
+     * Downloads the updated APK using Android's DownloadManager and automatically
+     * launches the package installer via FileProvider when complete.
+     */
+    @JavascriptInterface
+    fun downloadAndInstallApk(apkUrl: String): Boolean {
+        return try {
+            val uri = Uri.parse(apkUrl)
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+                ?: return fallbackOpenUrl(apkUrl)
+
+            val destinationFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "odyssey-latest.apk")
+            if (destinationFile.exists()) {
+                destinationFile.delete()
+            }
+
+            val request = DownloadManager.Request(uri).apply {
+                setTitle("Odyssey Update")
+                setDescription("Downloading latest Odyssey APK...")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationUri(Uri.fromFile(destinationFile))
+                setMimeType("application/vnd.android.package-archive")
+            }
+
+            val downloadId = downloadManager.enqueue(request)
+
+            val onComplete = object : BroadcastReceiver() {
+                override fun onReceive(ctxt: Context?, intent: Intent?) {
+                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: -1L
+                    if (id == downloadId) {
+                        try {
+                            context.unregisterReceiver(this)
+                        } catch (e: Exception) {}
+
+                        try {
+                            val apkUri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                destinationFile
+                            )
+                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(installIntent)
+                        } catch (e: Exception) {
+                            Log.e("OdysseyWallpaper", "Failed to launch APK installer: ${e.message}", e)
+                        }
+                    }
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(
+                    onComplete,
+                    IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                    Context.RECEIVER_NOT_EXPORTED
+                )
+            } else {
+                context.registerReceiver(
+                    onComplete,
+                    IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+                )
+            }
+
+            Toast.makeText(context, "Odyssey update download started...", Toast.LENGTH_SHORT).show()
+            true
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Error in downloadAndInstallApk: ${e.message}", e)
+            fallbackOpenUrl(apkUrl)
+        }
+    }
+
+    private fun fallbackOpenUrl(apkUrl: String): Boolean {
+        return try {
+            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(browserIntent)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**

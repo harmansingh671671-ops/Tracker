@@ -1,0 +1,13 @@
+{
+  "versionCode": 8,
+  "versionName": "1.3.3",
+  "releaseDate": "2026-09-27",
+  "mandatory": false,
+  "changelog": [
+    "Smart Live Date Engine: Automatically opens today's live schedule on app start and midnight rollover",
+    "Date-Specific Native Notifications: XX:57 background task cadence alerts strictly target today's live tasks",
+    "Multi-Day Native Sync: Tomorrow's evening planning automatically synchronizes with native lockscreen and live wallpapers",
+    "Smooth Quick Schedule Stream: Stable 24h inline hourly editing without focus interruptions",
+    "Reliable In-Place APK Updater: 1-tap in-app download and native Android package installation"
+  ]
+}

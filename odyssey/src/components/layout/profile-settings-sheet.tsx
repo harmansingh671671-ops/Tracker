@@ -22,11 +22,20 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
     versionName: "Web",
     isNative: false,
   });
+  const [latestRelease, setLatestRelease] = useState<{ versionCode: number; versionName: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchUser();
       setNativeVersion(getNativeAppVersion());
+      fetch("/api/app-version", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.versionName) {
+            setLatestRelease({ versionCode: data.versionCode, versionName: data.versionName });
+          }
+        })
+        .catch(() => {});
       const saved = localStorage.getItem("odyssey_hourly_alerts");
       if (saved !== null) {
         setHourlyAlertsEnabled(saved === "true");
@@ -288,8 +297,8 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
                 </h4>
                 <p className="text-xs text-on-surface-variant font-mono">
                   {nativeVersion.isNative
-                    ? `Installed: v${nativeVersion.versionName} (Release v1.3.1)`
-                    : "v1.3.1 (Live Cloud Synced)"}
+                    ? `Installed: v${nativeVersion.versionName} (Build ${nativeVersion.versionCode})`
+                    : `v${latestRelease?.versionName || "1.3.3"} (Live Cloud Synced)`}
                 </p>
               </div>
             </div>
@@ -306,7 +315,10 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
                 if (res && res.hasUpdate) {
                   window.dispatchEvent(new CustomEvent("odyssey:check-update-modal", { detail: res }));
                 } else {
-                  showToast("You are on the latest version (v1.3.1)!");
+                  const currentVer = nativeVersion.isNative
+                    ? nativeVersion.versionName
+                    : (latestRelease?.versionName || "1.3.3");
+                  showToast(`You are on the latest version (v${currentVer})!`);
                 }
               }}
               className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
@@ -334,7 +346,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
             <span className="font-mono font-bold uppercase text-[11px] text-on-surface">Odyssey Engine Status</span>
           </div>
           <p className="font-mono text-[11px]">
-            Hybrid Shell v1.3.1 • Vercel Instant Live Deployed • Battery Impact &lt;0.8%/day
+            {nativeVersion.isNative ? `Hybrid Native v${nativeVersion.versionName}` : `Web Shell v${latestRelease?.versionName || "1.3.3"}`} • Vercel Instant Live Deployed • Battery Impact &lt;0.8%/day
           </p>
         </div>
 

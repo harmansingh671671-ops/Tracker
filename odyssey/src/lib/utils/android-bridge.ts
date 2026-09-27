@@ -51,6 +51,7 @@ declare global {
       openSystemWallpaperChooser?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
+      downloadAndInstallApk?: (apkUrl: string) => boolean;
       isSupported?: () => boolean;
     };
     Android?: {
@@ -80,6 +81,7 @@ declare global {
       openSystemWallpaperChooser?: () => boolean;
       getAppVersionCode?: () => number;
       getAppVersionName?: () => string;
+      downloadAndInstallApk?: (apkUrl: string) => boolean;
     };
     AndroidWallpaper?: {
       setWallpaper?: (base64Image: string, target?: string) => boolean;
