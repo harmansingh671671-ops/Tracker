@@ -90,25 +90,32 @@ class OdysseyWallpaperBridge(
             } else {
                 base64Image
             }
+            if (cleanBase64.isBlank()) return false
             val decodedBytes = Base64.decode(cleanBase64.trim(), Base64.DEFAULT)
-            val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size) ?: return false
 
             val wallpaperManager = WallpaperManager.getInstance(context)
             backupCurrentWallpaperIfNeeded(wallpaperManager)
 
+            val isHome = targetScreen.lowercase() == "home"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                val flag = if (targetScreen.lowercase() == "home") WallpaperManager.FLAG_SYSTEM else WallpaperManager.FLAG_LOCK
+                val flag = if (isHome) WallpaperManager.FLAG_SYSTEM else WallpaperManager.FLAG_LOCK
                 wallpaperManager.setBitmap(bitmap, null, true, flag)
             } else {
                 wallpaperManager.setBitmap(bitmap)
             }
 
-            Log.d("OdysseyWallpaper", "Successfully applied custom wallpaper to $targetScreen via WallpaperManager")
+            Log.d("OdysseyWallpaper", "Successfully applied custom wallpaper to $targetScreen (flag=${if (isHome) "FLAG_SYSTEM" else "FLAG_LOCK"})")
             true
         } catch (e: Exception) {
             Log.e("OdysseyWallpaper", "Failed to apply custom wallpaper to $targetScreen: ${e.message}", e)
             false
         }
+    }
+
+    @JavascriptInterface
+    fun setCustomWallpaper(base64Image: String): Boolean {
+        return setCustomWallpaper(base64Image, "lock")
     }
 
     /**
@@ -133,6 +140,7 @@ class OdysseyWallpaperBridge(
             } else {
                 base64Image
             }
+            if (cleanBase64.isBlank()) return false
             val decodedBytes = Base64.decode(cleanBase64.trim(), Base64.DEFAULT)
             val file = File(context.filesDir, "custom_restoration_wallpaper_${target}.png")
             FileOutputStream(file).use { out ->
@@ -148,6 +156,11 @@ class OdysseyWallpaperBridge(
         }
     }
 
+    @JavascriptInterface
+    fun saveAlternateWallpaper(base64Image: String): Boolean {
+        return saveAlternateWallpaper(base64Image, "lock")
+    }
+
     /**
      * Returns the user's saved alternate wallpaper base64 string for "lock" or "home".
      */
@@ -155,7 +168,26 @@ class OdysseyWallpaperBridge(
     fun getAlternateWallpaper(targetScreen: String): String {
         val isHome = targetScreen.lowercase() == "home"
         val key = if (isHome) "alternate_home_wallpaper" else "alternate_lock_wallpaper"
-        return prefs.getString(key, "") ?: ""
+        val saved = prefs.getString(key, "") ?: ""
+        if (saved.isNotBlank()) return saved
+
+        // Fallback: check if isolated disk file exists and convert to base64
+        val target = if (isHome) "home" else "lock"
+        val file = File(context.filesDir, "custom_restoration_wallpaper_${target}.png")
+        if (file.exists()) {
+            try {
+                val bytes = file.readBytes()
+                val b64 = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+                prefs.edit().putString(key, b64).commit()
+                return b64
+            } catch (e: Exception) {}
+        }
+        return ""
+    }
+
+    @JavascriptInterface
+    fun getAlternateWallpaper(): String {
+        return getAlternateWallpaper("lock")
     }
 
     /**
@@ -175,6 +207,11 @@ class OdysseyWallpaperBridge(
         } catch (e: Exception) {
             false
         }
+    }
+
+    @JavascriptInterface
+    fun clearAlternateWallpaper(): Boolean {
+        return clearAlternateWallpaper("lock")
     }
 
     /**
@@ -199,21 +236,28 @@ class OdysseyWallpaperBridge(
 
             if (bitmap != null) {
                 val wallpaperManager = WallpaperManager.getInstance(context)
+                backupCurrentWallpaperIfNeeded(wallpaperManager)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     val flag = if (isHome) WallpaperManager.FLAG_SYSTEM else WallpaperManager.FLAG_LOCK
                     wallpaperManager.setBitmap(bitmap, null, true, flag)
                 } else {
                     wallpaperManager.setBitmap(bitmap)
                 }
-                Log.d("OdysseyWallpaper", "Successfully applied alternate wallpaper to $target")
+                Log.d("OdysseyWallpaper", "Successfully applied alternate wallpaper to $target (flag=${if (isHome) "FLAG_SYSTEM" else "FLAG_LOCK"})")
                 true
             } else {
+                Log.w("OdysseyWallpaper", "No alternate wallpaper bitmap found to apply for $target")
                 false
             }
         } catch (e: Exception) {
             Log.e("OdysseyWallpaper", "Failed to apply alternate wallpaper to $targetScreen: ${e.message}", e)
             false
         }
+    }
+
+    @JavascriptInterface
+    fun applyAlternateWallpaper(): Boolean {
+        return applyAlternateWallpaper("lock")
     }
 
     @JavascriptInterface
@@ -232,8 +276,13 @@ class OdysseyWallpaperBridge(
     }
 
     @JavascriptInterface
-    fun applyCustomWallpaper(targetScreen: String = "lock"): Boolean {
+    fun applyCustomWallpaper(targetScreen: String): Boolean {
         return applyAlternateWallpaper(targetScreen)
+    }
+
+    @JavascriptInterface
+    fun applyCustomWallpaper(): Boolean {
+        return applyAlternateWallpaper("lock")
     }
 
     /**
@@ -281,14 +330,6 @@ class OdysseyWallpaperBridge(
                     }
                 }
             }
-
-            OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
-            true
-        } catch (e: Exception) {
-            Log.e("OdysseyWallpaper", "Failed to clear wallpaper: ${e.message}", e)
-            false
-        }
-    }
 
             OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
             true

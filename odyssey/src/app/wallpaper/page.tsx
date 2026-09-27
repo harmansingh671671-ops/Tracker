@@ -13,7 +13,6 @@ import {
   clearNativeLockscreen,
   launchLiveWallpaperPicker,
   syncScheduleDataToNative,
-  setCustomTargetWallpaper,
   saveNativeAlternateWallpaper,
   getNativeAlternateWallpaper,
   clearNativeAlternateWallpaper,
@@ -49,13 +48,24 @@ export default function WallpaperPage() {
 
   // Independent Lock Screen vs Home Screen Alternate Wallpapers
   const [selectedAltTab, setSelectedAltTab] = useState<"lock" | "home">("lock");
+  const activeAltTabRef = useRef<"lock" | "home">("lock");
   const [lockWallpaper, setLockWallpaper] = useState<string | null>(null);
   const [homeWallpaper, setHomeWallpaper] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const customFileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    activeAltTabRef.current = selectedAltTab;
+    const saved = getNativeAlternateWallpaper(selectedAltTab);
+    if (saved) {
+      if (selectedAltTab === "home" && !homeWallpaper) setHomeWallpaper(saved);
+      if (selectedAltTab === "lock" && !lockWallpaper) setLockWallpaper(saved);
+    }
+  }, [selectedAltTab, homeWallpaper, lockWallpaper]);
+
   const handleOpenPhotoPicker = (targetScreen: "lock" | "home" = selectedAltTab) => {
+    activeAltTabRef.current = targetScreen;
     if (isAndroidApp()) {
       const launched = pickNativeCustomWallpaperPhoto(targetScreen);
       if (launched) return;
@@ -84,7 +94,11 @@ export default function WallpaperPage() {
 
     const onNativePhotoSelected = (e: any) => {
       if (e.detail?.base64) {
-        const target: "lock" | "home" = e.detail.target === "home" ? "home" : "lock";
+        const target: "lock" | "home" =
+          e.detail.target === "home" || e.detail.target === "lock"
+            ? e.detail.target
+            : activeAltTabRef.current;
+
         if (target === "home") {
           setHomeWallpaper(e.detail.base64);
           saveNativeAlternateWallpaper(e.detail.base64, "home");
@@ -158,7 +172,6 @@ export default function WallpaperPage() {
 
   const handleTargetChange = (target: "lock" | "home") => {
     setScreenTarget(target);
-    setCustomTargetWallpaper("", target);
     showToast(`Target configured: ${target === "home" ? "Home Screen" : "Lock Screen"}`);
   };
 
@@ -221,7 +234,7 @@ export default function WallpaperPage() {
     try {
       const base64 = await compressImageForWallpaper(file);
       if (base64) {
-        const target = selectedAltTab;
+        const target = activeAltTabRef.current;
         saveNativeAlternateWallpaper(base64, target);
         if (target === "home") {
           setHomeWallpaper(base64);
@@ -260,7 +273,7 @@ export default function WallpaperPage() {
     const label = target === "home" ? "Home Screen" : "Lock Screen";
 
     if (wallpaper) {
-      applyNativeAlternateWallpaper(target);
+      applyNativeAlternateWallpaper(target, wallpaper);
       showToast(`Applied alternate wallpaper directly to ${label}.`);
     } else {
       showToast(`No alternate wallpaper stored for ${label} yet. Tap to pick one first.`, true);
@@ -295,10 +308,10 @@ export default function WallpaperPage() {
       return;
     }
 
-    // Both are present -> Turn off Odyssey schedule & restore custom wallpapers
+    // Both are present -> Turn off Odyssey schedule & restore custom wallpapers directly
     clearNativeLockscreen();
-    applyNativeAlternateWallpaper("lock");
-    applyNativeAlternateWallpaper("home");
+    if (lockWallpaper) applyNativeAlternateWallpaper("lock", lockWallpaper);
+    if (homeWallpaper) applyNativeAlternateWallpaper("home", homeWallpaper);
     showToast("✨ Schedule wallpaper turned off. Restored your custom Lock & Home wallpapers!");
   };
 

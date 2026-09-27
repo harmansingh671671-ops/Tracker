@@ -120,6 +120,57 @@ export function resolveHobbyEmoji(icon?: string, name?: string): string {
   return "🎯";
 }
 
+export function selectDynamicHabits(
+  habits: Habit[] = [],
+  currentHour: number = new Date().getHours(),
+  maxCount: number = 4
+): Habit[] {
+  if (!habits || habits.length === 0) return [];
+  if (habits.length <= maxCount) return habits;
+
+  const parseHabitHour = (h: Habit): number => {
+    if (h.timeOfDay) {
+      const match = h.timeOfDay.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+      if (match) {
+        let hour = parseInt(match[1], 10);
+        const ampm = match[3]?.toUpperCase();
+        if (ampm === "PM" && hour < 12) hour += 12;
+        if (ampm === "AM" && hour === 12) hour = 0;
+        return hour;
+      }
+      const rawLower = h.timeOfDay.toLowerCase();
+      if (rawLower.includes("morn")) return 8;
+      if (rawLower.includes("afternoon")) return 14;
+      if (rawLower.includes("even") || rawLower.includes("night")) return 20;
+    }
+    if (h.period === "morning") return 8;
+    if (h.period === "afternoon") return 14;
+    if (h.period === "evening") return 20;
+
+    const name = (h.name || "").toLowerCase();
+    const cat = (h.category || "").toLowerCase();
+    if (name.includes("morn") || name.includes("sun") || name.includes("wake")) return 7;
+    if (name.includes("night") || name.includes("bed") || name.includes("sleep")) return 22;
+    if (name.includes("lunch") || name.includes("noon")) return 12;
+    if (name.includes("dinner") || name.includes("even")) return 19;
+    if (cat.includes("mind") || cat.includes("spirit")) return 9;
+    if (cat.includes("health") || cat.includes("vital")) return 11;
+    if (cat.includes("learn") || cat.includes("work")) return 15;
+
+    return 12;
+  };
+
+  const scored = habits.map((h, idx) => {
+    const targetH = parseHabitHour(h);
+    const dist = (targetH - currentHour + 24) % 24;
+    const score = dist > 14 ? (24 - dist + 12) : dist;
+    return { habit: h, score, originalIndex: idx };
+  });
+
+  scored.sort((a, b) => a.score - b.score || a.originalIndex - b.originalIndex);
+  return scored.slice(0, maxCount).map((s) => s.habit);
+}
+
 interface DisplayHobby {
   icon: string;
   title: string;
@@ -127,17 +178,16 @@ interface DisplayHobby {
   sub: string;
 }
 
-function getDisplayHobbies(habits: Habit[]): DisplayHobby[] {
+function getDisplayHobbies(habits: Habit[], currentHour: number = 12): DisplayHobby[] {
   const results: DisplayHobby[] = [];
-  if (habits && habits.length > 0) {
-    for (const h of habits.slice(0, 4)) {
-      results.push({
-        icon: resolveHobbyEmoji(h.icon, h.name),
-        title: h.name,
-        streak: h.currentStreak || 1,
-        sub: h.category ? `${h.category} • Target active` : "Habit track",
-      });
-    }
+  const selected = selectDynamicHabits(habits, currentHour, 4);
+  for (const h of selected) {
+    results.push({
+      icon: resolveHobbyEmoji(h.icon, h.name),
+      title: h.name,
+      streak: h.currentStreak || 1,
+      sub: h.category ? `${h.category} • Target active` : "Habit track",
+    });
   }
   return results;
 }
@@ -189,9 +239,8 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   const currentHourFloat = currentHour + currentMinute / 60;
   const timeStr = `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`;
 
-  // 3. TOP SAFE ZONE (y: 0 to topSafeZone)
-  // Minimal top safe margin (3.8%) to clear camera notch/status bar without wasting screen space!
-  const topSafeZone = data.topClockOffset ?? (data.showClockGuide ? 620 : Math.round(height * 0.038));
+  // 3. TOP SAFE ZONE (Calibrated to 540px / 23% so lockscreen clock never collides with cards)
+  const topSafeZone = data.topClockOffset ?? 540;
   const bottomMargin = Math.round(height * 0.028);
   const usableH = height - topSafeZone - bottomMargin;
 
@@ -545,12 +594,13 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
 
   // 7. HOBBIES & PASSIONS (Full-width horizontal rows - no cramped clipping!)
   const hobSectionStartY = nextY + nextCardH + Math.round(usableH * 0.020);
-  const userHobbies = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
-    ? data.habits.slice(0, 4)
+  const rawHabits = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
+    ? data.habits
     : [
-        { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track" } as any,
-        { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" } as any,
+        { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" } as any,
+        { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" } as any,
       ];
+  const userHobbies = selectDynamicHabits(rawHabits, currentHour, 4);
 
   if (userHobbies.length > 0) {
     const hobHeaderY = hobSectionStartY;

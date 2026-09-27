@@ -6,6 +6,7 @@ import {
   build24HourlyBlocks,
   getCenteredHourlyWindow,
   resolveHobbyEmoji,
+  selectDynamicHabits,
   type HourlyBlock,
 } from "@/lib/utils/wallpaper-generator";
 import {
@@ -161,10 +162,10 @@ export function WallpaperPreview({
       <div className="absolute top-[40%] -right-20 w-64 h-64 bg-emerald-950/20 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-slate-900/40 rounded-full blur-[90px] pointer-events-none" />
 
-      {/* 1. TOP SAFE ZONE (~12% height for camera notch & status bar) */}
+      {/* 1. TOP SAFE ZONE (~22% height for camera notch, status bar & lockscreen clock) */}
       <div
         className="relative w-full px-5 flex flex-col items-center justify-between z-10 transition-all duration-300"
-        style={{ minHeight: showClockGuide ? "145px" : "48px", paddingTop: "12px" }}
+        style={{ minHeight: "175px", paddingTop: "12px" }}
       >
         {/* Status Bar */}
         <div className="w-full flex items-center justify-between text-xs text-white/40 font-mono">
@@ -183,18 +184,20 @@ export function WallpaperPreview({
           </div>
         </div>
 
-        {/* Lockscreen Clock Simulation (Only when Clock Guide is toggled ON) */}
-        {showClockGuide ? (
-          <div className="flex flex-col items-center text-center my-auto pt-1 animate-in fade-in duration-300 w-full">
-            <span className="text-[10px] font-semibold tracking-[0.25em] uppercase text-white/45 font-mono">
-              {data.formattedDate}
-            </span>
-            <span className="text-4xl sm:text-5xl font-light tracking-tight text-white/60 my-0.5 font-mono">
-              {timeStr}
-            </span>
-            <span className="text-[9px] text-white/35 font-mono">Android System Clock Guide</span>
-          </div>
-        ) : null}
+        {/* Lockscreen Clock Simulation (Toggled via Live Guide) */}
+        <div
+          className={`flex flex-col items-center text-center my-auto pt-1 transition-opacity duration-300 w-full ${
+            showClockGuide ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <span className="text-[10px] font-semibold tracking-[0.25em] uppercase text-white/45 font-mono">
+            {data.formattedDate}
+          </span>
+          <span className="text-4xl sm:text-5xl font-light tracking-tight text-white/60 my-0.5 font-mono">
+            {timeStr}
+          </span>
+          <span className="text-[9px] text-white/35 font-mono">Android System Clock Guide</span>
+        </div>
       </div>
 
       {/* 2. HEADER ANCHOR CARD (Utilizes the upper screen area with high-radius corners) */}
@@ -388,14 +391,15 @@ export function WallpaperPreview({
         })()}
       </div>
 
-      {/* 5. HOBBIES & PASSIONS (Spacious Full-Width Horizontal Rows - Zero Text Clipping!) */}
+      {/* 5. HOBBIES & PASSIONS (At Most 4 Habits - Dynamically Switched by Time Allotted!) */}
       {data.includeHobbies !== false && (() => {
-        const userHobbies = (data.habits && data.habits.length > 0)
-          ? data.habits.slice(0, 4)
+        const rawHabits = (data.habits && data.habits.length > 0)
+          ? data.habits
           : [
-              { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track" } as any,
-              { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" } as any,
+              { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" } as any,
+              { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" } as any,
             ];
+        const userHobbies = selectDynamicHabits(rawHabits, activeHour, 4);
         const count = userHobbies.length;
 
         return (

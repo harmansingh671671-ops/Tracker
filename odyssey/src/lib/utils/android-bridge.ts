@@ -117,11 +117,27 @@ export function isAndroidApp(): boolean {
  * If running inside the Odyssey Native Android APK, this sets the lockscreen automatically with 0 clicks.
  * If running in a standard web browser/PWA, web security prevents silent lockscreen alteration.
  */
-export async function setNativeLockscreen(data: WallpaperData): Promise<NativeWallpaperResult> {
+export async function setNativeLockscreen(data: WallpaperData, targetScreen: "lock" | "home" = "lock"): Promise<NativeWallpaperResult> {
   const canvas = await generateWallpaperCanvas({ ...data, showClockGuide: false });
   const dataUrl = canvas.toDataURL("image/png");
 
   // 1. Check for Odyssey Native Android Bridge (WebView addJavascriptInterface)
+  if (typeof window !== "undefined" && window.OdysseyAndroid?.setCustomWallpaper) {
+    try {
+      const ok = window.OdysseyAndroid.setCustomWallpaper(dataUrl, targetScreen);
+      await syncScheduleDataToNative(data);
+      return {
+        success: Boolean(ok),
+        method: "native_bridge",
+        message: ok
+          ? `${targetScreen === "home" ? "Home Screen" : "Lock Screen"} updated directly via Native Odyssey Bridge!`
+          : "Native bridge reported an issue applying wallpaper.",
+      };
+    } catch (e: any) {
+      console.warn("OdysseyAndroid bridge error:", e);
+    }
+  }
+
   if (typeof window !== "undefined" && window.OdysseyAndroid?.setLockscreenWallpaper) {
     try {
       const ok = window.OdysseyAndroid.setLockscreenWallpaper(dataUrl);
@@ -197,17 +213,20 @@ export function isNativeBridgeAvailable(): boolean {
 export function buildNativeSchedulePayload(data: WallpaperData): string {
   const full24 = build24HourlyBlocks(data.blocks);
   
-  // Collect habits from data, or provide guaranteed default habit tracks so section is never blank
+  // Pass all active habits with period & timeOfDay so both JS and native Android can dynamically switch them
   const habitsList = (data.habits && data.habits.length > 0)
-    ? data.habits.slice(0, 4).map((h) => ({
+    ? data.habits.map((h) => ({
+        id: h.id,
         name: h.name,
         icon: h.icon,
         currentStreak: h.currentStreak || 1,
         category: h.category || "Habit Track",
+        period: h.period || "",
+        timeOfDay: h.timeOfDay || "",
       }))
     : [
-        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track" },
-        { name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track" },
+        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
+        { name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
       ];
 
   // Merge full 24 blocks with raw user blocks to ensure exact title and hour matching
@@ -704,8 +723,31 @@ export function clearNativeAlternateWallpaper(target: "lock" | "home" = "lock"):
 /**
  * Applies the user's saved alternate wallpaper directly to "lock" or "home".
  */
-export function applyNativeAlternateWallpaper(target: "lock" | "home" = "lock"): boolean {
+export function applyNativeAlternateWallpaper(target: "lock" | "home" = "lock", specificImage?: string): boolean {
   if (typeof window === "undefined") return false;
+  const imageToApply = specificImage || getNativeAlternateWallpaper(target);
+
+  // 1. Direct bitmap application via setCustomWallpaper
+  if (imageToApply) {
+    if (window.OdysseyAndroid?.setCustomWallpaper) {
+      try {
+        const ok = window.OdysseyAndroid.setCustomWallpaper(imageToApply, target);
+        if (ok) return true;
+      } catch (e) {
+        console.warn("OdysseyAndroid.setCustomWallpaper error:", e);
+      }
+    }
+    if (window.Android?.setCustomWallpaper) {
+      try {
+        const ok = window.Android.setCustomWallpaper(imageToApply, target);
+        if (ok) return true;
+      } catch (e) {
+        console.warn("Android.setCustomWallpaper error:", e);
+      }
+    }
+  }
+
+  // 2. Fallback to native bridge applyAlternateWallpaper
   if (window.OdysseyAndroid?.applyAlternateWallpaper) {
     try {
       return Boolean(window.OdysseyAndroid.applyAlternateWallpaper(target));
@@ -716,8 +758,7 @@ export function applyNativeAlternateWallpaper(target: "lock" | "home" = "lock"):
       return Boolean(window.Android.applyAlternateWallpaper(target));
     } catch {}
   }
-  const saved = getNativeAlternateWallpaper(target);
-  return Boolean(saved && saved.length > 0);
+  return Boolean(imageToApply && imageToApply.length > 0);
 }
 
 // Legacy aliases

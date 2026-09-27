@@ -35,6 +35,8 @@ data class HobbyItem(
     val icon: String,
     val streak: Int,
     val category: String,
+    val period: String = "",
+    val timeOfDay: String = "",
 )
 
 data class WallpaperCategoryBadge(
@@ -205,8 +207,16 @@ class OdysseyLiveWallpaperService : WallpaperService() {
 
             // When user turned off Odyssey wallpaper, restore custom photo or render sleek clean canvas
             if (!isEnabled) {
-                val customFile = java.io.File(filesDir, "custom_restoration_wallpaper.png")
-                val customBitmap = if (customFile.exists()) {
+                val lockFile = java.io.File(filesDir, "custom_restoration_wallpaper_lock.png")
+                val homeFile = java.io.File(filesDir, "custom_restoration_wallpaper_home.png")
+                val legacyFile = java.io.File(filesDir, "custom_restoration_wallpaper.png")
+                val customFile = when {
+                    lockFile.exists() -> lockFile
+                    homeFile.exists() -> homeFile
+                    legacyFile.exists() -> legacyFile
+                    else -> null
+                }
+                val customBitmap = if (customFile != null && customFile.exists()) {
                     BitmapFactory.decodeFile(customFile.absolutePath)
                 } else null
 
@@ -317,7 +327,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
                         }
                     }
 
-                    // Parse user habits/hobbies
+                    // Parse user habits/hobbies with period and timeOfDay
                     val habitsArr = obj.optJSONArray("habits")
                     if (habitsArr != null) {
                         for (i in 0 until habitsArr.length()) {
@@ -326,7 +336,9 @@ class OdysseyLiveWallpaperService : WallpaperService() {
                             val hIcon = h.optString("icon", "🎯")
                             val hStreak = h.optInt("currentStreak", 1)
                             val hCategory = h.optString("category", "Habit Track")
-                            userHabits.add(HobbyItem(hName, hIcon, hStreak, hCategory))
+                            val hPeriod = h.optString("period", "")
+                            val hTimeOfDay = h.optString("timeOfDay", "")
+                            userHabits.add(HobbyItem(hName, hIcon, hStreak, hCategory, hPeriod, hTimeOfDay))
                         }
                     }
                 } catch (e: Exception) {
@@ -338,10 +350,57 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val cardW = width - cardPad * 2f
 
             // FULL WALLPAPER SPACE ENGINE:
-            // Proportional layout utilizing 100% of screen height without empty voids or squeezing!
-            val topMargin = height * 0.042f
+            // Proportional layout calibrated to leave top 23% clear for Android lockscreen clock, date & notifications
+            val topMargin = height * 0.230f
             val bottomMargin = height * 0.030f
             val usableH = height - topMargin - bottomMargin
+
+            fun selectDynamicHabits(habits: List<HobbyItem>, currentH: Int, maxCount: Int = 4): List<HobbyItem> {
+                if (habits.size <= maxCount) return habits
+
+                fun getHabitHour(h: HobbyItem): Int {
+                    val tod = h.timeOfDay.trim()
+                    if (tod.isNotEmpty()) {
+                        val lower = tod.lowercase()
+                        if (lower.contains("morn")) return 8
+                        if (lower.contains("afternoon")) return 14
+                        if (lower.contains("even") || lower.contains("night")) return 20
+                        val regex = Regex("(\\d+)(?::(\\d+))?\\s*(am|pm)?", RegexOption.IGNORE_CASE)
+                        val match = regex.find(tod)
+                        if (match != null) {
+                            var hour = match.groupValues[1].toIntOrNull() ?: 12
+                            val ampm = match.groupValues[3].uppercase()
+                            if (ampm == "PM" && hour < 12) hour += 12
+                            if (ampm == "AM" && hour == 12) hour = 0
+                            return hour
+                        }
+                    }
+                    val per = h.period.lowercase()
+                    if (per.contains("morn")) return 8
+                    if (per.contains("afternoon")) return 14
+                    if (per.contains("even")) return 20
+
+                    val name = h.name.lowercase()
+                    val cat = h.category.lowercase()
+                    if (name.contains("morn") || name.contains("sun") || name.contains("wake")) return 7
+                    if (name.contains("night") || name.contains("bed") || name.contains("sleep")) return 22
+                    if (name.contains("lunch") || name.contains("noon")) return 12
+                    if (name.contains("dinner") || name.contains("even")) return 19
+                    if (cat.contains("mind") || cat.contains("spirit")) return 9
+                    if (cat.contains("health") || cat.contains("vital")) return 11
+                    if (cat.contains("learn") || cat.contains("work")) return 15
+                    return 12
+                }
+
+                return habits.mapIndexed { idx, h ->
+                    val targetH = getHabitHour(h)
+                    val dist = (targetH - currentH + 24) % 24
+                    val score = if (dist > 14) (24 - dist + 12) else dist
+                    Triple(h, score, idx)
+                }.sortedWith(compareBy({ it.second }, { it.third }))
+                .take(maxCount)
+                .map { it.first }
+            }
 
             // Helper to get category colors for the spectrum timeline
             fun getCategoryTheme(cat: String, h: Int): Pair<String, String> {
@@ -778,11 +837,12 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val currentY = timelineEndY + hobGap
 
             if (userHabits.isEmpty()) {
-                userHabits.add(HobbyItem("Mindful Focus", "🧘", userStreak, "Habit Track"))
-                userHabits.add(HobbyItem("Daily Hydration", "💧", userStreak, "Vitality Track"))
+                userHabits.add(HobbyItem("Mindful Focus", "🧘", userStreak, "Habit Track", "morning", "08:00 AM"))
+                userHabits.add(HobbyItem("Daily Hydration", "💧", userStreak, "Vitality Track", "afternoon", "01:00 PM"))
             }
 
-            val hobbiesCount = minOf(4, userHabits.size)
+            val displayHabits = selectDynamicHabits(userHabits, currentHour, 4)
+            val hobbiesCount = displayHabits.size
             val hobHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
                 textSize = width * 0.027f
@@ -814,7 +874,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             }
 
             for (idx in 0 until hobbiesCount) {
-                val habit = userHabits[idx]
+                val habit = displayHabits[idx]
                 val hY = hobStartY + idx * (hobCardH + hobItemGap)
                 val hRect = RectF(cardPad, hY, cardPad + cardW, hY + hobCardH)
                 canvas.drawRoundRect(hRect, 36f, 36f, hobBgPaint)
