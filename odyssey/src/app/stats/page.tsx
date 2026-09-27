@@ -302,13 +302,13 @@ export default function StatsPage() {
       if (typeof window !== "undefined" && window.getSelection) {
         try {
           window.getSelection()?.removeAllRanges();
-        } catch {}
+        } catch { }
       }
       try {
         if (typeof window !== "undefined" && navigator?.vibrate) {
           navigator.vibrate(40);
         }
-      } catch {}
+      } catch { }
       setPopupDate(cell.dateStr);
     }, 450);
   };
@@ -339,7 +339,7 @@ export default function StatsPage() {
     }
     try {
       localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
-    } catch {}
+    } catch { }
     router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
   };
 
@@ -448,11 +448,10 @@ export default function StatsPage() {
               onClick={handlePrevMonth}
               disabled={!canGoPrev}
               aria-label="Previous Month"
-              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
-                canGoPrev
+              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${canGoPrev
                   ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline/15 cursor-pointer active:scale-95"
                   : "bg-surface-container-lowest text-on-surface-variant/30 border-transparent cursor-not-allowed"
-              }`}
+                }`}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -461,11 +460,10 @@ export default function StatsPage() {
               onClick={handleNextMonth}
               disabled={!canGoNext}
               aria-label="Next Month"
-              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
-                canGoNext
+              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${canGoNext
                   ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline/15 cursor-pointer active:scale-95"
                   : "bg-surface-container-lowest text-on-surface-variant/30 border-transparent cursor-not-allowed"
-              }`}
+                }`}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -677,23 +675,22 @@ export default function StatsPage() {
             {/* Status Pill */}
             <div>
               <span
-                className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
-                  popupDayStats.status === "fully_completed"
+                className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${popupDayStats.status === "fully_completed"
                     ? "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 shadow-[0_0_10px_rgba(0,230,118,0.3)]"
                     : popupDayStats.status === "planned_unreviewed"
-                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                    : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                    : "bg-surface-container-low text-on-surface-variant border-outline/10"
-                }`}
+                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                      : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                        : "bg-surface-container-low text-on-surface-variant border-outline/10"
+                  }`}
               >
                 {popupDayStats.status === "fully_completed"
                   ? "100% Reviewed"
                   : popupDayStats.status === "planned_unreviewed"
-                  ? "Planned (0h Reviewed)"
-                  : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
-                  ? `${popupDayStats.reviewedHours}/${popupDayStats.plannedHours}h Reviewed`
-                  : "Not Planned"}
+                    ? "Planned (0h Reviewed)"
+                    : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
+                      ? `${popupDayStats.reviewedHours}/${popupDayStats.plannedHours}h Reviewed`
+                      : "Not Planned"}
               </span>
             </div>
 
@@ -724,8 +721,8 @@ export default function StatsPage() {
                       item.block?.status === "completed"
                         ? "Done"
                         : item.block?.status === "missed"
-                        ? "Missed"
-                        : "Scheduled";
+                          ? "Missed"
+                          : "Scheduled";
                     statusTitle = `Reviewed (${statusPrefix}): ${item.block?.title || "Focus"}`;
                   }
 
@@ -784,11 +781,10 @@ export default function StatsPage() {
                 <div
                   className="h-full bg-[#00E676] rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,230,118,0.5)]"
                   style={{
-                    width: `${
-                      popupDayStats.plannedHours > 0
+                    width: `${popupDayStats.plannedHours > 0
                         ? Math.min(100, (popupDayStats.reviewedHours / popupDayStats.plannedHours) * 100)
                         : 0
-                    }%`,
+                      }%`,
                   }}
                 />
               </div>
@@ -803,7 +799,7 @@ export default function StatsPage() {
                 setPopupDate(null);
                 try {
                   localStorage.setItem("odyssey_planner_selected_date", targetDate);
-                } catch {}
+                } catch { }
                 router.push(`/planner?date=${targetDate}&day=${targetDay}`);
               }}
               className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary-container text-on-primary text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"

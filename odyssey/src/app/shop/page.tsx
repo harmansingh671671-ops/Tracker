@@ -171,11 +171,10 @@ export default function ShopPage() {
       {/* Daily Free Mystery Chest */}
       <div
         onClick={handleOpenChest}
-        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm active:scale-[0.99] ${
-          chestClaimed
+        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm active:scale-[0.99] ${chestClaimed
             ? "bg-surface-container-low border-outline/10 opacity-70"
             : "bg-gradient-to-r from-secondary-container/40 via-surface-container to-primary/10 border-primary/40 hover:border-primary"
-        }`}
+          }`}
       >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-secondary-container text-secondary flex items-center justify-center text-2xl shadow-inner">
@@ -211,11 +210,10 @@ export default function ShopPage() {
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              activeCategory === cat.id
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${activeCategory === cat.id
                 ? "bg-primary text-on-primary font-bold shadow-sm"
                 : "bg-surface-container-low text-on-surface-variant hover:text-on-surface border border-outline/10"
-            }`}
+              }`}
           >
             {cat.label}
           </button>
@@ -261,11 +259,10 @@ export default function ShopPage() {
       {/* Toast Feedback */}
       {toastMsg && (
         <div
-          className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-lg animate-in fade-in duration-200 ${
-            toastMsg.isError
+          className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-lg animate-in fade-in duration-200 ${toastMsg.isError
               ? "bg-error-container text-on-error-container"
               : "bg-primary-container text-on-primary-container"
-          }`}
+            }`}
         >
           {toastMsg.isError ? (
             <AlertCircle className="w-4 h-4 shrink-0" />
