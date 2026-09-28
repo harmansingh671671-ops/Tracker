@@ -47,3 +47,6 @@ next-env.d.ts
 **/android/app/build/
 **/android/build/
 local.properties
+
+# Market Research
+Market Research/
