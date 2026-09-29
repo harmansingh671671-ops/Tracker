@@ -27,6 +27,7 @@ import {
   Sparkles,
   Check,
   XCircle,
+  Circle,
 } from "lucide-react";
 
 // Synchronous local cache helpers to ensure Frame-0 instant rendering without flashes
@@ -98,18 +99,68 @@ function PlannerContent() {
 
   const handleToggleBlockStatus = async (
     e: React.MouseEvent,
+    slotHour: number,
     block: ScheduleBlock | null,
     currentStatus?: string
   ) => {
     e.stopPropagation();
-    if (!block || !block.id) return;
-    const isCompleted = currentStatus === "completed" || block.status === "completed";
-    const nextStatus = isCompleted ? "missed" : "completed";
-    await db.scheduleBlocks.update(block.id, {
-      status: nextStatus,
-    });
+
+    // Prevent reviewing future hours
+    const isFuture =
+      selectedDate > todayStr ||
+      (selectedDate === todayStr && slotHour > currentHour);
+
+    if (isFuture) {
+      showHint(
+        selectedDate > todayStr
+          ? "Future days cannot be reviewed yet"
+          : "Future hours cannot be reviewed yet"
+      );
+      return;
+    }
+
+    const current = (currentStatus || block?.status || "pending") as "pending" | "completed" | "missed";
+    
+    // 3-state toggle cycle: unreviewed (pending) -> completed (tick) -> missed (cross) -> unreviewed (pending)
+    let nextStatus: "pending" | "completed" | "missed" = "completed";
+    if (current === "completed") {
+      nextStatus = "missed";
+    } else if (current === "missed") {
+      nextStatus = "pending";
+    } else {
+      nextStatus = "completed";
+    }
+
+    if (block && block.id) {
+      await db.scheduleBlocks.update(block.id, {
+        status: nextStatus,
+        completedAt: nextStatus === "completed" ? new Date().toISOString() : undefined,
+        missReason: nextStatus === "missed" ? "Did not follow" : undefined,
+      });
+    } else {
+      // Create block if reviewing an unscheduled slot in past/current hour
+      const startStr = `${String(slotHour).padStart(2, "0")}:00`;
+      const endStr = `${String((slotHour + 1) % 24 === 0 ? 24 : slotHour + 1).padStart(2, "0")}:00`;
+      const cat = (slotHour >= 23 || slotHour < 7) ? "sleep" : (slotHour >= 9 && slotHour < 18) ? "work" : "buffer";
+      await db.scheduleBlocks.add({
+        id: crypto.randomUUID(),
+        userId: user?.id || "default",
+        date: selectedDate,
+        startTime: startStr,
+        endTime: endStr,
+        title: cat === "sleep" ? "Sleep" : cat === "work" ? "Deep Work" : "Buffer",
+        category: cat,
+        status: nextStatus,
+        completedAt: nextStatus === "completed" ? new Date().toISOString() : undefined,
+        missReason: nextStatus === "missed" ? "Did not follow" : undefined,
+        tag: cat === "sleep" ? "Rest" : cat === "work" ? "Deep Work" : "Break",
+        isCommitted: true,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
     await loadBlocks(selectedDate);
-    syncCurrentScheduleToNative();
+    syncCurrentScheduleToNative(selectedDate);
   };
 
   const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
@@ -538,6 +589,9 @@ function PlannerContent() {
       selectedDate < todayStr ||
       (selectedDate === todayStr && slot.hour < currentHour);
     const isCurrent = isSelectedToday && currentHour === slot.hour;
+    const isFutureHour =
+      selectedDate > todayStr ||
+      (selectedDate === todayStr && slot.hour > currentHour);
     const isRecentlySaved = recentlySavedHour === slot.hour;
     const cat = getCatStyle(slot.category, slot.isCustom);
     const CatIcon = cat.Icon;
@@ -698,8 +752,8 @@ function PlannerContent() {
             {slot.status === "completed" ? (
               <button
                 type="button"
-                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
-                title="Completed (tap to toggle)"
+                onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
+                title="Completed ✓ (tap to mark missed)"
                 className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
               >
                 <CheckCircle2 className="w-5 h-5" />
@@ -707,29 +761,29 @@ function PlannerContent() {
             ) : slot.status === "missed" ? (
               <button
                 type="button"
-                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
-                title="Missed (tap to toggle)"
+                onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
+                title="Missed ✕ (tap to reset to unreviewed)"
                 className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
               >
                 <XCircle className="w-5 h-5" />
               </button>
-            ) : isPastHour ? (
+            ) : isFutureHour ? (
               <button
                 type="button"
-                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
-                title="Past hour (tap to mark completed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
+                title={selectedDate > todayStr ? "Future day (cannot review yet)" : "Future hour (cannot review yet)"}
+                className="w-7 h-7 rounded-full border border-outline/10 text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
               >
-                <XCircle className="w-5 h-5" />
+                <Circle className="w-3.5 h-3.5" />
               </button>
             ) : (
               <button
                 type="button"
-                onClick={(e) => handleToggleBlockStatus(e, slot.block, slot.status)}
-                title="Tap to mark completed"
+                onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
+                title="Unreviewed (tap to mark completed)"
                 className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
               >
-                <Check className="w-3.5 h-3.5" />
+                <Circle className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

@@ -11,6 +11,9 @@ import {
   Moon,
   Sparkles,
   Check,
+  CheckCircle2,
+  XCircle,
+  Circle,
   X,
   MoreVertical,
   Plus,
@@ -163,6 +166,7 @@ export function JourneyDaySchedule({
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const isDayPast = dateStr < todayStr;
+  const isDayFuture = dateStr > todayStr;
 
   // Formatted date string
   const formattedDate = useMemo(() => {
@@ -404,30 +408,38 @@ export function JourneyDaySchedule({
     onScheduleUpdated();
   };
 
-  // Mark Followed / Missed
-  const handleMarkFollowed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
+  // 3-state Review toggle: unreviewed -> completed -> missed -> unreviewed
+  const handleToggleReview = async (block: ScheduleBlock, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const startH = parseHour(block.startTime);
+    const isFuture = isDayFuture || (isToday && startH > Math.floor(currentHourFloat));
+    if (isFuture) {
+      return;
+    }
+
     const actualId = block.id.split("-h")[0];
-    const newStatus = block.status === "completed" ? "pending" : "completed";
+    const current = (block.status || "pending") as "pending" | "completed" | "missed";
+    let newStatus: "pending" | "completed" | "missed" = "completed";
+    if (current === "completed") {
+      newStatus = "missed";
+    } else if (current === "missed") {
+      newStatus = "pending";
+    } else {
+      newStatus = "completed";
+    }
+
     await updateBlock(actualId, {
       status: newStatus,
       completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
-    });
-    if (newStatus === "completed") {
-      addXp(25);
-    }
-    await fetchBlocksForDate(user!.id, dateStr);
-    onScheduleUpdated();
-  };
-
-  const handleMarkMissed = async (block: ScheduleBlock, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const actualId = block.id.split("-h")[0];
-    const newStatus = block.status === "missed" ? "pending" : "missed";
-    await updateBlock(actualId, {
-      status: newStatus,
       missReason: newStatus === "missed" ? "Did not follow" : undefined,
     });
+
+    if (newStatus === "completed") {
+      addXp(25);
+    } else if (current === "completed") {
+      addXp(-25);
+    }
+
     await fetchBlocksForDate(user!.id, dateStr);
     onScheduleUpdated();
   };
@@ -523,6 +535,7 @@ export function JourneyDaySchedule({
     const endH = getBlockEndHour(block);
     const isLive = isToday && currentHourFloat >= startH && currentHourFloat < endH;
     const isPast = isDayPast || (isToday && currentHourFloat >= endH);
+    const isFutureHour = isDayFuture || (isToday && startH > Math.floor(currentHourFloat));
     const isFollowed = block.status === "completed";
     const isMissed = block.status === "missed";
     const timeRangeStr = formatCleanHourRange(block.startTime, block.endTime);
@@ -576,6 +589,36 @@ export function JourneyDaySchedule({
                   LIVE NOW
                 </span>
               </div>
+
+              {block.status === "completed" ? (
+                <button
+                  type="button"
+                  onClick={(e) => handleToggleReview(block, e)}
+                  title="Completed ✓ (tap to mark missed)"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+              ) : block.status === "missed" ? (
+                <button
+                  type="button"
+                  onClick={(e) => handleToggleReview(block, e)}
+                  title="Missed ✕ (tap to reset to unreviewed)"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => handleToggleReview(block, e)}
+                  title="Unreviewed (tap to mark completed)"
+                  className="w-6 h-6 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <Circle className="w-3.5 h-3.5" />
+                </button>
+              )}
+
               <button
                 onClick={(e) => handleOpenEditModal(block, e)}
                 className="w-5 h-5 rounded-md hover:bg-surface-bright text-on-surface-variant/50 hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
@@ -623,35 +666,42 @@ export function JourneyDaySchedule({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {isPast && (
-              <div className="flex items-center gap-0.5 bg-surface-container-high/90 p-0.5 rounded-lg border border-outline/15 shadow-xs">
-                <button
-                  type="button"
-                  onClick={(e) => handleMarkFollowed(block, e)}
-                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                    isFollowed
-                      ? "bg-emerald-500 text-black shadow-xs"
-                      : "text-on-surface-variant/70 hover:text-emerald-400 hover:bg-emerald-500/15"
-                  }`}
-                  title={isFollowed ? "Done (tap to undo)" : "Mark as Done (+25 XP)"}
-                >
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                  {isFollowed && <span>Done</span>}
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => handleMarkMissed(block, e)}
-                  className={`h-5 sm:h-6 px-1.5 rounded flex items-center gap-1 text-[10px] sm:text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                    isMissed
-                      ? "bg-rose-500 text-white shadow-xs"
-                      : "text-on-surface-variant/70 hover:text-rose-400 hover:bg-rose-500/15"
-                  }`}
-                  title={isMissed ? "Missed (tap to undo)" : "Mark as Missed"}
-                >
-                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                  {isMissed && <span>Missed</span>}
-                </button>
-              </div>
+            {block.status === "completed" ? (
+              <button
+                type="button"
+                onClick={(e) => handleToggleReview(block, e)}
+                title="Completed ✓ (tap to mark missed)"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+              </button>
+            ) : block.status === "missed" ? (
+              <button
+                type="button"
+                onClick={(e) => handleToggleReview(block, e)}
+                title="Missed ✕ (tap to reset to unreviewed)"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            ) : isFutureHour ? (
+              <button
+                type="button"
+                onClick={(e) => handleToggleReview(block, e)}
+                title={isDayFuture ? "Future day (cannot review yet)" : "Future hour (cannot review yet)"}
+                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-outline/10 text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
+              >
+                <Circle className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => handleToggleReview(block, e)}
+                title="Unreviewed (tap to mark completed)"
+                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Circle className="w-3.5 h-3.5" />
+              </button>
             )}
 
             <button

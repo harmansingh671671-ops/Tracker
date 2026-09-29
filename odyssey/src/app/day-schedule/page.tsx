@@ -20,6 +20,7 @@ import {
   Check,
   CheckCircle2,
   XCircle,
+  Circle,
   Clock,
   Trash2,
   Loader2,
@@ -512,25 +513,43 @@ function DayScheduleContent() {
     syncCurrentScheduleToNative(dateStr);
   }, [user?.id, dateStr, autoFillSleep]);
 
-  // Toggle completion status
+  // Toggle completion status (3-state cycle: unreviewed -> completed -> missed -> unreviewed)
   const handleToggleComplete = useCallback(
     async (block: ScheduleBlock | null, hour: number) => {
       if (!block) return;
-      const newStatus = block.status === "completed" ? "pending" : "completed";
+      const isFuture =
+        dateStr > todayStr ||
+        (dateStr === todayStr && hour > currentHour);
+
+      if (isFuture) {
+        return;
+      }
+
+      const current = (block.status || "pending") as "pending" | "completed" | "missed";
+      let newStatus: "pending" | "completed" | "missed" = "completed";
+      if (current === "completed") {
+        newStatus = "missed";
+      } else if (current === "missed") {
+        newStatus = "pending";
+      } else {
+        newStatus = "completed";
+      }
+
       await updateBlock(block.id, {
         status: newStatus,
         completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
+        missReason: newStatus === "missed" ? "Did not follow" : undefined,
       });
 
       if (newStatus === "completed") {
         await addXp(10);
-      } else {
+      } else if (current === "completed") {
         await addXp(-10);
       }
       await fetchUser();
       syncCurrentScheduleToNative(dateStr);
     },
-    [updateBlock, addXp, fetchUser, dateStr]
+    [updateBlock, addXp, fetchUser, dateStr, todayStr, currentHour]
   );
 
   // Clear / delete block
@@ -550,6 +569,7 @@ function DayScheduleContent() {
   const renderHourSlot = (slot: (typeof full24Hours)[0]) => {
     const isPastHour = isSelectedToday && slot.hour < currentHour;
     const isCurrent = isSelectedToday && currentHour === slot.hour;
+    const isFutureHour = dateStr > todayStr || (dateStr === todayStr && slot.hour > currentHour);
     const isRecentlySaved = recentlySavedHour === slot.hour;
     const cat = getCatStyle(slot.category, slot.isCustom);
     const CatIcon = cat.Icon;
@@ -695,14 +715,14 @@ function DayScheduleContent() {
           </div>
         </div>
 
-        {/* Right Status: Tick for completed / pending hours */}
+        {/* Right Status: 3-state toggle (Tick, Cross, Unreviewed) */}
         <div className="flex items-center gap-1.5 shrink-0">
           {slot.block ? (
-            isCompleted ? (
+            slot.status === "completed" ? (
               <button
                 type="button"
                 onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title="Completed (tap to revert)"
+                title="Completed ✓ (tap to mark missed)"
                 className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
               >
                 <CheckCircle2 className="w-5 h-5" />
@@ -711,19 +731,28 @@ function DayScheduleContent() {
               <button
                 type="button"
                 onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title="Missed (tap to mark completed)"
+                title="Missed ✕ (tap to reset to unreviewed)"
                 className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
               >
                 <XCircle className="w-5 h-5" />
+              </button>
+            ) : isFutureHour ? (
+              <button
+                type="button"
+                onClick={() => handleToggleComplete(slot.block, slot.hour)}
+                title={dateStr > todayStr ? "Future day (cannot review yet)" : "Future hour (cannot review yet)"}
+                className="w-7 h-7 rounded-full border border-outline/10 text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
+              >
+                <Circle className="w-3.5 h-3.5" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title="Tap to mark completed"
+                title="Unreviewed (tap to mark completed)"
                 className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
               >
-                <Check className="w-3.5 h-3.5" />
+                <Circle className="w-3.5 h-3.5" />
               </button>
             )
           ) : (

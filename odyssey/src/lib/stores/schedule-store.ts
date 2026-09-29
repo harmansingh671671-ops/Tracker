@@ -81,8 +81,6 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
       if (!alreadyHas) {
         const endHourNum = parseInt(slot.endTime.split(':')[0], 10);
         const normEndH = endHourNum === 0 ? 24 : endHourNum;
-        const currentH = new Date().getHours();
-        const isAlreadyPast = currentH >= normEndH;
         const newBlock: ScheduleBlock = {
           id: uuidv4(),
           userId,
@@ -93,7 +91,7 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
           description: '',
           category: 'sleep',
           tag: 'Rest',
-          status: isAlreadyPast ? 'completed' : 'pending',
+          status: 'pending',
           isCommitted: true,
           createdAt: new Date().toISOString(),
         };

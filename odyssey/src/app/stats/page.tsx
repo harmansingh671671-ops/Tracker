@@ -278,10 +278,10 @@ export default function StatsPage() {
         };
       }
 
-      // All planned blocks (whether ticked, crossed, or neither) count as reviewed
+      const blockStatus = (block.status || "pending") as "pending" | "completed" | "missed";
       return {
         hour,
-        status: "reviewed" as const,
+        status: blockStatus,
         block,
       };
     });
@@ -714,16 +714,18 @@ export default function StatsPage() {
                     "bg-surface-container-highest/20 text-on-surface-variant/40 border-outline/10";
                   let statusTitle = "Nothing (Empty)";
 
-                  if (item.status === "reviewed") {
+                  if (item.status === "completed") {
                     bgClass =
                       "bg-[#00E676] text-[#002f18] font-black border-[#69f0ae] shadow-[0_0_6px_rgba(0,230,118,0.45)]";
-                    const statusPrefix =
-                      item.block?.status === "completed"
-                        ? "Done"
-                        : item.block?.status === "missed"
-                          ? "Missed"
-                          : "Scheduled";
-                    statusTitle = `Reviewed (${statusPrefix}): ${item.block?.title || "Focus"}`;
+                    statusTitle = `Done ✓: ${item.block?.title || "Task"}`;
+                  } else if (item.status === "missed") {
+                    bgClass =
+                      "bg-rose-500 text-white font-black border-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.45)]";
+                    statusTitle = `Missed ✕: ${item.block?.title || "Task"}`;
+                  } else if (item.status === "pending") {
+                    bgClass =
+                      "bg-amber-500/20 text-amber-300 font-semibold border-amber-500/40";
+                    statusTitle = `Unreviewed: ${item.block?.title || "Task"}`;
                   }
 
                   return (
@@ -742,7 +744,15 @@ export default function StatsPage() {
               <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-outline/10 text-[9px] font-mono text-on-surface-variant">
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-xs" />
-                  <span>Reviewed</span>
+                  <span>Done</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2 rounded-[2px] bg-rose-500 border border-rose-400 inline-block shadow-xs" />
+                  <span>Missed</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2 rounded-[2px] bg-amber-500/25 border border-amber-500/50 inline-block" />
+                  <span>Unreviewed</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2 rounded-[2px] bg-surface-container-highest/30 border border-outline/15 inline-block" />

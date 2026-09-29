@@ -41,23 +41,24 @@ export function evaluateDayCompletion(
   const plannedHours = blocks.length;
   const completedHours = blocks.filter((b) => b.status === "completed").length;
   const missedHours = blocks.filter((b) => b.status === "missed").length;
+  const reviewedHours = completedHours + missedHours;
   const pendingHours = blocks.filter((b) => b.status === "pending" || !b.status).length;
-  // All planned hours (whether ticked/completed, crossed/missed, or pending without tick/cross) are counted as reviewed
-  const reviewedHours = plannedHours;
 
   const hasSchedule = plannedHours > 0;
-  const reviewRatio = hasSchedule ? 1 : 0;
+  const reviewRatio = hasSchedule ? reviewedHours / plannedHours : 0;
   // A day is considered fully filled if there are at least 18 planned hours (standard 24h schedule with sleep & wake blocks)
   const isFullyFilled = plannedHours >= 18;
-  const isFullyReviewed = hasSchedule;
-  const isCompletelyDone = isFullyFilled;
+  const isFullyReviewed = hasSchedule && reviewedHours === plannedHours;
+  const isCompletelyDone = isFullyFilled && isFullyReviewed;
 
   let status: DayReviewStatus = "empty";
   if (!hasSchedule) {
     status = "empty";
-  } else if (isCompletelyDone || (hasSchedule && plannedHours >= 14)) {
+  } else if (reviewedHours === 0) {
+    status = "planned_unreviewed";
+  } else if (isCompletelyDone || isFullyReviewed) {
     status = "fully_completed";
-  } else if (plannedHours >= 8) {
+  } else if (reviewRatio >= 0.5) {
     status = "mostly_reviewed";
   } else {
     status = "partially_reviewed";
@@ -70,7 +71,7 @@ export function evaluateDayCompletion(
     reviewedHours,
     completedHours,
     missedHours,
-    pendingHours: 0,
+    pendingHours,
     reviewRatio,
     isFullyFilled,
     isFullyReviewed,
