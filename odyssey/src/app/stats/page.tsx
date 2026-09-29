@@ -287,7 +287,7 @@ export default function StatsPage() {
     });
   }, [popupDate, allBlocks]);
 
-  // Tap & hold (long press) gesture handlers
+  // Tap & hold (long press) gesture handlers - Now navigates directly to planner
   const startPress = (cell: (typeof monthCells)[0], e: React.TouchEvent | React.MouseEvent) => {
     if (cell.isPad) return;
     isLongPressRef.current = false;
@@ -309,7 +309,10 @@ export default function StatsPage() {
           navigator.vibrate(40);
         }
       } catch { }
-      setPopupDate(cell.dateStr);
+      try {
+        localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
+      } catch { }
+      router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
     }, 450);
   };
 
@@ -331,16 +334,14 @@ export default function StatsPage() {
     }
   };
 
+  // Regular Tap (click) opens the 24-Hour Overview popup modal
   const handleCellClick = (cell: (typeof monthCells)[0]) => {
     if (cell.isPad) return;
     if (isLongPressRef.current) {
       isLongPressRef.current = false;
       return;
     }
-    try {
-      localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
-    } catch { }
-    router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
+    setPopupDate(cell.dateStr);
   };
 
   const weekBars = [
@@ -503,10 +504,13 @@ export default function StatsPage() {
                   onMouseLeave={endPress}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    setPopupDate(cell.dateStr);
+                    try {
+                      localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
+                    } catch { }
+                    router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
                   }}
                   onClick={() => handleCellClick(cell)}
-                  title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap to open schedule • Hold for overview`}
+                  title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap for overview • Hold to open schedule`}
                   className={`w-full min-w-0 aspect-[1.35/1] sm:aspect-[1.3/1] rounded-[4px] flex flex-col items-center justify-center text-[10.5px] font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
                 >
                   <span className="leading-none">{cell.dayNumber}</span>

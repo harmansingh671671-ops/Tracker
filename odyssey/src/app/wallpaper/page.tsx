@@ -594,24 +594,28 @@ export default function WallpaperPage() {
 
           {/* Status summary of both screens */}
           <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono">
-            <div className={`p-2 rounded-lg border flex items-center justify-between ${
+            <div className={`p-2 rounded-lg border flex items-center justify-between gap-1 overflow-hidden ${
               lockWallpaper ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-amber-500/10 border-amber-500/25 text-amber-400"
             }`}>
-              <span className="flex items-center gap-1.5">
-                <Lock className="w-3 h-3" />
-                Lock Screen:
+              <span className="flex items-center gap-1.5 min-w-0 truncate">
+                <Lock className="w-3 h-3 shrink-0" />
+                <span className="truncate">Lock Screen</span>
               </span>
-              <span className="font-bold">{lockWallpaper ? "Configured" : "Not Set"}</span>
+              <span className="font-bold shrink-0 text-[10.5px] px-1.5 py-0.5 rounded bg-surface/50 border border-current/20">
+                {lockWallpaper ? "Set" : "None"}
+              </span>
             </div>
 
-            <div className={`p-2 rounded-lg border flex items-center justify-between ${
+            <div className={`p-2 rounded-lg border flex items-center justify-between gap-1 overflow-hidden ${
               homeWallpaper ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-amber-500/10 border-amber-500/25 text-amber-400"
             }`}>
-              <span className="flex items-center gap-1.5">
-                <Smartphone className="w-3 h-3" />
-                Home Screen:
+              <span className="flex items-center gap-1.5 min-w-0 truncate">
+                <Smartphone className="w-3 h-3 shrink-0" />
+                <span className="truncate">Home Screen</span>
               </span>
-              <span className="font-bold">{homeWallpaper ? "Configured" : "Not Set"}</span>
+              <span className="font-bold shrink-0 text-[10.5px] px-1.5 py-0.5 rounded bg-surface/50 border border-current/20">
+                {homeWallpaper ? "Set" : "None"}
+              </span>
             </div>
           </div>
         </div>
