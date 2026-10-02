@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Calendar,
   X,
+  Sparkles,
 } from "lucide-react";
 
 const MONTH_NAMES = [
@@ -287,7 +288,7 @@ export default function StatsPage() {
     });
   }, [popupDate, allBlocks]);
 
-  // Tap & hold (long press) gesture handlers - Now navigates directly to planner
+  // Tap & hold (long press) gesture handlers - Navigates directly to planner
   const startPress = (cell: (typeof monthCells)[0], e: React.TouchEvent | React.MouseEvent) => {
     if (cell.isPad) return;
     isLongPressRef.current = false;
@@ -344,50 +345,43 @@ export default function StatsPage() {
     setPopupDate(cell.dateStr);
   };
 
-  const weekBars = [
-    { day: "M", hours: 6.8, heightPct: 78, primaryPct: 60, secPct: 40 },
-    { day: "T", hours: 7.2, heightPct: 84, primaryPct: 65, secPct: 35 },
-    { day: "W", hours: 8.0, heightPct: 92, primaryPct: 70, secPct: 30 },
-    { day: "T", hours: 6.5, heightPct: 74, primaryPct: 55, secPct: 45 },
-    { day: "F", hours: 7.5, heightPct: 86, primaryPct: 65, secPct: 35 },
-    { day: "S", hours: 5.0, heightPct: 58, primaryPct: 40, secPct: 60 },
-    { day: "S", hours: 5.5, heightPct: 64, primaryPct: 45, secPct: 55 },
-  ];
-
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
       {/* Title */}
-      <div className="pt-1">
+      <div className="pt-1 flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-on-surface">Analytics &amp; Stats</h2>
+        <span className="text-xs font-mono font-semibold text-primary px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20">
+          Rank {rankInfo.division}
+        </span>
       </div>
 
-      {/* Hero Rank Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-surface-container-low p-4 sm:p-5 border border-outline/10 shadow-md space-y-3.5">
+      {/* Hero Rank Card - Akiflow Obsidian Glassmorphism */}
+      <div className="relative overflow-hidden rounded-3xl bg-[#0B101B]/80 backdrop-blur-xl p-4 sm:p-5 border border-white/[0.08] shadow-lg space-y-3.5">
         <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-surface-container-high text-primary flex items-center justify-center text-2xl shadow-inner border border-primary/20 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-surface-container-high text-primary flex items-center justify-center text-2xl shadow-inner border border-primary/25 shrink-0">
               {rankInfo.badge}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-on-surface truncate">{rankInfo.name}</h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-mono font-bold whitespace-nowrap">
+                <h3 className="text-base font-bold text-white truncate">{rankInfo.name}</h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 text-[10px] font-mono font-bold whitespace-nowrap">
                   {rankInfo.division} Division
                 </span>
               </div>
               <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-mono text-on-surface-variant mt-1">
-                <span className="inline-flex items-center gap-1 text-primary whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 text-primary whitespace-nowrap font-semibold">
                   <Award className="w-3.5 h-3.5 shrink-0" />
-                  <span>Top 8%</span>
+                  <span>Top Tier</span>
                 </span>
                 <span className="text-outline/40">•</span>
-                <span className="inline-flex items-center gap-1 text-secondary whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 text-sky-400 whitespace-nowrap font-semibold">
                   <Zap className="w-3.5 h-3.5 shrink-0" />
                   <span>Lv. {currentLevel}</span>
                 </span>
                 <span className="text-outline/40">•</span>
-                <span className="inline-flex items-center gap-1 text-amber-400 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 text-amber-400 whitespace-nowrap font-semibold">
                   <Flame className="w-3.5 h-3.5 shrink-0" />
                   <span>{completedDaysCount} Done</span>
                 </span>
@@ -397,7 +391,7 @@ export default function StatsPage() {
         </div>
 
         {/* Division Tier Progress Bar */}
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-1.5 pt-1 relative z-10">
           <div className="flex items-center justify-between text-xs font-mono whitespace-nowrap">
             <span className="inline-flex items-center gap-1.5 text-on-surface-variant truncate">
               <ShieldCheck className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -416,8 +410,8 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* MONTHLY HEATMAP CALENDAR */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low border border-outline/10 space-y-4 shadow-sm">
+      {/* MONTHLY HEATMAP CALENDAR (Akiflow Dark Glassmorphism) */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-4 shadow-sm">
         {/* Month Navigation Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -429,13 +423,13 @@ export default function StatsPage() {
                 setViewYear(y);
                 setViewMonth(m);
               }}
-              className="bg-transparent text-sm sm:text-base font-bold text-on-surface cursor-pointer focus:outline-none hover:text-primary transition-colors"
+              className="bg-transparent text-sm sm:text-base font-bold text-white cursor-pointer focus:outline-none hover:text-primary transition-colors"
             >
               {availableMonths.map((opt) => (
                 <option
                   key={`${opt.year}-${opt.month}`}
                   value={`${opt.year}-${opt.month}`}
-                  className="bg-surface-container text-on-surface text-xs"
+                  className="bg-[#0B101B] text-white text-xs"
                 >
                   {opt.label}
                 </option>
@@ -449,10 +443,11 @@ export default function StatsPage() {
               onClick={handlePrevMonth}
               disabled={!canGoPrev}
               aria-label="Previous Month"
-              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${canGoPrev
-                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline/15 cursor-pointer active:scale-95"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                canGoPrev
+                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-white/[0.08] cursor-pointer active:scale-95"
                   : "bg-surface-container-lowest text-on-surface-variant/30 border-transparent cursor-not-allowed"
-                }`}
+              }`}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -461,10 +456,11 @@ export default function StatsPage() {
               onClick={handleNextMonth}
               disabled={!canGoNext}
               aria-label="Next Month"
-              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${canGoNext
-                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline/15 cursor-pointer active:scale-95"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                canGoNext
+                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-white/[0.08] cursor-pointer active:scale-95"
                   : "bg-surface-container-lowest text-on-surface-variant/30 border-transparent cursor-not-allowed"
-                }`}
+              }`}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -511,7 +507,7 @@ export default function StatsPage() {
                   }}
                   onClick={() => handleCellClick(cell)}
                   title={`${cell.dateStr} (Day ${cell.journeyDay}): ${styles.label}\nTap for overview • Hold to open schedule`}
-                  className={`w-full min-w-0 aspect-[1.35/1] sm:aspect-[1.3/1] rounded-[4px] flex flex-col items-center justify-center text-[10.5px] font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
+                  className={`w-full min-w-0 aspect-[1.35/1] sm:aspect-[1.3/1] rounded-[6px] flex flex-col items-center justify-center text-[10.5px] font-mono border transition-all duration-200 cursor-pointer select-none relative group hover:scale-105 active:scale-95 ${styles.bgClass} ${styles.textClass} ${styles.borderClass} ${styles.glowClass}`}
                 >
                   <span className="leading-none">{cell.dayNumber}</span>
                 </button>
@@ -540,7 +536,7 @@ export default function StatsPage() {
                 Wallpaper Studio
               </h3>
               <p className="text-xs font-mono text-on-surface-variant truncate">
-                Schedule Lockscreen
+                Schedule Lockscreen Sync
               </p>
             </div>
           </div>
@@ -551,17 +547,17 @@ export default function StatsPage() {
         </div>
       </Link>
 
-      {/* 2x2 KPI Matrix */}
+      {/* 2x2 KPI Matrix (Akiflow Obsidian Glass) */}
       <div className="grid grid-cols-2 gap-3">
         {/* Completed Days */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
             <Flame className="w-4 h-4 shrink-0" />
             <span>Streak</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-on-surface">{completedDaysCount}</span>
+              <span className="text-2xl font-bold font-mono text-white">{completedDaysCount}</span>
               <span className="text-xs text-on-surface-variant font-mono">days</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
@@ -571,14 +567,14 @@ export default function StatsPage() {
         </div>
 
         {/* Diamonds */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
             <Gem className="w-4 h-4 shrink-0" />
             <span>Diamonds</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-on-surface">{user?.diamonds || 0}</span>
+              <span className="text-2xl font-bold font-mono text-white">{user?.diamonds || 0}</span>
               <span className="text-xs text-on-surface-variant">💎</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
@@ -588,14 +584,14 @@ export default function StatsPage() {
         </div>
 
         {/* Total XP */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-secondary">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-400">
             <Zap className="w-4 h-4 shrink-0" />
             <span>Total XP</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-on-surface">{currentXp}</span>
+              <span className="text-2xl font-bold font-mono text-white">{currentXp}</span>
               <span className="text-xs text-on-surface-variant font-mono">XP</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
@@ -605,14 +601,14 @@ export default function StatsPage() {
         </div>
 
         {/* Adherence */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
             <TrendingUp className="w-4 h-4 shrink-0" />
             <span>Adherence</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-on-surface">93%</span>
+              <span className="text-2xl font-bold font-mono text-white">93%</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
               {totalPlannedHours}h Planned
@@ -621,40 +617,15 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* Weekly Rhythm Chart */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low border border-outline/10 space-y-3 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-on-surface">Weekly Rhythm</h3>
-          <span className="text-xs font-mono text-primary font-bold">46.5h / 50h</span>
-        </div>
-
-        {/* Stacked Bars */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-end h-32 pt-2 pb-1">
-          {weekBars.map((bar, idx) => (
-            <div key={idx} className="flex flex-col items-center gap-1.5 h-full justify-end">
-              <span className="text-[9px] font-mono text-on-surface-variant whitespace-nowrap">{bar.hours}h</span>
-              <div
-                className="w-full max-w-[24px] flex flex-col-reverse rounded-t-md overflow-hidden bg-surface-container-highest"
-                style={{ height: `${bar.heightPct}%` }}
-              >
-                <div style={{ height: `${bar.primaryPct}%` }} className="bg-primary w-full" />
-                <div style={{ height: `${bar.secPct}%` }} className="bg-secondary w-full" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-on-surface-variant">{bar.day}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Day Overview Pop-up Modal (Opens on Tap & Hold) */}
+      {/* Day Overview Pop-up Modal (Opens on Tap) */}
       {popupDate && popupDayStats && (
         <div
           onClick={() => setPopupDate(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm rounded-3xl bg-surface-container border border-outline/20 p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-sm rounded-3xl bg-[#0E1522] border border-white/15 p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
@@ -662,7 +633,7 @@ export default function StatsPage() {
                 <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider block">
                   Day {popupDayStats.dayNumber} Overview
                 </span>
-                <h3 className="text-base font-bold text-on-surface truncate">
+                <h3 className="text-base font-bold text-white truncate">
                   {popupDayStats.date}
                 </h3>
               </div>
@@ -679,27 +650,28 @@ export default function StatsPage() {
             {/* Status Pill */}
             <div>
               <span
-                className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${popupDayStats.status === "fully_completed"
+                className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
+                  popupDayStats.status === "fully_completed"
                     ? "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 shadow-[0_0_10px_rgba(0,230,118,0.3)]"
                     : popupDayStats.status === "planned_unreviewed"
-                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                      : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
-                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                        : "bg-surface-container-low text-on-surface-variant border-outline/10"
-                  }`}
+                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                    : "bg-surface-container-low text-on-surface-variant border-outline/10"
+                }`}
               >
                 {popupDayStats.status === "fully_completed"
                   ? "100% Reviewed"
                   : popupDayStats.status === "planned_unreviewed"
-                    ? "Planned (0h Reviewed)"
-                    : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
-                      ? `${popupDayStats.reviewedHours}/${popupDayStats.plannedHours}h Reviewed`
-                      : "Not Planned"}
+                  ? "Planned (0h Reviewed)"
+                  : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
+                  ? `${popupDayStats.reviewedHours}/${popupDayStats.plannedHours}h Reviewed`
+                  : "Not Planned"}
               </span>
             </div>
 
             {/* 4 Rows x 6 Columns Hourly Heatmap */}
-            <div className="space-y-2 p-3.5 rounded-2xl bg-surface-container-low border border-outline/10">
+            <div className="space-y-2 p-3.5 rounded-2xl bg-surface-container-low/80 border border-white/[0.08]">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono font-bold text-on-surface flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-primary" />
@@ -745,7 +717,7 @@ export default function StatsPage() {
               </div>
 
               {/* Hourly Heatmap Legend */}
-              <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-outline/10 text-[9px] font-mono text-on-surface-variant">
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-white/[0.08] text-[9px] font-mono text-on-surface-variant">
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-xs" />
                   <span>Done</span>
@@ -767,15 +739,15 @@ export default function StatsPage() {
 
             {/* Metrics Breakdown */}
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/10">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-white/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Planned</span>
                 <span className="font-bold text-primary text-sm">{popupDayStats.plannedHours}h</span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/10">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-white/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Reviewed</span>
                 <span className="font-bold text-[#00E676] text-sm">{popupDayStats.reviewedHours}h</span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/10">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-white/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Unreviewed</span>
                 <span className="font-bold text-on-surface-variant text-sm">{popupDayStats.pendingHours}h</span>
               </div>
@@ -795,10 +767,11 @@ export default function StatsPage() {
                 <div
                   className="h-full bg-[#00E676] rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,230,118,0.5)]"
                   style={{
-                    width: `${popupDayStats.plannedHours > 0
+                    width: `${
+                      popupDayStats.plannedHours > 0
                         ? Math.min(100, (popupDayStats.reviewedHours / popupDayStats.plannedHours) * 100)
                         : 0
-                      }%`,
+                    }%`,
                   }}
                 />
               </div>
@@ -816,7 +789,7 @@ export default function StatsPage() {
                 } catch { }
                 router.push(`/planner?date=${targetDate}&day=${targetDay}`);
               }}
-              className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary-container text-on-primary text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"
+              className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-[#003825] text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"
             >
               <span>Open Day {popupDayStats.dayNumber} Schedule</span>
               <ArrowRight className="w-4 h-4" />

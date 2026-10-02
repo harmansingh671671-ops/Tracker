@@ -50,4 +50,6 @@ local.properties
 
 # Market Research
 Market Research/
-browser_use
+browser_use/
+# .agents
+.agents/

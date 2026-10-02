@@ -28,6 +28,7 @@ import {
   Check,
   XCircle,
   Circle,
+  Radio,
 } from "lucide-react";
 
 // Synchronous local cache helpers to ensure Frame-0 instant rendering without flashes
@@ -330,7 +331,6 @@ function PlannerContent() {
     });
   }, [blocks]);
 
-
   const isSelectedToday = selectedDate === todayStr;
   const isSelectedPastDay = selectedDate < todayStr;
 
@@ -515,10 +515,11 @@ function PlannerContent() {
         label: "Open Slot",
         Icon: Clock,
         color: "text-on-surface-variant/40",
-        badgeBg: "bg-surface-container-lowest border-outline/10 text-on-surface-variant/40",
-        cardBorder: "border-dashed border-outline/15 hover:border-primary/40",
-        cardBg: "bg-surface-container-lowest/30 hover:bg-surface-container-lowest/70",
-        accent: "border-outline/10",
+        badgeBg: "bg-surface-container-lowest border border-white/[0.06] text-on-surface-variant/40",
+        cardBorder: "border-dashed border-white/[0.08] hover:border-primary/40",
+        cardBg: "bg-[#0B101B]/40 hover:bg-[#0B101B]/70",
+        leftBorder: "border-l-transparent",
+        accentGlow: "",
       };
     }
     const c = cat.toLowerCase();
@@ -527,53 +528,58 @@ function PlannerContent() {
         label: "Rest & Sleep",
         Icon: Moon,
         color: "text-indigo-400",
-        badgeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-400",
-        cardBorder: "border-indigo-500/35 hover:border-indigo-500/60",
-        cardBg: "bg-indigo-950/25 hover:bg-indigo-950/35",
-        accent: "border-indigo-500/40",
+        badgeBg: "bg-indigo-500/15 border border-indigo-500/30 text-indigo-400",
+        cardBorder: "border-indigo-500/25 hover:border-indigo-500/50",
+        cardBg: "bg-indigo-950/20 hover:bg-indigo-950/30",
+        leftBorder: "border-l-indigo-500",
+        accentGlow: "shadow-[0_0_16px_rgba(99,102,241,0.15)]",
       };
     }
-    if (c.includes("vitality") || c.includes("habit")) {
+    if (c.includes("vitality") || c.includes("habit") || c.includes("health")) {
       return {
         label: "Vitality",
         Icon: Heart,
         color: "text-emerald-400",
-        badgeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
-        cardBorder: "border-emerald-500/35 hover:border-emerald-500/60",
-        cardBg: "bg-emerald-950/25 hover:bg-emerald-950/35",
-        accent: "border-emerald-500/40",
+        badgeBg: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400",
+        cardBorder: "border-emerald-500/25 hover:border-emerald-500/50",
+        cardBg: "bg-emerald-950/20 hover:bg-emerald-950/30",
+        leftBorder: "border-l-emerald-400",
+        accentGlow: "shadow-[0_0_16px_rgba(52,211,153,0.15)]",
       };
     }
-    if (c.includes("sync") || c.includes("meeting")) {
+    if (c.includes("sync") || c.includes("meeting") || c.includes("social")) {
       return {
         label: "Active Sync",
         Icon: MessageSquare,
         color: "text-sky-400",
-        badgeBg: "bg-sky-500/15 border-sky-500/30 text-sky-400",
-        cardBorder: "border-sky-500/35 hover:border-sky-500/60",
-        cardBg: "bg-sky-950/25 hover:bg-sky-950/35",
-        accent: "border-sky-500/40",
+        badgeBg: "bg-sky-500/15 border border-sky-500/30 text-sky-400",
+        cardBorder: "border-sky-500/25 hover:border-sky-500/50",
+        cardBg: "bg-sky-950/20 hover:bg-sky-950/30",
+        leftBorder: "border-l-sky-400",
+        accentGlow: "shadow-[0_0_16px_rgba(56,189,248,0.15)]",
       };
     }
-    if (c.includes("renewal") || c.includes("buffer")) {
+    if (c.includes("renewal") || c.includes("buffer") || c.includes("leisure")) {
       return {
         label: "Renewal",
         Icon: Coffee,
         color: "text-amber-400",
-        badgeBg: "bg-amber-500/15 border-amber-500/30 text-amber-400",
-        cardBorder: "border-amber-500/35 hover:border-amber-500/60",
-        cardBg: "bg-amber-950/25 hover:bg-amber-950/35",
-        accent: "border-amber-500/40",
+        badgeBg: "bg-amber-500/15 border border-amber-500/30 text-amber-400",
+        cardBorder: "border-amber-500/25 hover:border-amber-500/50",
+        cardBg: "bg-amber-950/20 hover:bg-amber-950/30",
+        leftBorder: "border-l-amber-400",
+        accentGlow: "shadow-[0_0_16px_rgba(251,191,36,0.15)]",
       };
     }
     return {
-      label: "Deep Work",
+      label: "Deep Focus",
       Icon: Brain,
       color: "text-primary",
-      badgeBg: "bg-primary/15 border-primary/30 text-primary",
-      cardBorder: "border-primary/35 hover:border-primary/60",
-      cardBg: "bg-[#0d1d24] hover:bg-[#12252e]",
-      accent: "border-primary/40",
+      badgeBg: "bg-primary/15 border border-primary/30 text-primary",
+      cardBorder: "border-primary/25 hover:border-primary/50",
+      cardBg: "bg-[#0B141C]/80 hover:bg-[#0E1A24]/90",
+      leftBorder: "border-l-primary",
+      accentGlow: "shadow-[0_0_16px_rgba(90,240,179,0.15)]",
     };
   };
 
@@ -606,7 +612,9 @@ function PlannerContent() {
         return;
       }
       handleOpenHour(slot.hour, slot.block, slot.hour + 1);
-    };    const handleTouchStart = () => {
+    };
+
+    const handleTouchStart = () => {
       if (!isPastHour) return;
       isLongPressTriggeredRef.current = false;
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -675,38 +683,46 @@ function PlannerContent() {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onContextMenu={(e) => e.preventDefault()}
-          className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-300 active:scale-[0.99] border ${cat.cardBorder} ${
+          className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${
             options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
-          } my-1 shadow-sm ${
+          } backdrop-blur-xl my-1 shadow-sm ${
             isRecentlySaved
-              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#121c2b] relative z-20"
               : isCurrent
-              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#121c2b] relative z-20"
               : ""
           }`}
         >
-          {/* Time Indicator on Left */}
+          {/* Structured Left Spine Time Stamp */}
           <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
-            <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary font-extrabold" : "text-on-surface"}`}>
+            <span className={`text-xs font-mono font-bold leading-tight ${isCurrent ? "text-primary font-extrabold" : "text-on-surface"}`}>
               {String(slot.hour).padStart(2, "0")}:00
             </span>
-            <span className="text-[10px] font-mono text-on-surface-variant/60">
+            <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
               {String((slot.hour + 1) % 24 === 0 ? 24 : slot.hour + 1).padStart(2, "0")}:00
             </span>
+            
+            {/* Regain Live Focus Beacon / Radar Indicator */}
             {isRecentlySaved ? (
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
+              <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-black mt-1 shadow-sm animate-pulse">
                 SAVED
               </span>
             ) : isCurrent ? (
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm">
-                NOW
-              </span>
+              <div className="flex items-center gap-1 mt-1 px-1.5 py-0.2 rounded-full bg-primary/20 border border-primary/40 text-primary">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                <span className="text-[8px] font-mono font-extrabold tracking-wider">LIVE</span>
+              </div>
             ) : null}
           </div>
 
-          {/* Category Icon */}
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
-            <CatIcon className="w-4 h-4" />
+          {/* Structured Node Glyph on Rail */}
+          <div className="relative shrink-0">
+            {isCurrent && (
+              <span className="absolute -inset-1 rounded-2xl bg-primary/20 animate-pulse pointer-events-none" />
+            )}
+            <div className={`relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} shadow-inner`}>
+              <CatIcon className="w-4 h-4" />
+            </div>
           </div>
 
           {/* Title & Details */}
@@ -729,7 +745,7 @@ function PlannerContent() {
             </div>
           </div>
 
-          {/* Right Status: Tick / Cross for completed / missed hours & Top-right Expand Arrow */}
+          {/* Right Status: 3-State Toggle & Expand Chevron */}
           <div className="flex items-center gap-1 shrink-0">
             {options?.expandToggle && (
               <button
@@ -754,25 +770,25 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Completed ✓ (tap to mark missed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer"
               >
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="w-5 h-5 shadow-[0_0_12px_rgba(52,211,153,0.4)]" />
               </button>
             ) : slot.status === "missed" ? (
               <button
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Missed ✕ (tap to reset to unreviewed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <XCircle className="w-5 h-5 shadow-[0_0_12px_rgba(244,63,94,0.4)]" />
               </button>
             ) : isFutureHour ? (
               <button
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title={selectedDate > todayStr ? "Future day (cannot review yet)" : "Future hour (cannot review yet)"}
-                className="w-7 h-7 rounded-full border border-outline/10 text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
+                className="w-7 h-7 rounded-full border border-white/[0.08] text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
               >
                 <Circle className="w-3.5 h-3.5" />
               </button>
@@ -781,7 +797,7 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Unreviewed (tap to mark completed)"
-                className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-7 h-7 rounded-full border border-white/20 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <Circle className="w-3.5 h-3.5" />
               </button>
@@ -791,7 +807,7 @@ function PlannerContent() {
       );
     }
 
-    // Open / Unscheduled Slot - Clean, no plus icon
+    // Open / Unscheduled Slot - Structured Minimalist Clean State
     return (
       <div
         key={`slot-${slot.hour}`}
@@ -804,22 +820,23 @@ function PlannerContent() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onContextMenu={(e) => e.preventDefault()}
-        className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-md my-0.5 ${
           isRecentlySaved
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#121c2b] relative z-20"
             : isCurrent
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#172033] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#121c2b] relative z-20"
             : ""
         }`}
       >
         <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
-          <span className={`text-xs font-mono font-bold ${isCurrent ? "text-primary" : "text-on-surface-variant/50"}`}>
+          <span className={`text-xs font-mono font-bold leading-tight ${isCurrent ? "text-primary font-bold" : "text-on-surface-variant/50"}`}>
             {String(slot.hour).padStart(2, "0")}:00
           </span>
           {isCurrent && (
-            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-0.5 shadow-sm">
-              NOW
-            </span>
+            <div className="flex items-center gap-1 mt-1 px-1.5 py-0.2 rounded-full bg-primary/20 border border-primary/40 text-primary">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+              <span className="text-[8px] font-mono font-extrabold tracking-wider">LIVE</span>
+            </div>
           )}
         </div>
 
@@ -833,7 +850,7 @@ function PlannerContent() {
           </h4>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-[10px] font-mono text-on-surface-variant/35">
-              {isPastHour ? "Hold to schedule past" : "Tap to schedule"}
+              {isPastHour ? "Hold to schedule past" : "Tap to schedule focus"}
             </span>
           </div>
         </div>
@@ -851,7 +868,7 @@ function PlannerContent() {
         todayStr={todayStr}
       />
 
-      {/* 24-Hour Category Distribution Box (Tappable for breakdown pop-up) */}
+      {/* 24-Hour Category Distribution Box (Akiflow Dark Glassmorphism) */}
       <div
         role="button"
         tabIndex={0}
@@ -862,12 +879,12 @@ function PlannerContent() {
             setIsDistributionModalOpen(true);
           }
         }}
-        className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 hover:border-outline/25 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group"
+        className="p-3.5 rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-white/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
       >
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold text-on-surface flex items-center gap-1.5 group-hover:text-primary transition-colors">
             <Clock className="w-3.5 h-3.5 text-primary" />
-            <span>Daily Schedule</span>
+            <span>Daily Schedule Rail</span>
           </span>
           <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
             <span suppressHydrationWarning>Scheduled: {categoryStats.plannedTotal} Hours</span>
@@ -876,7 +893,7 @@ function PlannerContent() {
         </div>
 
         {/* Proportional Balance Bar */}
-        <div suppressHydrationWarning className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
+        <div suppressHydrationWarning className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
           {categoryStats.plannedTotal > 0 ? (
             <>
               <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
@@ -891,8 +908,8 @@ function PlannerContent() {
         </div>
       </div>
 
-      {/* 24-Hour Chrono Stream Timeline - Grouping adjacent blocks of same type with minimized sleep */}
-      <div className="flex flex-col space-y-1">
+      {/* 24-Hour Chrono Stream Timeline - Structured Vertical Rail */}
+      <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/[0.06] before:rounded-full">
         {hourGroups.map((group) => {
           const isSleep = group.type === "sleep";
           const isRecentlySaved =
@@ -910,7 +927,7 @@ function PlannerContent() {
             return (
               <div
                 key={group.id}
-                className={`rounded-3xl border border-indigo-500/35 bg-indigo-950/20 p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                className={`rounded-3xl border border-indigo-500/30 bg-indigo-950/20 backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
                   isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
                 }`}
               >
@@ -939,7 +956,7 @@ function PlannerContent() {
             return (
               <div
                 key={group.id}
-                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
                   isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
                 }`}
               >

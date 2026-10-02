@@ -94,9 +94,10 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       shortLabel: "Open",
       Icon: Clock,
       color: "text-on-surface-variant/40",
-      badgeBg: "bg-surface-container-lowest border border-outline/10 text-on-surface-variant/40",
-      cardBorder: "border-dashed border-outline/15 hover:border-primary/40",
-      cardBg: "bg-surface-container-lowest/30 hover:bg-surface-container-lowest/70",
+      badgeBg: "bg-surface-container-lowest border border-white/[0.06] text-on-surface-variant/40",
+      cardBorder: "border-dashed border-white/[0.08] hover:border-primary/40",
+      cardBg: "bg-[#0B101B]/40 hover:bg-[#0B101B]/70",
+      leftBorder: "border-l-transparent",
       dotClass: "bg-surface-container-highest",
     };
   }
@@ -109,8 +110,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       Icon: Moon,
       color: "text-indigo-400",
       badgeBg: "bg-indigo-500/15 border border-indigo-500/30 text-indigo-400",
-      cardBorder: "border-indigo-500/35 hover:border-indigo-500/60",
-      cardBg: "bg-indigo-950/25 hover:bg-indigo-950/35",
+      cardBorder: "border-indigo-500/25 hover:border-indigo-500/50",
+      cardBg: "bg-indigo-950/20 hover:bg-indigo-950/30",
+      leftBorder: "border-l-indigo-500",
       dotClass: "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]",
     };
   }
@@ -122,8 +124,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       Icon: Heart,
       color: "text-emerald-400",
       badgeBg: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400",
-      cardBorder: "border-emerald-500/35 hover:border-emerald-500/60",
-      cardBg: "bg-emerald-950/25 hover:bg-emerald-950/35",
+      cardBorder: "border-emerald-500/25 hover:border-emerald-500/50",
+      cardBg: "bg-emerald-950/20 hover:bg-emerald-950/30",
+      leftBorder: "border-l-emerald-400",
       dotClass: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]",
     };
   }
@@ -135,8 +138,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       Icon: MessageSquare,
       color: "text-sky-400",
       badgeBg: "bg-sky-500/15 border border-sky-500/30 text-sky-400",
-      cardBorder: "border-sky-500/35 hover:border-sky-500/60",
-      cardBg: "bg-sky-950/25 hover:bg-sky-950/35",
+      cardBorder: "border-sky-500/25 hover:border-sky-500/50",
+      cardBg: "bg-sky-950/20 hover:bg-sky-950/30",
+      leftBorder: "border-l-sky-400",
       dotClass: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]",
     };
   }
@@ -148,8 +152,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       Icon: Coffee,
       color: "text-amber-400",
       badgeBg: "bg-amber-500/15 border border-amber-500/30 text-amber-400",
-      cardBorder: "border-amber-500/35 hover:border-amber-500/60",
-      cardBg: "bg-amber-950/25 hover:bg-amber-950/35",
+      cardBorder: "border-amber-500/25 hover:border-amber-500/50",
+      cardBg: "bg-amber-950/20 hover:bg-amber-950/30",
+      leftBorder: "border-l-amber-400",
       dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]",
     };
   }
@@ -160,8 +165,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
     Icon: Brain,
     color: "text-primary",
     badgeBg: "bg-primary/15 border border-primary/30 text-primary",
-    cardBorder: "border-primary/35 hover:border-primary/60",
-    cardBg: "bg-[#0d1d24] hover:bg-[#12252e]",
+    cardBorder: "border-primary/25 hover:border-primary/50",
+    cardBg: "bg-[#0B141C]/80 hover:bg-[#0E1A24]/90",
+    leftBorder: "border-l-primary",
     dotClass: "bg-primary shadow-[0_0_8px_rgba(90,240,179,0.5)]",
   };
 };
@@ -583,13 +589,13 @@ function DayScheduleContent() {
         key={`slot-${slot.hour}`}
         id={`hour-row-${slot.hour}`}
         onContextMenu={(e) => e.preventDefault()}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border select-none ${
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border border-l-4 ${cat.leftBorder} select-none ${
           cat.cardBg
-        } ${cat.cardBorder} my-1 shadow-sm ${
+        } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${
           isRecentlySaved
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#172033] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#121c2b] relative z-20"
             : isCurrent
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.25)] bg-[#172033] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.25)] bg-[#121c2b] relative z-20"
             : ""
         }`}
       >
@@ -606,18 +612,22 @@ function DayScheduleContent() {
             {formatHour((slot.hour + 1) % 24)}
           </span>
           {isRecentlySaved ? (
-            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
+            <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-black mt-1 shadow-sm animate-pulse">
               SAVED
             </span>
           ) : isCurrent ? (
-            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-bold mt-1 shadow-sm animate-pulse">
-              NOW
-            </span>
+            <div className="flex items-center gap-1 mt-1 px-1.5 py-0.2 rounded-full bg-primary/20 border border-primary/40 text-primary">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+              <span className="text-[8px] font-mono font-extrabold tracking-wider">LIVE</span>
+            </div>
           ) : null}
         </div>
 
         {/* Category Icon & Interactive Type Switcher Pill */}
         <div className="relative shrink-0">
+          {isCurrent && (
+            <span className="absolute -inset-1 rounded-2xl bg-primary/20 animate-pulse pointer-events-none" />
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -625,7 +635,7 @@ function DayScheduleContent() {
               setOpenCategoryHour(isCategoryPickerOpen ? null : slot.hour);
             }}
             title="Click to change block type"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} hover:brightness-110 active:scale-95 transition-all cursor-pointer`}
+            className={`relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-inner`}
           >
             <CatIcon className="w-4 h-4" />
           </button>
@@ -901,14 +911,14 @@ function DayScheduleContent() {
           </div>
         </section>
 
-        {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks */}
+        {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks (Structured Vertical Rail) */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-7 h-7 text-primary animate-spin" />
             <span className="text-xs font-mono text-on-surface-variant">Loading schedule blocks...</span>
           </div>
         ) : (
-          <div className="flex flex-col space-y-1">
+          <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/[0.06] before:rounded-full">
             {full24Hours.map((slot) => renderHourSlot(slot))}
           </div>
         )}

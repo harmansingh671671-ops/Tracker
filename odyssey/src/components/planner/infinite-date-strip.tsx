@@ -265,7 +265,7 @@ export function InfiniteDateStrip({
   }, [checkStickyPosition, prependDays, appendDays]);
 
   return (
-    <div className="relative w-full rounded-2xl bg-surface-container-low border border-outline/10 overflow-hidden select-none">
+    <div className="relative w-full rounded-2xl bg-[#0B101B]/90 backdrop-blur-xl border border-white/[0.08] overflow-hidden select-none shadow-sm">
       {/* Scrollable Date Track */}
       <div
         ref={containerRef}
@@ -288,19 +288,19 @@ export function InfiniteDateStrip({
               }}
               className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all shrink-0 cursor-pointer ${
                 isSelected
-                  ? "bg-primary text-on-primary font-bold shadow-md shadow-primary/20 scale-105 z-10"
+                  ? "bg-primary text-[#003825] font-black shadow-md shadow-primary/25 scale-105 z-10"
                   : isToday
-                  ? "bg-surface-container-high text-primary border border-primary/35 hover:border-primary/60 font-semibold"
-                  : "hover:bg-surface-container text-on-surface-variant hover:text-on-surface"
+                  ? "bg-surface-container-high text-primary border border-primary/40 hover:border-primary/70 font-bold"
+                  : "hover:bg-white/[0.04] text-on-surface-variant hover:text-white"
               }`}
             >
-              <span className="text-[10px] font-mono uppercase tracking-wider">
+              <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? "text-[#003825]/80 font-bold" : ""}`}>
                 {item.dayName}
               </span>
               <span
                 className={`text-sm font-bold font-mono ${
                   isSelected
-                    ? "text-on-primary"
+                    ? "text-[#003825] font-black"
                     : isToday
                     ? "text-primary"
                     : "text-on-surface"
@@ -311,7 +311,7 @@ export function InfiniteDateStrip({
               {isToday && (
                 <span
                   className={`w-1 h-1 rounded-full ${
-                    isSelected ? "bg-on-primary" : "bg-primary"
+                    isSelected ? "bg-[#003825]" : "bg-primary"
                   }`}
                 />
               )}
@@ -322,7 +322,7 @@ export function InfiniteDateStrip({
 
       {/* Sticky Today Pill - Stuck on Left Side when user scrolls into future */}
       {stickySide === "left" && (
-        <div className="absolute left-0 top-0 bottom-0 z-20 flex items-center pl-1 pr-6 bg-gradient-to-r from-surface-container-low via-surface-container-low/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
+        <div className="absolute left-0 top-0 bottom-0 z-20 flex items-center pl-1 pr-6 bg-gradient-to-r from-[#0B101B] via-[#0B101B]/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
           <button
             type="button"
             onClick={() => {
@@ -331,7 +331,7 @@ export function InfiniteDateStrip({
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
               selectedDate === todayStr
-                ? "bg-primary text-on-primary font-bold shadow-primary/30 border-primary"
+                ? "bg-primary text-[#003825] font-black shadow-primary/30 border-primary"
                 : "bg-surface-container-high border-primary/50 text-primary hover:bg-surface-container-highest"
             }`}
             title="Today (click to return)"
@@ -349,7 +349,7 @@ export function InfiniteDateStrip({
 
       {/* Sticky Today Pill - Stuck on Right Side when user scrolls into past */}
       {stickySide === "right" && (
-        <div className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-6 bg-gradient-to-l from-surface-container-low via-surface-container-low/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
+        <div className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-6 bg-gradient-to-l from-[#0B101B] via-[#0B101B]/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
           <button
             type="button"
             onClick={() => {
@@ -358,7 +358,7 @@ export function InfiniteDateStrip({
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
               selectedDate === todayStr
-                ? "bg-primary text-on-primary font-bold shadow-primary/30 border-primary"
+                ? "bg-primary text-[#003825] font-black shadow-primary/30 border-primary"
                 : "bg-surface-container-high border-primary/50 text-primary hover:bg-surface-container-highest"
             }`}
             title="Today (click to return)"
