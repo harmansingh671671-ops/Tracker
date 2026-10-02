@@ -11,6 +11,9 @@ import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
 import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
+import { InboxDrawer } from "@/components/planner/inbox-drawer";
+import { triggerStreaksConfetti } from "@/lib/utils/confetti";
+import { type InboxItem } from "@/lib/db";
 import {
   Clock,
   CheckCircle2,
@@ -29,6 +32,8 @@ import {
   XCircle,
   Circle,
   Radio,
+  Inbox,
+  Zap,
 } from "lucide-react";
 
 // Synchronous local cache helpers to ensure Frame-0 instant rendering without flashes
@@ -62,8 +67,8 @@ export default function PlannerPage() {
 function PlannerContent() {
   const searchParams = useSearchParams();
   const queryDate = searchParams ? searchParams.get("date") : null;
-  const { user, fetchUser } = useUserStore();
-  const { habits, fetchHabits } = useHabitStore();
+  const { user, fetchUser, addXp } = useUserStore();
+  const { habits, todayLogs, historyLogs, fetchHabits } = useHabitStore();
 
   const getLocalDateStr = (d = new Date()) => {
     const year = d.getFullYear();
@@ -80,6 +85,7 @@ function PlannerContent() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
   const [editingEndHour, setEditingEndHour] = useState<number>(10);
@@ -96,6 +102,27 @@ function PlannerContent() {
     setTimeout(() => {
       setHintToast((curr) => (curr === msg ? null : curr));
     }, 2000);
+  };
+
+  const handleScheduleInboxItem = (item: InboxItem) => {
+    // Find first open/unscheduled slot from current hour or 9 AM
+    const targetH = Math.max(0, Math.min(23, currentHour));
+    const durationHours = Math.max(1, Math.ceil((item.estimatedMinutes || 30) / 60));
+    setEditingHour(targetH);
+    setEditingEndHour(Math.min(24, targetH + durationHours));
+    setEditingBlock({
+      id: crypto.randomUUID(),
+      userId: user?.id || "default",
+      title: item.title,
+      category: (item.category as any) || "work",
+      startTime: `${String(targetH).padStart(2, "0")}:00`,
+      endTime: `${String(Math.min(24, targetH + durationHours)).padStart(2, "0")}:00`,
+      date: selectedDate,
+      status: "pending",
+      isCommitted: true,
+      createdAt: new Date().toISOString(),
+    });
+    setIsEditModalOpen(true);
   };
 
   const handleToggleBlockStatus = async (
@@ -130,6 +157,13 @@ function PlannerContent() {
       nextStatus = "pending";
     } else {
       nextStatus = "completed";
+    }
+
+    if (nextStatus === "completed") {
+      triggerStreaksConfetti(e.clientX, e.clientY);
+      if (user) {
+        addXp(10);
+      }
     }
 
     if (block && block.id) {
@@ -353,7 +387,23 @@ function PlannerContent() {
     });
 
     const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
-    return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
+    let capacityLabel = "Open Slate";
+    let capacityColor = "text-on-surface-variant/70 bg-surface-container-high border-outline/10";
+    if (focusH > 0 && focusH <= 3) {
+      capacityLabel = "Light Flow";
+      capacityColor = "text-emerald-400 bg-emerald-500/15 border-emerald-500/30";
+    } else if (focusH <= 6) {
+      capacityLabel = "Steady Load";
+      capacityColor = "text-sky-400 bg-sky-500/15 border-sky-500/30";
+    } else if (focusH <= 8) {
+      capacityLabel = "Full Focus";
+      capacityColor = "text-amber-400 bg-amber-500/15 border-amber-500/30";
+    } else if (focusH > 8) {
+      capacityLabel = "Heavy Load";
+      capacityColor = "text-rose-400 bg-rose-500/15 border-rose-500/30";
+    }
+
+    return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal, capacityLabel, capacityColor };
   }, [full24Hours]);
 
   // Helper to determine canonical category type for adjacent grouping
@@ -515,9 +565,9 @@ function PlannerContent() {
         label: "Open Slot",
         Icon: Clock,
         color: "text-on-surface-variant/40",
-        badgeBg: "bg-surface-container-lowest border border-white/[0.06] text-on-surface-variant/40",
-        cardBorder: "border-dashed border-white/[0.08] hover:border-primary/40",
-        cardBg: "bg-[#0B101B]/40 hover:bg-[#0B101B]/70",
+        badgeBg: "bg-surface-container-lowest border border-outline/[0.06] text-on-surface-variant/40",
+        cardBorder: "border-dashed border-outline/[0.08] hover:border-primary/40",
+        cardBg: "bg-surface-container-low/40 hover:bg-surface-container-low/70",
         leftBorder: "border-l-transparent",
         accentGlow: "",
       };
@@ -577,9 +627,9 @@ function PlannerContent() {
       color: "text-primary",
       badgeBg: "bg-primary/15 border border-primary/30 text-primary",
       cardBorder: "border-primary/25 hover:border-primary/50",
-      cardBg: "bg-[#0B141C]/80 hover:bg-[#0E1A24]/90",
+      cardBg: "bg-background/80 hover:bg-background/90",
       leftBorder: "border-l-primary",
-      accentGlow: "shadow-[0_0_16px_rgba(90,240,179,0.15)]",
+      accentGlow: "shadow-[0_0_16px_rgba(108,0,255,0.15)]",
     };
   };
 
@@ -687,9 +737,9 @@ function PlannerContent() {
             options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
           } backdrop-blur-xl my-1 shadow-sm ${
             isRecentlySaved
-              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#121c2b] relative z-20"
+              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
               : isCurrent
-              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#121c2b] relative z-20"
+              ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.22)] bg-surface-container-low relative z-20"
               : ""
           }`}
         >
@@ -704,7 +754,7 @@ function PlannerContent() {
             
             {/* Regain Live Focus Beacon / Radar Indicator */}
             {isRecentlySaved ? (
-              <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-black mt-1 shadow-sm animate-pulse">
+              <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-on-primary font-black mt-1 shadow-sm animate-pulse">
                 SAVED
               </span>
             ) : isCurrent ? (
@@ -728,7 +778,7 @@ function PlannerContent() {
           {/* Title & Details */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-white font-bold" : "text-on-surface"}`}>
+              <h4 className={`text-sm font-semibold truncate ${isCurrent ? "text-on-surface font-bold" : "text-on-surface"}`}>
                 {slot.title || cat.label}
               </h4>
             </div>
@@ -756,7 +806,7 @@ function PlannerContent() {
                 }}
                 aria-label={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
                 title={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
-                className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/25 flex items-center justify-center text-indigo-300 hover:text-white transition-all cursor-pointer"
+                className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/25 flex items-center justify-center text-indigo-300 hover:text-on-surface transition-all cursor-pointer"
               >
                 {options.expandToggle.isExpanded ? (
                   <ChevronUp className="w-4 h-4" />
@@ -788,7 +838,7 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title={selectedDate > todayStr ? "Future day (cannot review yet)" : "Future hour (cannot review yet)"}
-                className="w-7 h-7 rounded-full border border-white/[0.08] text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
+                className="w-7 h-7 rounded-full border border-outline/[0.08] text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
               >
                 <Circle className="w-3.5 h-3.5" />
               </button>
@@ -797,7 +847,7 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Unreviewed (tap to mark completed)"
-                className="w-7 h-7 rounded-full border border-white/20 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-7 h-7 rounded-full border border-outline/20 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <Circle className="w-3.5 h-3.5" />
               </button>
@@ -822,9 +872,9 @@ function PlannerContent() {
         onContextMenu={(e) => e.preventDefault()}
         className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-md my-0.5 ${
           isRecentlySaved
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#121c2b] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
             : isCurrent
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.22)] bg-[#121c2b] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.22)] bg-surface-container-low relative z-20"
             : ""
         }`}
       >
@@ -861,55 +911,81 @@ function PlannerContent() {
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
-      {/* Infinite Horizontal Date Selector Strip with Sticky Today */}
+      {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings */}
       <InfiniteDateStrip
         selectedDate={selectedDate}
         onSelectDate={handleSelectDate}
         todayStr={todayStr}
+        habits={habits}
+        todayLogs={todayLogs}
+        historyLogs={historyLogs}
       />
 
-      {/* 24-Hour Category Distribution Box (Akiflow Dark Glassmorphism) */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setIsDistributionModalOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setIsDistributionModalOpen(true);
-          }
-        }}
-        className="p-3.5 rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-white/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
-      >
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-on-surface flex items-center gap-1.5 group-hover:text-primary transition-colors">
-            <Clock className="w-3.5 h-3.5 text-primary" />
-            <span>Daily Schedule Rail</span>
-          </span>
-          <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
-            <span suppressHydrationWarning>Scheduled: {categoryStats.plannedTotal} Hours</span>
-            <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
+      {/* Quick Action Toolbar & 24-Hour Category Distribution Box (Akiflow / Sunsama / Structured) */}
+      <div className="space-y-2">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setIsDistributionModalOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setIsDistributionModalOpen(true);
+            }
+          }}
+          className="p-3.5 rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-outline/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-on-surface flex items-center gap-1.5 group-hover:text-primary transition-colors">
+                <Clock className="w-3.5 h-3.5 text-primary" />
+                <span>Daily Schedule Rail</span>
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${categoryStats.capacityColor}`}>
+                {categoryStats.capacityLabel}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
+              <span suppressHydrationWarning>Scheduled: {categoryStats.plannedTotal} Hours</span>
+              <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
+            </div>
+          </div>
+
+          {/* Proportional Balance Bar */}
+          <div suppressHydrationWarning className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
+            {categoryStats.plannedTotal > 0 ? (
+              <>
+                <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
+                <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
+                <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
+                <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
+                <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
+              </>
+            ) : (
+              <div className="w-full h-full bg-surface-container-highest/60" />
+            )}
           </div>
         </div>
 
-        {/* Proportional Balance Bar */}
-        <div suppressHydrationWarning className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
-          {categoryStats.plannedTotal > 0 ? (
-            <>
-              <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
-              <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
-              <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
-              <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
-              <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
-            </>
-          ) : (
-            <div className="w-full h-full bg-surface-container-highest/60" />
-          )}
+        {/* Quick-Capture Inbox Trigger Bar */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <button
+            type="button"
+            onClick={() => setIsInboxOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline/[0.1] text-xs font-mono font-semibold text-on-surface transition-all active:scale-95 cursor-pointer"
+          >
+            <Inbox className="w-3.5 h-3.5 text-primary" />
+            <span>Unstructured Inbox / Backlog</span>
+          </button>
+
+          <span className="text-[10px] font-mono text-on-surface-variant/60">
+            {isSelectedToday ? "Today Active" : selectedDate}
+          </span>
         </div>
       </div>
 
       {/* 24-Hour Chrono Stream Timeline - Structured Vertical Rail */}
-      <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/[0.06] before:rounded-full">
+      <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
         {hourGroups.map((group) => {
           const isSleep = group.type === "sleep";
           const isRecentlySaved =
@@ -928,7 +1004,7 @@ function PlannerContent() {
               <div
                 key={group.id}
                 className={`rounded-3xl border border-indigo-500/30 bg-indigo-950/20 backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
-                  isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
+                  isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
                 }`}
               >
                 {/* Render the 1st sleep hour slot with down/up arrow toggle on top right */}
@@ -957,7 +1033,7 @@ function PlannerContent() {
               <div
                 key={group.id}
                 className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
-                  isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)]" : ""
+                  isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
                 }`}
               >
                 {group.slots.map((slot) =>
@@ -993,16 +1069,24 @@ function PlannerContent() {
         blocks={blocks}
       />
 
+      {/* Unstructured Inbox / Backlog Drawer */}
+      <InboxDrawer
+        isOpen={isInboxOpen}
+        onClose={() => setIsInboxOpen(false)}
+        onScheduleItem={handleScheduleInboxItem}
+        selectedDate={selectedDate}
+      />
+
       {/* Scheduled Confirmation Toast Feedback */}
       {saveToast && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-[#0a121e]/95 border border-primary/50 text-on-surface shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-md">
+          <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-surface-container-low/95 border border-primary/50 text-on-surface shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-md">
             <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 animate-pulse">
               <Sparkles className="w-3.5 h-3.5" />
             </div>
             <div className="text-xs font-mono">
               <span className="font-bold text-primary">Scheduled: </span>
-              <span className="text-white font-semibold">{saveToast.title}</span>
+              <span className="text-on-surface font-semibold">{saveToast.title}</span>
               <span className="text-on-surface-variant/80 ml-1.5 text-[11px]">({saveToast.time})</span>
             </div>
           </div>

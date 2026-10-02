@@ -277,7 +277,7 @@ export function DistributionModal({
 
                   {/* Task preview chips */}
                   {item.blocks.length > 0 && (
-                    <div className="mt-2.5 pt-2 border-t border-white/5 space-y-1">
+                    <div className="mt-2.5 pt-2 border-t border-outline/5 space-y-1">
                       {item.blocks.slice(0, 2).map((b) => (
                         <div
                           key={b.id}

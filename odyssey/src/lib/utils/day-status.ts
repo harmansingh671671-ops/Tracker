@@ -124,11 +124,12 @@ export function getHeatmapCellStyles(stats: DayCompletionStats, isSelected: bool
   }
 
   if (isToday) {
-    borderClass += " ring-2 ring-primary ring-offset-1 ring-offset-surface-container-low";
+    borderClass += " ring-1.5 ring-primary/80 ring-offset-1 ring-offset-surface-container-low";
   }
 
   if (isSelected) {
-    borderClass += " ring-2 ring-white";
+    borderClass += " ring-2 ring-primary ring-offset-2 ring-offset-surface-container-low scale-110 z-10";
+    glowClass = "shadow-[0_0_14px_rgba(108,0,255,0.75)]";
   }
 
   return {

@@ -96,12 +96,24 @@ export interface WeeklyReport {
   createdAt: string;
 }
 
+export interface InboxItem {
+  id: string;
+  userId: string;
+  title: string;
+  timeHorizon: 'today' | 'this_week' | 'someday';
+  estimatedMinutes?: number;
+  priority?: 'urgent' | 'high' | 'normal' | 'low';
+  category?: string;
+  createdAt: string;
+}
+
 class OdysseyDB extends Dexie {
   profiles!: Table<Profile>;
   scheduleBlocks!: Table<ScheduleBlock>;
   habits!: Table<Habit>;
   habitLogs!: Table<HabitLog>;
   weeklyReports!: Table<WeeklyReport>;
+  inboxItems!: Table<InboxItem>;
 
   constructor() {
     super('OdysseyDB');
@@ -111,7 +123,8 @@ class OdysseyDB extends Dexie {
       scheduleBlocks: 'id, userId, date, [userId+date]',
       habits: 'id, userId, category, archivedAt',
       habitLogs: 'id, habitId, userId, date, [habitId+date], [userId+date]',
-      weeklyReports: 'id, userId, weekStart, [userId+weekStart]'
+      weeklyReports: 'id, userId, weekStart, [userId+weekStart]',
+      inboxItems: 'id, userId, timeHorizon, createdAt'
     });
   }
 }

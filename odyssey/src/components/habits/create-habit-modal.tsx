@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { type Habit } from "@/lib/db";
-import { X, Check, Sparkles, Flame } from "lucide-react";
+import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/habit-template-library";
+import { X, Check, Sparkles, Plus, ArrowLeft } from "lucide-react";
 
 interface CreateHabitModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface CreateHabitModalProps {
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
   }) => void;
+  existingHabitNames?: string[];
 }
 
 const EMOJIS = [
@@ -49,7 +51,9 @@ const DOMAINS = [
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalProps) {
+export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames = [] }: CreateHabitModalProps) {
+  const [view, setView] = useState<"browse" | "custom">("browse");
+  const [isExpanded, setIsExpanded] = useState(false);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🧘");
   const [domain, setDomain] = useState("Vitality & Fitness");
@@ -57,6 +61,13 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
 
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    setIsExpanded(false);
+    setView("browse");
+    setName("");
+    onClose();
+  };
 
   const toggleDay = (idx: number) => {
     if (selectedDays.includes(idx)) {
@@ -74,6 +85,26 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
     else setSelectedDays([1, 3, 5]);
   };
 
+  const handleSelectTemplate = (tpl: HabitTemplate) => {
+    setName(tpl.name);
+    setIcon(tpl.icon);
+    setDomain(tpl.domainLabel);
+    setSelectedDays(tpl.targetDays);
+    setTimeOfDay(tpl.period);
+    setView("custom");
+  };
+
+  const handleQuickAddTemplate = async (tpl: HabitTemplate) => {
+    onSave({
+      name: tpl.name,
+      icon: tpl.icon,
+      category: tpl.domainLabel,
+      frequency: tpl.targetDays.length,
+      targetDays: tpl.targetDays,
+      timeOfDay: tpl.period,
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalName = name.trim() || "Daily Routine";
@@ -85,196 +116,252 @@ export function CreateHabitModal({ isOpen, onClose, onSave }: CreateHabitModalPr
       targetDays: selectedDays,
       timeOfDay,
     });
-    setName("");
-    onClose();
+    handleClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-5 space-y-5 animate-in slide-in-from-bottom-6 duration-300">
-        {/* Drag Handle */}
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-1.5 rounded-full bg-outline/20 mb-3" />
-          <div className="w-full flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight text-on-surface">New Habit</h2>
-              <p className="text-xs text-on-surface-variant">Design a mindful daily routine</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <div
+      onClick={handleClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full max-w-lg flex flex-col bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-4 sm:p-5 pt-2 sm:pt-3 space-y-2.5 animate-in slide-in-from-bottom-6 duration-300 cursor-default transition-all duration-300 ease-out overflow-hidden ${
+          view === "custom" || isExpanded
+            ? "h-[94vh] max-h-[94vh]"
+            : "h-[83.33vh] max-h-[83.33vh]"
+        }`}
+      >
+        {/* Compact Drag Handle Bar */}
+        <div
+          onClick={() => {
+            if (!isExpanded) setIsExpanded(true);
+            else handleClose();
+          }}
+          className="flex flex-col items-center pt-0.5 pb-1 cursor-pointer group"
+          title={isExpanded ? "Click to close" : "Click to expand to full screen"}
+        >
+          <div className="w-10 h-1 rounded-full bg-outline/25 group-hover:bg-outline/50 transition-colors" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Habit Name Input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT NAME</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Morning Cold Hydration & Mobility"
-              className="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline-variant rounded-2xl py-3.5 px-4 border border-outline/15 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm text-sm font-semibold transition-all"
-              autoFocus
+        {/* Modal Header Bar */}
+        <div className="flex items-center justify-between pb-0.5 shrink-0">
+          {view === "custom" ? (
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setView("browse")}
+                className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+                title="Back to Templates"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold tracking-tight text-on-surface">Customize Habit</h2>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-on-surface">Add Habit</h2>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleClose}
+            className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {view === "browse" ? (
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <HabitTemplateLibrary
+              onSelectTemplate={handleSelectTemplate}
+              onQuickAdd={handleQuickAddTemplate}
+              onCreateCustom={() => {
+                setName("");
+                setIcon("🧘");
+                setDomain("Vitality & Fitness");
+                setSelectedDays([1, 2, 3, 4, 5]);
+                setTimeOfDay("morning");
+                setView("custom");
+              }}
+              isExpanded={isExpanded}
+              onExpand={() => setIsExpanded(true)}
+              onCollapse={() => setIsExpanded(false)}
+              existingHabitNames={existingHabitNames}
             />
           </div>
-
-          {/* Emoji & Icon Grid */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">SELECT AN ICON</label>
-            <div className="grid grid-cols-5 gap-2 p-2 bg-surface-container-low rounded-2xl border border-outline/10">
-              {EMOJIS.map((item) => (
-                <button
-                  key={item.emoji}
-                  type="button"
-                  onClick={() => setIcon(item.emoji)}
-                  className={`h-12 flex items-center justify-center rounded-xl text-xl transition-all active:scale-90 ${
-                    icon === item.emoji
-                      ? "bg-primary/20 border border-primary/50 shadow-md scale-105"
-                      : "bg-surface-container hover:bg-surface-bright"
-                  }`}
-                  title={item.label}
-                >
-                  <span>{item.emoji}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Domain Selector */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">LIFE DOMAIN</label>
-            <div className="grid grid-cols-2 gap-2">
-              {DOMAINS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setDomain(d.id)}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 ${
-                    domain === d.id
-                      ? `${d.bg} shadow-md`
-                      : "bg-surface-container hover:bg-surface-bright text-on-surface border border-outline/10"
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-current" />
-                  <span className="truncate">{d.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Frequency & Target Weekdays */}
-          <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-on-surface">Target Schedule</span>
-              <span className="font-mono text-primary font-bold">{selectedDays.length} days / week</span>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 pt-1 pr-1">
+            {/* Habit Name Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT NAME</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Morning Cold Hydration & Mobility"
+                className="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline-variant rounded-2xl py-3.5 px-4 border border-outline/15 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm text-sm font-semibold transition-all"
+                autoFocus
+              />
             </div>
 
-            {/* Presets */}
-            <div className="flex gap-1.5 p-1 bg-surface-container rounded-xl">
-              <button
-                type="button"
-                onClick={() => applyPreset("everyday")}
-                className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors ${
-                  selectedDays.length === 7 ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
-                }`}
-              >
-                Everyday
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset("weekdays")}
-                className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors ${
-                  selectedDays.length === 5 && !selectedDays.includes(6) ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
-                }`}
-              >
-                Weekdays
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset("3x")}
-                className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors ${
-                  selectedDays.length === 3 ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
-                }`}
-              >
-                3x Week
-              </button>
-            </div>
-
-            {/* Weekday Chips */}
-            <div className="flex justify-between items-center pt-1">
-              {WEEKDAYS.map((dName, idx) => {
-                const dayNum = idx + 1;
-                const isSelected = selectedDays.includes(dayNum);
-                return (
+            {/* Emoji & Icon Grid */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">SELECT AN ICON</label>
+              <div className="grid grid-cols-5 gap-2 p-2 bg-surface-container-low rounded-2xl border border-outline/10">
+                {EMOJIS.map((item) => (
                   <button
-                    key={dName}
+                    key={item.emoji}
                     type="button"
-                    onClick={() => toggleDay(dayNum)}
-                    className={`w-9 h-9 rounded-full text-xs font-mono font-bold flex items-center justify-center transition-transform active:scale-90 ${
-                      isSelected
-                        ? "bg-primary text-on-primary shadow-sm shadow-primary/30"
-                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    onClick={() => setIcon(item.emoji)}
+                    className={`h-11 flex items-center justify-center rounded-xl text-xl transition-all active:scale-90 cursor-pointer ${
+                      icon === item.emoji
+                        ? "bg-primary/20 border border-primary/50 shadow-md scale-105"
+                        : "bg-surface-container hover:bg-surface-bright"
+                    }`}
+                    title={item.label}
+                  >
+                    <span>{item.emoji}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Domain Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">LIFE DOMAIN</label>
+              <div className="grid grid-cols-2 gap-2">
+                {DOMAINS.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setDomain(d.id)}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                      domain === d.id
+                        ? `${d.bg} shadow-md`
+                        : "bg-surface-container hover:bg-surface-bright text-on-surface border border-outline/10"
                     }`}
                   >
-                    {dName[0]}
+                    <span className="w-2 h-2 rounded-full bg-current" />
+                    <span className="truncate">{d.label}</span>
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Time Anchor */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono text-on-surface-variant font-medium">TIME ANCHOR</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: "morning", label: "Morning", sub: "06:00 - 12:00" },
-                { id: "afternoon", label: "Afternoon", sub: "12:00 - 18:00" },
-                { id: "evening", label: "Evening", sub: "18:00 - 23:00" },
-                { id: "anytime", label: "Anytime", sub: "Flexible flow" },
-              ].map((slot) => (
+            {/* Frequency & Target Weekdays */}
+            <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-on-surface">Target Schedule</span>
+                <span className="font-mono text-primary font-bold">{selectedDays.length} days / week</span>
+              </div>
+
+              {/* Presets */}
+              <div className="flex gap-1.5 p-1 bg-surface-container rounded-xl">
                 <button
-                  key={slot.id}
                   type="button"
-                  onClick={() => setTimeOfDay(slot.id as any)}
-                  className={`p-3 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
-                    timeOfDay === slot.id
-                      ? "bg-primary/15 border border-primary/40 shadow-sm"
-                      : "bg-surface-container text-on-surface-variant border border-outline/10 opacity-70"
+                  onClick={() => applyPreset("everyday")}
+                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    selectedDays.length === 7 ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
                   }`}
                 >
-                  <span className={`text-xs font-semibold ${timeOfDay === slot.id ? "text-primary" : "text-on-surface"}`}>
-                    {slot.label}
-                  </span>
-                  <span className="text-[10px] font-mono">{slot.sub}</span>
+                  Everyday
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => applyPreset("weekdays")}
+                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    selectedDays.length === 5 && !selectedDays.includes(6) ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
+                  }`}
+                >
+                  Weekdays
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset("3x")}
+                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    selectedDays.length === 3 ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
+                  }`}
+                >
+                  3x Week
+                </button>
+              </div>
+
+              {/* Weekday Chips */}
+              <div className="flex justify-between items-center pt-1">
+                {WEEKDAYS.map((dName, idx) => {
+                  const dayNum = idx + 1;
+                  const isSelected = selectedDays.includes(dayNum);
+                  return (
+                    <button
+                      key={dName}
+                      type="button"
+                      onClick={() => toggleDay(dayNum)}
+                      className={`w-9 h-9 rounded-full text-xs font-mono font-bold flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${
+                        isSelected
+                          ? "bg-primary text-on-primary shadow-sm shadow-primary/30"
+                          : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                      }`}
+                    >
+                      {dName[0]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          {/* Gamification Reward Hint */}
-          <div className="p-3 rounded-xl bg-surface-container-low border border-outline/10 flex items-center justify-between text-xs font-mono">
-            <span className="text-on-surface-variant flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Habit Creation Yield:
-            </span>
-            <span className="text-primary font-bold">+30 XP • +5 💎</span>
-          </div>
+            {/* Time Anchor */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">TIME ANCHOR</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "morning", label: "Morning", sub: "06:00 - 12:00" },
+                  { id: "afternoon", label: "Afternoon", sub: "12:00 - 18:00" },
+                  { id: "evening", label: "Evening", sub: "18:00 - 23:00" },
+                  { id: "anytime", label: "Anytime", sub: "Flexible flow" },
+                ].map((slot) => (
+                  <button
+                    key={slot.id}
+                    type="button"
+                    onClick={() => setTimeOfDay(slot.id as any)}
+                    className={`p-3 rounded-xl text-left flex flex-col gap-0.5 transition-all cursor-pointer ${
+                      timeOfDay === slot.id
+                        ? "bg-primary/15 border border-primary/40 shadow-sm"
+                        : "bg-surface-container text-on-surface-variant border border-outline/10 opacity-70"
+                    }`}
+                  >
+                    <span className={`text-xs font-semibold ${timeOfDay === slot.id ? "text-primary" : "text-on-surface"}`}>
+                      {slot.label}
+                    </span>
+                    <span className="text-[10px] font-mono">{slot.sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-bold text-sm shadow-lg shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <Check className="w-4 h-4" />
-            <span>Create Habit</span>
-          </button>
-        </form>
+            {/* Gamification Reward Hint */}
+            <div className="p-3 rounded-xl bg-surface-container-low border border-outline/10 flex items-center justify-between text-xs font-mono">
+              <span className="text-on-surface-variant flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                Habit Creation Yield:
+              </span>
+              <span className="text-primary font-bold">+30 XP • +5 💎</span>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-bold text-sm shadow-lg shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>Save &amp; Start Habit</span>
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

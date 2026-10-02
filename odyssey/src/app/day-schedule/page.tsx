@@ -7,6 +7,7 @@ import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
+import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import {
   ChevronLeft,
   ChevronDown,
@@ -94,9 +95,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       shortLabel: "Open",
       Icon: Clock,
       color: "text-on-surface-variant/40",
-      badgeBg: "bg-surface-container-lowest border border-white/[0.06] text-on-surface-variant/40",
-      cardBorder: "border-dashed border-white/[0.08] hover:border-primary/40",
-      cardBg: "bg-[#0B101B]/40 hover:bg-[#0B101B]/70",
+      badgeBg: "bg-surface-container-lowest border border-outline/[0.06] text-on-surface-variant/40",
+      cardBorder: "border-dashed border-outline/[0.08] hover:border-primary/40",
+      cardBg: "bg-surface-container-low/40 hover:bg-surface-container-low/70",
       leftBorder: "border-l-transparent",
       dotClass: "bg-surface-container-highest",
     };
@@ -166,9 +167,9 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
     color: "text-primary",
     badgeBg: "bg-primary/15 border border-primary/30 text-primary",
     cardBorder: "border-primary/25 hover:border-primary/50",
-    cardBg: "bg-[#0B141C]/80 hover:bg-[#0E1A24]/90",
+    cardBg: "bg-background/80 hover:bg-background/90",
     leftBorder: "border-l-primary",
-    dotClass: "bg-primary shadow-[0_0_8px_rgba(90,240,179,0.5)]",
+    dotClass: "bg-primary shadow-[0_0_8px_rgba(108,0,255,0.5)]",
   };
 };
 
@@ -548,6 +549,12 @@ function DayScheduleContent() {
       });
 
       if (newStatus === "completed") {
+        triggerStreaksConfetti();
+        try {
+          if (typeof window !== "undefined" && navigator?.vibrate) {
+            navigator.vibrate(40);
+          }
+        } catch {}
         await addXp(10);
       } else if (current === "completed") {
         await addXp(-10);
@@ -593,9 +600,9 @@ function DayScheduleContent() {
           cat.cardBg
         } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${
           isRecentlySaved
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.35)] scale-[1.01] bg-[#121c2b] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
             : isCurrent
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(90,240,179,0.25)] bg-[#121c2b] relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.25)] bg-surface-container-low relative z-20"
             : ""
         }`}
       >
@@ -612,7 +619,7 @@ function DayScheduleContent() {
             {formatHour((slot.hour + 1) % 24)}
           </span>
           {isRecentlySaved ? (
-            <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-[#003825] font-black mt-1 shadow-sm animate-pulse">
+            <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-on-primary font-black mt-1 shadow-sm animate-pulse">
               SAVED
             </span>
           ) : isCurrent ? (
@@ -716,7 +723,7 @@ function DayScheduleContent() {
               isCompleted
                 ? "line-through text-on-surface-variant/50"
                 : hasContent
-                ? "text-white font-bold"
+                ? "text-on-surface font-bold"
                 : "text-on-surface-variant font-medium"
             }`}
           />
@@ -790,7 +797,7 @@ function DayScheduleContent() {
           {/* Title Stack */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_rgba(90,240,179,0.6)]" />
+              <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_rgba(108,0,255,0.6)]" />
               <h1 className="text-base sm:text-lg font-bold text-on-surface tracking-tight truncate">
                 {dayName ? dayName : `Day ${displayDay} Schedule`}
               </h1>
@@ -918,7 +925,7 @@ function DayScheduleContent() {
             <span className="text-xs font-mono text-on-surface-variant">Loading schedule blocks...</span>
           </div>
         ) : (
-          <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/[0.06] before:rounded-full">
+          <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
             {full24Hours.map((slot) => renderHourSlot(slot))}
           </div>
         )}

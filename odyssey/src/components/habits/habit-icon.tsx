@@ -163,6 +163,7 @@ interface HabitIconProps {
   className?: string;
   emojiClassName?: string;
   size?: number;
+  style?: React.CSSProperties;
 }
 
 export function HabitIcon({
@@ -170,16 +171,21 @@ export function HabitIcon({
   name,
   className = "w-5 h-5 text-primary",
   emojiClassName = "text-xl leading-none select-none",
+  style,
 }: HabitIconProps) {
   const resolved = resolveHabitIconString(icon, name);
 
   if (!resolved.isEmoji) {
     const Component = LUCIDE_ICON_MAP[resolved.value] || Target;
-    return <Component className={className} />;
+    return (
+      <span style={style} className="inline-flex items-center justify-center">
+        <Component className={className} />
+      </span>
+    );
   }
 
   return (
-    <span role="img" aria-label={name || "Habit icon"} className={emojiClassName}>
+    <span role="img" aria-label={name || "Habit icon"} className={emojiClassName} style={style}>
       {resolved.value}
     </span>
   );

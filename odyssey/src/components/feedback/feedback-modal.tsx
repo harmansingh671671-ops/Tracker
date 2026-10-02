@@ -52,7 +52,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-md rounded-3xl bg-surface-container-high border border-white/10 shadow-2xl p-5 sm:p-6 space-y-4 overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-md rounded-3xl bg-surface-container-high border border-outline/10 shadow-2xl p-5 sm:p-6 space-y-4 overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Background Ambient Glow */}

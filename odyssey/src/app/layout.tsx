@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-plus-jakarta-sans",
+  variable: "--font-inter",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const playfairDisplay = Playfair_Display({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-jetbrains-mono",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-playfair-display",
 });
 
 export const metadata: Metadata = {
@@ -32,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark h-full" suppressHydrationWarning>
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -41,7 +40,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={`${plusJakartaSans.variable} ${jetbrainsMono.variable} min-h-screen flex flex-col bg-surface text-on-surface font-body-md antialiased`} suppressHydrationWarning>
+      <body className={`${inter.variable} ${playfairDisplay.variable} min-h-screen flex flex-col text-on-surface font-body-md antialiased`} suppressHydrationWarning>
         <AppShell>{children}</AppShell>
       </body>
     </html>

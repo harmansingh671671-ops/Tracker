@@ -356,7 +356,7 @@ export default function StatsPage() {
       </div>
 
       {/* Hero Rank Card - Akiflow Obsidian Glassmorphism */}
-      <div className="relative overflow-hidden rounded-3xl bg-[#0B101B]/80 backdrop-blur-xl p-4 sm:p-5 border border-white/[0.08] shadow-lg space-y-3.5">
+      <div className="relative overflow-hidden rounded-3xl bg-surface-container-low/80 backdrop-blur-xl p-4 sm:p-5 border border-outline/[0.08] shadow-lg space-y-3.5">
         <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
         <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-center gap-3 min-w-0">
@@ -365,7 +365,7 @@ export default function StatsPage() {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-white truncate">{rankInfo.name}</h3>
+                <h3 className="text-base font-bold text-on-surface truncate">{rankInfo.name}</h3>
                 <span className="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 text-[10px] font-mono font-bold whitespace-nowrap">
                   {rankInfo.division} Division
                 </span>
@@ -411,7 +411,7 @@ export default function StatsPage() {
       </div>
 
       {/* MONTHLY HEATMAP CALENDAR (Akiflow Dark Glassmorphism) */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-4 shadow-sm">
+      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-4 shadow-sm">
         {/* Month Navigation Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -423,13 +423,13 @@ export default function StatsPage() {
                 setViewYear(y);
                 setViewMonth(m);
               }}
-              className="bg-transparent text-sm sm:text-base font-bold text-white cursor-pointer focus:outline-none hover:text-primary transition-colors"
+              className="bg-transparent text-sm sm:text-base font-bold text-on-surface cursor-pointer focus:outline-none hover:text-primary transition-colors"
             >
               {availableMonths.map((opt) => (
                 <option
                   key={`${opt.year}-${opt.month}`}
                   value={`${opt.year}-${opt.month}`}
-                  className="bg-[#0B101B] text-white text-xs"
+                  className="bg-surface-container-low text-on-surface text-xs"
                 >
                   {opt.label}
                 </option>
@@ -445,7 +445,7 @@ export default function StatsPage() {
               aria-label="Previous Month"
               className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
                 canGoPrev
-                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-white/[0.08] cursor-pointer active:scale-95"
+                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline/[0.08] cursor-pointer active:scale-95"
                   : "bg-surface-container-lowest text-on-surface-variant/30 border-transparent cursor-not-allowed"
               }`}
             >
@@ -458,7 +458,7 @@ export default function StatsPage() {
               aria-label="Next Month"
               className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
                 canGoNext
-                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-white/[0.08] cursor-pointer active:scale-95"
+                  ? "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline/[0.08] cursor-pointer active:scale-95"
                   : "bg-surface-container-lowest text-on-surface-variant/30 border-transparent cursor-not-allowed"
               }`}
             >
@@ -484,7 +484,8 @@ export default function StatsPage() {
               }
 
               const isToday = cell.dateStr === todayStr;
-              const styles = getHeatmapCellStyles(cell.stats, false, isToday);
+              const isSelected = cell.dateStr === popupDate;
+              const styles = getHeatmapCellStyles(cell.stats, isSelected, isToday);
 
               return (
                 <button
@@ -520,19 +521,19 @@ export default function StatsPage() {
       {/* WALLPAPER STUDIO GATEWAY CARD */}
       <Link
         href="/wallpaper"
-        className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#121B2B] via-[#0E1624] to-[#0A0F1A] border border-primary/30 hover:border-primary/60 p-4 sm:p-5 shadow-[0_0_24px_rgba(90,240,179,0.08)] hover:shadow-[0_0_32px_rgba(90,240,179,0.18)] transition-all duration-300 block"
+        className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-surface-container-low via-surface-container-low to-background border border-primary/30 hover:border-primary/60 p-4 sm:p-5 shadow-[0_0_24px_rgba(108,0,255,0.08)] hover:shadow-[0_0_32px_rgba(108,0,255,0.18)] transition-all duration-300 block"
       >
         <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-primary/15 blur-2xl pointer-events-none group-hover:bg-primary/25 transition-all" />
         <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/10 rounded-full blur-xl pointer-events-none" />
 
         <div className="flex items-center justify-between gap-3 relative z-10">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-[#090E17] border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-surface-container border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-inner group-hover:scale-105 transition-transform">
               <Smartphone className="w-5 h-5" />
             </div>
 
             <div className="min-w-0 space-y-0.5">
-              <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-primary transition-colors truncate">
+              <h3 className="text-sm sm:text-base font-bold text-on-surface group-hover:text-primary transition-colors truncate">
                 Wallpaper Studio
               </h3>
               <p className="text-xs font-mono text-on-surface-variant truncate">
@@ -541,7 +542,7 @@ export default function StatsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/15 group-hover:bg-primary text-primary group-hover:text-[#003825] border border-primary/30 group-hover:border-primary shrink-0 transition-all duration-300 shadow-md group-hover:scale-110">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/15 group-hover:bg-primary text-primary group-hover:text-on-primary border border-primary/30 group-hover:border-primary shrink-0 transition-all duration-300 shadow-md group-hover:scale-110">
             <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
@@ -550,14 +551,14 @@ export default function StatsPage() {
       {/* 2x2 KPI Matrix (Akiflow Obsidian Glass) */}
       <div className="grid grid-cols-2 gap-3">
         {/* Completed Days */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
             <Flame className="w-4 h-4 shrink-0" />
             <span>Streak</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-white">{completedDaysCount}</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{completedDaysCount}</span>
               <span className="text-xs text-on-surface-variant font-mono">days</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
@@ -567,14 +568,14 @@ export default function StatsPage() {
         </div>
 
         {/* Diamonds */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
             <Gem className="w-4 h-4 shrink-0" />
             <span>Diamonds</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-white">{user?.diamonds || 0}</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{user?.diamonds || 0}</span>
               <span className="text-xs text-on-surface-variant">💎</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
@@ -584,14 +585,14 @@ export default function StatsPage() {
         </div>
 
         {/* Total XP */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-400">
             <Zap className="w-4 h-4 shrink-0" />
             <span>Total XP</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-white">{currentXp}</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{currentXp}</span>
               <span className="text-xs text-on-surface-variant font-mono">XP</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
@@ -601,14 +602,14 @@ export default function StatsPage() {
         </div>
 
         {/* Adherence */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0B101B]/80 backdrop-blur-xl border border-white/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
             <TrendingUp className="w-4 h-4 shrink-0" />
             <span>Adherence</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-white">93%</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">93%</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
               {totalPlannedHours}h Planned
@@ -625,7 +626,7 @@ export default function StatsPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm rounded-3xl bg-[#0E1522] border border-white/15 p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-sm rounded-3xl bg-surface-container-low border border-outline/15 p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
@@ -633,7 +634,7 @@ export default function StatsPage() {
                 <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider block">
                   Day {popupDayStats.dayNumber} Overview
                 </span>
-                <h3 className="text-base font-bold text-white truncate">
+                <h3 className="text-base font-bold text-on-surface truncate">
                   {popupDayStats.date}
                 </h3>
               </div>
@@ -671,7 +672,7 @@ export default function StatsPage() {
             </div>
 
             {/* 4 Rows x 6 Columns Hourly Heatmap */}
-            <div className="space-y-2 p-3.5 rounded-2xl bg-surface-container-low/80 border border-white/[0.08]">
+            <div className="space-y-2 p-3.5 rounded-2xl bg-surface-container-low/80 border border-outline/[0.08]">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono font-bold text-on-surface flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-primary" />
@@ -692,11 +693,11 @@ export default function StatsPage() {
 
                   if (item.status === "completed") {
                     bgClass =
-                      "bg-[#00E676] text-[#002f18] font-black border-[#69f0ae] shadow-[0_0_6px_rgba(0,230,118,0.45)]";
+                      "bg-[#00E676] text-on-primary font-black border-[#69f0ae] shadow-[0_0_6px_rgba(0,230,118,0.45)]";
                     statusTitle = `Done ✓: ${item.block?.title || "Task"}`;
                   } else if (item.status === "missed") {
                     bgClass =
-                      "bg-rose-500 text-white font-black border-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.45)]";
+                      "bg-rose-500 text-on-surface font-black border-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.45)]";
                     statusTitle = `Missed ✕: ${item.block?.title || "Task"}`;
                   } else if (item.status === "pending") {
                     bgClass =
@@ -717,7 +718,7 @@ export default function StatsPage() {
               </div>
 
               {/* Hourly Heatmap Legend */}
-              <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-white/[0.08] text-[9px] font-mono text-on-surface-variant">
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-outline/[0.08] text-[9px] font-mono text-on-surface-variant">
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-xs" />
                   <span>Done</span>
@@ -739,15 +740,15 @@ export default function StatsPage() {
 
             {/* Metrics Breakdown */}
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-white/[0.06]">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Planned</span>
                 <span className="font-bold text-primary text-sm">{popupDayStats.plannedHours}h</span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-white/[0.06]">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Reviewed</span>
                 <span className="font-bold text-[#00E676] text-sm">{popupDayStats.reviewedHours}h</span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-white/[0.06]">
+              <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Unreviewed</span>
                 <span className="font-bold text-on-surface-variant text-sm">{popupDayStats.pendingHours}h</span>
               </div>
@@ -789,7 +790,7 @@ export default function StatsPage() {
                 } catch { }
                 router.push(`/planner?date=${targetDate}&day=${targetDay}`);
               }}
-              className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-[#003825] text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"
+              className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"
             >
               <span>Open Day {popupDayStats.dayNumber} Schedule</span>
               <ArrowRight className="w-4 h-4" />

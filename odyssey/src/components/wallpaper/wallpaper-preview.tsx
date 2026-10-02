@@ -307,11 +307,11 @@ export function WallpaperPreview({
           const curTheme = getCategoryTheme(curBlock.category);
 
           return (
-            <div className="rounded-[28px] p-3.5 px-4 transition-all flex flex-col gap-2 bg-[#172033] border-2 border-primary/90 shadow-[0_0_24px_rgba(90,240,179,0.25)] relative overflow-hidden ring-1 ring-primary/40">
+            <div className="rounded-[28px] p-3.5 px-4 transition-all flex flex-col gap-2 bg-[#172033] border-2 border-primary/90 shadow-[0_0_24px_rgba(108,0,255,0.25)] relative overflow-hidden ring-1 ring-primary/40">
               {/* Row 1: "NOW" Pill + Time + Category Pill */}
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary text-[#003825] shadow-sm">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary text-white shadow-sm">
                     NOW
                   </span>
                   <span className="font-mono text-xs font-bold text-amber-200">

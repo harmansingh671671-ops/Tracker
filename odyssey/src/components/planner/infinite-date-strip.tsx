@@ -9,11 +9,18 @@ import React, {
   useCallback,
 } from "react";
 
+import { type Habit, type HabitLog } from "@/lib/db";
+
 interface InfiniteDateStripProps {
   selectedDate: string;
   onSelectDate: (dateStr: string) => void;
   todayStr: string;
+  habits?: Habit[];
+  historyLogs?: Record<string, Record<string, boolean>>;
+  todayLogs?: Record<string, HabitLog>;
 }
+
+import { getHabitColor, isHabitScheduledOnDate } from "@/lib/utils/habit-colors";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -22,6 +29,9 @@ export function InfiniteDateStrip({
   selectedDate,
   onSelectDate,
   todayStr,
+  habits = [],
+  historyLogs = {},
+  todayLogs = {},
 }: InfiniteDateStripProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const todayPillRef = useRef<HTMLButtonElement>(null);
@@ -265,7 +275,7 @@ export function InfiniteDateStrip({
   }, [checkStickyPosition, prependDays, appendDays]);
 
   return (
-    <div className="relative w-full rounded-2xl bg-[#0B101B]/90 backdrop-blur-xl border border-white/[0.08] overflow-hidden select-none shadow-sm">
+    <div className="relative w-full rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-outline/[0.08] overflow-hidden select-none shadow-sm">
       {/* Scrollable Date Track */}
       <div
         ref={containerRef}
@@ -275,6 +285,23 @@ export function InfiniteDateStrip({
         {dateItems.map((item) => {
           const isSelected = selectedDate === item.dateStr;
           const isToday = item.isToday;
+          
+          const eligibleHabits = habits.filter((h) => {
+            const isScheduled = isHabitScheduledOnDate(h, item.dateStr);
+            const isDone = item.dateStr === todayStr
+              ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr])
+              : Boolean(historyLogs[h.id]?.[item.dateStr]);
+            return isScheduled || isDone;
+          });
+
+          const scheduledHabits = habits.filter((h) => isHabitScheduledOnDate(h, item.dateStr));
+          const completedCount = habits.filter((h) => {
+            if (item.dateStr === todayStr) {
+              return Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
+            }
+            return Boolean(historyLogs[h.id]?.[item.dateStr]);
+          }).length;
+          const isAllCompleted = scheduledHabits.length > 0 && completedCount >= scheduledHabits.length;
 
           return (
             <button
@@ -288,19 +315,19 @@ export function InfiniteDateStrip({
               }}
               className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all shrink-0 cursor-pointer ${
                 isSelected
-                  ? "bg-primary text-[#003825] font-black shadow-md shadow-primary/25 scale-105 z-10"
+                  ? "bg-surface-bright text-primary font-black shadow-md shadow-primary/20 scale-105 z-10 border-2 border-primary ring-2 ring-primary/20"
                   : isToday
                   ? "bg-surface-container-high text-primary border border-primary/40 hover:border-primary/70 font-bold"
-                  : "hover:bg-white/[0.04] text-on-surface-variant hover:text-white"
+                  : "hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? "text-[#003825]/80 font-bold" : ""}`}>
+              <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? "text-primary font-bold" : ""}`}>
                 {item.dayName}
               </span>
               <span
                 className={`text-sm font-bold font-mono ${
                   isSelected
-                    ? "text-[#003825] font-black"
+                    ? "text-primary font-black"
                     : isToday
                     ? "text-primary"
                     : "text-on-surface"
@@ -308,13 +335,58 @@ export function InfiniteDateStrip({
               >
                 {item.dayNum}
               </span>
-              {isToday && (
-                <span
-                  className={`w-1 h-1 rounded-full ${
-                    isSelected ? "bg-[#003825]" : "bg-primary"
-                  }`}
-                />
-              )}
+              {/* HabitDriven Segmented Rings & Solid Circles (only for eligible/completed habits) */}
+              <div className="flex items-center justify-center gap-1 mt-1 min-h-[10px] flex-wrap max-w-full">
+                {eligibleHabits.length === 0 ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-outline/20" title="Rest Day (No habits scheduled)" />
+                ) : eligibleHabits.length <= 5 ? (
+                  eligibleHabits.map((h) => {
+                    const isDone = item.dateStr === todayStr
+                      ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr])
+                      : Boolean(historyLogs[h.id]?.[item.dateStr]);
+                    const isScheduled = isHabitScheduledOnDate(h, item.dateStr);
+                    const color = getHabitColor(h);
+
+                    return (
+                      <span
+                        key={h.id}
+                        title={`${h.name}: ${
+                          isDone
+                            ? isScheduled
+                              ? "Completed ✓"
+                              : "Unscheduled Completed (!)"
+                            : "Pending"
+                        }`}
+                        className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-200 shrink-0 ${
+                          isDone
+                            ? "scale-105"
+                            : "bg-transparent"
+                        }`}
+                        style={{
+                          backgroundColor: isDone ? (isScheduled ? color : `${color}85`) : "transparent",
+                          borderColor: color,
+                          borderWidth: isDone ? "0px" : "2px",
+                          borderStyle: "solid",
+                          boxShadow: isDone ? `0 0 6px ${color}80` : undefined,
+                        }}
+                      />
+                    );
+                  })
+                ) : (
+                  // Compact progress pill when > 5 habits
+                  <div
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-mono font-bold ${
+                      isSelected
+                        ? "bg-primary/15 text-primary border border-primary/30"
+                        : isAllCompleted
+                        ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30"
+                        : "bg-surface-container-highest text-on-surface-variant"
+                    }`}
+                  >
+                    <span>{completedCount}/{scheduledHabits.length || eligibleHabits.length}</span>
+                  </div>
+                )}
+              </div>
             </button>
           );
         })}
@@ -322,7 +394,7 @@ export function InfiniteDateStrip({
 
       {/* Sticky Today Pill - Stuck on Left Side when user scrolls into future */}
       {stickySide === "left" && (
-        <div className="absolute left-0 top-0 bottom-0 z-20 flex items-center pl-1 pr-6 bg-gradient-to-r from-[#0B101B] via-[#0B101B]/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
+        <div className="absolute left-0 top-0 bottom-0 z-20 flex items-center pl-1 pr-6 bg-gradient-to-r from-surface-container-low via-surface-container-low/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
           <button
             type="button"
             onClick={() => {
@@ -331,7 +403,7 @@ export function InfiniteDateStrip({
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
               selectedDate === todayStr
-                ? "bg-primary text-[#003825] font-black shadow-primary/30 border-primary"
+                ? "bg-primary text-on-primary font-black shadow-primary/30 border-primary"
                 : "bg-surface-container-high border-primary/50 text-primary hover:bg-surface-container-highest"
             }`}
             title="Today (click to return)"
@@ -349,7 +421,7 @@ export function InfiniteDateStrip({
 
       {/* Sticky Today Pill - Stuck on Right Side when user scrolls into past */}
       {stickySide === "right" && (
-        <div className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-6 bg-gradient-to-l from-[#0B101B] via-[#0B101B]/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
+        <div className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-6 bg-gradient-to-l from-surface-container-low via-surface-container-low/95 to-transparent pointer-events-auto animate-in fade-in duration-150">
           <button
             type="button"
             onClick={() => {
@@ -358,7 +430,7 @@ export function InfiniteDateStrip({
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
               selectedDate === todayStr
-                ? "bg-primary text-[#003825] font-black shadow-primary/30 border-primary"
+                ? "bg-primary text-on-primary font-black shadow-primary/30 border-primary"
                 : "bg-surface-container-high border-primary/50 text-primary hover:bg-surface-container-highest"
             }`}
             title="Today (click to return)"

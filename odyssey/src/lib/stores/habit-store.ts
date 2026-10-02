@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { getLocalTodayStr } from '../utils/habit-colors';
 
 export interface TemporaryWallet {
   unclaimedDays: Array<{
@@ -215,7 +216,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       await db.habitLogs.add(newLog);
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = getLocalTodayStr();
 
     set((state) => {
       const updatedToday = { ...state.todayLogs };

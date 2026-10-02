@@ -31,11 +31,25 @@
   
   body {
     overflow-x: hidden;
-    font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", sans-serif;
+    font-family: var(--font-inter), "Inter", sans-serif;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
   }
   
+  :root {
+    color-scheme: light;
+  }
+
+  body {
+    background: linear-gradient(180deg, #ffffff 0%, #fff9f6 48%, #f4efff 100%);
+    background-attachment: fixed;
+    color: #24212a;
+  }
+
+  h1, h2 {
+    font-family: var(--font-playfair-display), Georgia, serif;
+  }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -228,4 +242,85 @@ button, a, input, select {
 
 .zoom-in-95 {
   animation-name: twZoomIn;
+}
+
+/* Rich Landing & Interactive Showcase Keyframes */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-1deg);
+  }
+}
+
+@keyframes radarWave {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(108, 0, 255, 0.25), inset 0 0 10px rgba(108, 0, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(108, 0, 255, 0.5), inset 0 0 20px rgba(108, 0, 255, 0.25);
+  }
+}
+
+@keyframes shimmerGlow {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 7s ease-in-out infinite;
+}
+
+.animate-radar-wave {
+  animation: radarWave 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin 20s linear infinite;
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, #6c00ff 0%, #b78aff 50%, #6c00ff 100%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmerGlow 4s linear infinite;
 }

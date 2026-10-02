@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { type Habit } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
+import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
+import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import {
   X,
   Check,
@@ -14,15 +16,16 @@ import {
   Flame,
   Trophy,
   Sparkles,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
-  Calendar,
 } from "lucide-react";
 
 interface EditHabitModalProps {
   habit: Habit | null;
   isOpen: boolean;
+  initialTab?: "history" | "edit";
+  selectedDate?: string;
+  todayStr?: string;
+  onSelectDate?: (dateStr: string) => void;
   onClose: () => void;
   onSave: (
     habitId: string,
@@ -71,11 +74,21 @@ const DOMAINS = [
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: EditHabitModalProps) {
+export function EditHabitModal({
+  habit,
+  isOpen,
+  initialTab = "history",
+  selectedDate,
+  todayStr: propTodayStr,
+  onSelectDate,
+  onClose,
+  onSave,
+  onDelete,
+}: EditHabitModalProps) {
   const { user } = useUserStore();
   const { historyLogs, toggleHabitLog } = useHabitStore();
 
-  const [activeTab, setActiveTab] = useState<"history" | "edit">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "edit">(initialTab);
 
   // Form states for Edit Tab
   const [name, setName] = useState("");
@@ -85,14 +98,14 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
-  // Month navigation state for History Tab
-  const [historyYear, setHistoryYear] = useState(() => new Date().getFullYear());
-  const [historyMonth, setHistoryMonth] = useState(() => new Date().getMonth());
+  const today = propTodayStr || getLocalTodayStr();
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<string>(selectedDate || today);
 
-  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const habitColor = useMemo(() => (habit ? getHabitColor(habit) : "#6C00FF"), [habit]);
 
   useEffect(() => {
     if (habit) {
+      setActiveTab(initialTab);
       setName(habit.name || "");
       setIcon(habit.icon || "🧘");
       setDomain(habit.category || "Vitality & Fitness");
@@ -112,76 +125,9 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
         setTimeOfDay("anytime");
       }
       setIsConfirmingDelete(false);
-
-      const now = new Date();
-      setHistoryYear(now.getFullYear());
-      setHistoryMonth(now.getMonth());
+      setSelectedHistoryDate(selectedDate || today);
     }
-  }, [habit]);
-
-  // History Calendar calculation
-  const historyCalendar = useMemo(() => {
-    if (!habit) return { monthLabel: "", days: [], completedInMonth: 0, totalDaysInMonth: 30 };
-
-    const totalDays = new Date(historyYear, historyMonth + 1, 0).getDate();
-    const dateForLabel = new Date(historyYear, historyMonth, 1);
-    const monthLabel = dateForLabel.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-    const effectiveScheduledDays = habit.targetDays && habit.targetDays.length > 0
-      ? habit.targetDays
-      : habit.targetDaysPerWeek === 5
-      ? [1, 2, 3, 4, 5]
-      : habit.targetDaysPerWeek === 3
-      ? [1, 3, 5]
-      : habit.targetDaysPerWeek && habit.targetDaysPerWeek < 7
-      ? Array.from({ length: habit.targetDaysPerWeek }, (_, i) => i + 1)
-      : [1, 2, 3, 4, 5, 6, 7];
-
-    const list: Array<{
-      dateStr: string;
-      dayNumber: number;
-      weekday: string;
-      dayOfWeek: number;
-      isScheduled: boolean;
-      isToday: boolean;
-      isFuture: boolean;
-      isCompleted: boolean;
-    }> = [];
-
-    for (let d = 1; d <= totalDays; d++) {
-      const monthPadded = String(historyMonth + 1).padStart(2, "0");
-      const dayPadded = String(d).padStart(2, "0");
-      const dateStr = `${historyYear}-${monthPadded}-${dayPadded}`;
-      const isToday = dateStr === today;
-      const isFuture = dateStr > today;
-      const isCompleted = !!historyLogs[habit.id]?.[dateStr];
-
-      const dObj = new Date(historyYear, historyMonth, d);
-      const jsDay = dObj.getDay();
-      const dayOfWeek = jsDay === 0 ? 7 : jsDay;
-      const isScheduled = effectiveScheduledDays.includes(dayOfWeek);
-
-      list.push({
-        dateStr,
-        dayNumber: d,
-        weekday: dObj.toLocaleDateString("en-US", { weekday: "short" }),
-        dayOfWeek,
-        isScheduled,
-        isToday,
-        isFuture,
-        isCompleted,
-      });
-    }
-
-    const completedInMonth = list.filter((d) => d.isCompleted).length;
-
-    return {
-      monthLabel,
-      days: list,
-      completedInMonth,
-      totalDaysInMonth: totalDays,
-    };
-  }, [habit, historyYear, historyMonth, historyLogs, today]);
+  }, [habit, initialTab, selectedDate, today]);
 
   // All completed dates for this habit
   const completedLogDates = useMemo(() => {
@@ -194,33 +140,6 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
   }, [habit, historyLogs]);
 
   if (!isOpen || !habit) return null;
-
-  const handlePrevMonth = () => {
-    if (historyMonth === 0) {
-      setHistoryMonth(11);
-      setHistoryYear((y) => y - 1);
-    } else {
-      setHistoryMonth((m) => m - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    const now = new Date();
-    if (historyYear === now.getFullYear() && historyMonth >= now.getMonth()) {
-      return; // Cannot navigate to future months
-    }
-    if (historyMonth === 11) {
-      setHistoryMonth(0);
-      setHistoryYear((y) => y + 1);
-    } else {
-      setHistoryMonth((m) => m + 1);
-    }
-  };
-
-  const handleToggleHistoryDate = async (dateStr: string, isFuture: boolean, isScheduled: boolean) => {
-    if (isFuture || !isScheduled || !user || !habit) return;
-    await toggleHabitLog(user.id, habit.id, dateStr);
-  };
 
   const toggleDay = (idx: number) => {
     if (selectedDays.includes(idx)) {
@@ -263,11 +182,21 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-5 space-y-4 animate-in slide-in-from-bottom-6 duration-300">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-5 space-y-4 animate-in slide-in-from-bottom-6 duration-300 cursor-default"
+      >
         {/* Header Bar */}
         <div className="flex flex-col items-center">
-          <div className="w-12 h-1.5 rounded-full bg-outline/20 mb-3" />
+          <div
+            onClick={onClose}
+            className="w-12 h-1.5 rounded-full bg-outline/20 hover:bg-outline/50 transition-colors mb-3 cursor-pointer"
+            title="Click to dismiss"
+          />
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span className="text-2xl">{habit.icon}</span>
@@ -275,7 +204,7 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
                 <h2 className="text-lg font-bold tracking-tight text-on-surface truncate max-w-[220px]">
                   {habit.name}
                 </h2>
-                <p className="text-[11px] text-on-surface-variant font-mono">
+                <p className="text-[11px] text-on-surface-variant font-mono" style={{ color: habitColor }}>
                   {habit.category || "Daily Habit"}
                 </p>
               </div>
@@ -343,7 +272,7 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
               </div>
 
               <div className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 flex flex-col items-center justify-center text-center">
-                <span className="text-primary font-bold font-mono text-base flex items-center gap-1">
+                <span className="font-bold font-mono text-base flex items-center gap-1" style={{ color: habitColor }}>
                   <Sparkles className="w-4 h-4" />
                   {habit.totalCompletions || 0}
                 </span>
@@ -353,78 +282,23 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
               </div>
             </div>
 
-            {/* Interactive Month Heatmap Calendar Card */}
-            <div className="p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold text-on-surface">
-                    {historyCalendar.monthLabel}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    className="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-90 transition-all cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    className="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-90 transition-all cursor-pointer"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* 10-Column Calendar Matrix Starting at 1st of Month */}
-              <div className="grid grid-cols-10 gap-1 w-full min-w-0 pt-1">
-                {historyCalendar.days.map((day) => {
-                  const isNotScheduled = !day.isScheduled;
-
-                  return (
-                    <button
-                      key={day.dateStr}
-                      type="button"
-                      onClick={() => handleToggleHistoryDate(day.dateStr, day.isFuture, day.isScheduled)}
-                      disabled={day.isFuture || (isNotScheduled && !day.isCompleted)}
-                      title={`${day.dateStr} (${day.weekday}): ${
-                        day.isCompleted
-                          ? "Completed ✓"
-                          : isNotScheduled
-                          ? "Rest Day (Not scheduled)"
-                          : day.isFuture
-                          ? "Upcoming"
-                          : "Not completed"
-                      }${day.isToday ? " • Today" : ""}`}
-                      className={`w-full min-w-0 aspect-[1.15/1] rounded-[4px] flex items-center justify-center text-[9.5px] font-mono transition-all select-none ${
-                        day.isCompleted
-                          ? `bg-primary text-on-primary font-bold shadow-xs shadow-primary/30 border border-primary/40 hover:brightness-110 active:scale-90 cursor-pointer ${
-                              day.isToday ? "ring-2 ring-primary/80 ring-offset-1 ring-offset-surface-container-low" : ""
-                            }`
-                          : isNotScheduled
-                          ? "bg-surface-container-lowest/30 text-on-surface-variant/20 border border-outline/5 opacity-35 cursor-not-allowed pointer-events-none"
-                          : day.isToday
-                          ? "bg-surface-container text-primary border-2 border-primary/80 font-bold hover:bg-surface-bright active:scale-90 cursor-pointer"
-                          : day.isFuture
-                          ? "bg-surface-container-lowest/40 text-on-surface-variant/20 border border-outline/5 cursor-default"
-                          : "bg-surface-container-lowest/80 text-on-surface-variant/40 border border-outline/10 hover:border-outline/30 hover:bg-surface-container/60 hover:text-on-surface-variant active:scale-90 cursor-pointer"
-                      }`}
-                    >
-                      <span className="leading-none">{day.dayNumber}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-1">
-                <span>Month Total: {historyCalendar.completedInMonth} days</span>
-                <span className="text-primary font-semibold">Tap any day to toggle log</span>
-              </div>
+            {/* 52-Week GitHub Continuous Heatmap */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-3">
+              <HabitGitHubHeatmap
+                habitId={habit.id}
+                name={habit.name}
+                targetDays={habit.targetDays}
+                targetDaysPerWeek={habit.targetDaysPerWeek}
+                category={habit.category}
+                selectedDate={selectedHistoryDate}
+                todayStr={today}
+                showLegend={false}
+                showStats={true}
+                onSelectDate={(dateStr) => {
+                  setSelectedHistoryDate(dateStr);
+                  if (onSelectDate) onSelectDate(dateStr);
+                }}
+              />
             </div>
 
             {/* Recent Completed Log List */}
@@ -454,15 +328,23 @@ export function EditHabitModal({ habit, isOpen, onClose, onSave, onDelete }: Edi
                         className="flex items-center justify-between p-2 rounded-xl bg-surface-container text-xs font-mono border border-outline/5"
                       >
                         <span className="flex items-center gap-1.5 text-on-surface">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                          <CheckCircle2 className="w-3.5 h-3.5" style={{ color: habitColor }} />
                           <span>{formatted}</span>
                           {isToday && (
-                            <span className="px-1.5 py-0.2 bg-primary/20 text-primary text-[9px] font-bold rounded-full">
+                            <span
+                              className="px-1.5 py-0.2 text-[9px] font-bold rounded-full"
+                              style={{
+                                backgroundColor: `${habitColor}25`,
+                                color: habitColor,
+                              }}
+                            >
                               TODAY
                             </span>
                           )}
                         </span>
-                        <span className="text-[10px] text-primary font-bold">+15 XP • +1 💎</span>
+                        <span className="text-[10px] font-bold" style={{ color: habitColor }}>
+                          +15 XP • +1 💎
+                        </span>
                       </div>
                     );
                   })}

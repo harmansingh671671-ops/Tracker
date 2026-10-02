@@ -6,24 +6,24 @@ import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitHeatmap } from "@/components/habits/habit-heatmap";
+import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
 import { type Habit } from "@/lib/db";
+import { triggerStreaksConfetti } from "@/lib/utils/confetti";
+import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import {
   Plus,
   Flame,
   Check,
   Sparkles,
   Lock,
-  CheckCircle2,
   LayoutList,
   LayoutGrid,
   CalendarDays,
-  MoreVertical,
-  Calendar,
+  Coffee,
 } from "lucide-react";
-
-const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+import { motion, AnimatePresence } from "framer-motion";
 
 type HabitViewMode = "list" | "grid" | "heatmap";
 
@@ -32,6 +32,7 @@ export default function HabitsPage() {
   const {
     habits,
     todayLogs,
+    historyLogs,
     temporaryWallet,
     fetchHabits,
     toggleHabitLog,
@@ -45,13 +46,53 @@ export default function HabitsPage() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<HabitViewMode>("list");
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [todayStr, setTodayStr] = useState<string>(getLocalTodayStr);
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalTodayStr);
+
+  const isFutureSelectedDate = selectedDate > todayStr;
 
   // Long press / tap-and-hold timer refs
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef<boolean>(false);
   const pressStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Detect midnight / day change and automatically advance today and selectedDate
+  useEffect(() => {
+    const checkDateChange = () => {
+      const currentToday = getLocalTodayStr();
+      setTodayStr((prevToday) => {
+        if (prevToday !== currentToday) {
+          setSelectedDate((prevSelected) => {
+            if (prevSelected === prevToday) {
+              return currentToday;
+            }
+            return prevSelected;
+          });
+          if (user) {
+            fetchHabits(user.id, currentToday);
+          }
+          return currentToday;
+        }
+        return prevToday;
+      });
+    };
+
+    const interval = setInterval(checkDateChange, 3000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkDateChange();
+      }
+    };
+    window.addEventListener("focus", checkDateChange);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", checkDateChange);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [user, fetchHabits]);
 
   useEffect(() => {
     fetchUser().then((u) => {
@@ -66,18 +107,64 @@ export default function HabitsPage() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const total = habits.length;
-  const completed = habits.filter((h) => todayLogs[h.id]?.completed).length;
+  // Track scheduled habits count for daily progress stats while keeping natural order
+  const scheduledHabits = useMemo(() => {
+    return habits.filter((h) => isHabitScheduledOnDate(h, selectedDate));
+  }, [habits, selectedDate]);
+
+  const total = scheduledHabits.length || habits.length;
+  const completed = habits.filter((h) => {
+    return selectedDate === todayStr
+      ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
+      : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
+  }).length;
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const handleToggle = async (habitId: string) => {
+  const formattedSelectedDate = useMemo(() => {
+    if (selectedDate === todayStr) return "Today";
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }, [selectedDate, todayStr]);
+
+  const handleToggle = async (
+    habitId: string,
+    targetDate: string = selectedDate,
+    e?: React.MouseEvent | React.TouchEvent
+  ) => {
     if (!user) return;
-    const isNowCompleted = await toggleHabitLog(user.id, habitId, selectedDate);
+    if (targetDate > todayStr) {
+      showToast("Cannot complete habits for future dates.");
+      return;
+    }
+
+    const isNowCompleted = await toggleHabitLog(user.id, habitId, targetDate);
+    const habit = habits.find((h) => h.id === habitId);
+    const habitColor = habit ? getHabitColor(habit) : undefined;
+    const isScheduled = habit ? isHabitScheduledOnDate(habit, targetDate) : true;
+
     if (isNowCompleted) {
+      let clientX: number | undefined;
+      let clientY: number | undefined;
+      if (e) {
+        if ("clientX" in e && typeof e.clientX === "number") {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        } else if ("touches" in e && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        }
+      }
+      triggerStreaksConfetti(clientX, clientY, habitColor);
+      try {
+        if (typeof window !== "undefined" && navigator?.vibrate) {
+          navigator.vibrate(40);
+        }
+      } catch {}
       await addXp(15);
       await addDiamonds(1);
       await fetchUser();
-      showToast("Habit completed! +15 XP • +1 💎");
+      showToast(isScheduled ? "Habit completed! +15 XP • +1 💎" : "Rest-day completion registered! (!) +15 XP • +1 💎");
     } else {
       await addXp(-15);
       await addDiamonds(-1);
@@ -136,25 +223,31 @@ export default function HabitsPage() {
     showToast("Habit deleted.");
   };
 
-  // Long press gesture listeners
+  // Long press gesture listeners to open habit editing modal
   const startPress = (habit: Habit, e: React.TouchEvent | React.MouseEvent) => {
+    if ("button" in e && e.button !== 0) return;
     isLongPressRef.current = false;
-    if ("touches" in e) {
+    if ("touches" in e && e.touches.length > 0) {
       pressStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else {
+    } else if ("clientX" in e) {
       pressStartPosRef.current = { x: e.clientX, y: e.clientY };
     }
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
+      try {
+        if (typeof window !== "undefined" && navigator?.vibrate) {
+          navigator.vibrate(50);
+        }
+      } catch {}
       setEditingHabit(habit);
-    }, 500);
+    }, 400);
   };
 
   const movePress = (e: React.TouchEvent | React.MouseEvent) => {
     if (!pressTimerRef.current) return;
-    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const clientX = "touches" in e && e.touches.length > 0 ? e.touches[0].clientX : "clientX" in e ? e.clientX : 0;
+    const clientY = "touches" in e && e.touches.length > 0 ? e.touches[0].clientY : "clientY" in e ? e.clientY : 0;
     const dist = Math.hypot(clientX - pressStartPosRef.current.x, clientY - pressStartPosRef.current.y);
     if (dist > 12) {
       clearTimeout(pressTimerRef.current);
@@ -169,12 +262,16 @@ export default function HabitsPage() {
     }
   };
 
-  const handleCardClick = (habit: Habit) => {
+  const handleCardClick = (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
     if (isLongPressRef.current) {
       isLongPressRef.current = false;
       return;
     }
-    handleToggle(habit.id);
+    if (isFutureSelectedDate) {
+      showToast("Cannot complete habits for future dates.");
+      return;
+    }
+    handleToggle(habit.id, selectedDate, e);
   };
 
   return (
@@ -200,6 +297,7 @@ export default function HabitsPage() {
         onSelectDate={(newDate) => setSelectedDate(newDate)}
         habits={habits}
         todayLogs={todayLogs}
+        todayStr={todayStr}
       />
 
       {/* Reward Vault Banner */}
@@ -222,20 +320,29 @@ export default function HabitsPage() {
 
       {/* View Switcher Header (List vs Grid vs Heatmap) & Stats Summary */}
       <div className="flex items-center justify-between gap-2 pt-1">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-mono font-bold text-on-surface">
-            {completed}/{total} Completed ({percentage}%)
+            {formattedSelectedDate}{isFutureSelectedDate ? " (Upcoming)" : ""}: {completed}/{total} ({percentage}%)
           </span>
+          {selectedDate !== todayStr && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className="text-[10px] font-mono font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          )}
         </div>
 
-        {/* HabitBee 3-Mode View Switcher */}
-        <div className="flex items-center bg-surface-container-low p-1 rounded-xl border border-outline/15 shadow-xs">
+        {/* 3-Mode View Switcher */}
+        <div className="flex items-center bg-surface-container-low p-1 rounded-xl border border-outline/15 shadow-xs shrink-0">
           <button
             type="button"
             onClick={() => setViewMode("list")}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
               viewMode === "list"
-                ? "bg-primary text-[#003825] font-bold shadow-xs"
+                ? "bg-primary text-on-primary font-bold shadow-xs"
                 : "text-on-surface-variant hover:text-on-surface"
             }`}
             title="List View"
@@ -249,7 +356,7 @@ export default function HabitsPage() {
             onClick={() => setViewMode("grid")}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
               viewMode === "grid"
-                ? "bg-primary text-[#003825] font-bold shadow-xs"
+                ? "bg-primary text-on-primary font-bold shadow-xs"
                 : "text-on-surface-variant hover:text-on-surface"
             }`}
             title="Grid View"
@@ -263,7 +370,7 @@ export default function HabitsPage() {
             onClick={() => setViewMode("heatmap")}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
               viewMode === "heatmap"
-                ? "bg-primary text-[#003825] font-bold shadow-xs"
+                ? "bg-primary text-on-primary font-bold shadow-xs"
                 : "text-on-surface-variant hover:text-on-surface"
             }`}
             title="Heatmap View"
@@ -290,174 +397,466 @@ export default function HabitsPage() {
           </button>
         </div>
       ) : viewMode === "list" ? (
-        /* 1. LIST VIEW: Full-width interactive cards */
+        /* 1. LIST VIEW: Full-width interactive cards for selected date */
         <div className="space-y-2.5">
-          {habits.map((h) => {
-            const isCompleted = !!todayLogs[h.id]?.completed;
-            return (
-              <div
-                key={h.id}
-                onTouchStart={(e) => startPress(h, e)}
-                onTouchMove={movePress}
-                onTouchEnd={endPress}
-                onTouchCancel={endPress}
-                onMouseDown={(e) => startPress(h, e)}
-                onMouseMove={movePress}
-                onMouseUp={endPress}
-                onMouseLeave={endPress}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setEditingHabit(h);
-                }}
-                onClick={() => handleCardClick(h)}
-                className={`group flex flex-col p-3.5 rounded-2xl cursor-pointer transition-all duration-200 select-none border active:scale-[0.99] shadow-xs ${
-                  isCompleted
-                    ? "bg-surface-container-low/90 border-primary/40 shadow-sm"
-                    : "bg-surface-container hover:bg-surface-container-high border-outline/10"
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform ${
-                        isCompleted
-                          ? "bg-primary/20 border border-primary/30"
-                          : "bg-surface-container-high group-hover:scale-105"
-                      }`}
-                    >
-                      <HabitIcon icon={h.icon} name={h.name} className="w-5 h-5 text-primary" />
+          <AnimatePresence mode="popLayout" initial={false}>
+            {habits.map((h) => {
+              const isScheduled = isHabitScheduledOnDate(h, selectedDate);
+              const isCompleted = selectedDate === todayStr
+                ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
+                : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
+              const habitColor = getHabitColor(h);
+
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0.85, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{
+                    layout: { type: "spring", stiffness: 350, damping: 28 },
+                    opacity: { duration: 0.2 },
+                    scale: { duration: 0.2 },
+                  }}
+                  key={h.id}
+                  onTouchStart={(e) => startPress(h, e)}
+                  onTouchMove={movePress}
+                  onTouchEnd={endPress}
+                  onTouchCancel={endPress}
+                  onMouseDown={(e) => startPress(h, e)}
+                  onMouseMove={movePress}
+                  onMouseUp={endPress}
+                  onMouseLeave={endPress}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setEditingHabit(h);
+                  }}
+                  onClick={(e) => handleCardClick(h, e)}
+                  className={`group flex flex-col p-3.5 rounded-2xl cursor-pointer transition-colors duration-200 select-none border active:scale-[0.99] shadow-xs ${
+                    isCompleted
+                      ? "bg-surface-container-low/90 shadow-sm"
+                      : isFutureSelectedDate
+                      ? "bg-surface-container opacity-85 border-outline/10"
+                      : !isScheduled
+                      ? "bg-surface-container/60 hover:bg-surface-container opacity-80 border-dashed border-outline/20"
+                      : "bg-surface-container hover:bg-surface-container-high border-outline/10"
+                  }`}
+                  style={{
+                    borderColor: isCompleted
+                      ? isScheduled
+                        ? `${habitColor}50`
+                        : `${habitColor}35`
+                      : undefined,
+                  }}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform ${
+                          isCompleted
+                            ? "border group-hover:scale-105"
+                            : "bg-surface-container-high group-hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: isCompleted
+                            ? isScheduled
+                              ? `${habitColor}20`
+                              : `${habitColor}14`
+                            : undefined,
+                          borderColor: isCompleted
+                            ? `${habitColor}${isScheduled ? "40" : "25"}`
+                            : undefined,
+                        }}
+                      >
+                        <HabitIcon icon={h.icon} name={h.name} className="w-5 h-5" style={{ color: habitColor }} />
+                      </div>
+
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4
+                            className={`text-sm font-semibold truncate ${
+                              isCompleted ? "text-on-surface line-through opacity-80" : "text-on-surface"
+                            }`}
+                          >
+                            {h.name}
+                          </h4>
+                          {!isScheduled && (
+                            <span className="px-1.5 py-0.2 rounded-md bg-surface-container-highest text-on-surface-variant text-[9.5px] font-mono font-bold shrink-0">
+                              Rest Day
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
+                          <span className="font-semibold" style={{ color: habitColor }}>{h.category || "Routine"}</span>
+                          <span>•</span>
+                          <span className="text-amber-400 flex items-center gap-0.5">
+                            <Flame className="w-3 h-3" />
+                            {h.currentStreak || 1}d
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4
-                          className={`text-sm font-semibold truncate ${
-                            isCompleted ? "text-on-surface line-through opacity-80" : "text-white"
-                          }`}
-                        >
-                          {h.name}
-                        </h4>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
-                        <span className="text-primary font-medium">{h.category || "Routine"}</span>
-                        <span>•</span>
-                        <span className="text-amber-400 flex items-center gap-0.5">
-                          <Flame className="w-3 h-3" />
-                          {h.currentStreak || 1}d
-                        </span>
+                    {/* Completion Action Ring / Solid Circle */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isFutureSelectedDate) {
+                            showToast("Cannot complete habits for future dates.");
+                            return;
+                          }
+                          handleToggle(h.id, selectedDate, e);
+                        }}
+                        title={
+                          isFutureSelectedDate
+                            ? "Cannot complete habits for future dates"
+                            : isCompleted
+                            ? isScheduled
+                              ? "Completed (tap to undo)"
+                              : "Unscheduled Completed (!) • Tap to undo"
+                            : !isScheduled
+                            ? "Rest Day (tap to register)"
+                            : "Tap to complete"
+                        }
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${
+                          isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                        } ${
+                          isCompleted
+                            ? "text-white shadow-sm scale-105"
+                            : isFutureSelectedDate
+                            ? "bg-transparent"
+                            : !isScheduled
+                            ? "bg-transparent hover:scale-105 opacity-75"
+                            : "bg-transparent hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: isCompleted
+                            ? isScheduled
+                              ? habitColor
+                              : `${habitColor}70`
+                            : "transparent",
+                          borderColor: isFutureSelectedDate && !isCompleted
+                            ? `${habitColor}60`
+                            : !isScheduled && !isCompleted
+                            ? `${habitColor}70`
+                            : habitColor,
+                          borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2.5px",
+                          borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
+                          boxShadow: isCompleted
+                            ? `0 0 10px ${habitColor}${isScheduled ? "66" : "35"}`
+                            : undefined,
+                        }}
+                      >
+                        <AnimatePresence mode="wait">
+                          {isCompleted ? (
+                            <motion.div
+                              key={isScheduled ? "check" : "excl"}
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="flex items-center justify-center"
+                            >
+                              {isScheduled ? (
+                                <Check className="w-4 h-4 stroke-[3]" />
+                              ) : (
+                                <span className="font-black text-xs leading-none">!</span>
+                              )}
+                            </motion.div>
+                          ) : null}
+                        </AnimatePresence>
                       </div>
                     </div>
                   </div>
 
-                  {/* Completion Action Checkbox */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                        isCompleted
-                          ? "bg-primary text-[#003825] shadow-xs shadow-primary/40 scale-105"
-                          : "border-2 border-outline/30 hover:border-primary text-transparent"
-                      }`}
-                    >
-                      <Check className="w-4 h-4 stroke-[3]" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Inline Monthly Heatmap preview */}
-                <HabitHeatmap
-                  habitId={h.id}
-                  targetDays={h.targetDays}
-                  targetDaysPerWeek={h.targetDaysPerWeek}
-                  category={h.category}
-                />
-              </div>
-            );
-          })}
+                  {/* Inline Monthly Calendar preview */}
+                  <HabitMonthCalendar
+                    habitId={h.id}
+                    name={h.name}
+                    targetDays={h.targetDays}
+                    targetDaysPerWeek={h.targetDaysPerWeek}
+                    category={h.category}
+                    selectedDate={selectedDate}
+                    todayStr={todayStr}
+                    onSelectDate={(newDate) => setSelectedDate(newDate)}
+                    onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
+                  />
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       ) : viewMode === "grid" ? (
-        /* 2. GRID VIEW: 2-Column Compact mobile cards (HabitBee style) */
+        /* 2. GRID VIEW: 2-Column Compact mobile cards for selected date */
         <div className="grid grid-cols-2 gap-2.5">
-          {habits.map((h) => {
-            const isCompleted = !!todayLogs[h.id]?.completed;
-            return (
-              <div
-                key={h.id}
-                onClick={() => handleCardClick(h)}
-                className={`p-3 rounded-2xl flex flex-col justify-between gap-2.5 border transition-all cursor-pointer active:scale-95 select-none ${
-                  isCompleted
-                    ? "bg-surface-container-low border-primary/40 shadow-sm"
-                    : "bg-surface-container hover:bg-surface-container-high border-outline/15"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-1.5">
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      isCompleted ? "bg-primary/20 border border-primary/30" : "bg-surface-container-high"
-                    }`}
-                  >
-                    <HabitIcon icon={h.icon} name={h.name} className="w-4 h-4 text-primary" />
+          <AnimatePresence mode="popLayout" initial={false}>
+            {habits.map((h) => {
+              const isScheduled = isHabitScheduledOnDate(h, selectedDate);
+              const isCompleted = selectedDate === todayStr
+                ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
+                : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
+              const habitColor = getHabitColor(h);
+
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0.85, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{
+                    layout: { type: "spring", stiffness: 350, damping: 28 },
+                    opacity: { duration: 0.2 },
+                    scale: { duration: 0.2 },
+                  }}
+                  key={h.id}
+                  onTouchStart={(e) => startPress(h, e)}
+                  onTouchMove={movePress}
+                  onTouchEnd={endPress}
+                  onTouchCancel={endPress}
+                  onMouseDown={(e) => startPress(h, e)}
+                  onMouseMove={movePress}
+                  onMouseUp={endPress}
+                  onMouseLeave={endPress}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setEditingHabit(h);
+                  }}
+                  onClick={(e) => handleCardClick(h, e)}
+                  className={`p-3 rounded-2xl flex flex-col justify-between gap-2.5 border transition-colors duration-200 cursor-pointer active:scale-95 select-none ${
+                    isCompleted
+                      ? "bg-surface-container-low shadow-sm"
+                      : isFutureSelectedDate
+                      ? "bg-surface-container opacity-85 border-outline/15"
+                      : !isScheduled
+                      ? "bg-surface-container/60 hover:bg-surface-container opacity-80 border-dashed border-outline/20"
+                      : "bg-surface-container hover:bg-surface-container-high border-outline/15"
+                  }`}
+                  style={{
+                    borderColor: isCompleted
+                      ? isScheduled
+                        ? `${habitColor}50`
+                        : `${habitColor}35`
+                      : undefined,
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        isCompleted ? "border" : "bg-surface-container-high"
+                      }`}
+                      style={{
+                        backgroundColor: isCompleted
+                          ? isScheduled
+                            ? `${habitColor}20`
+                            : `${habitColor}14`
+                          : undefined,
+                        borderColor: isCompleted
+                          ? `${habitColor}${isScheduled ? "40" : "25"}`
+                          : undefined,
+                      }}
+                    >
+                      <HabitIcon icon={h.icon} name={h.name} className="w-4 h-4" style={{ color: habitColor }} />
+                    </div>
+
+                    <div
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isFutureSelectedDate) {
+                          showToast("Cannot complete habits for future dates.");
+                          return;
+                        }
+                        handleToggle(h.id, selectedDate, e);
+                      }}
+                      title={
+                        isFutureSelectedDate
+                          ? "Cannot complete habits for future dates"
+                          : isCompleted
+                          ? isScheduled
+                            ? "Completed (tap to undo)"
+                            : "Unscheduled Completed (!) • Tap to undo"
+                          : !isScheduled
+                          ? "Rest Day (tap to register)"
+                          : "Tap to complete"
+                      }
+                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ${
+                        isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                      } ${
+                        isCompleted
+                          ? "text-white shadow-xs scale-105"
+                          : isFutureSelectedDate
+                          ? "bg-transparent"
+                          : !isScheduled
+                          ? "bg-transparent hover:scale-105 opacity-75"
+                          : "bg-transparent hover:scale-105"
+                      }`}
+                      style={{
+                        backgroundColor: isCompleted
+                          ? isScheduled
+                            ? habitColor
+                            : `${habitColor}70`
+                          : "transparent",
+                        borderColor: isFutureSelectedDate && !isCompleted
+                          ? `${habitColor}60`
+                          : !isScheduled && !isCompleted
+                          ? `${habitColor}70`
+                          : habitColor,
+                        borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2px",
+                        borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
+                        boxShadow: isCompleted
+                          ? `0 0 8px ${habitColor}${isScheduled ? "66" : "35"}`
+                          : undefined,
+                      }}
+                    >
+                      <AnimatePresence mode="wait">
+                        {isCompleted ? (
+                          <motion.div
+                            key={isScheduled ? "check" : "excl"}
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex items-center justify-center"
+                          >
+                            {isScheduled ? (
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            ) : (
+                              <span className="font-black text-[11px] leading-none">!</span>
+                            )}
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </div>
                   </div>
 
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                      isCompleted
-                        ? "bg-primary text-[#003825] shadow-xs"
-                        : "border border-outline/30 hover:border-primary"
-                    }`}
-                  >
-                    {isCompleted ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                  <div>
+                    <div className="flex items-center gap-1.5 justify-between">
+                      <h4
+                        className={`text-xs font-semibold truncate ${
+                          isCompleted ? "line-through text-on-surface-variant" : "text-on-surface"
+                        }`}
+                      >
+                        {h.name}
+                      </h4>
+                      {!isScheduled && (
+                        <span className="px-1 py-0.2 rounded bg-surface-container-highest text-on-surface-variant text-[8.5px] font-mono font-bold shrink-0">
+                          Rest
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
+                      <span className="truncate font-semibold" style={{ color: habitColor }}>{h.category || "General"}</span>
+                      <span className="text-amber-400 font-bold shrink-0 flex items-center gap-0.5">
+                        <Flame className="w-3 h-3" />
+                        {h.currentStreak || 1}d
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <h4
-                    className={`text-xs font-semibold truncate ${
-                      isCompleted ? "line-through text-on-surface-variant" : "text-on-surface"
-                    }`}
-                  >
-                    {h.name}
-                  </h4>
-                  <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
-                    <span className="text-primary truncate">{h.category || "General"}</span>
-                    <span className="text-amber-400 font-bold shrink-0 flex items-center gap-0.5">
-                      <Flame className="w-3 h-3" />
-                      {h.currentStreak || 1}d
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       ) : (
-        /* 3. HEATMAP VIEW: Consolidated full-month matrices */
-        <div className="space-y-3">
-          {habits.map((h) => (
-            <div
-              key={h.id}
-              className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/15 shadow-sm space-y-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <HabitIcon icon={h.icon} name={h.name} className="w-4 h-4 text-primary shrink-0" />
-                  <h4 className="text-xs font-bold text-on-surface truncate">{h.name}</h4>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs font-mono">
-                  <span className="text-amber-400 font-bold flex items-center gap-0.5">
-                    <Flame className="w-3 h-3" />
-                    {h.currentStreak || 1}d streak
-                  </span>
-                </div>
-              </div>
+        /* 3. HEATMAP VIEW: 2-Column Quad-like Matrices */
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {habits.map((h) => {
+              const isScheduled = isHabitScheduledOnDate(h, selectedDate);
+              const isCompleted = selectedDate === todayStr
+                ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
+                : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
+              const habitColor = getHabitColor(h);
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0.85, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{
+                    layout: { type: "spring", stiffness: 350, damping: 28 },
+                    opacity: { duration: 0.2 },
+                    scale: { duration: 0.2 },
+                  }}
+                  key={h.id}
+                  onTouchStart={(e) => startPress(h, e)}
+                  onTouchMove={movePress}
+                  onTouchEnd={endPress}
+                  onTouchCancel={endPress}
+                  onMouseDown={(e) => startPress(h, e)}
+                  onMouseMove={movePress}
+                  onMouseUp={endPress}
+                  onMouseLeave={endPress}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setEditingHabit(h);
+                  }}
+                  className={`p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border shadow-xs transition-colors duration-200 select-none flex flex-col justify-between hover:bg-surface-container-high/40 active:scale-[0.98] ${
+                    !isScheduled ? "border-dashed border-outline/20 opacity-90" : "border-outline/15"
+                  }`}
+                  style={{
+                    borderColor: isScheduled ? `${habitColor}35` : undefined,
+                    boxShadow: isCompleted ? `0 0 10px ${habitColor}12` : undefined,
+                  }}
+                >
+                  {/* Quad Card Header */}
+                  <div className="flex items-start justify-between gap-1.5 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          backgroundColor: `${habitColor}18`,
+                          borderColor: `${habitColor}35`,
+                        }}
+                      >
+                        <HabitIcon icon={h.icon} name={h.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" style={{ color: habitColor }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-on-surface truncate leading-tight" title={h.name}>
+                          {h.name}
+                        </h4>
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-on-surface-variant">
+                          <span className="truncate font-semibold" style={{ color: habitColor }}>
+                            {h.category || "Routine"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-              <HabitHeatmap
-                habitId={h.id}
-                targetDays={h.targetDays}
-                targetDaysPerWeek={h.targetDaysPerWeek}
-                category={h.category}
-              />
-            </div>
-          ))}
+                    <div className="flex flex-col items-end shrink-0 gap-0.5">
+                      <span className="text-amber-400 font-bold text-[10px] font-mono flex items-center gap-0.5">
+                        <Flame className="w-3 h-3" />
+                        {h.currentStreak || 1}d
+                      </span>
+                      {!isScheduled && (
+                        <span className="px-1 py-0.2 rounded bg-surface-container-highest text-on-surface-variant text-[8px] font-mono font-bold">
+                          Rest
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quad Compact Heatmap */}
+                  <HabitHeatmap
+                    habitId={h.id}
+                    name={h.name}
+                    targetDays={h.targetDays}
+                    targetDaysPerWeek={h.targetDaysPerWeek}
+                    category={h.category}
+                    selectedDate={selectedDate}
+                    compact={true}
+                    todayStr={todayStr}
+                    onSelectDate={(newDate) => setSelectedDate(newDate)}
+                    onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
+                  />
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
@@ -466,22 +865,27 @@ export default function HabitsPage() {
         <EditHabitModal
           habit={editingHabit}
           isOpen={true}
+          initialTab="history"
+          selectedDate={selectedDate}
+          todayStr={todayStr}
+          onSelectDate={(newDate) => setSelectedDate(newDate)}
           onClose={() => setEditingHabit(null)}
           onSave={handleUpdateHabit}
           onDelete={handleDeleteHabit}
         />
       )}
 
-      {/* Create Habit Modal */}
+      {/* Create Habit Modal with Template Library */}
       <CreateHabitModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSave={handleCreateHabit}
+        existingHabitNames={habits.map((h) => h.name)}
       />
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-primary text-[#003825] px-4 py-2 rounded-full font-mono text-xs font-bold shadow-lg shadow-primary/25 animate-in fade-in zoom-in duration-200">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-primary text-on-primary px-4 py-2 rounded-full font-mono text-xs font-bold shadow-lg shadow-primary/25 animate-in fade-in zoom-in duration-200">
           {toastMsg}
         </div>
       )}
