@@ -116,6 +116,55 @@ export function InfiniteDateStrip({
     }
   }, []);
 
+  // Tween helper: a hand-rolled rAF animation rather than behavior:'smooth'.
+  // Native smooth scrolling is ignored outright in some environments, and it
+  // cannot be eased or cancelled. Kept identical to the habits date strip.
+  const scrollAnimRef = useRef<number | null>(null);
+
+  const animateScrollLeft = useCallback(
+    (container: HTMLElement, to: number, duration = 420) => {
+      if (scrollAnimRef.current !== null) {
+        cancelAnimationFrame(scrollAnimRef.current);
+        scrollAnimRef.current = null;
+      }
+
+      const from = container.scrollLeft;
+      const delta = to - from;
+      if (Math.abs(delta) < 1) return;
+
+      if (
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
+        container.scrollLeft = to;
+        return;
+      }
+
+      const start = performance.now();
+      const step = (now: number) => {
+        const elapsed = now - start;
+        const t = Math.min(1, elapsed / duration);
+        // easeOutCubic: quick to start, gentle settle.
+        const eased = 1 - Math.pow(1 - t, 3);
+        container.scrollLeft = from + delta * eased;
+        if (t < 1) {
+          scrollAnimRef.current = requestAnimationFrame(step);
+        } else {
+          scrollAnimRef.current = null;
+        }
+      };
+      scrollAnimRef.current = requestAnimationFrame(step);
+    },
+    []
+  );
+
+  useEffect(
+    () => () => {
+      if (scrollAnimRef.current !== null) cancelAnimationFrame(scrollAnimRef.current);
+    },
+    []
+  );
+
   // Center a target date in the visible track
   const centerDate = useCallback(
     (targetDateStr: string, smooth: boolean = false): boolean => {
@@ -130,26 +179,56 @@ export function InfiniteDateStrip({
       isProgrammaticScrollRef.current = true;
       const targetLeft =
         targetEl.offsetLeft - (container.clientWidth - targetEl.clientWidth) / 2;
+      const left = Math.max(0, targetLeft);
 
-      container.scrollTo({
-        left: Math.max(0, targetLeft),
-        behavior: smooth ? "smooth" : "auto",
-      });
+      if (smooth) {
+        animateScrollLeft(container, left);
+      } else {
+        if (scrollAnimRef.current !== null) {
+          cancelAnimationFrame(scrollAnimRef.current);
+          scrollAnimRef.current = null;
+        }
+        container.scrollLeft = left;
+      }
 
       checkStickyPosition();
 
-      setTimeout(() => {
+      // Release the programmatic-scroll guard only once the movement settles,
+      // otherwise the sticky badge is recomputed mid-animation and the strip
+      // appears to jump back.
+      const release = () => {
         isProgrammaticScrollRef.current = false;
         isInitializedRef.current = true;
         checkStickyPosition();
-      }, smooth ? 250 : 30);
+      };
 
+      if (smooth) {
+        let settleTimer: ReturnType<typeof setTimeout>;
+        const onScrollEnd = () => {
+          clearTimeout(settleTimer);
+          settleTimer = setTimeout(release, 90);
+        };
+        container.addEventListener("scroll", onScrollEnd, { passive: true });
+        settleTimer = setTimeout(() => {
+          container.removeEventListener("scroll", onScrollEnd);
+          release();
+        }, 900);
+        return true;
+      }
+
+      setTimeout(release, 30);
       return true;
     },
-    [checkStickyPosition]
+    [checkStickyPosition, animateScrollLeft]
   );
 
-  // Synchronous pre-paint alignment: ensures Today is ALREADY in center before frame 0 paints
+  // Synchronous pre-paint alignment: ensures Today is ALREADY in center before
+  // frame 0 paints.
+  //
+  // Mount-only. Assigning scrollLeft on every date change overrode the
+  // animation started by centerDate() in the same tick, which made the strip
+  // snap instead of moving.
+  const didInitialAlignRef = useRef(false);
   useIsomorphicLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -158,6 +237,12 @@ export function InfiniteDateStrip({
     const targetEl = container.querySelector<HTMLElement>(
       `[data-date-pill="${target}"]`
     );
+
+    if (didInitialAlignRef.current) {
+      checkStickyPosition();
+      return;
+    }
+    didInitialAlignRef.current = true;
 
     if (targetEl && container.clientWidth > 0) {
       const targetLeft =
@@ -182,8 +267,15 @@ export function InfiniteDateStrip({
     }
   }, [selectedDate, todayStr, pastDaysOffset, checkStickyPosition]);
 
-  // Robust pixel-perfect centering fallback
+  // Pixel-perfect centering fallback.
+  //
+  // Mount-only by design. Polling with smooth=false on every date change issued
+  // an instant scrollTo in the same tick as the animation and cancelled it.
+  const didFallbackRef = useRef(false);
   useEffect(() => {
+    if (didFallbackRef.current) return;
+    didFallbackRef.current = true;
+
     const target = selectedDate || todayStr;
     if (!target) return;
 
@@ -197,7 +289,8 @@ export function InfiniteDateStrip({
     }, 30);
 
     return () => clearInterval(interval);
-  }, [centerDate, selectedDate, todayStr]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Re-center when app resumes from minimized/background state
   useEffect(() => {
@@ -250,7 +343,20 @@ export function InfiniteDateStrip({
 
   // Monitor scroll for infinite loading & sticky Today positioning
   const handleScroll = useCallback(() => {
+    // A user drag/touch takes over from any in-flight tween, otherwise the
+    // animation keeps pulling the strip back toward the selected date.
+    if (
+      scrollAnimRef.current !== null &&
+      !isProgrammaticScrollRef.current &&
+      !isPrependingRef.current
+    ) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+      isProgrammaticScrollRef.current = false;
+    }
+
     checkStickyPosition();
+
 
     // NEVER trigger infinite loads until initial centering is complete or during programmatic scroll
     if (
@@ -314,23 +420,33 @@ export function InfiniteDateStrip({
                 centerDate(item.dateStr, true);
               }}
               className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all shrink-0 cursor-pointer ${
+                // Identical to the habits date strip. The ring carries the state;
+                // an opened day has no body background of its own, because a
+                // surface colour reads as a hard rectangle inside the glow.
+                //   unselected, not today -> no ring
+                //   today, unselected     -> ring + faint wash
+                //   opened (any day)      -> ring + glow (+ stronger wash if today)
                 isSelected
-                  ? "bg-primary text-on-primary font-black shadow-md shadow-primary/25 scale-105 z-10"
+                  ? `date-ring date-ring-fade-in date-ring-glow date-ring-pulse text-primary font-bold bg-transparent ${
+                      isToday ? "date-ring-today-wash-strong" : ""
+                    } ${isToday ? "scale-[1.03]" : "scale-105"} z-10`
                   : isToday
-                  ? "bg-surface-container-high text-primary border border-primary/40 hover:border-primary/70 font-bold"
-                  : "hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface"
+                  ? "date-ring date-ring-fade-in date-ring-today-wash font-bold text-primary"
+                  : "bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline/10"
               }`}
             >
-              <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? "text-on-primary font-bold" : "text-on-surface-variant/70"}`}>
+              <span
+                className={`text-[10px] font-mono uppercase tracking-wider ${
+                  isToday || isSelected
+                    ? "text-primary font-bold"
+                    : "text-on-surface-variant/70"
+                }`}
+              >
                 {item.dayName}
               </span>
               <span
                 className={`text-sm font-bold font-mono ${
-                  isSelected
-                    ? "text-on-primary font-black"
-                    : isToday
-                    ? "text-primary font-bold"
-                    : "text-on-surface"
+                  isToday || isSelected ? "text-primary font-bold" : "text-on-surface"
                 }`}
               >
                 {item.dayNum}
@@ -401,11 +517,8 @@ export function InfiniteDateStrip({
               onSelectDate(todayStr);
               centerDate(todayStr, true);
             }}
-            className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
-              selectedDate === todayStr
-                ? "bg-primary text-on-primary font-black shadow-primary/30 border-primary"
-                : "bg-surface-container-high border-primary/50 text-primary hover:bg-surface-container-highest"
-            }`}
+            className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring date-ring-fade-in text-primary font-bold date-ring-today-wash
+              ${selectedDate === todayStr ? "date-ring-glow date-ring-pulse date-ring-today-wash-strong" : ""}`}
             title="Today (click to return)"
           >
             <span className="text-[8px] font-mono uppercase tracking-wider font-extrabold flex items-center gap-0.5">
@@ -428,11 +541,8 @@ export function InfiniteDateStrip({
               onSelectDate(todayStr);
               centerDate(todayStr, true);
             }}
-            className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 shadow-lg border transition-all active:scale-95 cursor-pointer ${
-              selectedDate === todayStr
-                ? "bg-primary text-on-primary font-black shadow-primary/30 border-primary"
-                : "bg-surface-container-high border-primary/50 text-primary hover:bg-surface-container-highest"
-            }`}
+            className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring date-ring-fade-in text-primary font-bold date-ring-today-wash
+              ${selectedDate === todayStr ? "date-ring-glow date-ring-pulse date-ring-today-wash-strong" : ""}`}
             title="Today (click to return)"
           >
             <span className="text-[8px] font-mono uppercase tracking-wider font-extrabold flex items-center gap-0.5">
