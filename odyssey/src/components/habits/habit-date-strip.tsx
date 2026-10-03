@@ -439,9 +439,14 @@ export function HabitDateStrip({
                   //   unselected, not today -> no ring
                   //   today, unselected     -> ring + faint wash
                   //   opened (any day)      -> ring + glow (+ stronger wash if today)
+                  //
+                  // An opened day must have NO background of its own. A body colour
+                  // reads as a hard-edged rectangle against the strip behind it
+                  // (measured contrast 1.45:1), which looked like a stray border
+                  // sitting inside the glow. The ring and glow are unaffected.
                   isSelected
-                    ? `date-ring date-ring-fade-in date-ring-glow date-ring-pulse text-primary font-bold ${
-                        isToday ? "date-ring-today-wash-strong" : "bg-surface-container-high"
+                    ? `date-ring date-ring-fade-in date-ring-glow date-ring-pulse text-primary font-bold bg-transparent ${
+                        isToday ? "date-ring-today-wash-strong" : ""
                       } ${isToday ? "scale-[1.03]" : "scale-105"} z-10`
                     : isToday
                     ? "date-ring date-ring-fade-in date-ring-today-wash font-bold text-primary"
