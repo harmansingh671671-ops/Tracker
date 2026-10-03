@@ -64,3 +64,16 @@ approval), **DURING** (one feature, nothing else), **AFTER** (plain-language rep
    say so plainly rather than overselling it.
 6. **A phase is not a feature.** Work one feature from the current phase at a time, in phase order.
 7. After completing a feature, **stop** and let the user decide what is next.
+---
+
+# Project memory (Hindsight)
+
+This project keeps persistent cross-session memory via Hindsight. See `docs/HINDSIGHT.md` for setup.
+
+- **Before non-trivial work**, recall prior context so you do not rediscover it.
+- **After learning something durable** (an architecture decision, a non-obvious constraint, a bug
+  and its real fix), store it.
+- Pass **full context, not a summary** - Hindsight extracts the facts itself.
+- On Windows the `uvx hindsight-embed memory ...` subcommand **does not work** (needs bash/WSL).
+  Use the REST API examples in `docs/HINDSIGHT.md`.
+- **Never** store secrets, API keys, or user PII in memory.
