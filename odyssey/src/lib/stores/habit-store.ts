@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import { getLocalTodayStr } from '../utils/habit-colors';
+import { getLocalTodayStr, isHabitScheduledOnDate } from '../utils/habit-colors';
+
+/**
+ * Reward rates. Declared as named constants per ADR 0001 section 7 -- the
+ * values are NOT yet a settled product decision, so they must live in one
+ * place and never be inlined at a call site.
+ */
+export const XP_PER_COMPLETION = 15;
+export const DIAMONDS_PER_COMPLETION = 1;
 
 export interface TemporaryWallet {
   unclaimedDays: Array<{
@@ -23,8 +31,8 @@ interface HabitState {
   loading: boolean;
   temporaryWallet: TemporaryWallet;
   fetchHabits: (userId: string, date: string) => Promise<void>;
-  fetchTemporaryWallet: (userId: string, today: string) => Promise<void>;
-  claimTemporaryWallet: (userId: string, today: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
+  fetchTemporaryWallet: (userId: string) => Promise<void>;
+  claimTemporaryWallet: (userId: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'currentStreak' | 'longestStreak' | 'totalCompletions'>) => Promise<Habit>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitLog: (userId: string, habitId: string, date: string) => Promise<boolean>;
@@ -81,18 +89,41 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     });
 
     set({ habits, todayLogs: logsMap, historyLogs: historyMap, loading: false });
-    await get().fetchTemporaryWallet(userId, date);
+    await get().fetchTemporaryWallet(userId);
   },
 
-  fetchTemporaryWallet: async (userId, today) => {
+  /**
+   * Recomputes the Temporary Wallet from habit logs.
+   *
+   * IMPORTANT: `today` is resolved internally via getLocalTodayStr() and is
+   * deliberately NOT a parameter. The wallet is anchored to the real current
+   * date, so switching the date being viewed in the UI can never move it.
+   *
+   * A day earns a reward only when every one of these holds:
+   *   - the habit was completed that day (l.completed)
+   *   - the habit was SCHEDULED for that day (ADR 0001 section 6.2)
+   *   - the day has ended (d < today), so today's figure is shown separately
+   *     as an accrual and is not yet claimable
+   *
+   * Unscheduled completions are worth nothing -- otherwise a once-a-week habit
+   * marked done on all seven days would earn seven days of rewards.
+   */
+  fetchTemporaryWallet: async (userId) => {
+    const today = getLocalTodayStr();
+
     const allLogs = await db.habitLogs
       .where('userId')
       .equals(userId)
       .filter(l => l.completed)
       .toArray();
 
+    // Count only completions of habits that were actually due that day.
+    const habitsById = new Map(get().habits.map(h => [h.id, h]));
     const countsByDate: Record<string, number> = {};
     allLogs.forEach(l => {
+      const habit = habitsById.get(l.habitId);
+      if (!habit) return; // habit deleted or not loaded -> cannot verify it was due
+      if (!isHabitScheduledOnDate(habit, l.date)) return; // ADR 0001 section 6.2
       countsByDate[l.date] = (countsByDate[l.date] || 0) + 1;
     });
 
@@ -112,8 +143,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
           unclaimedDays.push({
             date: d,
             completedCount: count,
-            xp: count * 15,
-            diamonds: count * 1,
+            xp: count * XP_PER_COMPLETION,
+            diamonds: count * DIAMONDS_PER_COMPLETION,
           });
         }
       }
@@ -128,13 +159,13 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         unclaimedDays,
         totalXp,
         totalDiamonds,
-        todayAccruedXp: todayCount * 15,
-        todayAccruedDiamonds: todayCount * 1,
+        todayAccruedXp: todayCount * XP_PER_COMPLETION,
+        todayAccruedDiamonds: todayCount * DIAMONDS_PER_COMPLETION,
       }
     });
   },
 
-  claimTemporaryWallet: async (userId, today) => {
+  claimTemporaryWallet: async (userId) => {
     const { temporaryWallet } = get();
     const { totalXp, totalDiamonds, unclaimedDays } = temporaryWallet;
 
@@ -166,7 +197,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       localStorage.setItem(key, JSON.stringify(updatedClaimed));
     }
 
-    await get().fetchTemporaryWallet(userId, today);
+    await get().fetchTemporaryWallet(userId);
     return { claimedXp: totalXp, claimedDiamonds: totalDiamonds };
   },
 
@@ -273,7 +304,10 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       }));
     }
 
-    await get().fetchTemporaryWallet(userId, date);
+    // Recompute the wallet from the real today. `date` here is the day the user
+    // toggled, which may be any past day -- it must not influence the wallet,
+    // so it is deliberately not passed (ADR 0001 section 6).
+    await get().fetchTemporaryWallet(userId);
     return isCompleted;
   },
 
