@@ -269,7 +269,7 @@ P0 Stabilise -> P1 Daily Clarity -> P2 Routines -> P3 Progression & Ambient
 | **P0-T1** | **Land the in-flight theme work** | `theme-store` + `theme-provider` + `theme-switcher` committed; D4 listener leak fixed with cleanup; light and dark visually verified on 4 routes |
 | **P0-T2** | Refresh knowledge graph | `graphify update .` run; `GRAPH_REPORT.md` commit hash matches HEAD |
 | **P0-T3** | Category normalisation groundwork | `normalizeCategory()` promoted to one shared util; type narrowed to a single documented union; alias map documented with a retirement order. **Incremental only, no big-bang rename** (see 2.5) |
-| **P0-T4** | Specify the reward economy | Written spec for profile-XP vs Temporary-Wallet-XP, when transfers happen, double-claim prevention (closes D9) |
+| **P0-T4** | Specify the reward economy | Written spec for profile-XP vs Temporary-Wallet-XP, when transfers happen, double-claim prevention (closes D9). **Done** -- see `docs/adr/0001-reward-economy.md` |
 | **P0-T5** | First tests | Vitest + `fake-indexeddb`. Cover `evaluateDayCompletion`, `calculateRank`, `build24HourlyBlocks`, `getJourneyDayNumber`, `toggleHabitLog` |
 | **P0-T6** | Adapter pattern for the native bridge | Wrap the 3 namespace aliases behind one typed module so D1 is no longer a monolith. **Behaviour-preserving.** |
 | **P0-T7** | Remove dead code | `seedInitialData()` emptied (D8) |
