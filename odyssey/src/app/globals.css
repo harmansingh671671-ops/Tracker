@@ -1,6 +1,118 @@
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 
+:root, .light {
+  --background: #F8F5FB;
+  --body-bg: linear-gradient(180deg, #ffffff 0%, #fff9f6 48%, #f4efff 100%);
+  --surface: #FFFDFF;
+  --surface-dim: #F1ECF5;
+  --surface-bright: #FFFFFF;
+  --surface-variant: #ECE6F1;
+  --surface-container-lowest: #FFFFFF;
+  --surface-container-low: #FBF9FD;
+  --surface-container: #F5F0F8;
+  --surface-container-high: #EEE8F3;
+  --surface-container-highest: #E7E0EC;
+  --outline: #D9D1E2;
+  --primary: #6C00FF;
+  --on-primary: #FFFFFF;
+  --primary-container: #EBDDFF;
+  --on-primary-container: #42128A;
+  --primary-fixed: #EBDDFF;
+  --primary-fixed-dim: #D3B6FF;
+  --on-primary-fixed: #260052;
+  --on-primary-fixed-variant: #4A2180;
+  --inverse-primary: #6C00FF;
+  --secondary: #7751A2;
+  --on-secondary: #FFFFFF;
+  --secondary-container: #E9DDF7;
+  --on-secondary-container: #4D3270;
+  --secondary-fixed: #EFE7FA;
+  --secondary-fixed-dim: #D8C8EF;
+  --on-secondary-fixed: #2D183F;
+  --on-secondary-fixed-variant: #493261;
+  --tertiary: #A45B20;
+  --on-tertiary: #FFFFFF;
+  --tertiary-container: #F5E0CA;
+  --on-tertiary-container: #70451E;
+  --tertiary-fixed: #F7E3CE;
+  --tertiary-fixed-dim: #EBC9A6;
+  --on-tertiary-fixed: #4E2F12;
+  --on-tertiary-fixed-variant: #6B4525;
+  --error: #B3261E;
+  --on-error: #FFFFFF;
+  --error-container: #FCE8E6;
+  --on-error-container: #7F1D1D;
+  --on-surface: #24212A;
+  --on-surface-variant: #625B6B;
+  --on-background: #24212A;
+  --inverse-surface: #302B35;
+  --inverse-on-surface: #F8F5FB;
+  --surface-tint: #6C00FF;
+  --journey-completed: #6C00FF;
+  --journey-upcoming: #D3B6FF;
+  --journey-node-completed-bg: #6C00FF;
+  --journey-node-completed-text: #FFFFFF;
+  --journey-node-completed-border: #9B4DFF;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0b1326;
+  --body-bg: #0b1326;
+  --surface: #0b1326;
+  --surface-dim: #0b1326;
+  --surface-bright: #31394d;
+  --surface-variant: #2d3449;
+  --surface-container-lowest: #060e20;
+  --surface-container-low: #131b2e;
+  --surface-container: #171f33;
+  --surface-container-high: #222a3d;
+  --surface-container-highest: #2d3449;
+  --outline: #2a3449;
+  --primary: #5af0b3;
+  --on-primary: #003825;
+  --primary-container: #1a382e;
+  --on-primary-container: #7bf8c2;
+  --primary-fixed: #68fcbf;
+  --primary-fixed-dim: #45dfa4;
+  --on-primary-fixed: #002114;
+  --on-primary-fixed-variant: #005137;
+  --inverse-primary: #006c4b;
+  --secondary: #bdc2ff;
+  --on-secondary: #131e8c;
+  --secondary-container: #2f3aa3;
+  --on-secondary-container: #a8afff;
+  --secondary-fixed: #e0e0ff;
+  --secondary-fixed-dim: #bdc2ff;
+  --on-secondary-fixed: #000767;
+  --on-secondary-fixed-variant: #2f3aa3;
+  --tertiary: #ffcf96;
+  --on-tertiary: #472a00;
+  --tertiary-container: #ffa929;
+  --on-tertiary-container: #6b4200;
+  --tertiary-fixed: #ffddb8;
+  --tertiary-fixed-dim: #ffb95f;
+  --on-tertiary-fixed: #2a1700;
+  --on-tertiary-fixed-variant: #653e00;
+  --error: #ffb4ab;
+  --on-error: #690005;
+  --error-container: #93000a;
+  --on-error-container: #ffdad6;
+  --on-surface: #dae2fd;
+  --on-surface-variant: #bbcac0;
+  --on-background: #dae2fd;
+  --inverse-surface: #dae2fd;
+  --inverse-on-surface: #283044;
+  --surface-tint: #5af0b3;
+  --journey-completed: #00E676;
+  --journey-upcoming: #64748b;
+  --journey-node-completed-bg: #00E676;
+  --journey-node-completed-text: #002f18;
+  --journey-node-completed-border: #69f0ae;
+  color-scheme: dark;
+}
+
 @layer base {
   *,
   *::before,
@@ -34,16 +146,9 @@
     font-family: var(--font-inter), "Inter", sans-serif;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
-  }
-  
-  :root {
-    color-scheme: light;
-  }
-
-  body {
-    background: linear-gradient(180deg, #ffffff 0%, #fff9f6 48%, #f4efff 100%);
+    background: var(--body-bg);
     background-attachment: fixed;
-    color: #24212a;
+    color: var(--on-surface);
   }
 
   h1, h2 {
