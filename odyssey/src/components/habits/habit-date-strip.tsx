@@ -316,17 +316,17 @@ export function HabitDateStrip({
                   centerDate(item.dateStr, true);
                 }}
                 className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center justify-between transition-all shrink-0 cursor-pointer select-none ${
-                  // State is carried by the ring only. Nothing is filled with the
-                  // theme colour -- the border is the single source of truth.
+                  // Nothing is filled solid. The ring carries the state, and today
+                  // additionally gets a faint wash of the theme colour.
                   //   unselected, not today -> no ring
-                  //   today, unselected   -> ring, no glow
-                  //   opened (any day)     -> ring + glow
+                  //   today, unselected     -> ring + faint wash
+                  //   opened (any day)      -> ring + glow (+ stronger wash if today)
                   isSelected
-                    ? `date-ring date-ring-glow date-ring-pulse font-bold bg-surface-container-high text-primary ${
-                        isToday ? "scale-[1.03]" : "scale-105"
-                      } z-10`
+                    ? `date-ring date-ring-fade-in date-ring-glow date-ring-pulse text-primary font-bold ${
+                        isToday ? "date-ring-today-wash-strong" : "bg-surface-container-high"
+                      } ${isToday ? "scale-[1.03]" : "scale-105"} z-10`
                     : isToday
-                    ? "date-ring font-bold bg-surface-container text-primary hover:bg-surface-bright"
+                    ? "date-ring date-ring-fade-in date-ring-today-wash font-bold text-primary"
                     : "bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline/10"
                 }`}
               >
@@ -418,11 +418,8 @@ export function HabitDateStrip({
                 onSelectDate(todayStr);
                 centerDate(todayStr, true);
               }}
-              className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring text-primary ${
-                selectedDate === todayStr
-                  ? "date-ring-glow date-ring-pulse bg-surface-container-high font-bold"
-                  : "bg-surface-container-high font-bold"
-              }`}
+              className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring date-ring-fade-in text-primary font-bold date-ring-today-wash
+                ${selectedDate === todayStr ? "date-ring-glow date-ring-pulse date-ring-today-wash-strong" : ""}`}
               title="Today (click to return)"
             >
               <span className="text-[8px] font-mono uppercase tracking-wider font-extrabold flex items-center gap-0.5">
@@ -445,11 +442,8 @@ export function HabitDateStrip({
                 onSelectDate(todayStr);
                 centerDate(todayStr, true);
               }}
-              className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring text-primary ${
-                selectedDate === todayStr
-                  ? "date-ring-glow date-ring-pulse bg-surface-container-high font-bold"
-                  : "bg-surface-container-high font-bold"
-              }`}
+              className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring date-ring-fade-in text-primary font-bold date-ring-today-wash
+                ${selectedDate === todayStr ? "date-ring-glow date-ring-pulse date-ring-today-wash-strong" : ""}`}
               title="Today (click to return)"
             >
               <span className="text-[8px] font-mono uppercase tracking-wider font-extrabold flex items-center gap-0.5">

@@ -155,6 +155,32 @@
   }
 }
 
+/* Applied to the pill itself, so the ring fades in and out with the pill's
+   state change.
+
+   IMPORTANT: this must not set opacity on the pill, or every ordinary day would
+   render invisible. The ring is a pseudo-element that is simply absent when the
+   pill is unselected, so there is nothing to fade -- `transition-all` on the
+   pill already smooths the background and text colour. Only the GLOW needs an
+   explicit transition, because box-shadow is not otherwise animated here. */
+@utility date-ring-fade-in {
+  transition:
+    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Today's body carries a faded wash of the theme colour so it reads as
+   distinct from ordinary days even at a glance. Deliberately faint -- the
+   ring is what identifies today; this only supports it. */
+@utility date-ring-today-wash {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+@utility date-ring-today-wash-strong {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
 /* Glow only. Kept separate so an unselected today stays quiet. */
 @utility date-ring-glow {
   box-shadow:

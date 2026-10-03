@@ -321,7 +321,13 @@ export default function HabitsPage() {
       {/* View Switcher Header (List vs Grid vs Heatmap) & Stats Summary */}
       <div className="flex items-center justify-between gap-2 pt-1">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-mono font-bold text-on-surface">
+          {/* Cross-fades on day change. Implemented with a CSS transition rather
+              than a keyed motion element: changing a React `key` remounts the
+              node, which leaves it on its initial state and never animates. */}
+          <span
+            key={formattedSelectedDate + percentage}
+            className="text-xs font-mono font-bold text-on-surface animate-in fade-in slide-in-from-top-1 duration-300"
+          >
             {formattedSelectedDate}{isFutureSelectedDate ? " (Upcoming)" : ""}: {completed}/{total} ({percentage}%)
           </span>
           {selectedDate !== todayStr && (
@@ -398,6 +404,12 @@ export default function HabitsPage() {
         </div>
       ) : viewMode === "list" ? (
         /* 1. LIST VIEW: Full-width interactive cards for selected date */
+        /* Each card is keyed by `${selectedDate}-${h.id}` so switching days
+           unmounts the old set and mounts a new one, which is what lets the
+           enter animation play. The date must be in the KEY, not on the parent
+           div: putting key= on the parent remounts the whole subtree including
+           AnimatePresence, which suppresses the enter transition and leaves the
+           cards stuck at the initial opacity of 0. */
         <div className="space-y-2.5">
           <AnimatePresence mode="popLayout" initial={false}>
             {habits.map((h) => {
@@ -410,15 +422,16 @@ export default function HabitsPage() {
               return (
                 <motion.div
                   layout
-                  initial={{ opacity: 0.85, y: 6, scale: 0.98 }}
+                  initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{
                     layout: { type: "spring", stiffness: 350, damping: 28 },
-                    opacity: { duration: 0.2 },
-                    scale: { duration: 0.2 },
+                    opacity: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                    scale: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                    y: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
                   }}
-                  key={h.id}
+                  key={`${selectedDate}-${h.id}`}
                   onTouchStart={(e) => startPress(h, e)}
                   onTouchMove={movePress}
                   onTouchEnd={endPress}
