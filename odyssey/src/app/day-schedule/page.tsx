@@ -821,7 +821,7 @@ function DayScheduleContent() {
                   cy="22"
                   r="17"
                   fill="transparent"
-                  stroke="#222a3d"
+                  stroke="var(--surface-container-high)"
                   strokeWidth="3.5"
                   strokeLinecap="round"
                 />
@@ -830,7 +830,7 @@ function DayScheduleContent() {
                   cy="22"
                   r="17"
                   fill="transparent"
-                  stroke="#5af0b3"
+                  stroke="var(--primary)"
                   strokeWidth="3.5"
                   strokeLinecap="round"
                   strokeDasharray="106.8"

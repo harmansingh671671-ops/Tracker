@@ -653,11 +653,11 @@ export default function StatsPage() {
               <span
                 className={`inline-block px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
                   popupDayStats.status === "fully_completed"
-                    ? "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 shadow-[0_0_10px_rgba(0,230,118,0.3)]"
+                    ? "bg-journey-completed/20 text-journey-completed border-journey-completed/40 shadow-[0_0_10px_var(--journey-completed)]/30"
                     : popupDayStats.status === "planned_unreviewed"
-                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
                     : popupDayStats.status === "mostly_reviewed" || popupDayStats.status === "partially_reviewed"
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                    ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
                     : "bg-surface-container-low text-on-surface-variant border-outline/10"
                 }`}
               >
@@ -693,7 +693,7 @@ export default function StatsPage() {
 
                   if (item.status === "completed") {
                     bgClass =
-                      "bg-[#00E676] text-on-primary font-black border-[#69f0ae] shadow-[0_0_6px_rgba(0,230,118,0.45)]";
+                      "bg-journey-completed text-on-primary font-black border-journey-node-completed-border shadow-[0_0_6px_var(--journey-completed)]/40";
                     statusTitle = `Done ✓: ${item.block?.title || "Task"}`;
                   } else if (item.status === "missed") {
                     bgClass =
@@ -720,7 +720,7 @@ export default function StatsPage() {
               {/* Hourly Heatmap Legend */}
               <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-outline/[0.08] text-[9px] font-mono text-on-surface-variant">
                 <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2 rounded-[2px] bg-[#00E676] border border-[#69f0ae] inline-block shadow-xs" />
+                  <span className="w-2.5 h-2 rounded-[2px] bg-journey-completed border-journey-node-completed-border inline-block shadow-xs" />
                   <span>Done</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -746,7 +746,7 @@ export default function StatsPage() {
               </div>
               <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Reviewed</span>
-                <span className="font-bold text-[#00E676] text-sm">{popupDayStats.reviewedHours}h</span>
+                <span className="font-bold text-journey-completed text-sm">{popupDayStats.reviewedHours}h</span>
               </div>
               <div className="p-2.5 rounded-2xl bg-surface-container-low border border-outline/[0.06]">
                 <span className="text-[10px] text-on-surface-variant block mb-0.5">Unreviewed</span>
@@ -758,7 +758,7 @@ export default function StatsPage() {
             <div className="space-y-1 pt-0.5">
               <div className="flex items-center justify-between text-[11px] font-mono">
                 <span className="text-on-surface-variant">Review Progress</span>
-                <span className="text-[#00E676] font-bold">
+                <span className="text-journey-completed font-bold">
                   {popupDayStats.plannedHours > 0
                     ? `${Math.round((popupDayStats.reviewedHours / popupDayStats.plannedHours) * 100)}%`
                     : "0%"}
@@ -766,7 +766,7 @@ export default function StatsPage() {
               </div>
               <div className="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
                 <div
-                  className="h-full bg-[#00E676] rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,230,118,0.5)]"
+                  className="h-full bg-journey-completed rounded-full transition-all duration-500 shadow-[0_0_8px_var(--journey-completed)]/50"
                   style={{
                     width: `${
                       popupDayStats.plannedHours > 0

@@ -42,8 +42,8 @@ const TIME_SLICES = [
     category: "Vitality",
     catKey: "vitality",
     color: "#34D399",
-    bgClass: "from-emerald-50 via-white to-violet-50",
-    badgeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
+    bgClass: "from-emerald-50 via-white to-violet-50 dark:from-emerald-950/50 dark:via-surface-container dark:to-violet-950/50",
+    badgeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-400",
     icon: Heart,
     desc: "Hydration, breathwork, Zone 2 movement",
   },
@@ -54,7 +54,7 @@ const TIME_SLICES = [
     category: "Deep Focus",
     catKey: "work",
     color: "#6C00FF",
-    bgClass: "from-violet-50 via-white to-violet-50",
+    bgClass: "from-violet-50 via-white to-violet-50 dark:from-violet-950/50 dark:via-surface-container dark:to-violet-950/50",
     badgeBg: "bg-primary/15 border-primary/30 text-primary",
     icon: Brain,
     desc: "Zero-distraction high cognitive output",
@@ -66,8 +66,8 @@ const TIME_SLICES = [
     category: "Renewal",
     catKey: "renewal",
     color: "#FBBF24",
-    bgClass: "from-amber-50 via-white to-violet-50",
-    badgeBg: "bg-amber-500/15 border-amber-500/30 text-amber-400",
+    bgClass: "from-amber-50 via-white to-violet-50 dark:from-amber-950/50 dark:via-surface-container dark:to-violet-950/50",
+    badgeBg: "bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-400",
     icon: Coffee,
     desc: "Clean nutrition, mental decompression",
   },
@@ -78,8 +78,8 @@ const TIME_SLICES = [
     category: "Active Sync",
     catKey: "sync",
     color: "#38BDF8",
-    bgClass: "from-sky-50 via-white to-violet-50",
-    badgeBg: "bg-sky-500/15 border-sky-500/30 text-sky-400",
+    bgClass: "from-sky-50 via-white to-violet-50 dark:from-sky-950/50 dark:via-surface-container dark:to-violet-950/50",
+    badgeBg: "bg-sky-500/15 border-sky-500/30 text-sky-700 dark:text-sky-400",
     icon: MessageSquare,
     desc: "Asynchronous updates, strategic alignments",
   },
@@ -90,8 +90,8 @@ const TIME_SLICES = [
     category: "Rest & Sleep",
     catKey: "sleep",
     color: "#818CF8",
-    bgClass: "from-indigo-50 via-white to-violet-50",
-    badgeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-400",
+    bgClass: "from-indigo-50 via-white to-violet-50 dark:from-indigo-950/50 dark:via-surface-container dark:to-violet-950/50",
+    badgeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-400",
     icon: Moon,
     desc: "Melatonin ramp, sleep architecture protection",
   },
@@ -297,7 +297,7 @@ export default function LandingPage() {
               href="/habits"
               className="w-full sm:w-auto py-3.5 px-6 rounded-2xl bg-surface-container/90 hover:bg-surface-container-high text-on-surface border border-outline/[0.12] text-sm font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-mono"
             >
-              <Sparkles className="w-4 h-4 text-sky-400" />
+              <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <span>Explore Habit Studio</span>
             </Link>
           </motion.div>
@@ -310,12 +310,12 @@ export default function LandingPage() {
             </span>
             <span className="text-on-surface/20">•</span>
             <span className="flex items-center gap-1.5 text-on-surface/90">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               <span>Battery Impact &lt;0.8%/day</span>
             </span>
             <span className="text-on-surface/20">•</span>
             <span className="flex items-center gap-1.5 text-on-surface/90">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>0 Runtime Popups</span>
             </span>
           </div>
@@ -473,7 +473,7 @@ export default function LandingPage() {
                 <div className="p-2.5 rounded-2xl bg-surface-container-low/90 border border-outline/[0.08] space-y-2">
                   <div className="flex items-center justify-between text-[10px] font-mono">
                     <span className="font-bold text-on-surface flex items-center gap-1">
-                      <Flame className="w-3 h-3 text-amber-400" />
+                      <Flame className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                       <span>Daily Habits (Tap to Test)</span>
                     </span>
                     <span className="text-primary font-bold font-mono">+{totalXpEarned} XP</span>
@@ -543,13 +543,13 @@ export default function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-on-surface">Structured Visual Schedule Rail</h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                24-hour continuous time spine with category color-coded left accents. Review past hours with 3 tactile states (<code className="text-emerald-400">✓ Done</code>, <code className="text-rose-400">✕ Missed</code>, <code className="text-on-surface-variant">◯ Open</code>) while automatically locking future slots.
+                24-hour continuous time spine with category color-coded left accents. Review past hours with 3 tactile states (<code className="text-emerald-700 dark:text-emerald-400">✓ Done</code>, <code className="text-rose-700 dark:text-rose-400">✕ Missed</code>, <code className="text-on-surface-variant">◯ Open</code>) while automatically locking future slots.
               </p>
             </div>
 
             {/* Pillar 2: HabitDriven Intelligence */}
             <div className="p-5 rounded-3xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-3 hover:border-emerald-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
                 <Layers className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-on-surface">HabitBee 3-Mode Studio</h3>
@@ -560,7 +560,7 @@ export default function LandingPage() {
 
             {/* Pillar 3: Native Live Lockscreen Engine */}
             <div className="p-5 rounded-3xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-3 hover:border-sky-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-center text-sky-400 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-center text-sky-600 dark:text-sky-400 group-hover:scale-105 transition-transform">
                 <Smartphone className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-on-surface">Live Android Lockscreen Sync</h3>
@@ -571,7 +571,7 @@ export default function LandingPage() {
 
             {/* Pillar 4: RPG Gamified Discipline */}
             <div className="p-5 rounded-3xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-3 hover:border-amber-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
                 <Award className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-on-surface">Rank Progression &amp; Vault</h3>
@@ -615,7 +615,7 @@ export default function LandingPage() {
                   cy="50"
                   r="44"
                   fill="transparent"
-                  stroke="#E7E0EC"
+                  stroke="var(--surface-container-highest)"
                   strokeWidth="5"
                 />
                 <circle
@@ -623,7 +623,7 @@ export default function LandingPage() {
                   cy="50"
                   r="44"
                   fill="transparent"
-                  stroke="#6C00FF"
+                  stroke="var(--primary)"
                   strokeWidth="5"
                   strokeDasharray="276.46"
                   strokeDashoffset={276.46 - (276.46 * holdProgress) / 100}
