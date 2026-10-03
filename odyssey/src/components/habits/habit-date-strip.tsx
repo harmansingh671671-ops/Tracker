@@ -398,10 +398,15 @@ export function HabitDateStrip({
 
       {/* Horizontal Scrollable Date Track */}
       <div className="relative w-full">
+        {/* NOTE: vertical padding is load-bearing, not cosmetic.
+            `overflow-x-auto` forces overflow-y to `auto` as well, so this
+            element clips vertically. With py-1 (4px) a 14px glow was cut
+            flat at the top and bottom edges, which rendered as a hard line
+            across the pill. The padding is sized to contain the glow. */}
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          className="flex items-center gap-1.5 overflow-x-auto py-5 px-0.5 my-[-16px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           {dateItems.map((item) => {
             const isSelected = selectedDate === item.dateStr;

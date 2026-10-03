@@ -381,12 +381,19 @@ export function InfiniteDateStrip({
   }, [checkStickyPosition, prependDays, appendDays]);
 
   return (
-    <div className="relative w-full rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-outline/[0.08] overflow-hidden select-none shadow-sm">
-      {/* Scrollable Date Track */}
+    <div className="relative w-full rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-outline/[0.08] overflow-visible select-none shadow-sm">
+      {/* Scrollable Date Track
+          NOTE: vertical padding is load-bearing, not cosmetic.
+          `overflow-x-auto` forces overflow-y to `auto` as well, so this element
+          clips vertically. With py-1.5 a 14px glow was cut flat at the top and
+          bottom edges, rendering as a hard line across the pill. The padding
+          contains the glow; the negative margin keeps the layout height the
+          same. The outer wrapper also needs overflow-visible for the same
+          reason. */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="flex items-center gap-1.5 overflow-x-auto py-5 px-2 my-[-14px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {dateItems.map((item) => {
           const isSelected = selectedDate === item.dateStr;
