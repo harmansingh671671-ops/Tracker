@@ -1,4 +1,23 @@
 graphify-out/
 .clinerules
 Design
-.agents/
+.agents/
+
+# env files - contain API keys, never commit
+.env
+.env.*
+!.env.example
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+
+# editor / IDE
+.vscode/
+
+# hindsight server output - contains request detail and bank ids
+hindsight-server.log
+hindsight-server.err.log
+hindsight-test-runs.txt
+*.pid

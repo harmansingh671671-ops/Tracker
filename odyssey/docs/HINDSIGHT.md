@@ -1,4 +1,31 @@
-# Hindsight Memory (Shared Setup)
+# Hindsight Memory (Odyssey)
+
+**This setup no longer applies to Odyssey.** It documented the previous
+OmniRoute + `uvx hindsight-embed` arrangement. OmniRoute, the profile daemon and
+the `RMSA-AI` combo have all been removed.
+
+The current bare-metal Hindsight server (Dahl as the LLM endpoint) is documented
+in the canonical location:
+
+> **[`docs/HINDSIGHT.md`](../../docs/HINDSIGHT.md)** — repo root
+>
+> Covers install, `.env` configuration, starting `hindsight-api`, the
+> retain/recall verification test, troubleshooting, and the known Dahl HTTP 429
+> limitation.
+
+Quick reference for the current arrangement:
+
+| | |
+|---|---|
+| Server | `hindsight-api` on `http://127.0.0.1:8888` |
+| LLM | Dahl — `deepseek-ai/DeepSeek-V4-Flash-0731` |
+| Config | `c:\PROJECTS\.env` (git-ignored) |
+| Verify | `.\.venv\Scripts\python.exe test_hindsight.py` |
+
+If you are reading this because you followed an old instruction and found a
+missing OmniRoute or a `uvx` command: that instruction is obsolete. Use the
+document linked above.
+
 
 Hindsight gives this project persistent, cross-session memory. An agent can **store** what it
 learned about this codebase and **recall** it later, instead of rediscovering it every session.
