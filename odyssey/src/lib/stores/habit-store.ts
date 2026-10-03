@@ -118,11 +118,15 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       .toArray();
 
     // Count only completions of habits that were actually due that day.
-    const habitsById = new Map(get().habits.map(h => [h.id, h]));
+    // Read habits from the database rather than store state: the wallet is
+    // called from several places (including a claim) and must not silently drop
+    // rewards when it runs before fetchHabits has populated `habits`.
+    const allHabits = await db.habits.toArray();
+    const habitsById = new Map(allHabits.map(h => [h.id, h]));
     const countsByDate: Record<string, number> = {};
     allLogs.forEach(l => {
       const habit = habitsById.get(l.habitId);
-      if (!habit) return; // habit deleted or not loaded -> cannot verify it was due
+      if (!habit) return; // habit hard-deleted -> cannot verify it was due
       if (!isHabitScheduledOnDate(habit, l.date)) return; // ADR 0001 section 6.2
       countsByDate[l.date] = (countsByDate[l.date] || 0) + 1;
     });

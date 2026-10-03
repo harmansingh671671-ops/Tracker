@@ -132,7 +132,11 @@ day of work.
 > that same date**. Neither condition alone is sufficient.
 
 **Existing support:** `isHabitScheduledOnDate(habit, dateStr)` in `src/lib/utils/habit-colors.ts`
-already resolves this, via `getHabitScheduledDays()`. The Temporary Wallet does not use it today.
+already resolves this, via `getHabitScheduledDays()`.
+
+**Status: implemented** in commit `67c8c5b`. The wallet applies this check, reading habits from the
+database rather than store state so it cannot silently drop rewards when it runs before
+`fetchHabits` has populated the store.
 
 **Boundary — deliberately excluded:** whether a completion counts if the habit's schedule was
 *edited retroactively* to include a past date. That needs habit edit-history, which does not exist.
@@ -153,15 +157,26 @@ behavioural drift.
 
 ## 8. Known defects in the current implementation
 
-**Not** fixed by this document. This is the implementation backlog for a follow-up feature.
+This is the implementation backlog. Status as of `67c8c5b`:
 
-| # | Defect | Rule violated |
-|---|---|---|
-| 7.1 | Claim record stored in `localStorage`, not the database | 4 |
-| 7.2 | Payout written *before* the claim record (line 145 vs 166), so a crash between them pays out twice | 4 |
-| 7.3 | No schedule check — unscheduled completions are paid | 6.2 |
-| 7.4 | Streak inflated by the number of days claimed | 5 |
-| 7.5 | `Math.max(1, unclaimedDays.length)` advances streak even on an empty claim | 5 |
+| # | Defect | Rule violated | Status |
+|---|---|---|---|
+| 7.1 | Claim record stored in `localStorage`, not the database | 4 | **Open** |
+| 7.2 | Payout written *before* the claim record, so a crash between them pays out twice | 4 | **Open** |
+| 7.3 | No schedule check — unscheduled completions are paid | 6.2 | **Fixed** (`67c8c5b`) |
+| 7.4 | Streak inflated by the number of days claimed | 5 | **Open** |
+| 7.5 | `Math.max(1, unclaimedDays.length)` advances streak even on an empty claim | 5 | **Open** |
+
+### 7.3 also fixed a date-anchoring defect
+
+`fetchTemporaryWallet(userId, today)` took the date being viewed and used it as "today", filtering on
+`d < today`. Editing any past day therefore made that day read as today: the viewed day dropped out
+of its own accrual, the day before it became claimable, and the vault moved for reasons unrelated to
+what the user did.
+
+The `today` parameter has been **removed entirely**; the wallet resolves the date via
+`getLocalTodayStr()`. No caller can move the anchor, which closes the whole class of bug rather than
+one call site.
 
 ---
 
