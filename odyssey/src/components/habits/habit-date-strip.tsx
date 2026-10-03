@@ -126,6 +126,59 @@ export function HabitDateStrip({
     }
   }, []);
 
+  // Center a target date in the visible track.
+  //
+  // Uses a hand-rolled tween rather than `behavior: "smooth"`. Native smooth
+  // scrolling is ignored outright in some environments (verified here: an
+  // "auto" scroll moved the container, a "smooth" one produced zero scroll
+  // events and no movement at all), and it also cannot be cancelled or eased
+  // to taste. The tween below works everywhere and is interruptible.
+  const scrollAnimRef = useRef<number | null>(null);
+
+  const animateScrollLeft = useCallback((container: HTMLElement, to: number, duration = 420) => {
+    if (scrollAnimRef.current !== null) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+    }
+
+    const from = container.scrollLeft;
+    const delta = to - from;
+    if (Math.abs(delta) < 1) return;
+
+    // Honour reduced-motion: jump straight to the destination.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      container.scrollLeft = to;
+      return;
+    }
+
+    const start = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / duration);
+      // easeOutCubic: quick to start, gentle settle -- reads as weight rather
+      // than a linear slide.
+      const eased = 1 - Math.pow(1 - t, 3);
+      container.scrollLeft = from + delta * eased;
+      if (t < 1) {
+        scrollAnimRef.current = requestAnimationFrame(step);
+      } else {
+        scrollAnimRef.current = null;
+      }
+    };
+    scrollAnimRef.current = requestAnimationFrame(step);
+  }, []);
+
+  // Cancel any in-flight scroll tween (e.g. the user grabs the strip).
+  useEffect(
+    () => () => {
+      if (scrollAnimRef.current !== null) cancelAnimationFrame(scrollAnimRef.current);
+    },
+    []
+  );
+
   // Center a target date in the visible track
   const centerDate = useCallback(
     (targetDateStr: string, smooth: boolean = false): boolean => {
@@ -140,26 +193,55 @@ export function HabitDateStrip({
       isProgrammaticScrollRef.current = true;
       const targetLeft =
         targetEl.offsetLeft - (container.clientWidth - targetEl.clientWidth) / 2;
+      const left = Math.max(0, targetLeft);
 
-      container.scrollTo({
-        left: Math.max(0, targetLeft),
-        behavior: smooth ? "smooth" : "auto",
-      });
+      if (smooth) {
+        animateScrollLeft(container, left);
+      } else {
+        if (scrollAnimRef.current !== null) {
+          cancelAnimationFrame(scrollAnimRef.current);
+          scrollAnimRef.current = null;
+        }
+        container.scrollLeft = left;
+      }
 
       checkStickyPosition();
 
-      setTimeout(() => {
+      // Release the programmatic-scroll guard only once the movement has
+      // settled. A fixed timeout released it early, so the sticky badge was
+      // recomputed mid-animation and the strip appeared to jump back.
+      const release = () => {
         isProgrammaticScrollRef.current = false;
         isInitializedRef.current = true;
         checkStickyPosition();
-      }, smooth ? 250 : 30);
+      };
 
+      if (smooth) {
+        let settleTimer: ReturnType<typeof setTimeout>;
+        const onScrollEnd = () => {
+          clearTimeout(settleTimer);
+          settleTimer = setTimeout(release, 90);
+        };
+        container.addEventListener("scroll", onScrollEnd, { passive: true });
+        settleTimer = setTimeout(() => {
+          container.removeEventListener("scroll", onScrollEnd);
+          release();
+        }, 900);
+        return true;
+      }
+
+      setTimeout(release, 30);
       return true;
     },
-    [checkStickyPosition]
+    [checkStickyPosition, animateScrollLeft]
   );
 
-  // Synchronous pre-paint alignment: ensures target is centered before paint
+  // Synchronous pre-paint alignment: ensures target is centered before paint.
+  //
+  // Runs ONLY on first mount. On later date changes it used to assign
+  // scrollLeft directly, which overrode the smooth scroll started by
+  // centerDate() in the same tick -- so the strip snapped instead of moving.
+  const didInitialAlignRef = useRef(false);
   useIsomorphicLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -168,6 +250,14 @@ export function HabitDateStrip({
     const targetEl = container.querySelector<HTMLElement>(
       `[data-date-pill="${target}"]`
     );
+
+    if (didInitialAlignRef.current) {
+      // Date changed after mount: let centerDate own the position, and just
+      // keep the sticky badge in sync with the new selection.
+      checkStickyPosition();
+      return;
+    }
+    didInitialAlignRef.current = true;
 
     if (targetEl && container.clientWidth > 0) {
       const targetLeft =
@@ -191,8 +281,22 @@ export function HabitDateStrip({
     }
   }, [selectedDate, todayStr, pastDaysOffset, checkStickyPosition]);
 
-  // Centering fallback
+  // Centering fallback: retries while the target pill is not yet mounted.
+  //
+  // This must NOT run on every date change. It calls centerDate(target, false),
+  // and an "auto" scrollTo to the same offset issued right after the smooth
+  // scroll began cancels that animation outright -- the strip snapped because
+  // this second call landed in the same tick. Verified by tracing scrollTo:
+  //   [{left: 2612, behavior: "smooth"}]
+  //   [{left: 2613, behavior: "auto"}]   <- killed it
+  //
+  // So it runs once on mount only, to catch late-arriving pills, and stops as
+  // soon as one is found.
+  const didFallbackRef = useRef(false);
   useEffect(() => {
+    if (didFallbackRef.current) return;
+    didFallbackRef.current = true;
+
     const target = selectedDate || todayStr;
     if (!target) return;
 
@@ -206,7 +310,9 @@ export function HabitDateStrip({
     }, 30);
 
     return () => clearInterval(interval);
-  }, [centerDate, selectedDate, todayStr]);
+    // Mount-only by design; see the comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Prepend earlier past days seamlessly
   const prependDays = useCallback(() => {
@@ -240,6 +346,18 @@ export function HabitDateStrip({
 
   // Monitor scroll for infinite loading & sticky Today positioning
   const handleScroll = useCallback(() => {
+    // A user drag/touch takes over from any in-flight tween, otherwise the
+    // animation keeps pulling the strip back toward the selected date.
+    if (
+      scrollAnimRef.current !== null &&
+      !isProgrammaticScrollRef.current &&
+      !isPrependingRef.current
+    ) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+      isProgrammaticScrollRef.current = false;
+    }
+
     checkStickyPosition();
 
     if (
