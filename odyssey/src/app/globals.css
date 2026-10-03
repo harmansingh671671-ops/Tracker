@@ -113,6 +113,69 @@
   color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------------
+   Today marker on the habit date strip.
+
+   Today is marked with a glowing ring that is deliberately left OPEN at the
+   bottom -- a small notch, so the shape reads as "current" rather than as a
+   second selected state. Implemented as a masked border ring so the gap is a
+   true transparent cut-out and the pill's own background shows through.
+   --------------------------------------------------------------------------- */
+@utility today-glow-ring {
+  position: relative;
+  isolation: isolate;
+}
+
+/* The ring itself: a conic-free approach using an inset pseudo-element so it
+   follows the pill's border radius exactly. */
+@utility today-glow-ring-after {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(
+      to bottom,
+      var(--primary) 0%,
+      var(--primary) 78%,
+      transparent 88%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 55%, transparent))
+      drop-shadow(0 0 12px color-mix(in srgb, var(--primary) 30%, transparent));
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes today-glow-pulse {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 55%, transparent))
+        drop-shadow(0 0 12px color-mix(in srgb, var(--primary) 30%, transparent));
+      opacity: 1;
+    }
+    50% {
+      filter: drop-shadow(0 0 8px color-mix(in srgb, var(--primary) 75%, transparent))
+        drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 42%, transparent));
+      opacity: 0.92;
+    }
+  }
+}
+
+/* Applied to the ring element alongside today-glow-ring-after. */
+@utility today-glow-pulse {
+  animation: today-glow-pulse 2.6s ease-in-out infinite;
+}
+
 @layer base {
   *,
   *::before,
@@ -121,7 +184,6 @@
     -webkit-user-select: none;
     user-select: none;
   }
-
   input,
   textarea,
   [contenteditable="true"],
