@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion, isAndroidNativeApp } from "@/lib/utils/android-bridge";
-import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw } from "lucide-react";
+import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 interface ProfileSettingsSheetProps {
   isOpen: boolean;
@@ -174,6 +175,22 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
               />
             </div>
           </div>
+        </div>
+
+        {/* Appearance & Theme System */}
+        <div className="rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Palette className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-on-surface">Theme &amp; Appearance</h4>
+                <p className="text-xs text-on-surface-variant">Switch light, dark, or sync with OS</p>
+              </div>
+            </div>
+          </div>
+          <ThemeSwitcher />
         </div>
 
         {/* Hourly Notification Settings */}

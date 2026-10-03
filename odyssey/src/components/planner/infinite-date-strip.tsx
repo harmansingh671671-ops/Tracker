@@ -315,21 +315,21 @@ export function InfiniteDateStrip({
               }}
               className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all shrink-0 cursor-pointer ${
                 isSelected
-                  ? "bg-surface-bright text-primary font-black shadow-md shadow-primary/20 scale-105 z-10 border-2 border-primary ring-2 ring-primary/20"
+                  ? "bg-primary text-on-primary font-black shadow-md shadow-primary/25 scale-105 z-10"
                   : isToday
                   ? "bg-surface-container-high text-primary border border-primary/40 hover:border-primary/70 font-bold"
                   : "hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? "text-primary font-bold" : ""}`}>
+              <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? "text-on-primary font-bold" : "text-on-surface-variant/70"}`}>
                 {item.dayName}
               </span>
               <span
                 className={`text-sm font-bold font-mono ${
                   isSelected
-                    ? "text-primary font-black"
+                    ? "text-on-primary font-black"
                     : isToday
-                    ? "text-primary"
+                    ? "text-primary font-bold"
                     : "text-on-surface"
                 }`}
               >

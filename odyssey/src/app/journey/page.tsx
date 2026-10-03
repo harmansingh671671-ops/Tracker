@@ -306,7 +306,7 @@ export default function JourneyPage() {
           {curvePaths.completedPath && (
             <path
               d={curvePaths.completedPath}
-              stroke="#00E676"
+              stroke="var(--journey-completed)"
               strokeWidth="4"
               strokeLinecap="round"
               fill="none"
@@ -317,7 +317,7 @@ export default function JourneyPage() {
           {curvePaths.upcomingPath && (
             <path
               d={curvePaths.upcomingPath}
-              stroke="#64748b"
+              stroke="var(--journey-upcoming)"
               strokeWidth="3"
               strokeDasharray="6 6"
               strokeLinecap="round"
@@ -406,17 +406,22 @@ export default function JourneyPage() {
                     onClick={() => handleOpenDaySchedule(node.day)}
                     className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 ${
                       dayStat.status === "fully_completed"
-                        ? "bg-[#00E676] text-[#002f18] font-black border-2 border-[#69f0ae] shadow-emerald-500/30 hover:ring-primary/40"
+                        ? "font-black border-2 shadow-emerald-500/30 hover:ring-primary/40"
                         : dayStat.status === "planned_unreviewed"
                         ? "bg-amber-500 text-white font-bold border-2 border-amber-400 shadow-amber-500/30 hover:ring-amber-400/40"
                         : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed"
                         ? "bg-emerald-600 text-white font-bold border-2 border-emerald-400 shadow-emerald-600/30 hover:ring-emerald-400/40"
                         : "bg-surface-container-high border-2 border-outline/30 text-on-surface-variant hover:border-outline/50 hover:text-on-surface hover:ring-outline/40"
                     }`}
+                    style={dayStat.status === "fully_completed" ? {
+                      backgroundColor: "var(--journey-node-completed-bg)",
+                      color: "var(--journey-node-completed-text)",
+                      borderColor: "var(--journey-node-completed-border)",
+                    } : undefined}
                     title={`Open Day ${node.day} Schedule (${dayStat.status})`}
                   >
                     {dayStat.status === "fully_completed" ? (
-                      <Check className="w-6 h-6 stroke-[3] text-[#002f18] group-hover:scale-110 transition-transform" />
+                      <Check className="w-6 h-6 stroke-[3] group-hover:scale-110 transition-transform" style={{ color: "var(--journey-node-completed-text)" }} />
                     ) : dayStat.status === "planned_unreviewed" ? (
                       <Clock className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                     ) : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed" ? (
@@ -430,13 +435,17 @@ export default function JourneyPage() {
                     onClick={() => handleOpenDaySchedule(node.day)}
                     className={`mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-colors cursor-pointer border ${
                       dayStat.status === "fully_completed"
-                        ? "bg-surface-container hover:bg-surface-container-high text-[#00E676] border-[#00E676]/30 font-bold"
+                        ? "bg-surface-container hover:bg-surface-container-high border-outline/20 font-bold"
                         : dayStat.status === "planned_unreviewed"
                         ? "bg-surface-container hover:bg-surface-container-high text-amber-400 border-amber-500/30 font-bold"
                         : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed"
                         ? "bg-surface-container hover:bg-surface-container-high text-emerald-400 border-emerald-500/30 font-bold"
                         : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant border-outline/10"
                     }`}
+                    style={dayStat.status === "fully_completed" ? {
+                      color: "var(--journey-completed)",
+                      borderColor: "color-mix(in srgb, var(--journey-completed) 30%, transparent)",
+                    } : undefined}
                   >
                     {customDayName ? (
                       customDayName

@@ -317,7 +317,7 @@ export function HabitDateStrip({
                 }}
                 className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center justify-between transition-all shrink-0 cursor-pointer select-none ${
                   isSelected
-                    ? "bg-surface-bright text-primary font-black shadow-md shadow-primary/20 scale-105 z-10 border-2 border-primary ring-2 ring-primary/20"
+                    ? "bg-primary text-on-primary font-black shadow-md shadow-primary/25 scale-105 z-10"
                     : isToday
                     ? "bg-surface-container text-primary border border-primary/40 hover:bg-surface-bright font-bold"
                     : "bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline/10"
@@ -327,7 +327,7 @@ export function HabitDateStrip({
                 <span
                   className={`text-[10px] font-mono uppercase tracking-wider ${
                     isSelected
-                      ? "text-primary font-bold"
+                      ? "text-on-primary font-bold"
                       : isToday
                       ? "text-primary font-bold"
                       : "text-on-surface-variant/70"
@@ -340,7 +340,7 @@ export function HabitDateStrip({
                 <span
                   className={`text-sm sm:text-base font-mono my-0.5 leading-tight ${
                     isSelected
-                      ? "text-primary font-black"
+                      ? "text-on-primary font-black"
                       : isToday
                       ? "text-primary font-bold"
                       : "text-on-surface font-semibold"

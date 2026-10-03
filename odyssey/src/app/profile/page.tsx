@@ -18,9 +18,11 @@ import {
   Layers,
   Heart,
   Target,
+  Palette,
 } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getRankInfo, calculateRank, RANKS } from "@/lib/utils/gamification";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -162,7 +164,22 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* 2. Personal Details (Editable) */}
+        {/* 2. Appearance & Theme Selection */}
+        <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-primary font-bold text-sm">
+              <Palette className="w-4 h-4" />
+              <span>Theme &amp; Appearance</span>
+            </div>
+            <span className="text-[11px] font-mono text-on-surface-variant">
+              Light • Dark • System
+            </span>
+          </div>
+
+          <ThemeSwitcher />
+        </section>
+
+        {/* 3. Personal Details (Editable) */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3.5">
           <div className="flex items-center gap-2 text-primary font-bold text-sm">
             <User className="w-4 h-4" />
@@ -260,7 +277,7 @@ export default function ProfilePage() {
           </form>
         </section>
 
-        {/* 3. Concrete Milestones & Stats */}
+        {/* 4. Concrete Milestones & Stats */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
           <div className="flex items-center gap-2 text-primary font-bold text-sm">
             <Target className="w-4 h-4" />
@@ -306,7 +323,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* 4. Unlocked Badges */}
+        {/* 5. Unlocked Badges */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-primary font-bold text-sm">
@@ -357,7 +374,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* 5. Account & Data Actions */}
+        {/* 6. Account & Data Actions */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
