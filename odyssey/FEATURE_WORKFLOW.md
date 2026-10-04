@@ -114,3 +114,6 @@ AFTER   ->  plain-language report, honest about visibility, committed, then STOP
 ## CURRENTLY STAGED FEATURE
 
 *(None awaiting approval. The next feature to brief is recorded here once proposed.)*
+
+**To find the next feature:** read `FEATURES.md` → section **NEXT UP**. Do not dig through the code
+or the research corpus to decide. `FEATURES.md` is the status of record.

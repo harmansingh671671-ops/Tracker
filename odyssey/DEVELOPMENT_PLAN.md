@@ -759,6 +759,10 @@ unverified work as verified.
 
 ## 8. IMMEDIATE NEXT ACTIONS
 
+> **Feature status lives in `FEATURES.md`, not here.** That file is the canonical register of what is
+> shipped, ready, blocked and gated. This section keeps the reasoning. If the two ever disagree,
+> `FEATURES.md` is the status of record and this section is the stale one — fix it.
+
 Delivered strictly one at a time per rule 6.1. Do these in order; nothing else starts until the P0
 exit gate is met.
 
