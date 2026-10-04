@@ -544,6 +544,164 @@ as arithmetic on measured counts.
 **Corrected since first write:** the original review stated the Kotlin was not compiled. That is no
 longer true — `:app:compileDebugKotlin` now exits 0 and is a required gate (rule 6.6 step 5).
 
+---
+
+## 10. CODEBASE HEALTH AUDIT (2026-10-04)
+
+**Why this section exists.** Sections 2–8 were a feature-focused review. This is a *whole-codebase*
+sweep covering everything the earlier review did not, aimed at one goal: **stop new code from
+reproducing the patterns that keep causing defects.**
+
+**Method.** Static instrumentation over the full source tree (`src/`, `android/app/src/main/`) plus a
+full `eslint` run. Every number below is counted, not estimated.
+
+### 10.1 Summary
+
+| Class | Count | Severity |
+|---|---|---|
+| **C1 Silent failures** (empty `catch`) | **77** (70 TS + 7 Kotlin) | **CRITICAL** |
+| **C2 No single source of truth** | 5 families, ~390 sites | **HIGH** |
+| **C3 React correctness** (`setState` in effect) | **21** across 18 files | **HIGH** |
+| **C4 Type-safety holes** (`any` / `!`) | **31 `any`**, 11 `!` | MEDIUM |
+| **C5 Dead code** | **92 unused**, 12 dead exports, 16 `console.log` | MEDIUM |
+| **C6 Test coverage** | 0 tests for pages/components/native | **HIGH** |
+| **C7 Accessibility** | 8 `<img>`, 3 modals w/o keyboard handling | LOW — deferred |
+
+**Totals: 157 lint findings (58 errors, 99 warnings) across the tree.**
+
+### 10.2 C1 — Silent failures · CRITICAL
+
+**70 TypeScript `try` blocks have a `catch` that does nothing. That is 67% of all 104 `try` blocks.**
+7 more on the Kotlin side. Total **77**.
+
+When something fails in Odyssey, it fails invisibly. This is the single class that explains the
+defects found earlier in this document and in the wallpaper work: a wrong default buried inside an
+empty `catch`, where nothing reports it.
+
+| File | Empty catches |
+|---|---|
+| `src/lib/utils/android-bridge.ts` | **35** |
+| `src/app/planner/page.tsx` | 6 |
+| `src/app/stats/page.tsx` | 5 |
+| `src/lib/stores/wallpaper-toggle-store.ts` | 4 |
+| `src/components/common/app-update-modal.tsx` | 3 |
+| `src/app/day-schedule/page.tsx` | 3 |
+| `src/lib/habit-cache.ts` | 2 |
+| `src/app/habits/page.tsx` | 2 |
+| `src/lib/stores/wallpaper-store.ts` | 2 |
+| 9 further files | 1 each |
+
+`android-bridge.ts` alone accounts for **half**. Its 35 empty catches sit directly on the path where
+the wallpaper default bug lived — every one is a place where a failure would be invisible on a real
+device only.
+
+**Not all 77 are defects.** Some are legitimately optional browser APIs (a `localStorage` read that
+may legitimately throw in private mode). Those get an explanatory comment instead of a log. The rest
+get real logging.
+### 10.3 C2 — No single source of truth · HIGH
+
+Every one of these is a place where the next feature will copy the existing pattern, which is how
+the count grows.
+
+| Concern | Current state | Consequence |
+|---|---|---|
+| "Is this a real Android device?" | **59 hand-written copies** of detect → call → fall back | Copies have **already drifted**. This is the `nativeEnabled \|\| webEnabled` defect (see 8.1). |
+| Dates | **101** `new Date(…)` + **25** `toLocale*` calls | No single formatting rule; timezone bugs are per-call-site |
+| Saved settings | **78** `localStorage` reads + 12 raw key strings | No typed keys; typos are silent |
+| Colours | **149** hardcoded hex values | Theme-blind — dark mode cannot be fixed properly |
+| Categories | **2 divergent unions** (`db.ts:44` vs `db.ts:59`) | `work`/`Work`, `health`/`Health`, `sleep`/`Sleep` are the *same idea*, differently spelled |
+
+`android-bridge.ts` is **1,027 lines with 35 exports**, and **11 of those exports are dead** —
+unused bridge code that has never been exercised and cannot be assumed to work.
+
+**Importers (6):** `day-schedule`, `planner`, `wallpaper`, `app-update-modal`, `app-shell`,
+`profile-settings-sheet`. Every native feature in the app funnels through this file.
+
+### 10.4 C3 — React correctness · HIGH
+
+**21 `setState`-called-synchronously-inside-`useEffect` errors**, spread across **18 files** — this
+is systemic, not localised.
+
+```
+7  day-schedule/page.tsx       4  planner/page.tsx        4  wallpaper/page.tsx
+4  evening-reminder-modal      3  edit-habit-modal        3  edit-hour-modal
+1  profile/page.tsx            1  shop/page.tsx           1  habit-date-strip
+1  habit-month-calendar        1  habit-template-library  1  journey-day-schedule
+1  profile-settings-sheet      1  day-schedule-modal      1  distribution-modal
+1  inbox-drawer                1  infinite-date-strip
+```
+
+These are cascading-render risks: state written during an effect forces at least one extra render
+pass. Two additional warnings — *"Compilation Skipped: Existing memoization could not be preserved"* —
+show the React compiler has **already given up** on preserving memoisation in two places.
+### 10.6 C5 — Dead code · MEDIUM
+
+**92 unused** declarations: **70** imported-but-unused, **22** assigned-but-never-read.
+
+Worst files: `planner/page.tsx` (12), `inbox-drawer.tsx` (11), `wallpaper-preview.tsx` (11),
+`page.tsx` (9), `day-schedule/page.tsx` (7), `shop/page.tsx` (5), `profile/page.tsx` (4).
+
+Also: **16** `console.log` left in production code, **81** `Log.d`/`Log.w` in production Kotlin,
+**12 dead exports** (11 in `android-bridge.ts`).
+
+### 10.7 C6 — Test coverage · HIGH
+
+8 suites exist, all covering **pure helper functions** (`journey`, `gamification`, `habit-colors`,
+`day-status`, `onboarding`, `wallpaper-generator`, `habit-cache`, `wallpaper-toggle-store`).
+
+**Zero tests for:** any page component, any UI component, `android-bridge.ts`, and **all Kotlin**.
+Every defect class above lives in the untested regions.
+
+### 10.8 C7 — Accessibility · LOW (deferred)
+
+8 `<img>` without `next/image`, 4 `<img>` missing `alt`, and only 3 `onKeyDown`/`aria-modal`
+occurrences across every modal in the app — so most modals are not keyboard-dismissable. No
+`onClick` on raw `div`/`span` (good). **Deferred**: real work, but not defect-causing.
+
+---
+
+### 10.9 Remediation plan
+
+Scope agreed 2026-10-04: **fix everything that can cause a defect or will bite new features
+(C1–C6). Defer C7.** Each pass is one commit and leaves the app working.
+
+| Pass | Class | What it does | Behaviour change |
+|---|---|---|---|
+| **1** | C1 | Empty `catch` → real logging (classify optional-browser cases) | None |
+| **2** | C2 | One home per concern: bridge, dates, storage, colours, categories | None intended |
+| **3** | C3, C4 | `setState`-in-effect, `any` in live paths, memoisation bailouts | None intended |
+| **4** | C5 | Delete unused + dead exports + `console.log` | None |
+| **5** | — | **ESLint guards so the above cannot return** | Build fails on new violations |
+
+**Pass 5 is what stops this audit from being undone.** The config is currently bare Next defaults,
+so nothing prevents the patterns returning. These rules make new code fail the build:
+empty `catch` · `any` · direct `localStorage` outside the storage module · direct date formatting
+outside the date module · raw hex outside colour tokens.
+
+### 10.10 Fix log
+
+| Date | Pass | Result |
+|---|---|---|
+| 2026-10-04 | Audit | Recorded. Nothing changed yet. |
+
+---
+Related: **1** `exhaustive-deps` violation, **2** `no-location-assign` (internal navigation via
+`window.location` instead of the router).
+
+### 10.5 C4 — Type-safety holes · MEDIUM
+
+**31 `any` casts** and **11 non-null assertions**, concentrated in exactly the native bridge:
+
+| File | `any` casts |
+|---|---|
+| `src/lib/utils/android-bridge.ts` | **14** |
+| `src/app/day-schedule/page.tsx` | 3 |
+| 8 further files | 1–2 each |
+
+The bridge is where types are weakest *and* where a mistake only shows up on a real phone. That
+combination is the worst case in the codebase.
+
+---
 **Confidence:** the live-wallpaper finding (2.1) is the highest-confidence item here. The 30 FPS
 loop, the full-scene re-render and the single-sine-variable are all directly readable in the source,
 and the arithmetic follows from measured per-frame allocation counts.
