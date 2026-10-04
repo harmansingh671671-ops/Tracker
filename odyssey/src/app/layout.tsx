@@ -46,20 +46,16 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const stored = readString('odyssey_theme_mode') || 'system';
-                  const stored = readString(THEME_STORAGE_KEY) || 'system';
+                  // Must stay self-contained: this runs before any bundle is
+                  // parsed, so readString/THEME_STORAGE_KEY/logWarn do not exist
+                  // here. Key must match THEME_STORAGE_KEY in theme-store.ts.
+                  var stored = localStorage.getItem('odyssey_theme_mode') || 'system';
                   var isDark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                   var root = document.documentElement;
-                  if (isDark) {
-                    root.classList.add('dark');
-                    root.classList.remove('light');
-                    root.style.colorScheme = 'dark';
-                  } else {
-                    root.classList.remove('dark');
-                    root.classList.add('light');
-                    root.style.colorScheme = 'light';
-                  }
-                } catch (e) { logWarn("layout", "browser call failed: window.matchMedia", e); }
+                  root.classList.toggle('dark', isDark);
+                  root.classList.toggle('light', !isDark);
+                  root.style.colorScheme = isDark ? 'dark' : 'light';
+                } catch (e) { /* private mode / storage disabled */ }
               })();
             `,
           }}

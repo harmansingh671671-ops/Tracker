@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
-import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion, isAndroidNativeApp } from "@/lib/utils/android-bridge";
+import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette, Image as ImageIcon } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
@@ -419,17 +419,6 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
               <span>Download APK</span>
             </button>
           </div>
-        </div>
-
-        {/* Engine Diagnostics */}
-        <div className="rounded-xl bg-surface-container-lowest p-3 border border-outline/5 text-xs text-on-surface-variant leading-relaxed">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            <span className="font-mono font-bold uppercase text-[11px] text-on-surface">Odyssey Engine Status</span>
-          </div>
-          <p className="font-mono text-[11px]">
-            {nativeVersion.isNative ? `Hybrid Native v${nativeVersion.versionName}` : `Web Shell v${latestRelease?.versionName || "1.3.3"}`} • Vercel Instant Live Deployed • Battery Impact &lt;0.8%/day
-          </p>
         </div>
 
         {/* Toast */}
