@@ -574,6 +574,14 @@ Framer Motion 13 | Recharts 3
   permission in the manifest is both Play-review surface and a false claim to the user.
 - **Kotlin is not covered by `tsc`.** Any native change is unverified until `:app:compileDebugKotlin`
   exits 0. See rule 6.6 step 5.
+- **OTA release order is strict: bump `version.json` -> rebuild the APK -> put it at
+  `public/downloads/odyssey-latest.apk` -> push.** `app/build.gradle` reads `versionCode`/`versionName`
+  straight out of `version.json`, so an APK built *before* the bump carries the old versionCode and
+  Android rejects the in-place install with `INSTALL_FAILED_VERSION_DOWNGRADE`. The API also only
+  offers an update when `latest > installed`, so bumping the version alone -- without a rebuilt APK --
+  advertises a build that cannot install. Note the download URL is fixed at
+  `/downloads/odyssey-latest.apk` in `src/app/api/app-version/route.ts`; the file must be named
+  exactly that or the download 404s.
 
 ### 5.8 Accessibility and performance floors
 

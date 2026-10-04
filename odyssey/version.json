@@ -1,13 +1,13 @@
 {
-  "versionCode": 9,
-  "versionName": "1.3.4",
-  "releaseDate": "2026-09-27",
+  "versionCode": 10,
+  "versionName": "1.3.5",
+  "releaseDate": "2026-10-04",
   "mandatory": false,
   "changelog": [
-    "Isolated Alternate Wallpapers: Independent Lock Screen and Home Screen photo selection, storage, and direct 1-tap application",
-    "Turn Off Wallpaper Safety: Required separate Lock and Home restoration wallpapers before disabling schedule wallpaper",
-    "Dynamic Live & Hourly Habits: Intelligent 4-habit routine rotation prioritized by time-of-day and cadence periods",
-    "Smart Live Date Engine: Automatically opens today's live schedule on app start and midnight rollover",
-    "Reliable In-Place APK Updater: 1-tap in-app download and native Android package installation"
+    "Big Battery Win: The live wallpaper is now static and redraws only once a minute instead of 30 times a second — far less drain, same look",
+    "Wallpaper Master Switch: Turn the whole wallpaper system on or off from Profile. It now ships OFF by default, so Odyssey never draws in the background unless you choose to",
+    "Your Own Wallpaper Stays Still: Once you pick a custom Lock or Home wallpaper, Odyssey stops refreshing altogether — no background work at all",
+    "Clock Never Lags: The wallpaper re-syncs on the exact minute boundary, so the time it shows is always right",
+    "Fixes: Lock and Home wallpapers are now restored separately when you switch the schedule wallpaper off, and an unused permission has been removed"
   ]
 }
