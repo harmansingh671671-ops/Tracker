@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate } from '../utils/habit-colors';
+import { readHabitCache, writeHabitCache } from '../habit-cache';
 
 /**
  * Reward rates. Declared as named constants per ADR 0001 section 7 -- the
@@ -28,8 +29,11 @@ interface HabitState {
   habits: Habit[];
   todayLogs: Record<string, HabitLog>; // habitId -> HabitLog
   historyLogs: Record<string, Record<string, boolean>>; // habitId -> date -> completed boolean
+  /** Date that `todayLogs` was captured for; '' when unknown. */
+  todayLogsDate: string;
   loading: boolean;
   temporaryWallet: TemporaryWallet;
+  hydrateFromCache: (userId: string, date: string) => void;
   fetchHabits: (userId: string, date: string) => Promise<void>;
   fetchTemporaryWallet: (userId: string) => Promise<void>;
   claimTemporaryWallet: (userId: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
@@ -52,6 +56,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
   todayLogs: {},
   historyLogs: {},
+  todayLogsDate: "",
   // Starts LOADING, not idle. Before the first fetch resolves there are no
   // habits and no logs, and a date strip rendering that empty store would
   // paint a confidently wrong "0/0" (and a "Rest Day" dot) that flips a moment
@@ -60,7 +65,34 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   loading: true,
   temporaryWallet: initialWallet,
 
+  /**
+   * Seeds the store from the synchronous localStorage mirror, so the very first
+   * render already has real values instead of an empty store. `loading` is left
+   * TRUE: the mirror is last-known-good, not current, so consumers must keep
+   * showing their "unknown yet" treatment until fetchHabits (the authoritative
+   * IndexedDB read) lands and clears the flag.
+   */
+  hydrateFromCache: (userId: string, date: string) => {
+    if (get().habits.length > 0) return; // real data already present
+    const cached = readHabitCache(userId);
+    if (!cached) return;
+    // `todayLogs` belongs to the day it was captured on. Habits and history are
+    // date-independent and always safe to reuse; the day-scoped slice is only
+    // reused when it is the day actually being asked for, otherwise reusing it
+    // would attribute yesterday's completions to today.
+    const todayLogsUsable = cached.capturedDate === date;
+    set({
+      habits: cached.habits,
+      historyLogs: cached.historyLogs,
+      todayLogs: todayLogsUsable ? cached.todayLogs : {},
+      todayLogsDate: todayLogsUsable ? cached.capturedDate : "",
+    });
+  },
+
   fetchHabits: async (userId, date) => {
+    // Seed from the mirror first so a fast synchronous paint is possible even
+    // though IndexedDB reads are async. IndexedDB below remains authoritative.
+    get().hydrateFromCache(userId, date);
     set({ loading: true });
     let habits = await db.habits
       .where('userId')
@@ -93,7 +125,18 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       historyMap[l.habitId][l.date] = l.completed;
     });
 
-    set({ habits, todayLogs: logsMap, historyLogs: historyMap, loading: false });
+    set({ habits, todayLogs: logsMap, historyLogs: historyMap, todayLogsDate: date, loading: false });
+
+    // Mirror the authoritative read so the next cold load can paint instantly.
+    // `logsMap` is by construction the logs for `date`, and it is stored under
+    // `capturedDate`, so hydrateFromCache can tell whether it applies.
+    writeHabitCache(userId, {
+      capturedDate: date,
+      habits,
+      todayLogs: logsMap,
+      historyLogs: historyMap,
+    });
+
     await get().fetchTemporaryWallet(userId);
   },
 
