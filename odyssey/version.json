@@ -1,13 +1,13 @@
 {
-  "versionCode": 10,
-  "versionName": "1.3.5",
+  "versionCode": 11,
+  "versionName": "1.3.6",
   "releaseDate": "2026-10-04",
   "mandatory": false,
   "changelog": [
     "Big Battery Win: The live wallpaper is now static and redraws only once a minute instead of 30 times a second — far less drain, same look",
-    "Wallpaper Master Switch: Turn the whole wallpaper system on or off from Profile. It now ships OFF by default, so Odyssey never draws in the background unless you choose to",
-    "Your Own Wallpaper Stays Still: Once you pick a custom Lock or Home wallpaper, Odyssey stops refreshing altogether — no background work at all",
-    "Clock Never Lags: The wallpaper re-syncs on the exact minute boundary, so the time it shows is always right",
-    "Fixes: Lock and Home wallpapers are now restored separately when you switch the schedule wallpaper off, and an unused permission has been removed"
+    "Wallpaper Master Switch: Turn the whole wallpaper system on or off from Settings — just tap your avatar in the top bar. It ships OFF by default, so Odyssey never draws in the background unless you ask it to",
+    "Wallpaper Corrected: Placeholder habits no longer show your real streak number beside a habit you haven't created, and damaged saved wallpaper settings now recover instead of silently resetting",
+    "Category Labels Now Consistent: A task tagged \"Work\" and one tagged \"work\" are treated as the same everywhere, so filtering, colours and the wallpaper stop disagreeing",
+    "Reliability & Speed: 77 failure points that failed silently now report what actually went wrong, and roughly 600 lines of duplicated code were consolidated — fewer surprises, less wasted battery, faster launches"
   ]
 }
