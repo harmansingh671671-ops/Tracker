@@ -20,15 +20,17 @@ plan is the *decision layer*.
 **Rule of precedence:**
 
 ```
-1. THIS DOCUMENT          (decisions, order, gates)
-2. ACTUAL CODE            (reality - code always beats docs)
-3. MASTER_TODO_REVISED.md (feature catalogue + rationale)
-4. All other Market Research files (evidence only, non-binding)
+1. main_plan.md           (order, priority, STATUS - single source)
+2. THIS DOCUMENT          (engineering conventions, workflow, conflicts)
+3. ACTUAL CODE            (reality - code always beats docs)
+4. MASTER_TODO_REVISED.md (feature catalogue + rationale)
+5. All other Market Research files (evidence only, non-binding)
 ```
 
-If this document and a Market Research file disagree, **this document wins.** If this
-document and the **code** disagree, **stop and reconcile** - one is wrong; fix it before
-work continues.
+If this document and a Market Research file disagree, **this document wins** on
+engineering and workflow. On **order and status**, `main_plan.md` wins. If
+anything disagrees with the **code**, **stop and reconcile** - one is wrong; fix
+it before work continues.
 
 ---
 
@@ -47,16 +49,20 @@ work continues.
 | `Market Research/AI_TODO.md` | Older AI list | **SUPERSEDED** by MASTER_TODO_REVISED |
 | `Market Research/Apps Videos/` | 15 competitor screen recordings | Evidence only |
 
-### 1.1 Market Research is git-ignored
+### 1.1 Market Research is tracked
 
-`.gitignore` line 52 excludes `Market Research/`. **Zero research files are tracked in git.**
+The planning docs under `Market Research/` **are** committed (they are the evidence
+base that `main_plan.md` cites by file and line number). Only
+`Market Research/Apps Videos/` is git-ignored -- 265 MB of competitor `.mp4`
+recordings that would bloat every clone and exceed GitHub's 100 MB per-file limit.
 
-Consequences everyone must know:
+Consequences:
 
-- Do **not** store acceptance criteria, status or decisions only in `Market Research/` - they will be lost.
-- All tracked status lives in this file plus git history.
-- If research must be shared across machines it needs a deliberate separate sync. Until then, treat
-  each checkout's copy as local and non-authoritative.
+- Acceptance criteria, status and decisions **must** live in `main_plan.md` at the
+  repo root, not only in `Market Research/`.
+- All tracked status lives in `main_plan.md` plus git history.
+- If the recordings must be shared across machines, that needs a deliberate
+  separate sync. Treat each checkout's copy as local.
 
 ---
 
@@ -169,66 +175,46 @@ Decision matrix section 21: `XP_Required = 100 * (Level ^ 1.5)` (L5 = 1118, L10 
 Every feature checkbox in `Market Research/` is `- [ ]`. **But Phase 1 shipped via git (`c862657`,
 `6b42b74`) without updating any checkbox.** Checkboxes are unreliable as status.
 
-> **RESOLUTION:** Section 3 is the only status record. When you finish a feature, update section 3
-> **and** tick the box. Two places, always.
+> **RESOLUTION (superseded 2026-10-05):** the status record has moved to
+> **`main_plan.md`**, which is now the single source of truth. When you finish a
+> feature, update its line in `main_plan.md`. The research checkboxes stay unticked
+> by design -- they are a frozen backlog, not a progress tracker.
 
 ---
 
-## 3. VERIFIED BASELINE -- WHAT ACTUALLY EXISTS
+## 3. VERIFIED BASELINE — STATUS NOW LIVES IN `main_plan.md`
 
-**Reconciled against source on 2026-10-03 @ `6b42b74`.** 65 TS/TSX files, 9 routes, 11 component
-directories. This table is the status record -- update it when you ship.
+> **STATUS MIGRATED (2026-10-05).** The built / not-built / technical-debt tables
+> that lived here are now maintained in **`main_plan.md` §2**, which is the single
+> status record for the project. That copy was reconciled against source at
+> `6b42b74` and has since been updated (v1.3.6 shipped, 8 test suites, D4/D7 fixed).
+>
+> **Do not re-add status tables here.** If you need to know what is built, open
+> `main_plan.md` first. This section is retained only as a pointer.
 
-### 3.1 Working, shipped, verified
+### 3.1–3.3 → see `main_plan.md`
 
-| Area | Verified working |
-|---|---|
-| **Planner** (`/planner`) | 24h inline hour blocks, NOW/NEXT, 3-state review (Unreviewed/Tick/Cross), future-hour lock, infinite date strip, inbox drawer, distribution modal, localStorage frame-0 cache |
-| **Day schedule** (`/day-schedule`) | Vertical timeline, category tags, inline task creator, category picker, sleep auto-fill (8h) |
-| **Habits** (`/habits`) | 3 view modes (list/grid/heatmap), GitHub-style heatmap 10-col, month nav + arrows, create/edit modal, template library, per-habit streaks |
-| **Journey** (`/journey`) | Scrollable day map, SVG bezier curves, dynamic past/future day counts, today-in-view tracking |
-| **Stats** (`/stats`) | Month-navigable calendar heatmap, tap-for-24h-overview, hold-to-open-planner, rank tier badge |
-| **Shop** (`/shop`) | Diamond store, streak-freeze purchase, XP boosts, daily mystery chest, reward-celebration modal |
-| **Wallpaper** (`/wallpaper`) | Live engine + static auto-updater, isolated lock/home custom photos, 1-tap apply, hourly auto-update toggle, cadence notifications, schedule sync and verify |
-| **Gamification** | XP, level, diamonds, 9 ranks (Beginner to Legend), streak, **Temporary Wallet** (claim-on-review) |
-| **Data** | Dexie `OdysseyDB`, 6 tables, compound indexes, UTC timestamps |
-| **Native** | Kotlin bridge (34 methods), Live Wallpaper Service, hourly + boot workers, cadence notifications, in-place APK updater via FileProvider |
-| **Theming** | **IN FLIGHT / UNCOMMITTED**: `theme-store.ts`, `theme-provider.tsx`, `theme-switcher.tsx`, anti-FOUC script, light/dark/system |
-
-### 3.2 Not built (researched and planned, zero code)
-
-| ID | Feature | Notes |
-|---|---|---|
-| XL14 | **Interactive onboarding flow** | No `/onboarding` route. `/` is a circadian-dial marketing page, not a first-run flow |
-| M1-M3, M6 | Local-first trust badge, **empty states**, welcome banner | Zero matches in code. Highest-ROI polish |
-| M4-M5 | All-done celebration card, creation-confirmation toast | -- |
-| M7-M12 | Last-done, capacity indicator, completion fraction, up-next ticker, period colours, wallpaper gauge | M10/M11/M12 absent from wallpaper |
-| HD11-HD12 | Morning planning / evening shutdown rituals | Evening reminder modal exists but is a nudge, not a ritual |
-| HD13-HD15 | Pomodoro, soundscapes, breathing pacer | No focus timer at all |
-| HD17-HD19 | Flexible rollover, vacation/freeze, auto-archive | Freeze exists as a *shop item* only |
-| HD21-HD24 | 52-week heatmap, deep-work accumulator, time-of-day graph, best/worst day | -- |
-| S4-S6, HD29-HD30 | Cue / why / identity fields, daily highlight, frog | -- |
-| XL1-XL4 | Avatar world, furniture sync, room themes, nudge engine | -- |
-| XL12-XL13 | Home-screen widgets, notification shade HUD | -- |
-| XL5-XL7 | App blocker, task-unlock gate, hardcore damage | **See Risk R1 -- gated** |
-| AI-1..AI-23 | All AI | Zero. Tier A/B are local math only |
-| SC1-SC10 | All social and expansion | Zero. Requires backend |
-
-### 3.3 Technical debt register
-
-| ID | Debt | Impact | Priority |
-|---|---|---|---|
-| D1 | `android-bridge.ts` ~1000 lines, 34 bridge methods, 3 namespace aliases | Highest god-node (34 edges). Any change risks breaking 16 wallpaper controls | High |
-| D2 | `useUserStore` 33 edges -- mixes profile, wallet, shop purchases, rank derivation | Split into profile/wallet/inventory slices (P3) | High |
-| D3 | Category union drift + ~50 colour aliases (see 2.5) | Every new category feature inherits the mess | High |
-| D4 | `theme-store.initTheme()` adds a `matchMedia` listener with **no cleanup** | Memory leak pattern; multiplies if `initTheme` is ever called more than once | **Fix in P0** |
-| D5 | Planner/journey/stats pages bypass Zustand, read `db` directly | Two data-access styles in one app | Medium |
-| D6 | Knowledge graph stale -- built from `efa7dc9a`, HEAD `6b42b74` | Run `graphify update .` before any impact analysis | Medium |
-| D7 | No test suite at all | 65 files, zero automated tests | High |
-| D8 | `seedInitialData()` is an **empty function** with 2 call sites | Dead code; misleading name | Low |
-| D9 | Dual XP accounting: profile XP vs Temporary Wallet XP | Reward-inflation / double-claim risk -- must be specified before P3 | **High** |
+The previous contents of this section (shipped features, not-built features, and
+the technical debt register D1–D9) are preserved verbatim in git history at commit
+`6b42b74` and in `main_plan.md` §2.1 (shipped) and §2.2 (debt register).
 
 ---
+
+### 3.1 Working, shipped, verified → moved
+
+See `main_plan.md` §2.1.
+
+### 3.2 Not built → moved
+
+See `main_plan.md` §3–§9, where every feature carries its own status.
+
+### 3.3 Technical debt register → moved
+
+See `main_plan.md` §2.2. Items D4 and D7 are now closed; the rest are tracked
+there and in Phase 1 (`P0-T3`, `P0-T6`, `P0-T7`, `DEBT`).
+
+---
+
 ## 4. PHASE PLAN
 
 Nine phases. **Each has an exit gate that must be objectively verifiable.** Do not start a phase
@@ -663,7 +649,7 @@ A feature is **done** only when all of these are true:
 - [ ] Empty, loading, error and long-content states handled
 - [ ] Offline behaviour verified (local-first is a product promise)
 - [ ] No analytics or telemetry added -- this is a local-first, zero-tracking product
-- [ ] Section 3 status table updated **and** the research checkbox ticked (see 2.8)
+- [ ] `main_plan.md` updated — checkbox **and** status, in the same commit (see 2.8)
 - [ ] Any new schema field documented in `src/lib/db.ts` with a migration note
 - [ ] **Committed** -- an uncommitted feature is not done, it is in progress
 ---
