@@ -10,20 +10,25 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ---
 
-# ⚠️ MANDATORY: Read `DEVELOPMENT_PLAN.md` BEFORE writing any code
+# ⚠️ MANDATORY: Read `main_plan.md` BEFORE writing any code
 
-**`DEVELOPMENT_PLAN.md` is the canonical source of truth for this project.** Read it before starting
-any task. It contains:
+**`main_plan.md` is the single source of truth for what gets built, in what order, and its
+status.** Read it before starting any task. It contains:
 
-- The **phase plan and order of work** — never start feature work out of order
-- **Resolved conflicts** between the Market Research documents (feature IDs, schemas, phase numbering)
-- **Binding engineering conventions** — styling, data, state, native, accessibility rules
-- **Exit gates** — the previous phase must be signed off before the next begins
-- **Definition of Done** — required before any PR is considered complete
+- **The 7-phase plan and order of work** — never start feature work out of order
+- **Every feature with its status** — `SHIPPED` / `PARTIAL` / `NOT BUILT` / `GATED`
+- **A source reference per feature** — open the cited `doc §section Lnnn` and read the full
+  spec before coding; the one-line brief is not sufficient
+- **A contradictions log (§10)** — do not implement anything listed as OPEN
+- **A binding 10-step agent workflow (§1)** and **Definition of Done**
+
+Then read `DEVELOPMENT_PLAN.md` for the **how**: engineering conventions (§5), workflow and
+process rules (§6), the risk register (§7), and resolved conflicts (§2).
 
 ### Non-negotiables
 
-1. **Never start a feature without its ID and phase** from `DEVELOPMENT_PLAN.md` §4.
+1. **Never start a feature without its ID and phase from `main_plan.md`.** If the feature is
+   not listed there, add it first, then implement it.
 2. **`src/lib/db.ts` is the canonical schema** — *not* `Market Research/MASTER_TODO_REVISED.md` §20.1,
    which is an unapproved proposal. Schema changes are additive by default and need an ADR.
 3. **`MASTER_TODO_REVISED.md` `AI-n` IDs are canonical** — *not* `AI_TODO.md`, which uses the same
@@ -32,10 +37,15 @@ any task. It contains:
    Next.js API. Do not rely on training-data knowledge.
 5. **Never raw hex in components** — use the CSS-var Tailwind tokens from `globals.css`.
 6. **Every UI change must work in light AND dark mode.**
-7. **Do not edit files in `Market Research/` for status tracking** — that folder is git-ignored.
-   Update the §3 status table in `DEVELOPMENT_PLAN.md` instead.
-8. **Phase gates are hard.** Proposing to skip a gate is a decision for the plan owner, not an
+7. **Status lives only in `main_plan.md`.** Update that feature's line (checkbox **and** status)
+   in the same commit as the code. Do not maintain status in any other document.
+8. **Code beats documents.** If `main_plan.md` disagrees with the code, the code is right —
+   fix `main_plan.md`.
+9. **Phase gates are hard.** Proposing to skip a gate is a decision for the plan owner, not an
    implementation detail.
+10. **Ask the battery question before coding** anything that runs while the app is closed:
+    what wakes the device, what is the default when state is unreadable, and what exactly
+    happens when the user turns it off. A feature that cannot be stopped is unfinished.
 
 ### Before you finish
 
@@ -43,7 +53,7 @@ any task. It contains:
 npx tsc --noEmit && npm run lint && npm run build
 ```
 
-…and satisfy the Definition of Done in `DEVELOPMENT_PLAN.md` §6.4.
+…then satisfy the Definition of Done in `main_plan.md` §1 **and** `DEVELOPMENT_PLAN.md` §6.5.
 <!-- END:nextjs-agent-rules -->
 
 ---

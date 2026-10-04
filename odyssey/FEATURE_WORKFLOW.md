@@ -1,6 +1,10 @@
 # ODYSSEY - FEATURE WORKFLOW
 
 > **This file defines how every feature is briefed, built and closed.**
+>
+> Feature **order, phase and status** come from `main_plan.md` — read it first.
+> The 10-step agent workflow and Definition of Done in `main_plan.md` §1 apply to
+> every feature; this file covers the briefing/approval conversation around them.
 > It exists so these rules are never restated in conversation.
 
 ---

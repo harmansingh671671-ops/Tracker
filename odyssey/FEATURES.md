@@ -1,4 +1,10 @@
-# ODYSSEY — FEATURE REGISTER (canonical status of record)
+# ODYSSEY — FEATURE REGISTER
+
+> **⚠️ STATUS HAS MOVED.** This register is now a **supplementary feature description**,
+> not the status record. The canonical status for every feature lives in
+> **`main_plan.md`** at the repo root, which also assigns phase and priority.
+>
+> When the two disagree, `main_plan.md` wins. Update status there, not here.
 
 > **Purpose:** one scannable answer to *what is built, what is next, and what is blocked* — without
 > reading code or digging through 126 KB of research.

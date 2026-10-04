@@ -1,5 +1,12 @@
 # Odyssey — Phase 0 Baseline Audit & Architecture Report
 
+> **⚠️ HISTORICAL SNAPSHOT + ONE KNOWN FACTUAL ERROR.**
+>
+> - **Order and status:** `main_plan.md` at the repo root. Read that first.
+> - **⚠️ §2 is wrong:** it states *"Next.js 14 Web Layer"*. The app is on **Next.js 16.3.5**.
+>   Do not trust that diagram label. See `DEVELOPMENT_PLAN.md` §2.6.
+> - Phase 0 is closed; its status tables have moved to `main_plan.md` §2.
+
 **Version:** 1.0.0 (Phase 0 Complete)  
 **Date:** October 2, 2026  
 **Scope:** Active Codebase Audit, AST Dependency Analysis, Single Source of Truth Contract, Android Native Feasibility, and Phase 1 Handoff.

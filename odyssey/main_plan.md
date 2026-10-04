@@ -741,7 +741,7 @@ src: `DEVELOPMENT_PLAN.md §2.8 L167`
 | `Market Research/PHASE_0_AUDIT_REPORT.md` | Verified-vs-assumed audit | Reference — **factual error: says Next.js 14; app is 16.3.5** |
 | `Market Research/TODO.md` | Older non-AI list | **SUPERSEDED** archive |
 | `Market Research/AI_TODO.md` | Older AI list | **SUPERSEDED** archive — ⚠️ ID collision, see C7 |
-| `Market Research/MASTER_TODO.md` | Older combined list | **SUPERSEDED** archive |
+| `Market Research/MASTER_TODO.md` | Older combined list | **SUPERSEDED** archive — despite its title, it is **not** the single source of truth |
 | `Market Research/App_Reviews.md`, `Review_Analysis.md`, `UI_UX_review.md` | Competitor evidence | Evidence only |
 | `Market Research/Habit Research/`, `Schedule Research/` | Habit science, competitor tables | Evidence only |
 | `Market Research/Apps Videos/` | 15 competitor recordings | Local only — **git-ignored** (265 MB) |
@@ -771,3 +771,4 @@ superseded archives contribute no features that are absent above.
 | Date | Change |
 |---|---|
 | 2026-10-05 | **Created.** Migrated the status record from `DEVELOPMENT_PLAN.md` §3 (reconciled against `6b42b74`); consolidated all six backlog docs into the 7 owner-defined phases; recorded 9 contradictions (4 open). Market Research docs un-ignored so they are tracked. |
+| 2026-10-05 | **Propagated the new rules across all docs.** `AGENTS.md` now mandates `main_plan.md` first (status rule, code-beats-docs, battery question added as non-negotiables); `.clinerules` gained a §0 Source of Truth section; `FEATURES.md` dropped its "canonical status of record" claim; `MASTER_TODO_REVISED`, `PRODUCTION_PLAN`, `MASTER_TODO`, `TODO`, `AI_TODO` and `PHASE_0_AUDIT_REPORT` all carry headers pointing here and marking their own phase numbers non-binding; `DEVELOPMENT_PLAN.md` §4 maps its P0–P8 onto Phases 1–7. |

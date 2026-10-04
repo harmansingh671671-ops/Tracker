@@ -1,4 +1,16 @@
 # ODYSSEY — AI FEATURES TODO
+
+> **⚠️ FROZEN ARCHIVE — DO NOT USE AS A WORK LIST.**
+>
+> - **Order and status:** `main_plan.md` at the repo root. Read that first.
+> - **Feature definitions:** `MASTER_TODO_REVISED.md` §5 (I-series) and §19 (AI-1..AI-23).
+>
+> ⚠️ **ID COLLISION:** this file and `MASTER_TODO_REVISED.md` both use `AI-n` with
+> **different meanings** — e.g. `AI-1` and `AI-13` describe different features in each.
+> **Never cite an `AI-n` ID from this file.** `MASTER_TODO_REVISED.md` is canonical.
+> See `main_plan.md` §10 contradiction **C7**.
+>
+> Its summary count is also unreliable (claims 22, the list runs to AI-23).
 ## All AI-Powered Features · Sorted by Effort (Smallest → Largest)
 ## Rule-based v1 first, LLM upgrade later
 

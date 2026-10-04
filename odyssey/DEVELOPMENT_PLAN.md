@@ -217,6 +217,17 @@ there and in Phase 1 (`P0-T3`, `P0-T6`, `P0-T7`, `DEBT`).
 
 ## 4. PHASE PLAN
 
+> **⚠️ ORDER AND STATUS → `main_plan.md`.** The seven phases that actually govern
+> build order live in **`main_plan.md`**. The nine-phase scheme below is retained
+> because it still explains *why* the work was sequenced that way and carries the
+> exit gates — but its numbering is **not** the build order, and it disagrees with
+> `main_plan.md` (notably this document's P4/P5 are AI/Social, while `main_plan.md`
+> places Social at Phase 4 and AI at Phase 7).
+>
+> `DEVELOPMENT_PLAN.md` P0–P3 map to `main_plan.md` Phase 1–3; P4–P5 map to
+> `main_plan.md` Phase 7 and 4 respectively; P6–P8 are covered by `main_plan.md`
+> Phase 6. **Use `main_plan.md` to decide what to build next.**
+
 Nine phases. **Each has an exit gate that must be objectively verifiable.** Do not start a phase
 until the previous gate is met and recorded in git.
 

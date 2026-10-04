@@ -1,4 +1,14 @@
 # ODYSSEY — MASTER FEATURE TODO
+
+> **⚠️ FROZEN ARCHIVE — DO NOT USE AS A WORK LIST.**
+>
+> - **Order and status:** `main_plan.md` at the repo root. Read that first.
+> - **Feature definitions:** `MASTER_TODO_REVISED.md` §5 (A–J catalogue) and §19 (production
+>   matrix). Those already deduplicate everything in this file.
+>
+> Every feature below has a canonical ID in `MASTER_TODO_REVISED.md` and a phase in
+> `main_plan.md`. Do not implement an item from here directly — find its canonical
+> ID and work from that.
 ## All Non-AI Features · Sorted by Effort (Smallest → Largest)
 ## Check off what you want to build. Leave unchecked what you don't.
 

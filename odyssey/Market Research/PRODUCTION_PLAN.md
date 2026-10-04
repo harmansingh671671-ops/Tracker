@@ -1,5 +1,15 @@
 # Odyssey — Production Plan
 
+> **⚠️ SUPERSEDED ON ORDER AND STATUS.** Feature order, phase assignment and status
+> live in **`main_plan.md`** at the repo root. Read that first.
+>
+> This document's Phase 0–7 framing is **retained as narrative context only**. Its
+> numbering does **not** match `main_plan.md` — notably it places Social (P4) before
+> AI (P5), whereas `main_plan.md` and `DEVELOPMENT_PLAN.md` §2.3 deliberately do the
+> reverse. See `main_plan.md` §10 contradiction **C1**.
+>
+> Do not use these phase numbers to decide what to build next.
+
 **Purpose:** Provide the staged production roadmap for turning the Market Research folder into Odyssey: an all-ages, Android-first self-improvement app for habits, schedules, focus, reflection, and motivating personal progress.
 
 **Plan sources:** MASTER_TODO_REVISED.md is the current consolidated product guide. It combines the written competitor reviews, app recordings and UI notes, Habit Research, Schedule Research, TODO.md, AI_TODO.md, and the earlier master backlog. This plan sorts those findings into production phases and records the decisions that should guide implementation.

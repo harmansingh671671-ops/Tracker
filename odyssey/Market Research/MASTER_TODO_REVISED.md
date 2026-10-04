@@ -1,5 +1,18 @@
 # Odyssey Product Research and Production Guide
 
+> **⚠️ THIS IS NOT THE WORK LIST.** Feature **order** and **status** live in
+> **`main_plan.md`** at the repo root — read that first. This document is the
+> **evidence base**: full specifications, rationale, competitor analysis and habit
+> science. It is the source that `main_plan.md` cites by section and line.
+>
+> This document also defines three of its own phase schemes (§8 Phase 0–5 and §19
+> Phase 1–5), which **do not match each other** and **do not match `main_plan.md`'s
+> 7 phases.** Those phase numbers are non-binding. Where they conflict, `main_plan.md`
+> wins. Known disagreements are logged in `main_plan.md` §10.
+>
+> Checkboxes here are `- [ ]` by design and are **not** a progress tracker —
+> Phase 1 shipped without ticking any. Never update status here.
+
 **Purpose:** A consolidated guide to the market research, personal competitor reviews, screenshots, recorded walkthrough notes, habit-science brainstorms, and proposed feature backlogs in this folder.
 
 **Scope:** This guide now covers every research document and non-video asset, including MASTER_TODO.md after the user's follow-up request. Repeated ideas are merged into one feature specification; related but distinct behaviors are kept separate.

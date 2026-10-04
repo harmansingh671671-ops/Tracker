@@ -1,4 +1,12 @@
 # ODYSSEY — THE ULTIMATE MASTER PRODUCTION ROADMAP & FEATURE SPECIFICATION
+
+> **⚠️ SUPERSEDED — THIS IS NOT THE SINGLE SOURCE OF TRUTH.**
+> Despite the title, that role now belongs to **`main_plan.md`** at the repo root, which
+> holds feature order, phase assignment and status. Read that first.
+>
+> This document remains useful as **detailed UI/UX specification and design-system
+> rationale**. Where it conflicts with `main_plan.md`, `main_plan.md` wins.
+> See `DEVELOPMENT_PLAN.md` §1 (Document Authority Map).
 ## The Single Source of Truth for Architecture, UI/UX Design System, Feature Specifications, and Production TODOs
 > **Document Purpose:** This is the complete blueprint for Odyssey. It combines every user review, competitor insight, visual video analysis, behavioral psychology principle, gamification mechanism, and AI algorithm into an exhaustive, actionable production manual. No other document is required to build the app.
 
