@@ -366,9 +366,6 @@ export default function StatsPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-on-surface truncate">{rankInfo.name}</h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 text-[10px] font-mono font-bold whitespace-nowrap">
-                  {rankInfo.division} Division
-                </span>
               </div>
               <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-mono text-on-surface-variant mt-1">
                 <span className="inline-flex items-center gap-1 text-primary whitespace-nowrap font-semibold">

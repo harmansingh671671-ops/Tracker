@@ -401,23 +401,8 @@ function PlannerContent() {
     });
 
     const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
-    let capacityLabel = "Open Slate";
-    let capacityColor = "text-on-surface-variant/70 bg-surface-container-high border-outline/10";
-    if (focusH > 0 && focusH <= 3) {
-      capacityLabel = "Light Flow";
-      capacityColor = "text-emerald-400 bg-emerald-500/15 border-emerald-500/30";
-    } else if (focusH <= 6) {
-      capacityLabel = "Steady Load";
-      capacityColor = "text-sky-400 bg-sky-500/15 border-sky-500/30";
-    } else if (focusH <= 8) {
-      capacityLabel = "Full Focus";
-      capacityColor = "text-amber-400 bg-amber-500/15 border-amber-500/30";
-    } else if (focusH > 8) {
-      capacityLabel = "Heavy Load";
-      capacityColor = "text-rose-400 bg-rose-500/15 border-rose-500/30";
-    }
 
-    return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal, capacityLabel, capacityColor };
+    return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
   }, [full24Hours]);
 
   // Helper to determine canonical category type for adjacent grouping
@@ -990,12 +975,8 @@ function PlannerContent() {
                 <Clock className="w-3.5 h-3.5 text-primary" />
                 <span>Daily Schedule Rail</span>
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${categoryStats.capacityColor}`}>
-                {categoryStats.capacityLabel}
-              </span>
             </div>
             <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
-              <span suppressHydrationWarning>Scheduled: {categoryStats.plannedTotal} Hours</span>
               <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
             </div>
           </div>

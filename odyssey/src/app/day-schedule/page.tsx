@@ -823,10 +823,6 @@ function DayScheduleContent() {
             <p className="text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5 font-mono">
               {dayName && <span className="text-primary font-semibold">Day {displayDay} • </span>}
               <span>{dateStr ? formatDateDisplay(dateStr) : ""}</span>
-              <span className="text-outline">•</span>
-              <span className="text-primary font-semibold">
-                {categoryStats.plannedTotal}/24 Hours
-              </span>
             </p>
           </div>
 
