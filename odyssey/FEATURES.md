@@ -28,12 +28,39 @@ against the research corpus when it is available, but the register never *requir
 
 | # | ID | What | Why it is next |
 |---|---|---|---|
-| 1 | **P0-T6** | Native bridge adapter layer | 34 methods, ~1000 lines, dual `window.OdysseyAndroid \|\| window.Android` checked inline at call sites. Highest god-node (D1, R3). The graph is now current, so its blast radius can be measured rather than guessed. |
-| 2 | **P0-T3** | Category normalisation | Two divergent unions live side by side (`db.ts` lines 44 and 59); every new category feature inherits it (D3). Needs a written decision on the canonical set. |
+| 1 | **XL14** | Interactive onboarding (P1) | **Next feature.** No `/onboarding` route exists; `/` is a marketing dial, not a first-run flow. Largest gap between the app and its own research. |
+| 2 | M1–M3, M6 | Empty states, trust badge, welcome banner (P1) | Highest-ROI polish after onboarding. |
+| 3 | HD13–HD15 | Pomodoro, soundscapes, breathing pacer (P2) | There is no focus timer at all. |
 
-**First user-facing feature once P0 closes: `XL14` — interactive onboarding.** No `/onboarding`
-route exists today; `/` is a marketing dial, not a first-run flow. Largest gap between the app and
-its own research, and P1's highest-ROI item.
+---
+
+## ✅ CLEANUP CAMPAIGN COMPLETE (2026-10-04, phase P8)
+
+All five passes landed and are committed **locally**. `FEATURES.md` is now the single status of
+record; this section is the only place that needs updating per feature.
+
+| | Before | After |
+|---|---|---|
+| Silent failures (empty `catch`) | 77 | **0** |
+| `any` casts | 31 | **0** |
+| Direct `localStorage` call sites | 85 | **0** |
+| Direct bridge-namespace references | 59 | **1** (the resolver itself) |
+| `android-bridge.ts` | 1027 lines | **813 lines** |
+| Divergent category unions | 2 | **1** + normalizer |
+| Lint guard rules | **0** | **6**, all passing |
+
+Gates: `tsc` 0 · 8/8 tests · `build` compiled · `:app:assembleDebug` exit 0 · verified in a
+real browser (`/stats`, `/planner`, `/wallpaper`).
+
+**Deliberately not done** — none of these are blocking, none are defects:
+21 `setState`-in-effect warnings (need per-site judgement; a wrong guard is worse than none),
+~100 unused imports (dead weight only), 149 hardcoded hex colours and 101 `new Date` call sites
+(both would change what users see, so they need visual review rather than a sweep).
+
+**Before the first feature:** push is enough for web-only work, but this session's wallpaper
+changes are **native** and need an APK rebuild — see `DEVELOPMENT_PLAN.md` 5.7 for the OTA order.
+
+---
 
 ---
 
@@ -125,9 +152,9 @@ Verified by building, compiling, and (where possible) running it.
 
 | ID | Debt | Status |
 |---|---|---|
-| D1 | `android-bridge.ts` ~1000 lines, 34 methods, dual-namespace inline checks | **OPEN** — highest god-node. P0-T6 addresses it |
+| D1 | `android-bridge.ts` dual-namespace checks duplicated 59x | **CLOSED** (P8 pass 2) — one resolver, 1027→813 lines |
 | D2 | `useUserStore` 33 edges — profile + wallet + shop + rank in one store | **OPEN** — split in P3 |
-| D3 | Category union drift, ~50 colour aliases | **OPEN** — P0-T3 |
+| D3 | Divergent category unions | **CLOSED** (P8 pass 2) — 50 colour aliases remain, see 10.11 |
 | D4 | `theme-store` `matchMedia` listener leak | **CLOSED** (P0-T1) |
 | D5 | Planner/journey/stats bypass Zustand, read `db` directly | **OPEN** — two data-access styles |
 | D6 | Knowledge graph stale | **CLOSED** (P0-T2) — rebuilt from `dda4383d`; report now tracked in git |

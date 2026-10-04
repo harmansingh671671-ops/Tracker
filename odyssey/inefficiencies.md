@@ -683,7 +683,26 @@ outside the date module · raw hex outside colour tokens.
 | Date | Pass | Result |
 |---|---|---|
 | 2026-10-04 | Audit | Recorded. Nothing changed yet. |
-| 2026-10-04 | **Pass 1** | **77/77 empty catches eliminated.** Added `src/lib/utils/logger.ts` (`logWarn`/`logError`). TS: 70 → 0 across 16 files. Kotlin: 7 → 0 across 2 files. Messages name the actual failed operation rather than a generic string. **Zero behaviour change.** |
+| 2026-10-04 | **Pass 1** | **77/77 empty catches eliminated.** Added `src/lib/utils/logger.ts` (`logWarn`/`logError`). TS: 70 → 0 across 16 files. Kotlin: 7 → 0 across 2 files. Messages name the actual failed operation. **Zero behaviour change.** |
+| 2026-10-04 | **Pass 2** | Typed storage module; 85 call sites migrated. Bridge alias resolved once — direct `window.OdysseyAndroid`/`window.Android` references **59 → 1**, file **1027 → 813 lines**. Two divergent category unions unified (`normalizeCategory` + 8 new tests). |
+| 2026-10-04 | **Pass 3/4 (C4)** | **All 31 `any` casts removed.** Two real defects fixed: placeholder habits rendered the *user's real streak* on the wallpaper; `edit-hour-modal` cast a status the modal cannot represent. |
+| 2026-10-04 | **Pass 5** | **Six lint guards added, all reporting 0:** empty `catch`, `any`, direct `localStorage`, direct bridge namespaces, `eqeqeq`, `prefer-const`. Each boundary rule exempts exactly one file — the module that owns the concern. |
+
+### 10.11 What is still open, and why
+
+| Item | Count | Why it was not forced |
+|---|---|---|
+| `react-hooks/set-state-in-effect` | 21 | Real cascading-render risk, but most are legitimate async-fetch patterns. Fixing them mechanically would change behaviour, so each needs individual judgement. **Not guarded** — a wrong guard here would be worse than none. |
+| Unused imports | ~100 | Dead weight, zero defect risk. A scripted removal was unreliable (two script bugs below), so they were left rather than half-fixed. |
+| Direct `window.*` bridge access | 0 | Resolved by the resolver. Guarded. |
+| Hardcoded hex colours | 149 | Theme migration, not a correctness fix. Changing them alters rendered output and needs visual review per screen. Deliberately deferred. |
+| Date formatting spread | 101 `new Date` | Same — needs per-site review to avoid changing what users see. |
+
+**Two script failures worth remembering**, both caught by `tsc` rather than by the script
+reporting success: a PowerShell function defined *inside* a loop silently no-opped, and
+`"str" + @array` concatenates element-wise, merging import names into one identifier. Both
+were rebuilt to take ESLint's own output as the source of truth instead of a regex over
+file text.
 
 ---
 Related: **1** `exhaustive-deps` violation, **2** `no-location-assign` (internal navigation via
