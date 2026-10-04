@@ -49,8 +49,15 @@ const WEEKDAY_NAMES = ["M", "T", "W", "T", "F", "S", "S"];
 export default function StatsPage() {
   const router = useRouter();
   const { user, fetchUser } = useUserStore();
-  // Master wallpaper switch -- gates the Wallpaper Studio entry point.
-  const wallpaperToggle = useWallpaperToggle();
+  // Master wallpaper switch -- gates the Wallpaper Studio entry point. Individual
+  // selectors, not the whole store object, so ordinary store writes (e.g. the
+  // `loaded` flag) do not re-render this entire page.
+  const wallpaperEnabled = useWallpaperToggle((s) => s.enabled);
+  const refreshWallpaperToggle = useWallpaperToggle((s) => s.refresh);
+  // Until the authoritative state has been resolved for THIS visit we render no
+  // wallpaper UI at all. Fail-closed: showing the card and then hiding it would
+  // flash a feature the user may have already switched off.
+  const [wallpaperResolved, setWallpaperResolved] = useState(false);
   const [totalPlannedHours, setTotalPlannedHours] = useState(0);
   const [allBlocks, setAllBlocks] = useState<ScheduleBlock[]>([]);
 
@@ -80,14 +87,24 @@ export default function StatsPage() {
 
   useEffect(() => {
     fetchUser();
-    wallpaperToggle.refresh();
     db.scheduleBlocks.toArray().then((blocks) => {
       setAllBlocks(blocks);
       setTotalPlannedHours(blocks.length);
     });
-    // refresh is stable on the zustand store; mount-only read is intentional.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUser]);
+
+  // Resolve native state separately, and only reveal the studio once it has
+  // actually answered -- see wallpaperResolved above.
+  useEffect(() => {
+    let cancelled = false;
+    refreshWallpaperToggle().finally(() => {
+      if (cancelled) return;
+      setWallpaperResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshWallpaperToggle]);
 
   // Compute day completion stats for all recorded dates
   const dayStatsByDate = useMemo(() => {
@@ -517,8 +534,9 @@ export default function StatsPage() {
 
       {/* WALLPAPER STUDIO GATEWAY CARD -- hidden entirely when the wallpaper
           master switch is off, so the feature is unreachable rather than
-          merely inert. */}
-      {wallpaperToggle.enabled && (
+          merely inert. Also hidden until the authoritative state resolves, so
+          a switch flipped elsewhere never flashes this card on arrival. */}
+      {wallpaperResolved && wallpaperEnabled && (
         <Link
           href="/wallpaper"
           className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-surface-container-low via-surface-container-low to-background border border-primary/30 hover:border-primary/60 p-4 sm:p-5 shadow-[0_0_24px_rgba(108,0,255,0.08)] hover:shadow-[0_0_32px_rgba(108,0,255,0.18)] transition-all duration-300 block"
