@@ -1037,7 +1037,10 @@ function PlannerContent() {
             return (
               <div
                 key={group.id}
-                className={`rounded-3xl border border-indigo-500/30 bg-indigo-950/20 backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                // Same palette as every other category group. This branch used
+                // to hardcode `bg-indigo-950/20`, which is a dark navy at 20%
+                // and reads as a flat grey plate over a light page.
+                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
                   isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
                 }`}
               >
