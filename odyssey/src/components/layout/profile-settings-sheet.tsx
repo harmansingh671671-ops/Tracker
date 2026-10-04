@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion, isAndroidNativeApp } from "@/lib/utils/android-bridge";
-import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette } from "lucide-react";
+import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
+import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette, Image as ImageIcon } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 interface ProfileSettingsSheetProps {
@@ -25,9 +27,21 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
   });
   const [latestRelease, setLatestRelease] = useState<{ versionCode: number; versionName: string } | null>(null);
 
+  // Master wallpaper switch. This sheet is the ONLY settings surface reachable
+  // from the UI (the header avatar opens it), so the control that stops all
+  // background wallpaper work has to live here.
+  // Selectors are used individually: taking the whole store object into the
+  // effect deps would re-run the effect on every store write.
+  const wallpaperEnabled = useWallpaperToggle((s) => s.enabled);
+  const setWallpaperEnabled = useWallpaperToggle((s) => s.setEnabled);
+  const refreshWallpaperToggle = useWallpaperToggle((s) => s.refresh);
+
   useEffect(() => {
     if (isOpen) {
       fetchUser();
+      // Resolve the authoritative (native) wallpaper state every time the sheet
+      // opens, so the toggle can never show a stale value.
+      void refreshWallpaperToggle();
       setNativeVersion(getNativeAppVersion());
       fetch("/api/app-version", { cache: "no-store" })
         .then((res) => res.json())
@@ -44,7 +58,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
       db.scheduleBlocks.count().then(setTotalBlocks);
       db.habits.count().then(setTotalHabits);
     }
-  }, [isOpen, fetchUser]);
+  }, [isOpen, fetchUser, refreshWallpaperToggle]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -105,6 +119,14 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
   const handleTestHourlyAlert = () => {
     sendTestNotificationToAndroid("NOW", "Deep Monotasking Sprint", "Focus");
     showToast("Sent XX:57 heads-up test alert via native engine.");
+  };
+
+  // Closes the sheet before routing, otherwise the sheet stays mounted over
+  // the destination page.
+  const router = useRouter();
+  const handleOpenWallpaperStudio = () => {
+    onClose();
+    router.push("/wallpaper");
   };
 
   if (!isOpen) return null;
@@ -227,6 +249,48 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           >
             <span>⚡ Send Test XX:57 Notification</span>
           </button>
+        </div>
+
+        {/* Odyssey Wallpaper -- master switch, OFF by default.
+            Deliberately placed next to the Heads-Up Alert toggle: both control
+            background work that continues while the app is closed. */}
+        <div className="rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <ImageIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-on-surface">Odyssey Wallpaper</h4>
+                <p className="text-xs text-on-surface-variant">Put your schedule on Lock &amp; Home screens</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+              <input
+                type="checkbox"
+                checked={wallpaperEnabled}
+                onChange={(e) => void setWallpaperEnabled(e.target.checked)}
+                className="sr-only peer"
+                aria-label="Toggle Odyssey wallpaper"
+              />
+              <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-surface-container peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container after:rounded-full after:h-5 after:w-5 after:transition-all" />
+            </label>
+          </div>
+
+          <p className="text-[11px] font-mono text-on-surface-variant/90 leading-relaxed">
+            {wallpaperEnabled
+              ? "On. Lock & Home show your live schedule. Turning this off restores your own wallpapers and stops all background wallpaper work."
+              : "Off. Nothing runs in the background and your own wallpapers are left untouched. Turn this on, then choose a wallpaper in Wallpaper Studio."}
+          </p>
+
+          {wallpaperEnabled && (
+            <button
+              onClick={handleOpenWallpaperStudio}
+              className="w-full py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-bright text-xs font-mono font-medium text-primary transition-colors flex items-center justify-center gap-2"
+            >
+              <span>Open Wallpaper Studio →</span>
+            </button>
+          )}
         </div>
 
         {/* Circadian Sleep & Rhythm Boundaries */}
