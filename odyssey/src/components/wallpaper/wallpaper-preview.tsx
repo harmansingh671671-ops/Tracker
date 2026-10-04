@@ -234,62 +234,14 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 3. CORE 24-HOUR SPECTRUM BAR */}
-      <div className="px-4 w-full z-10 mt-2">
-        <div className="rounded-2xl p-2.5 px-3 bg-[#13151D]/75 border border-white/15 backdrop-blur-md flex flex-col gap-1.5 shadow-lg">
-          {/* Multi-segmented Timeline Bar (24 individual 1-hour slots) */}
-          <div className="relative w-full pt-1 pb-8">
-            <div className="h-2.5 w-full bg-slate-900 rounded-full flex overflow-hidden border border-white/15 shadow-inner">
-              {all24HourlyBlocks.map((b) => {
-                const widthPct = (1 / 24) * 100;
-                const theme = getCategoryTheme(b.category);
-                const isActiveHour = b.hour === activeHour;
-                return (
-                  <div
-                    key={b.hour}
-                    style={{ width: `${widthPct}%`, backgroundColor: theme.color }}
-                    className={`border-r border-black/40 h-full transition-all ${
-                      isActiveHour ? "brightness-150 contrast-125" : "opacity-80"
-                    }`}
-                    title={`${b.startTime} - ${b.endTime}: ${b.title} (${theme.label})`}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Active Time Needle Marker - Large Radiant Glowing Beacon (Larger than bar!) */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 -ml-3 pointer-events-none flex flex-col items-center transition-all duration-300 z-10"
-              style={{
-                left: `${Math.min(
-                  96,
-                  Math.max(
-                    4,
-                    ((activeHour + (activeHourOverride !== null ? 0.5 : currentMinute / 60)) / 24) * 100
-                  )
-                )}%`,
-              }}
-            >
-              {/* Beacon layers */}
-              <div className="flex items-center justify-center relative">
-                {/* Tier 1: Soft Ambient Radiant Aura */}
-                <div className="absolute w-9 h-9 rounded-full bg-amber-400/25 animate-pulse blur-[3px]" />
-                {/* Tier 2: Glowing Halo Ring */}
-                <div className="absolute w-6 h-6 rounded-full bg-amber-400/35 border border-amber-300/80 shadow-[0_0_12px_#F59E0B]" />
-                {/* Tier 3: Solid Amber Core Body */}
-                <div className="relative w-4 h-4 rounded-full bg-amber-400 border-2 border-[#090A0F] shadow-[0_0_10px_#F59E0B] flex items-center justify-center">
-                  {/* Tier 4: Specular White Pinpoint */}
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                </div>
-              </div>
-              {/* Active hour time label directly below the dot */}
-              <span className="mt-[18px] text-[8.5px] font-mono font-bold text-amber-300 tracking-wide whitespace-nowrap bg-[#090A0F]/80 px-1.5 py-0.5 rounded-full border border-amber-400/30 shadow-[0_0_6px_rgba(245,158,11,0.3)]">
-                {String(activeHour).padStart(2, "0")}:00
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 3. 24-HOUR SPECTRUM BAR -- REMOVED.
+          The segmented 24-hour strip and its glowing "now" needle were
+          competing with the clock at the top of the same preview for the same
+          job, and at phone width the strip compressed to an unreadable sliver.
+          The underlying idea is NOT lost: it is tracked as a Phase 1
+          glanceability item ("wallpaper gauge", IDs M4, M7-M12) in
+          DEVELOPMENT_PLAN.md, to be re-designed against the Phase 1 time
+          period system and placed deliberately rather than dropped in here. */}
 
       {/* 4. 2-TASK DISPLAY (CURRENT TASK & UPCOMING TASK ONLY) */}
       <div className="px-4 pt-1.5 pb-2 flex flex-col gap-2.5 z-10">

@@ -291,6 +291,7 @@ that **onboarding was the single most-praised quality across 12 reviewed apps.**
 | Trust and welcome | M1, M6 | Local-first trust badge, 3-pillar welcome banner |
 | Creation feedback | M5, M13, M14, M15 | Confirmation toast, warm microcopy, per-rank level-up lore, badge narratives |
 | Glanceability | M4, M7-M12 | Completion fraction, up-next ticker, last-done label, capacity indicator, period colours, wallpaper gauge |
+| Wallpaper 24-hour gauge (**deferred here**) | M4, M12 | The segmented 24-hour spectrum strip and its glowing "now" needle were removed from the Wallpaper Studio preview -- at phone width the strip compressed to an unreadable sliver and it duplicated the clock sitting directly above it. The concept is **not cancelled**, only relocated. Rebuild it here against the Phase 1 time period system (M11) and decide deliberately where it belongs: as a real 24-hour gauge, or merged into the planner's balance bar. Do not re-add it to the preview unexamined. |
 | Time period system | M11 | Morning amber / Afternoon blue / Evening purple / Night indigo -- **map onto existing CSS vars, never raw hex** |
 | Habit identity fields | S4, S5, S6, HD29, HD30 | Cue, why, identity, daily-highlight, frog. Additive schema migration (see 2.4) |
 
