@@ -501,8 +501,8 @@ That single issue is very likely an order of magnitude larger than everything th
 
 | # | Finding | Resolution |
 |---|---|---|
-| 2.1 | Per-frame JSON re-parse + `SharedPreferences` read | **Partly fixed.** `CachedSchedule` caches the parsed model; invalidated on sync broadcast and on day rollover. The ~900-line full redraw, and the per-frame `Paint`/`Typeface`/gradient allocation, are **still open** — this is the real remaining cost and is the next P8 item. |
-| 2.2 | "Zero battery drain" claim | **Fixed.** Comment reworded to describe actual behaviour. |
+| 2.1 | Per-frame JSON re-parse + `SharedPreferences` read, and a 30 FPS full-scene redraw | **Fixed (2026-10-04).** The animation is gone: the engine is now **static**, rendering once and re-rendering only on the minute boundary. The schedule JSON is also cached in `CachedSchedule`, invalidated on sync and on day rollover. Per-render cost drops from ~30/sec to ~1/min. |
+| 2.2 | "Zero battery drain" claim | **Fixed.** Comment replaced with what the engine actually does. |
 | 2.3 | Hourly alarm wakes device even when wallpaper is off | **Fixed.** `scheduleNextHourlyUpdate` returns early when the master switch is off. |
 | 2.4 | Unused `WAKE_LOCK` | **Fixed.** Removed from the manifest after confirming 0 call sites. |
 | 2.6 | Preview clock ticks 60× too fast | **Fixed.** Now re-arms on the minute boundary. |

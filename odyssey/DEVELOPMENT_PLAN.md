@@ -462,16 +462,29 @@ entire wallpaper mechanism.
 - **Fail closed on error.** If the bridge exists but throws, the state is treated as OFF. An unknown
   state must never resolve to "on" for a background service.
 
-**P8-E2 -- Render cost.** The schedule JSON was re-parsed and re-read from `SharedPreferences` on
-*every one* of the ~30 frames per second, although it only changes when the app syncs or the day
-rolls over. Now cached in a `CachedSchedule` and invalidated on sync and on day rollover.
+**P8-E2 -- Render cost: the wallpaper is now static.** The engine previously ran a ~30 FPS loop that
+redrew the entire ~900-line scene thirty times a second to move a single alpha value, re-reading and
+re-parsing the schedule JSON on **every one** of those frames even though it only changes when the
+app syncs or the day rolls over. Now:
+
+- renders **once**, then re-renders **only on the minute boundary** -- the shortest interval at which
+  anything on screen can actually change, since the clock is the only time-dependent element;
+- re-arms on the boundary (`60_000 - now % 60_000`) rather than a flat 60s, so the clock never shows
+  the previous minute for a few seconds each hour;
+- caches the parsed schedule in `CachedSchedule`, invalidated on the sync broadcast and on rollover;
+- freezes the beacon glow at a fixed mid-cycle value instead of animating it;
+- **draws nothing further at all when the user has applied an alternate wallpaper** -- if their own
+  image is what's actually displayed, there is nothing to redraw.
+
+Per-second cost drops from ~30 renders to 1 per minute, and the timer is a `Handler` callback that
+only runs while the engine is visible -- so it produces **no wakeups at all** when the screen is off.
 
 **P8-E3 -- Power-claim honesty.** Source comments claimed "zero battery drain". They now describe
 what the engine actually does. Do not write a power claim you have not measured.
 
-**P8-E4 -- Open, tracked in `inefficiencies.md`.** Per-frame `Paint`/`Typeface`/gradient allocation
-and the full-scene redraw itself are **not** solved by E2 -- E2 only removes the data-layer waste.
-The 30 FPS full redraw is the real remaining cost.
+**P8-E4 -- Open, tracked in `inefficiencies.md`.** `Paint` objects are still allocated per render
+(~57 per frame). At 1 render per minute instead of 30 per second this is now a rounding error rather
+than a drain, so it is **not** worth optimising further unless the refresh rate is ever raised.
 
 **EXIT GATE:** every background subsystem is default-off and reachable only through an explicit
 user opt-in; disabling it measurably reduces wakeups and CPU; the Kotlin bridge compiles; the web
@@ -765,6 +778,7 @@ exit gate is met.
 | 2026-10-03 | Plan created. Reconciled 8 contradictions across the Market Research corpus: feature-ID collision, phase collision, schema divergence, Next.js version error, XP curve, checkbox drift, git-ignore, and plan-vs-reality. Verified baseline against `6b42b74`. | Cline |
 | 2026-10-03 | Added the one-feature-at-a-time delivery rule (6.1, reinforced in 4, 6.5, Quick Reference) and logged it as risk R11. Restored content lost during an edit. | Cline |
 | 2026-10-04 | Opened **P8 Efficiency & Battery Hardening** as the final, cross-cutting phase (gates P6/P7). Landed the wallpaper master switch: default-off everywhere, `/wallpaper` route-guarded as well as hidden, disable stops loop + cancels hourly alarm + restores the user's lock/home wallpapers, native authoritative over stale `localStorage`, fail-closed on bridge error. Cached the schedule JSON per change instead of per frame. Removed the unused `WAKE_LOCK` permission. Split the `FLAG_LOCK or FLAG_SYSTEM` apply. Added rule 6.6 (efficiency-first agent workflow), risks R12/R13, and the Kotlin-compile gate in 5.9. | Cline |
+| 2026-10-04 | Made the live wallpaper **static** (P8-E2, closing 2.1). Removed the ~30 FPS loop: renders once, re-renders on the minute boundary to keep the clock correct, re-arms on the boundary rather than a flat 60s. Freezes the beacon glow at a fixed value. Draws nothing further when the user has an alternate wallpaper. ~30 renders/sec -> 1/min, and zero wakeups while the screen is off. | Cline |
 
 ---
 

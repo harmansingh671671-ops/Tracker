@@ -8,18 +8,17 @@ import android.content.IntentFilter
 import android.graphics.*
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.toColorInt
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import kotlin.math.sin
 
 data class ScheduleBlockItem(
     val startHour: Int,
@@ -55,18 +54,19 @@ data class WallpaperCategoryBadge(
  * 
  * Real-Time Dynamics:
  * - Wakes up when the screen turns on.
- * - Runs a smooth, organic breathing/fading glow animation for the active task beacon.
+ * - STATIC: renders once, then re-renders only on the minute boundary so the
+ *   clock stays correct. There is no continuous animation.
  * - Reads real user tasks from latest_schedule_json (synced from the Odyssey app).
  * - Reacts instantly to ACTION_WALLPAPER_DATA_UPDATED broadcasts from the web app.
  * - Features high-curvature rounded cards (54f) and a radiant, enlarged glowing timeline beacon.
  * - Fully utilizes screen height from top to bottom (no wasted space, no squeezed content).
- * - Zero battery drain: sleeps and removes callbacks whenever screen is off.
+ * - Low battery cost: at most one render per minute while visible, none while
+ *   hidden, and none at all once the user applies their own alternate wallpaper.
  */
 // ---- Cached schedule data -----------------------------------------------
-// The breathing animation drives a frame every 33ms, but the schedule behind it
-// changes only when the app syncs or the day rolls over. Re-reading
-// SharedPreferences and re-parsing the schedule JSON 30x a second was pure
-// waste; this cache collapses that to once per change.
+// The schedule behind the wallpaper changes only when the app syncs or the day
+// rolls over. Re-reading SharedPreferences and re-parsing the schedule JSON on
+// every render was pure waste; this cache collapses that to once per change.
 //
 // Declared at file level (like ScheduleBlockItem/HobbyItem above) because
 // Kotlin does not permit nested classes inside an `inner class`.
@@ -82,6 +82,11 @@ private data class CachedSchedule(
     val blocks: List<ScheduleBlockItem>,
     val habits: List<HobbyItem>
 )
+
+// The shortest interval at which anything drawn can actually change is one
+// minute, because the only time-dependent element is the clock. Refreshing
+// faster than this is pure wakeup cost with an identical result.
+private const val REFRESH_INTERVAL_MS = 60_000L
 
 @SuppressLint("NewApi")
 class OdysseyLiveWallpaperService : WallpaperService() {
@@ -109,7 +114,16 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             }
         }
 
-        private val pulseRunnable = object : Runnable {
+        /**
+         * The Odyssey wallpaper is STATIC. It renders once and then only re-renders
+         * on the minute boundary, purely to keep the on-screen clock honest.
+         *
+         * This replaces a ~30 FPS animation loop that redrew the entire ~900-line
+         * scene 30 times a second to move one alpha value -- see
+         * inefficiencies.md 2.1, which measured ~1,710 Paint and ~690 Typeface
+         * allocations per second from that loop.
+         */
+        private val refreshRunnable = object : Runnable {
             override fun run() {
                 if (!visible) return
                 // Nothing to draw into: a destroyed surface makes lockCanvas()
@@ -120,14 +134,39 @@ class OdysseyLiveWallpaperService : WallpaperService() {
                 val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
                 // Default false, not true: a user who has never enabled the
                 // wallpaper must never have it animate. See the master switch.
-                val isEnabled = prefs.getBoolean("wallpaper_enabled", false)
+                if (!prefs.getBoolean("wallpaper_enabled", false)) return
+
                 drawFrame()
-                if (isEnabled) {
-                    // ~30 FPS. The breath cycle is 2.4s, so 30 FPS is already far
-                    // more than the motion needs; see inefficiencies.md 2.1.
-                    handler.postDelayed(this, 33)
-                }
+
+                // The user chose their own still image for lock or home. Nothing
+                // we draw is visible, so stop entirely rather than wake up once a
+                // minute to redraw something nobody is looking at.
+                if (hasAlternateWallpaper(prefs)) return
+
+                // Re-arm on the next minute boundary rather than a fixed 60s.
+                // A plain 60s timer drifts out of phase with the clock and starts
+                // showing the previous minute for a few seconds each hour.
+                val delay = REFRESH_INTERVAL_MS - (System.currentTimeMillis() % REFRESH_INTERVAL_MS)
+                handler.postDelayed(this, delay)
             }
+        }
+
+        /**
+         * True when the user has saved their own lock or home wallpaper.
+         *
+         * Checked against both the preference and the on-disk file, because
+         * `getAlternateWallpaper()` persists the base64 lazily -- a wallpaper
+         * picked from the gallery may exist on disk before it is ever written to
+         * SharedPreferences.
+         */
+        private fun hasAlternateWallpaper(prefs: android.content.SharedPreferences): Boolean {
+            fun present(prefKey: String, fileName: String): Boolean {
+                val saved = try { prefs.getString(prefKey, "") } catch (e: Exception) { "" }
+                if (!saved.isNullOrBlank()) return true
+                return try { File(filesDir, fileName).exists() } catch (e: Exception) { false }
+            }
+            return present("alternate_lock_wallpaper", "custom_restoration_wallpaper_lock.png") ||
+                present("alternate_home_wallpaper", "custom_restoration_wallpaper_home.png")
         }
 
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
@@ -149,16 +188,16 @@ class OdysseyLiveWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
             if (visible) {
-                handler.removeCallbacks(pulseRunnable)
-                handler.post(pulseRunnable)
+                handler.removeCallbacks(refreshRunnable)
+                handler.post(refreshRunnable)
             } else {
-                handler.removeCallbacks(pulseRunnable)
+                handler.removeCallbacks(refreshRunnable)
             }
         }
 
         override fun onDestroy() {
             super.onDestroy()
-            handler.removeCallbacks(pulseRunnable)
+            handler.removeCallbacks(refreshRunnable)
             try {
                 unregisterReceiver(updateReceiver)
             } catch (e: Exception) {}
@@ -315,9 +354,11 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val currentMinute = cal[Calendar.MINUTE]
             val currentHourFloat = currentHour + currentMinute / 60f
 
-            // Smooth breathing phase (0.0 to 1.0 over 2.4-second cycle) for organic fading and defading
-            val elapsed = SystemClock.elapsedRealtime()
-            val breathPhase = ((sin(elapsed / 1200.0 * Math.PI) + 1.0) / 2.0).toFloat()
+            // The former breath animation is frozen. The wallpaper is static now, so the
+            // glow is drawn at a fixed mid-cycle value (0.5) instead of being recomputed
+            // every frame. 0.5 is the centre of the old 0..1 range, so the beacon keeps
+            // its intended brightness rather than being caught at the dim or bright end.
+            val breathPhase = 0.5f
 
             // Load Synced Schedule Data from SharedPreferences
             val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -607,12 +648,13 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             }
 
             // =========================================================================
-            // RADIANT BREATHING GLOWING TIMELINE BEACON (Smooth breathing aura)
+            // RADIANT GLOWING TIMELINE BEACON (fixed aura -- the wallpaper is static now;
+            // breathPhase is pinned at 0.5, so these ranges no longer sweep)
             // =========================================================================
             val needleX = stripX + (currentHourFloat / 24f) * stripW
             val needleCenterY = stripY + stripH / 2f
 
-            // Tier 1: Soft Ambient Radiant Glow Aura (Smooth breathing: radius 38f..54f, alpha 35..85)
+            // Tier 1: Soft Ambient Radiant Glow Aura (frozen at radius 46f, alpha 60)
             val auraRadius = 38f + 16f * breathPhase
             val auraAlpha = (35 + (50 * breathPhase)).toInt().coerceIn(0, 255)
             val auraPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -620,7 +662,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             }
             canvas.drawCircle(needleX, needleCenterY, auraRadius, auraPaint)
 
-            // Tier 2: Bright Radiant Halo Ring (Smooth breathing: radius 24f..30f, alpha 65..125)
+            // Tier 2: Bright Radiant Halo Ring (frozen at radius 27f, alpha 95)
             val haloRadius = 24f + 6f * breathPhase
             val haloAlpha = (65 + (60 * breathPhase)).toInt().coerceIn(0, 255)
             val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -698,7 +740,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val curCat = curMatching?.category ?: ""
             val curBadge = getCategoryBadge(curCat, currentHour)
 
-            // Dynamic Live Breathing Aura around NOW Card
+            // Fixed glow aura around the NOW card (was animated)
             val curGlowAlpha = (40 + (50 * breathPhase)).toInt().coerceIn(0, 255)
             val curGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(curGlowAlpha, 90, 240, 179)
