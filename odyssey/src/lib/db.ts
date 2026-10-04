@@ -33,6 +33,64 @@ export interface Profile {
   notificationsEnabled: boolean;
 }
 
+/**
+ * Canonical schedule categories.
+ *
+ * This union used to be declared inline as
+ *   'sleep' | 'work' | 'habits' | 'buffer' | 'Work' | 'Study' | 'Health' | 'Sleep' | 'Leisure' | 'Admin'
+ * which listed the same idea twice in two spellings ('work' AND 'Work',
+ * 'health' AND 'Health', 'sleep' AND 'Sleep'). Any `category === 'work'` check
+ * silently failed for rows saved as 'Work', and vice versa.
+ *
+ * Title Case is canonical -- it is what the habit taxonomy already used.
+ * {@link normalizeCategory} maps existing lowercase data onto it.
+ */
+export const SCHEDULE_CATEGORIES = [
+  "Work",
+  "Study",
+  "Health",
+  "Sleep",
+  "Leisure",
+  "Admin",
+  "Habits",
+  "Buffer",
+] as const;
+
+export type ScheduleCategory = (typeof SCHEDULE_CATEGORIES)[number];
+
+/**
+ * Canonical habit categories.
+ *
+ * Same problem as above: the inline union mixed Title Case with the lowercase
+ * leftovers 'growth', 'work' and 'health'.
+ */
+export const HABIT_CATEGORIES = [
+  "Health",
+  "Mindfulness",
+  "Learning",
+  "Productivity",
+  "Social",
+  "Growth",
+] as const;
+
+export type HabitCategory = (typeof HABIT_CATEGORIES)[number];
+
+/**
+ * Maps any previously-saved spelling onto the canonical one.
+ *
+ * Case-insensitive, and preserves anything unrecognised rather than discarding
+ * it -- a user's data must never be dropped because it did not match a list.
+ * Returns the input unchanged when no mapping applies.
+ */
+export function normalizeCategory(value: string): string {
+  const lower = String(value ?? "").trim().toLowerCase();
+  if (!lower) return value;
+  const match =
+    SCHEDULE_CATEGORIES.find((c) => c.toLowerCase() === lower) ??
+    HABIT_CATEGORIES.find((c) => c.toLowerCase() === lower);
+  return match ?? value;
+}
+
 export interface ScheduleBlock {
   id: string;
   userId: string;
@@ -41,7 +99,7 @@ export interface ScheduleBlock {
   endTime: string; // HH:mm
   title: string;
   description?: string;
-  category: 'sleep' | 'work' | 'habits' | 'buffer' | 'Work' | 'Study' | 'Health' | 'Sleep' | 'Leisure' | 'Admin';
+  category: ScheduleCategory | (string & {});
   tag?: string;
   energyLevel?: 'high' | 'medium' | 'low';
   status: 'pending' | 'completed' | 'missed' | 'pivoted';
@@ -56,7 +114,7 @@ export interface Habit {
   userId: string;
   name: string;
   icon: string;
-  category: 'Health' | 'Mindfulness' | 'Learning' | 'Productivity' | 'Social' | 'growth' | 'work' | 'health';
+  category: HabitCategory | (string & {});
   period?: 'morning' | 'afternoon' | 'evening';
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
