@@ -68,7 +68,7 @@ function PlannerContent() {
   const searchParams = useSearchParams();
   const queryDate = searchParams ? searchParams.get("date") : null;
   const { user, fetchUser, addXp } = useUserStore();
-  const { habits, todayLogs, historyLogs, fetchHabits } = useHabitStore();
+  const { habits, todayLogs, historyLogs, fetchHabits, loading: habitsLoading } = useHabitStore();
 
   const getLocalDateStr = (d = new Date()) => {
     const year = d.getFullYear();
@@ -317,11 +317,25 @@ function PlannerContent() {
     fetchUser();
   }, [fetchUser]);
 
-  // Load habits and blocks cleanly on date change without double-firing on user object resolution
+  // Blocks are keyed by date only, so they can load as soon as the date is
+  // known -- no reason to make the schedule wait on the profile.
   useEffect(() => {
-    fetchHabits(user?.id || "default", selectedDate);
     loadBlocks(selectedDate);
-  }, [selectedDate, fetchHabits, loadBlocks]);
+  }, [selectedDate, loadBlocks]);
+
+  // Habits are keyed by userId, so this must WAIT for the real profile id.
+  //
+  // This used to run `fetchHabits(user?.id || "default", selectedDate)` with
+  // `user` deliberately absent from the dependency list. On a cold load `user`
+  // is still null, so the query ran against the literal string "default",
+  // which matches no rows -- and fetchHabits then falls back to loading EVERY
+  // unarchived habit while finding none of the user's logs. The date strip
+  // rendered that as a real denominator against an empty numerator: "0/19"
+  // on every day, which persisted until some later event refetched.
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchHabits(user.id, selectedDate);
+  }, [user?.id, selectedDate, fetchHabits]);
 
   const handleSelectDate = useCallback((dateStr: string) => {
     setSelectedDate(dateStr);
@@ -953,6 +967,7 @@ function PlannerContent() {
         habits={habits}
         todayLogs={todayLogs}
         historyLogs={historyLogs}
+        loading={habitsLoading || !user?.id}
       />
 
       {/* Quick Action Toolbar & 24-Hour Category Distribution Box (Akiflow / Sunsama / Structured) */}

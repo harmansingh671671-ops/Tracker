@@ -52,7 +52,12 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
   todayLogs: {},
   historyLogs: {},
-  loading: false,
+  // Starts LOADING, not idle. Before the first fetch resolves there are no
+  // habits and no logs, and a date strip rendering that empty store would
+  // paint a confidently wrong "0/0" (and a "Rest Day" dot) that flips a moment
+  // later. Consumers treat `loading` as "nothing is known yet" and show a
+  // neutral placeholder instead. No consumer existed for this flag before.
+  loading: true,
   temporaryWallet: initialWallet,
 
   fetchHabits: async (userId, date) => {

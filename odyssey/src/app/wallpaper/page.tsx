@@ -81,7 +81,13 @@ export default function WallpaperPage() {
   useEffect(() => {
     fetchUser();
     const todayStr = new Date().toISOString().split("T")[0];
-    fetchHabits(user?.id || "default", todayStr);
+    // Habits are keyed by userId. Fetching under the literal "default" id
+    // matched nothing and hit fetchHabits' "load everything" fallback, so the
+    // preview briefly showed every habit against zero of the user's logs.
+    // Wait for the real profile id instead.
+    if (user?.id) {
+      fetchHabits(user.id, todayStr);
+    }
 
     db.scheduleBlocks.where("date").equals(todayStr).toArray().then(setBlocks);
 

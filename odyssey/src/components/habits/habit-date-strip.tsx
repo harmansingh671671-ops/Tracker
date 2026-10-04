@@ -19,6 +19,12 @@ interface HabitDateStripProps {
   logsByDate?: Record<string, Record<string, HabitLog>>; // date -> { habitId: HabitLog }
   todayLogs?: Record<string, HabitLog>;
   todayStr?: string;
+  /**
+   * True until the habit store has completed its first fetch. While it is set
+   * the strip renders placeholders instead of counters, so a reload never
+   * prints a "0/0" that snaps to the truth a moment later.
+   */
+  loading?: boolean;
 }
 
 const useIsomorphicLayoutEffect =
@@ -31,8 +37,11 @@ export function HabitDateStrip({
   logsByDate = {},
   todayLogs = {},
   todayStr: propTodayStr,
+  loading = false,
 }: HabitDateStripProps) {
-  const { historyLogs = {} } = useHabitStore();
+  const { historyLogs = {}, loading: storeLoading } = useHabitStore();
+  // An explicit prop wins, otherwise follow the store's own first-fetch state.
+  const isLoading = loading || storeLoading;
   const containerRef = useRef<HTMLDivElement>(null);
   const todayPillRef = useRef<HTMLButtonElement>(null);
 
@@ -484,7 +493,12 @@ export function HabitDateStrip({
 
                 {/* HabitDriven Segmented Rings & Solid Circles (only for eligible/completed habits) */}
                 <div className="flex items-center justify-center gap-1 mt-1 min-h-[10px] flex-wrap max-w-full">
-                  {eligibleHabits.length === 0 ? (
+                  {isLoading ? (
+                    // Unknown yet. A neutral bar of the same height as the
+                    // counter pill keeps the row from collapsing and shifting
+                    // the strip when the real numbers arrive.
+                    <span className="w-8 h-[14px] rounded-full bg-surface-container-highest animate-pulse" />
+                  ) : eligibleHabits.length === 0 ? (
                     <span className="w-1.5 h-1.5 rounded-full bg-outline/20" title="Rest Day (No habits scheduled)" />
                   ) : eligibleHabits.length <= 5 ? (
                     eligibleHabits.map((h) => {

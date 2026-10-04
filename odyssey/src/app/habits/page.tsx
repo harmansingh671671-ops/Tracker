@@ -39,6 +39,7 @@ export default function HabitsPage() {
     addHabit,
     updateHabit,
     deleteHabit,
+    loading: habitsLoading,
   } = useHabitStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -298,6 +299,7 @@ export default function HabitsPage() {
         habits={habits}
         todayLogs={todayLogs}
         todayStr={todayStr}
+        loading={habitsLoading || !user?.id}
       />
 
       {/* Reward Vault Banner */}
