@@ -769,7 +769,9 @@ exit gate is met.
 1. **Fix and land the theme work** (P0-T1) -- already half-written and currently uncommitted. Fix the
    D4 listener leak while doing it. Suggested as two commits: (a) the leak fix alone, (b) the feature
    itself once verified in both themes.
-2. **Refresh the knowledge graph** (P0-T2) -- run `graphify update .` and commit the new report.
+2. ~~**Refresh the knowledge graph** (P0-T2)~~ **DONE 2026-10-04.** Rebuilt from `dda4383d`:
+   542→854 nodes, 991→1454 edges, 30→59 communities. The report is now tracked in git; `graph.json`
+   (906 KB) and `graph.html` (740 KB) stay ignored as local artifacts. Closes D6 and R10.
 3. **Write the reward-economy spec** (P0-T4) -- closes the highest-severity open correctness risk.
 4. **Stand up the test harness** (P0-T5) -- Vitest plus `fake-indexeddb`, five pure-function suites.
 5. **Wrap the native bridge** (P0-T6) -- behaviour-preserving adapter.

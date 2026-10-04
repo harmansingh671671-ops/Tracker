@@ -28,9 +28,8 @@ against the research corpus when it is available, but the register never *requir
 
 | # | ID | What | Why it is next |
 |---|---|---|---|
-| 1 | **P0-T2** | Refresh the knowledge graph | 5+ commits behind. Every impact analysis is currently guessing (R10). ~5 min. |
-| 2 | **P0-T6** | Native bridge adapter layer | 34 methods, ~1000 lines, dual `window.OdysseyAndroid \|\| window.Android` checked inline at call sites. Highest god-node (D1, R3). |
-| 3 | **P0-T3** | Category normalisation | Two divergent unions live side by side; every new category feature inherits it (D3). |
+| 1 | **P0-T6** | Native bridge adapter layer | 34 methods, ~1000 lines, dual `window.OdysseyAndroid \|\| window.Android` checked inline at call sites. Highest god-node (D1, R3). The graph is now current, so its blast radius can be measured rather than guessed. |
+| 2 | **P0-T3** | Category normalisation | Two divergent unions live side by side (`db.ts` lines 44 and 59); every new category feature inherits it (D3). Needs a written decision on the canonical set. |
 
 **First user-facing feature once P0 closes: `XL14` — interactive onboarding.** No `/onboarding`
 route exists today; `/` is a marketing dial, not a first-run flow. Largest gap between the app and
@@ -72,6 +71,7 @@ Verified by building, compiling, and (where possible) running it.
 | **P0-T4** | **Reward-economy spec** | P0 | `docs/adr/0001` |
 | **P0-T5** | **Test harness** — Vitest, 8 suites | P0 | Also closed D7 |
 | **P0-T7** | **Dead code removal** | P0 | Also closed D8 |
+| **P0-T2** | **Knowledge graph refresh** | P0 | 542→854 nodes, 991→1454 edges, 30→59 communities. Closed D6, R10. |
 | **P8-E1** | **Wallpaper master switch** — default-off, fail-closed | P8 | Native authoritative |
 | **P8-E2** | **Static wallpaper** — 1 render/min, none if alternate set | P8 | Closed 2.1 |
 | **P8-E3** | **Power-claim honesty** — comments match behaviour | P8 | |
@@ -130,7 +130,7 @@ Verified by building, compiling, and (where possible) running it.
 | D3 | Category union drift, ~50 colour aliases | **OPEN** — P0-T3 |
 | D4 | `theme-store` `matchMedia` listener leak | **CLOSED** (P0-T1) |
 | D5 | Planner/journey/stats bypass Zustand, read `db` directly | **OPEN** — two data-access styles |
-| D6 | Knowledge graph stale | **OPEN** — P0-T2 |
+| D6 | Knowledge graph stale | **CLOSED** (P0-T2) — rebuilt from `dda4383d`; report now tracked in git |
 | D7 | No test suite | **CLOSED** — 8 suites (P0-T5) |
 | D8 | `seedInitialData()` empty with 2 call sites | **CLOSED** (P0-T7) |
 | D9 | Dual XP accounting | **OPEN — HIGH**, blocks P3 |

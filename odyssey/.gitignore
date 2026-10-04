@@ -53,3 +53,16 @@ Market Research/
 browser_use/
 # .agents
 .agents/
+
+# Knowledge graph
+# NOTE: the git repo root is one level ABOVE this project (C:\PROJECTS), and that
+# root .gitignore excludes graphify-out/. So the rule "commit the new report"
+# (P0-T2) could not be honoured until this was re-included.
+#
+# Re-include only the human-readable report. graph.json is ~900 KB and graph.html
+# ~740 KB of generated output that would dominate the repo and churn on every
+# commit. The report is what a person actually reads; the graph is a local
+# artifact that graphify rebuilds on demand.
+!graphify-out/
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
