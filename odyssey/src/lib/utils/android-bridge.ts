@@ -1,5 +1,5 @@
 import { type WallpaperData, generateWallpaperCanvas, build24HourlyBlocks } from "./wallpaper-generator";
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readString, writeString, remove } from "@/lib/utils/logger";
 import { db } from "../db";
 import { calculateRank, getRankInfo } from "./gamification";
 
@@ -24,75 +24,113 @@ export interface SyncVerificationResult {
 
 declare global {
   interface Window {
-    OdysseyAndroid?: {
-      setLockscreenWallpaper?: (base64Image: string) => boolean;
-      setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
-      saveCustomWallpaper?: (base64Image: string) => boolean;
-      getCustomWallpaper?: () => string;
-      clearCustomWallpaper?: () => boolean;
-      applyCustomWallpaper?: (targetScreen: string) => boolean;
-      pickCustomWallpaperPhoto?: (targetScreen?: string) => boolean;
-      saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
-      getAlternateWallpaper?: (targetScreen: string) => string;
-      clearAlternateWallpaper?: (targetScreen: string) => boolean;
-      applyAlternateWallpaper?: (targetScreen: string) => boolean;
-      clearLockscreenWallpaper?: () => boolean;
-      isWallpaperEnabled?: () => boolean;
-      setWallpaperMasterEnabled?: (enabled: boolean) => boolean;
-      syncSchedule?: (scheduleJson: string) => boolean | void;
-      syncScheduleWithResult?: (scheduleJson: string) => string;
-      getSyncedSchedule?: () => string;
-      verifySync?: () => string;
-      launchLiveWallpaperPicker?: () => void;
-      enableHourlyAutoUpdate?: () => boolean;
-      disableHourlyAutoUpdate?: () => boolean;
-      isHourlyAutoUpdateEnabled?: () => boolean;
-      enableCadenceNotifications?: () => boolean;
-      disableCadenceNotifications?: () => boolean;
-      isCadenceNotificationsEnabled?: () => boolean;
-      triggerTestNotification?: () => boolean;
-      armCadenceNotification?: () => boolean;
-      openSystemWallpaperChooser?: () => boolean;
-      getAppVersionCode?: () => number;
-      getAppVersionName?: () => string;
-      downloadAndInstallApk?: (apkUrl: string) => boolean;
-      isSupported?: () => boolean;
-    };
-    Android?: {
-      setWallpaper?: (base64Image: string) => void;
-      setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
-      saveCustomWallpaper?: (base64Image: string) => boolean;
-      getCustomWallpaper?: () => string;
-      clearCustomWallpaper?: () => boolean;
-      applyCustomWallpaper?: (targetScreen: string) => boolean;
-      pickCustomWallpaperPhoto?: (targetScreen?: string) => boolean;
-      saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
-      getAlternateWallpaper?: (targetScreen: string) => string;
-      clearAlternateWallpaper?: (targetScreen: string) => boolean;
-      applyAlternateWallpaper?: (targetScreen: string) => boolean;
-      syncSchedule?: (scheduleJson: string) => void;
-      syncScheduleWithResult?: (scheduleJson: string) => string;
-      getSyncedSchedule?: () => string;
-      verifySync?: () => string;
-      launchLiveWallpaperPicker?: () => void;
-      enableHourlyAutoUpdate?: () => boolean;
-      disableHourlyAutoUpdate?: () => boolean;
-      isHourlyAutoUpdateEnabled?: () => boolean;
-      enableCadenceNotifications?: () => boolean;
-      disableCadenceNotifications?: () => boolean;
-      isCadenceNotificationsEnabled?: () => boolean;
-      triggerTestNotification?: () => boolean;
-      armCadenceNotification?: () => boolean;
-      openSystemWallpaperChooser?: () => boolean;
-      getAppVersionCode?: () => number;
-      getAppVersionName?: () => string;
-      downloadAndInstallApk?: (apkUrl: string) => boolean;
-    };
-    AndroidWallpaper?: {
-      setWallpaper?: (base64Image: string, target?: string) => boolean;
-    };
+    /**
+     * The bridge, under either of its historical names.
+     *
+     * The Android side has exposed the same object as both `OdysseyAndroid` and
+     * `Android`. Rather than duplicate that choice at ~50 call sites -- which is
+     * exactly how the two drifted apart -- resolve it once, here.
+     */
+    OdysseyAndroid?: OdysseyBridge;
+    /** @deprecated Historical alias for {@link OdysseyAndroid}. Read via `nativeBridge()`. */
+    Android?: LegacyAndroidBridge;
+    /** @deprecated Historical alias. Read via `nativeBridge()`. */
+    AndroidWallpaper?: LegacyAndroidBridge;
     Capacitor?: any;
   }
+}
+
+/** Methods on the current bridge. Optional because a browser has none of them. */
+export interface OdysseyBridge {
+  setLockscreenWallpaper?: (base64Image: string) => boolean;
+  setWallpaper?: (base64Image: string) => void;
+  setCustomWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+  saveCustomWallpaper?: (base64Image: string) => boolean;
+  getCustomWallpaper?: () => string;
+  clearCustomWallpaper?: () => boolean;
+  applyCustomWallpaper?: (targetScreen: string) => boolean;
+  pickCustomWallpaperPhoto?: (targetScreen?: string) => boolean;
+  saveAlternateWallpaper?: (base64Image: string, targetScreen: string) => boolean;
+  getAlternateWallpaper?: (targetScreen: string) => string;
+  clearAlternateWallpaper?: (targetScreen: string) => boolean;
+  applyAlternateWallpaper?: (targetScreen: string) => boolean;
+  clearLockscreenWallpaper?: () => boolean;
+  isWallpaperEnabled?: () => boolean;
+  setWallpaperMasterEnabled?: (enabled: boolean) => boolean;
+  syncSchedule?: (scheduleJson: string) => boolean | void;
+  syncScheduleWithResult?: (scheduleJson: string) => string;
+  getSyncedSchedule?: () => string;
+  verifySync?: () => string;
+  launchLiveWallpaperPicker?: () => void;
+  enableHourlyAutoUpdate?: () => boolean;
+  disableHourlyAutoUpdate?: () => boolean;
+  isHourlyAutoUpdateEnabled?: () => boolean;
+  enableCadenceNotifications?: () => boolean;
+  disableCadenceNotifications?: () => boolean;
+  isCadenceNotificationsEnabled?: () => boolean;
+  triggerTestNotification?: () => boolean;
+  armCadenceNotification?: () => boolean;
+  openSystemWallpaperChooser?: () => boolean;
+  getAppVersionCode?: () => number;
+  getAppVersionName?: () => string;
+  downloadAndInstallApk?: (apkUrl: string) => boolean;
+  isSupported?: () => boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * The older alias. Deliberately NOT `Omit<OdysseyBridge, ...>`: `Omit` is built
+ * on `Exclude<keyof T, K>`, and because `OdysseyBridge` has a string index
+ * signature `keyof` is `string | number`, so the `Exclude` discards every named
+ * method and the alias silently types as `{}`.
+ */
+type LegacyAndroidBridge = OdysseyBridge;
+
+/**
+ * The native bridge, whichever name it answers to. `null` in a plain browser.
+ *
+ * Single source of truth for "is there a bridge, and which one is it". Every
+ * call site goes through this so the alias question is answered once.
+ */
+export function nativeBridge(): OdysseyBridge | null {
+  if (typeof window === "undefined") return null;
+  return window.OdysseyAndroid ?? window.Android ?? window.AndroidWallpaper ?? null;
+}
+
+/** True when the bridge exists *and* implements `method`. */
+export function hasNative(method: string): boolean {
+  const b = nativeBridge();
+  return Boolean(b && typeof b[method] === "function");
+}
+
+/**
+ * Calls `method` on the bridge and returns its result.
+ *
+ * Returns `undefined` when there is no bridge or no such method, so callers can
+ * tell "the phone said no" (`false`) from "there is no phone" (`undefined`).
+ * A throwing bridge is reported and treated as absent rather than crashing the
+ * screen -- this is the single place that decision is made.
+ */
+export function callNative<T>(method: string, ...args: unknown[]): T | undefined {
+  const b = nativeBridge();
+  const fn = b?.[method];
+  if (typeof fn !== "function") return undefined;
+  try {
+    return (fn as (...a: unknown[]) => T).apply(b, args);
+  } catch (e) {
+    logWarn("android-bridge", `bridge call ${method} failed`, e);
+    return undefined;
+  }
+}
+
+/**
+ * Like {@link callNative} but coerces a missing bridge to `fallback` (default
+ * `false`). For the common "did it work?" bridge method.
+ */
+export function callNativeBool(method: string, args: unknown[] = [], fallback = false): boolean {
+  const result = callNative<unknown>(method, ...args);
+  if (result === undefined) return fallback;
+  return result !== false;
 }
 
 /**
@@ -102,7 +140,7 @@ export function isAndroidApp(): boolean {
   if (typeof window === "undefined") return false;
 
   // 1. Explicit native JavaScript Interface injected by Android APK
-  if (window.OdysseyAndroid || window.Android) return true;
+  if (nativeBridge()) return true;
 
   // 2. Capacitor native runtime on Android
   if (window.Capacitor) return true;
@@ -124,52 +162,44 @@ export async function setNativeLockscreen(data: WallpaperData, targetScreen: "lo
   const canvas = await generateWallpaperCanvas({ ...data, showClockGuide: false });
   const dataUrl = canvas.toDataURL("image/png");
 
-  // 1. Check for Odyssey Native Android Bridge (WebView addJavascriptInterface)
-  if (typeof window !== "undefined" && window.OdysseyAndroid?.setCustomWallpaper) {
-    try {
-      const ok = window.OdysseyAndroid.setCustomWallpaper(dataUrl, targetScreen);
-      await syncScheduleDataToNative(data);
-      return {
-        success: Boolean(ok),
-        method: "native_bridge",
-        message: ok
+  // 1. Target-aware bridge method, then the lock-only legacy one, then the
+  //    single-target legacy one. Each is a genuinely different bridge method,
+  //    not a copy of the same check -- so they stay as separate attempts, but
+  //    the alias resolution is now one call.
+  const viaSetCustom = callNative<boolean>("setCustomWallpaper", dataUrl, targetScreen);
+  if (viaSetCustom !== undefined) {
+    await syncScheduleDataToNative(data);
+    return {
+      success: viaSetCustom !== false,
+      method: "native_bridge",
+      message:
+        viaSetCustom !== false
           ? `${targetScreen === "home" ? "Home Screen" : "Lock Screen"} updated directly via Native Odyssey Bridge!`
           : "Native bridge reported an issue applying wallpaper.",
-      };
-    } catch (e: any) {
-      console.warn("OdysseyAndroid bridge error:", e);
-    }
+    };
   }
 
-  if (typeof window !== "undefined" && window.OdysseyAndroid?.setLockscreenWallpaper) {
-    try {
-      const ok = window.OdysseyAndroid.setLockscreenWallpaper(dataUrl);
-      await syncScheduleDataToNative(data);
-      return {
-        success: Boolean(ok),
-        method: "native_bridge",
-        message: ok
+  const viaSetLockscreen = callNative<boolean>("setLockscreenWallpaper", dataUrl);
+  if (viaSetLockscreen !== undefined) {
+    await syncScheduleDataToNative(data);
+    return {
+      success: viaSetLockscreen !== false,
+      method: "native_bridge",
+      message:
+        viaSetLockscreen !== false
           ? "Lockscreen updated directly via Native Odyssey Bridge!"
           : "Native bridge reported an issue applying wallpaper.",
-      };
-    } catch (e: any) {
-      console.warn("OdysseyAndroid bridge error:", e);
-    }
+    };
   }
 
-  // 2. Check for generic Android wallpaper interface
-  if (typeof window !== "undefined" && window.Android?.setWallpaper) {
-    try {
-      window.Android.setWallpaper(dataUrl);
-      await syncScheduleDataToNative(data);
-      return {
-        success: true,
-        method: "native_bridge",
-        message: "Lockscreen updated directly via Android bridge!",
-      };
-    } catch (e: any) {
-      console.warn("Android bridge error:", e);
-    }
+  const viaSetWallpaper = callNative<void>("setWallpaper", dataUrl);
+  if (viaSetWallpaper !== undefined) {
+    await syncScheduleDataToNative(data);
+    return {
+      success: true,
+      method: "native_bridge",
+      message: "Lockscreen updated directly via Android bridge!",
+    };
   }
 
   // 3. Check for Capacitor native bridge
@@ -203,10 +233,11 @@ export async function setNativeLockscreen(data: WallpaperData, targetScreen: "lo
  */
 export function isNativeBridgeAvailable(): boolean {
   if (typeof window === "undefined") return false;
-  return Boolean(
-    window.OdysseyAndroid?.setLockscreenWallpaper ||
-    window.Android?.setWallpaper ||
-    window.Capacitor?.Plugins?.Wallpaper?.setWallpaper
+  return (
+    hasNative("setCustomWallpaper") ||
+    hasNative("setLockscreenWallpaper") ||
+    hasNative("setWallpaper") ||
+    Boolean(window.Capacitor?.Plugins?.Wallpaper?.setWallpaper)
   );
 }
 
@@ -228,8 +259,8 @@ export function buildNativeSchedulePayload(data: WallpaperData): string {
         timeOfDay: h.timeOfDay || "",
       }))
     : [
-        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
-        { name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
+        { name: "Mindful Focus", icon: "ðŸ§˜", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
+        { name: "Daily Hydration", icon: "ðŸ’§", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
       ];
 
   // Merge full 24 blocks with raw user blocks to ensure exact title and hour matching
@@ -267,28 +298,13 @@ export async function syncScheduleDataToNative(data: WallpaperData): Promise<boo
   const payload = buildNativeSchedulePayload(data);
 
   // Save to web local cache
-  try {
-    localStorage.setItem("odyssey_native_schedule_cache", payload);
-  } catch (e) { logWarn("android-bridge", "could not write to storage", e); }
+  writeString("odyssey_native_schedule_cache", payload);
 
-  // Push to Android native bridge if present
-  if (window.OdysseyAndroid?.syncSchedule) {
-    try {
-      const res = window.OdysseyAndroid.syncSchedule(payload);
-      return res !== false;
-    } catch (e) {
-      console.warn("OdysseyAndroid.syncSchedule error:", e);
-    }
-  } else if (window.Android?.syncSchedule) {
-    try {
-      window.Android.syncSchedule(payload);
-      return true;
-    } catch (e) {
-      console.warn("Android.syncSchedule error:", e);
-    }
-  }
-
-  return true;
+  // Push to Android native bridge if present. `undefined` means no bridge (or
+  // a bridge that threw) -- the local cache is still correct, so report success.
+  const res = callNative<boolean | void>("syncSchedule", payload);
+  if (res === undefined) return true;
+  return res !== false;
 }
 
 /**
@@ -308,12 +324,13 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
     localStorage.setItem("odyssey_native_schedule_cache", payload);
   } catch (e) { logWarn("android-bridge", "could not write to storage", e); }
 
-  // 1. Native Android APK Bridge Check
-  if (typeof window !== "undefined" && window.OdysseyAndroid) {
+  // 1. Native Android APK bridge. The richer methods (result-reporting sync and
+  //    verification) only exist on the current bridge; the legacy alias can only
+  //    do a plain sync. One path, two capability levels.
+  if (nativeBridge()) {
     try {
-      // Try syncScheduleWithResult first
-      if (window.OdysseyAndroid.syncScheduleWithResult) {
-        const rawRes = window.OdysseyAndroid.syncScheduleWithResult(payload);
+      const rawRes = callNative<string>("syncScheduleWithResult", payload);
+      if (rawRes) {
         try {
           const resObj = JSON.parse(rawRes);
           if (resObj.success) {
@@ -329,12 +346,12 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
               timestamp: timeFormatted,
             };
           }
-        } catch (e) { logWarn("android-bridge", "JSON.parse failed", e); }
+        } catch (e) { logWarn("android-bridge", "sync result was not valid JSON", e); }
       }
 
-      // Fallback: standard syncSchedule + verifySync
-      window.OdysseyAndroid.syncSchedule?.(payload);
-      const verifyStr = window.OdysseyAndroid.verifySync?.() || "";
+      // Fallback: standard sync, then read back what landed.
+      callNative("syncSchedule", payload);
+      const verifyStr = callNative<string>("verifySync") || "";
       const isOk = verifyStr.startsWith("OK") || verifyStr.length > 0;
 
       return {
@@ -366,37 +383,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
     }
   }
 
-  // 2. Generic Android Bridge
-  if (typeof window !== "undefined" && window.Android?.syncSchedule) {
-    try {
-      window.Android.syncSchedule(payload);
-      return {
-        success: true,
-        isNativeBridge: true,
-        blockCount: taskNames.length,
-        habitCount: habitNames.length,
-        taskNames,
-        habitNames,
-        streak: data.userStreak || 1,
-        message: `Synced ${taskNames.length} tasks & ${habitNames.length} hobbies to Android bridge.`,
-        timestamp: timeFormatted,
-      };
-    } catch (e: any) {
-      return {
-        success: false,
-        isNativeBridge: true,
-        blockCount: taskNames.length,
-        habitCount: habitNames.length,
-        taskNames,
-        habitNames,
-        streak: data.userStreak || 1,
-        message: `Android bridge sync error: ${e?.message || e}`,
-        timestamp: timeFormatted,
-      };
-    }
-  }
-
-  // 3. Web Browser Environment (No native bridge injected)
+  // 2. Web Browser Environment (No native bridge injected)
   return {
     success: false,
     isNativeBridge: false,
@@ -414,21 +401,9 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
  * Opens Android's native Live Wallpaper preview screen
  */
 export function launchLiveWallpaperPicker(): boolean {
-  if (typeof window === "undefined") return false;
-
-  if (window.OdysseyAndroid?.launchLiveWallpaperPicker) {
-    try {
-      window.OdysseyAndroid.launchLiveWallpaperPicker();
-      return true;
-    } catch (e) { logWarn("android-bridge", "bridge call launchLiveWallpaperPicker failed", e); }
-  } else if (window.Android?.launchLiveWallpaperPicker) {
-    try {
-      window.Android.launchLiveWallpaperPicker();
-      return true;
-    } catch (e) { logWarn("android-bridge", "bridge call launchLiveWallpaperPicker failed", e); }
-  }
-
-  return false;
+  // callNative already resolves the alias, reports a throwing bridge, and tells
+  // "no bridge" from "bridge declined" via undefined vs false.
+  return callNativeBool("launchLiveWallpaperPicker");
 }
 
 /**
@@ -442,88 +417,35 @@ export async function enableNativeHourlyAutoUpdate(data?: WallpaperData): Promis
     await syncScheduleDataToNative(data);
   }
 
-  if (window.OdysseyAndroid?.enableHourlyAutoUpdate) {
-    try {
-      return window.OdysseyAndroid.enableHourlyAutoUpdate() !== false;
-    } catch (e) { logWarn("android-bridge", "bridge call enableHourlyAutoUpdate failed", e); }
-  } else if (window.Android?.enableHourlyAutoUpdate) {
-    try {
-      return window.Android.enableHourlyAutoUpdate() !== false;
-    } catch (e) { logWarn("android-bridge", "bridge call enableHourlyAutoUpdate failed", e); }
-  }
-
-  return false;
+  return callNativeBool("enableHourlyAutoUpdate");
 }
 
 /**
  * Disables automatic hourly background updates in the Android APK.
  */
 export function disableNativeHourlyAutoUpdate(): boolean {
-  if (typeof window === "undefined") return false;
-
-  if (window.OdysseyAndroid?.disableHourlyAutoUpdate) {
-    try {
-      return window.OdysseyAndroid.disableHourlyAutoUpdate() !== false;
-    } catch (e) { logWarn("android-bridge", "bridge call disableHourlyAutoUpdate failed", e); }
-  } else if (window.Android?.disableHourlyAutoUpdate) {
-    try {
-      return window.Android.disableHourlyAutoUpdate() !== false;
-    } catch (e) { logWarn("android-bridge", "bridge call disableHourlyAutoUpdate failed", e); }
-  }
-
-  return false;
+  return callNativeBool("disableHourlyAutoUpdate");
 }
 
 /**
  * Checks whether the native hourly auto-update worker is active.
  */
 export function checkNativeAutoUpdateStatus(): boolean {
-  if (typeof window === "undefined") return false;
-
-  if (window.OdysseyAndroid?.isHourlyAutoUpdateEnabled) {
-    try {
-      return Boolean(window.OdysseyAndroid.isHourlyAutoUpdateEnabled());
-    } catch (e) { logWarn("android-bridge", "bridge call isHourlyAutoUpdateEnabled failed", e); }
-  } else if (window.Android?.isHourlyAutoUpdateEnabled) {
-    try {
-      return Boolean(window.Android.isHourlyAutoUpdateEnabled());
-    } catch (e) { logWarn("android-bridge", "bridge call isHourlyAutoUpdateEnabled failed", e); }
-  }
-
-  return false;
+  return callNativeBool("isHourlyAutoUpdateEnabled");
 }
 
 /**
  * Clears custom lockscreen wallpaper on Android and restores system default.
  */
 export function clearNativeLockscreen(): boolean {
-  if (typeof window === "undefined") return false;
-
-  if (window.OdysseyAndroid?.clearLockscreenWallpaper) {
-    try {
-      return Boolean(window.OdysseyAndroid.clearLockscreenWallpaper());
-    } catch (e) { logWarn("android-bridge", "bridge call clearLockscreenWallpaper failed", e); }
-  }
-
-  return false;
+  return callNativeBool("clearLockscreenWallpaper");
 }
 
 /**
  * Instantly triggers a test cadence notification on native Android.
  */
 export function triggerNativeTestNotification(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.OdysseyAndroid?.triggerTestNotification) {
-    try {
-      return Boolean(window.OdysseyAndroid.triggerTestNotification());
-    } catch (e) { logWarn("android-bridge", "bridge call triggerTestNotification failed", e); }
-  }
-  if (window.Android?.triggerTestNotification) {
-    try {
-      return Boolean(window.Android.triggerTestNotification());
-    } catch (e) { logWarn("android-bridge", "bridge call triggerTestNotification failed", e); }
-  }
-  return false;
+  return callNativeBool("triggerTestNotification");
 }
 
 /**
@@ -531,18 +453,7 @@ export function triggerNativeTestNotification(): boolean {
  * and store a custom restoration wallpaper for target screen ("lock" or "home").
  */
 export function pickNativeCustomWallpaperPhoto(targetScreen: "lock" | "home" = "lock"): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.OdysseyAndroid?.pickCustomWallpaperPhoto) {
-    try {
-      return Boolean(window.OdysseyAndroid.pickCustomWallpaperPhoto(targetScreen));
-    } catch (e) { logWarn("android-bridge", "bridge call pickCustomWallpaperPhoto failed", e); }
-  }
-  if (window.Android?.pickCustomWallpaperPhoto) {
-    try {
-      return Boolean(window.Android.pickCustomWallpaperPhoto(targetScreen));
-    } catch (e) { logWarn("android-bridge", "bridge call pickCustomWallpaperPhoto failed", e); }
-  }
-  return false;
+  return callNativeBool("pickCustomWallpaperPhoto", [targetScreen]);
 }
 
 /**
@@ -550,18 +461,7 @@ export function pickNativeCustomWallpaperPhoto(targetScreen: "lock" | "home" = "
  * their previous gallery photo or custom wallpaper.
  */
 export function openSystemWallpaperPicker(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.OdysseyAndroid?.openSystemWallpaperChooser) {
-    try {
-      return Boolean(window.OdysseyAndroid.openSystemWallpaperChooser());
-    } catch (e) { logWarn("android-bridge", "bridge call openSystemWallpaperChooser failed", e); }
-  }
-  if (window.Android?.openSystemWallpaperChooser) {
-    try {
-      return Boolean(window.Android.openSystemWallpaperChooser());
-    } catch (e) { logWarn("android-bridge", "bridge call openSystemWallpaperChooser failed", e); }
-  }
-  return false;
+  return callNativeBool("openSystemWallpaperChooser");
 }
 
 export const openSystemWallpaperChooser = openSystemWallpaperPicker;
@@ -570,54 +470,25 @@ export const openSystemWallpaperChooser = openSystemWallpaperPicker;
  * Enables automatic XX:57 cadence notifications.
  */
 export function enableCadenceNotifications(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.OdysseyAndroid?.enableCadenceNotifications) {
-    try {
-      return Boolean(window.OdysseyAndroid.enableCadenceNotifications());
-    } catch (e) { logWarn("android-bridge", "bridge call enableCadenceNotifications failed", e); }
-  }
-  if (window.Android?.enableCadenceNotifications) {
-    try {
-      return Boolean(window.Android.enableCadenceNotifications());
-    } catch (e) { logWarn("android-bridge", "bridge call enableCadenceNotifications failed", e); }
-  }
-  return false;
+  return callNativeBool("enableCadenceNotifications");
 }
 
 /**
  * Disables automatic XX:57 cadence notifications.
  */
 export function disableCadenceNotifications(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.OdysseyAndroid?.disableCadenceNotifications) {
-    try {
-      return Boolean(window.OdysseyAndroid.disableCadenceNotifications());
-    } catch (e) { logWarn("android-bridge", "bridge call disableCadenceNotifications failed", e); }
-  }
-  if (window.Android?.disableCadenceNotifications) {
-    try {
-      return Boolean(window.Android.disableCadenceNotifications());
-    } catch (e) { logWarn("android-bridge", "bridge call disableCadenceNotifications failed", e); }
-  }
-  return false;
+  return callNativeBool("disableCadenceNotifications");
 }
 
 /**
  * Checks whether cadence notifications are enabled in native preferences.
+ *
+ * Defaults to `true` when there is no bridge: notifications-on is the intended
+ * behaviour for the native app, so a missing bridge should not silently read
+ * as "off" and suppress the schedule.
  */
 export function isCadenceNotificationsEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  if (window.OdysseyAndroid?.isCadenceNotificationsEnabled) {
-    try {
-      return Boolean(window.OdysseyAndroid.isCadenceNotificationsEnabled());
-    } catch (e) { logWarn("android-bridge", "bridge call isCadenceNotificationsEnabled failed", e); }
-  }
-  if (window.Android?.isCadenceNotificationsEnabled) {
-    try {
-      return Boolean(window.Android.isCadenceNotificationsEnabled());
-    } catch (e) { logWarn("android-bridge", "bridge call isCadenceNotificationsEnabled failed", e); }
-  }
-  return true;
+  return callNativeBool("isCadenceNotificationsEnabled", [], true);
 }
 
 /**
@@ -626,18 +497,7 @@ export function isCadenceNotificationsEnabled(): boolean {
  * "home" -> Home screen only
  */
 export function setCustomTargetWallpaper(base64Image: string, target: "lock" | "home" = "lock"): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.OdysseyAndroid?.setCustomWallpaper) {
-    try {
-      return Boolean(window.OdysseyAndroid.setCustomWallpaper(base64Image, target));
-    } catch (e) { logWarn("android-bridge", "bridge call setCustomWallpaper failed", e); }
-  }
-  if (window.Android?.setCustomWallpaper) {
-    try {
-      return Boolean(window.Android.setCustomWallpaper(base64Image, target));
-    } catch (e) { logWarn("android-bridge", "bridge call setCustomWallpaper failed", e); }
-  }
-  return false;
+  return callNativeBool("setCustomWallpaper", [base64Image, target]);
 }
 
 /**
@@ -645,29 +505,13 @@ export function setCustomTargetWallpaper(base64Image: string, target: "lock" | "
  * Isolated so Lock Screen and Home Screen never overwrite each other.
  */
 export function saveNativeAlternateWallpaper(base64Image: string, target: "lock" | "home" = "lock"): boolean {
-  if (typeof window === "undefined") return false;
-  const key = `odyssey_alt_wallpaper_${target}`;
-  try {
-    localStorage.setItem(key, base64Image);
-  } catch (e) {
-    console.warn("localStorage quota error saving alternate wallpaper:", e);
-  }
+  writeString(`odyssey_alt_wallpaper_${target}`, base64Image);
 
-  let nativeSuccess = false;
-  if (window.OdysseyAndroid?.saveAlternateWallpaper) {
-    try {
-      nativeSuccess = Boolean(window.OdysseyAndroid.saveAlternateWallpaper(base64Image, target));
-    } catch (e) {
-      console.warn("OdysseyAndroid.saveAlternateWallpaper error:", e);
-    }
-  } else if (window.Android?.saveAlternateWallpaper) {
-    try {
-      nativeSuccess = Boolean(window.Android.saveAlternateWallpaper(base64Image, target));
-    } catch (e) {
-      console.warn("Android.saveAlternateWallpaper error:", e);
-    }
-  }
-  return nativeSuccess || true;
+  callNativeBool("saveAlternateWallpaper", [base64Image, target]);
+
+  // Always true: the browser-side mirror is written above, and the native side
+  // is best-effort (it may be absent, or the phone may reject the blob).
+  return true;
 }
 
 /**
@@ -675,27 +519,18 @@ export function saveNativeAlternateWallpaper(base64Image: string, target: "lock"
  */
 export function getNativeAlternateWallpaper(target: "lock" | "home" = "lock"): string {
   if (typeof window === "undefined") return "";
-  if (window.OdysseyAndroid?.getAlternateWallpaper) {
-    try {
-      const val = window.OdysseyAndroid.getAlternateWallpaper(target);
-      if (val && val.length > 0) return val;
-    } catch (e) { logWarn("android-bridge", "bridge call getAlternateWallpaper failed", e); }
+
+  const nativeVal = callNative<string>("getAlternateWallpaper", target);
+  if (nativeVal && nativeVal.length > 0) return nativeVal;
+
+  const local = readString(`odyssey_alt_wallpaper_${target}`);
+  if (local) return local;
+
+  // Legacy single-slot key, kept so older saves are not orphaned.
+  if (target === "lock") {
+    const legacy = readString("odyssey_custom_restoration_wallpaper");
+    if (legacy) return legacy;
   }
-  if (window.Android?.getAlternateWallpaper) {
-    try {
-      const val = window.Android.getAlternateWallpaper(target);
-      if (val && val.length > 0) return val;
-    } catch (e) { logWarn("android-bridge", "bridge call getAlternateWallpaper failed", e); }
-  }
-  try {
-    const key = `odyssey_alt_wallpaper_${target}`;
-    const local = localStorage.getItem(key);
-    if (local) return local;
-    if (target === "lock") {
-      const legacy = localStorage.getItem("odyssey_custom_restoration_wallpaper");
-      if (legacy) return legacy;
-    }
-  } catch (e) { logWarn("storage call failed: localStorage.getItem", "storage call failed: localStorage.getItem", e); }
   return "";
 }
 
@@ -703,23 +538,11 @@ export function getNativeAlternateWallpaper(target: "lock" | "home" = "lock"): s
  * Clears only the alternate wallpaper for the specified screen ("lock" or "home").
  */
 export function clearNativeAlternateWallpaper(target: "lock" | "home" = "lock"): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    localStorage.removeItem(`odyssey_alt_wallpaper_${target}`);
-    if (target === "lock") {
-      localStorage.removeItem("odyssey_custom_restoration_wallpaper");
-    }
-  } catch (e) { logWarn("storage call failed: localStorage.removeItem", "storage call failed: localStorage.removeItem", e); }
-  if (window.OdysseyAndroid?.clearAlternateWallpaper) {
-    try {
-      window.OdysseyAndroid.clearAlternateWallpaper(target);
-    } catch (e) { logWarn("android-bridge", "bridge call clearAlternateWallpaper failed", e); }
+  remove(`odyssey_alt_wallpaper_${target}`);
+  if (target === "lock") {
+    remove("odyssey_custom_restoration_wallpaper");
   }
-  if (window.Android?.clearAlternateWallpaper) {
-    try {
-      window.Android.clearAlternateWallpaper(target);
-    } catch (e) { logWarn("android-bridge", "bridge call clearAlternateWallpaper failed", e); }
-  }
+  callNative("clearAlternateWallpaper", target);
   return true;
 }
 
@@ -732,36 +555,11 @@ export function applyNativeAlternateWallpaper(target: "lock" | "home" = "lock", 
 
   // 1. Direct bitmap application via setCustomWallpaper
   if (imageToApply) {
-    if (window.OdysseyAndroid?.setCustomWallpaper) {
-      try {
-        const ok = window.OdysseyAndroid.setCustomWallpaper(imageToApply, target);
-        if (ok) return true;
-      } catch (e) {
-        console.warn("OdysseyAndroid.setCustomWallpaper error:", e);
-      }
-    }
-    if (window.Android?.setCustomWallpaper) {
-      try {
-        const ok = window.Android.setCustomWallpaper(imageToApply, target);
-        if (ok) return true;
-      } catch (e) {
-        console.warn("Android.setCustomWallpaper error:", e);
-      }
-    }
+    if (callNativeBool("setCustomWallpaper", [imageToApply, target])) return true;
   }
 
   // 2. Fallback to native bridge applyAlternateWallpaper
-  if (window.OdysseyAndroid?.applyAlternateWallpaper) {
-    try {
-      return Boolean(window.OdysseyAndroid.applyAlternateWallpaper(target));
-    } catch (e) { logWarn("android-bridge", "bridge call applyAlternateWallpaper failed", e); }
-  }
-  if (window.Android?.applyAlternateWallpaper) {
-    try {
-      return Boolean(window.Android.applyAlternateWallpaper(target));
-    } catch (e) { logWarn("android-bridge", "bridge call applyAlternateWallpaper failed", e); }
-  }
-  return Boolean(imageToApply && imageToApply.length > 0);
+  return callNativeBool("applyAlternateWallpaper", [target]);
 }
 
 // Legacy aliases
@@ -794,7 +592,7 @@ export interface AppUpdateCheckResult {
  */
 export function isAndroidNativeApp(): boolean {
   if (typeof window === "undefined") return false;
-  return Boolean(window.OdysseyAndroid || window.Android);
+  return nativeBridge() !== null;
 }
 
 /**
@@ -803,23 +601,14 @@ export function isAndroidNativeApp(): boolean {
 export function getNativeAppVersion(): { versionCode: number; versionName: string; isNative: boolean } {
   if (typeof window === "undefined") return { versionCode: 0, versionName: "Web", isNative: false };
 
-  try {
-    if (window.OdysseyAndroid?.getAppVersionCode) {
-      return {
-        versionCode: window.OdysseyAndroid.getAppVersionCode() || 1,
-        versionName: window.OdysseyAndroid.getAppVersionName?.() || "1.0",
-        isNative: true,
-      };
-    }
-    if (window.Android?.getAppVersionCode) {
-      return {
-        versionCode: window.Android.getAppVersionCode() || 1,
-        versionName: window.Android.getAppVersionName?.() || "1.0",
-        isNative: true,
-      };
-    }
-  } catch (e) { logWarn("android-bridge", "bridge call getAppVersionCode failed", e); }
-
+  const code = callNative<number>("getAppVersionCode");
+  if (code !== undefined) {
+    return {
+      versionCode: code || 1,
+      versionName: callNative<string>("getAppVersionName") || "1.0",
+      isNative: true,
+    };
+  }
   return { versionCode: 0, versionName: "Web", isNative: false };
 }
 
@@ -835,11 +624,8 @@ export function downloadAndInstallNativeApk(apkUrl: string): boolean {
         ? apkUrl
         : `${window.location.origin}${apkUrl.startsWith("/") ? "" : "/"}${apkUrl}`;
 
-    if ((window.OdysseyAndroid as any)?.downloadAndInstallApk) {
-      return (window.OdysseyAndroid as any).downloadAndInstallApk(fullUrl);
-    }
-    if ((window.Android as any)?.downloadAndInstallApk) {
-      return (window.Android as any).downloadAndInstallApk(fullUrl);
+    if (hasNative("downloadAndInstallApk")) {
+      return callNativeBool("downloadAndInstallApk", [fullUrl]);
     }
     // Browser fallback: trigger immediate direct file download without opening empty tabs
     const a = document.createElement("a");
@@ -1004,7 +790,7 @@ export function sendTestNotificationToAndroid(
 
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
-      new Notification(`Odyssey • XX:57 Heads-Up`, {
+      new Notification(`Odyssey â€¢ XX:57 Heads-Up`, {
         body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
         icon: "/logo.png",
       });
@@ -1012,7 +798,7 @@ export function sendTestNotificationToAndroid(
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission().then((perm) => {
         if (perm === "granted") {
-          new Notification(`Odyssey • XX:57 Heads-Up`, {
+          new Notification(`Odyssey â€¢ XX:57 Heads-Up`, {
             body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
             icon: "/logo.png",
           });
