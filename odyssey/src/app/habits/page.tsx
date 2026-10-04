@@ -70,7 +70,8 @@ export default function HabitsPage() {
             return prevSelected;
           });
           if (user) {
-            fetchHabits(user.id, currentToday);
+            // force: the day rolled over, so logs for the new day must be read.
+            fetchHabits(user.id, currentToday, { force: true });
           }
           return currentToday;
         }
@@ -197,7 +198,7 @@ export default function HabitsPage() {
     await addXp(30);
     await addDiamonds(5);
     await fetchUser();
-    await fetchHabits(user.id, selectedDate);
+    await fetchHabits(user.id, selectedDate, { force: true });
     showToast("New habit created! +30 XP • +5 💎 added");
   };
 
@@ -214,13 +215,15 @@ export default function HabitsPage() {
     }
   ) => {
     await updateHabit(habitId, updates);
-    if (user) await fetchHabits(user.id, selectedDate);
+    // force: the habit list itself just changed in the database.
+    if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit updated.");
   };
 
   const handleDeleteHabit = async (habitId: string) => {
     await deleteHabit(habitId);
-    if (user) await fetchHabits(user.id, selectedDate);
+    // force: the habit list itself just changed in the database.
+    if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit deleted.");
   };
 

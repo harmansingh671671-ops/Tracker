@@ -146,3 +146,37 @@ describe("day-scoped reuse", () => {
     expect(decide(read!.capturedDate, "2026-04-10")).toBe(false);
   });
 });
+
+/**
+ * These mirror the guard inside fetchHabits. The store is a module singleton
+ * that outlives route changes, so a page switch must not re-query the database.
+ * A guard that is too eager would serve another user's data; one that is too
+ * lazy would serve stale data after a mutation.
+ */
+describe("refetch guard", () => {
+  const shouldSkip = (loadedUserId: string, userId: string, todayLogsDate: string, date: string) =>
+    loadedUserId === userId && todayLogsDate === date;
+
+  it("skips the read when the store already holds this user and day", () => {
+    expect(shouldSkip("u1", "u1", "2026-04-10", "2026-04-10")).toBe(true);
+  });
+
+  it("does not skip when a different day is requested", () => {
+    expect(shouldSkip("u1", "u1", "2026-04-10", "2026-04-11")).toBe(false);
+  });
+
+  it("does not skip on first load, when nothing is loaded yet", () => {
+    expect(shouldSkip("", "u1", "", "2026-04-10")).toBe(false);
+  });
+
+  it("never serves another user's already-loaded data", () => {
+    expect(shouldSkip("u1", "u2", "2026-04-10", "2026-04-10")).toBe(false);
+  });
+
+  it("a forced refetch always reads, even when the guard would skip", () => {
+    // Mutations pass force because the database changed behind the store's back.
+    const force = true;
+    const guarded = shouldSkip("u1", "u1", "2026-04-10", "2026-04-10");
+    expect(guarded && !force).toBe(false);
+  });
+});

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate } from '../utils/habit-colors';
-import { readHabitCache, writeHabitCache } from '../habit-cache';
+import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
 
 /**
  * Reward rates. Declared as named constants per ADR 0001 section 7 -- the
@@ -31,10 +31,16 @@ interface HabitState {
   historyLogs: Record<string, Record<string, boolean>>; // habitId -> date -> completed boolean
   /** Date that `todayLogs` was captured for; '' when unknown. */
   todayLogsDate: string;
+  /** User whose data the store currently holds; '' until first successful load. */
+  loadedUserId: string;
   loading: boolean;
   temporaryWallet: TemporaryWallet;
   hydrateFromCache: (userId: string, date: string) => void;
-  fetchHabits: (userId: string, date: string) => Promise<void>;
+  fetchHabits: (
+    userId: string,
+    date: string,
+    options?: { force?: boolean },
+  ) => Promise<void>;
   fetchTemporaryWallet: (userId: string) => Promise<void>;
   claimTemporaryWallet: (userId: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'currentStreak' | 'longestStreak' | 'totalCompletions'>) => Promise<Habit>;
@@ -57,6 +63,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   todayLogs: {},
   historyLogs: {},
   todayLogsDate: "",
+  loadedUserId: "",
   // Starts LOADING, not idle. Before the first fetch resolves there are no
   // habits and no logs, and a date strip rendering that empty store would
   // paint a confidently wrong "0/0" (and a "Rest Day" dot) that flips a moment
@@ -89,7 +96,54 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     });
   },
 
-  fetchHabits: async (userId, date) => {
+  /**
+   * Reads habits + logs from IndexedDB and refreshes the store.
+   *
+   * By DEFAULT this is a no-op when the store already holds this user's data,
+   * because the store is a module-level singleton that outlives route changes:
+   * the data is already correct and re-reading it only costs a flash. Callers
+   * that just MUTATED the database pass `force: true` to demand a re-read.
+   *
+   * This is what makes a page switch instant. Previously every mount of the
+   * planner and the habits page ran a fresh IndexedDB query, so moving between
+   * them visibly emptied and refilled the data.
+   *
+   * `date` is only the day whose logs land in `todayLogs`; `historyLogs` always
+   * carries every day, so a different `date` alone does not require a re-read
+   * unless `todayLogs` is actually consulted for that day.
+   */
+  fetchHabits: async (userId, date, options) => {
+    const force = options?.force === true;
+
+    if (!force) {
+      const state = get();
+      const alreadyHaveThisUser = state.loadedUserId === userId;
+      const todayLogsUsable = state.todayLogsDate === date;
+      // Habits and history are date-independent. todayLogs is the only
+      // date-scoped slice, so it must match before we can call this satisfied.
+      if (alreadyHaveThisUser && todayLogsUsable) return;
+      // Same user, but todayLogs belongs to another day. Rebuild just that
+      // slice from historyLogs, which already holds every day -- no database
+      // read needed, because historyLogs is the complete record.
+      if (alreadyHaveThisUser) {
+        const rebuilt: Record<string, HabitLog> = {};
+        for (const habit of get().habits) {
+          const done = get().historyLogs[habit.id]?.[date];
+          if (done === undefined) continue;
+          rebuilt[habit.id] = {
+            id: `${habit.id}:${date}`,
+            habitId: habit.id,
+            userId,
+            date,
+            completed: done,
+            loggedAt: new Date().toISOString(),
+          };
+        }
+        set({ todayLogs: rebuilt, todayLogsDate: date });
+        return;
+      }
+    }
+
     // Seed from the mirror first so a fast synchronous paint is possible even
     // though IndexedDB reads are async. IndexedDB below remains authoritative.
     get().hydrateFromCache(userId, date);
@@ -125,7 +179,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       historyMap[l.habitId][l.date] = l.completed;
     });
 
-    set({ habits, todayLogs: logsMap, historyLogs: historyMap, todayLogsDate: date, loading: false });
+    set({ habits, todayLogs: logsMap, historyLogs: historyMap, todayLogsDate: date, loadedUserId: userId, loading: false });
 
     // Mirror the authoritative read so the next cold load can paint instantly.
     // `logsMap` is by construction the logs for `date`, and it is stored under
@@ -375,6 +429,9 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     for (const h of habits) {
       await db.habits.update(h.id, { archivedAt: new Date().toISOString() });
     }
-    set({ habits: [] });
+    // The mirror must go too, otherwise the next cold load restores the habits
+    // that were just archived.
+    clearHabitCache(userId);
+    set({ habits: [], historyLogs: {}, todayLogs: {}, todayLogsDate: "", loadedUserId: "" });
   }
 }));
