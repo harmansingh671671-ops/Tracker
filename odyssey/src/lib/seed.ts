@@ -1,5 +1,5 @@
 import { db, type Profile } from './db';
-import { logWarn, remove } from "@/lib/utils/logger";
+import { remove } from "@/lib/utils/logger";
 import { v4 as uuidv4 } from 'uuid';
 
 export async function seedInitialData(userId: string): Promise<void> {

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { logWarn, writeJson } from "@/lib/utils/logger";
+import { logWarn, readString, writeJson } from "@/lib/utils/logger";
 
 export interface WallpaperSettings {
   enabled: boolean;
@@ -29,7 +29,7 @@ function loadSavedSettings(): WallpaperSettings {
     };
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readString(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {

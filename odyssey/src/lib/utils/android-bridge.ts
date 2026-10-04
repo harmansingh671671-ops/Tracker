@@ -1,5 +1,5 @@
 import { type WallpaperData, generateWallpaperCanvas, build24HourlyBlocks } from "./wallpaper-generator";
-import { logWarn, readString, writeString, remove } from "@/lib/utils/logger";
+import { logWarn, readString, remove, writeString } from "@/lib/utils/logger";
 import { db } from "../db";
 import { calculateRank, getRankInfo } from "./gamification";
 
@@ -338,7 +338,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
 
   // Cache to web storage
   try {
-    localStorage.setItem("odyssey_native_schedule_cache", payload);
+    writeString("odyssey_native_schedule_cache", payload);
   } catch (e) { logWarn("android-bridge", "could not write to storage", e); }
 
   // 1. Native Android APK bridge. The richer methods (result-reporting sync and

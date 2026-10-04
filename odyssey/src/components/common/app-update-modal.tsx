@@ -1,6 +1,6 @@
 "use client";
 
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 import { Sparkles, Download, X, ArrowUpCircle, CheckCircle2, RefreshCw, Smartphone } from "lucide-react";
 import { checkForAppUpdate, downloadAndInstallNativeApk, isAndroidNativeApp, AppUpdateCheckResult } from "@/lib/utils/android-bridge";
@@ -29,13 +29,13 @@ export function AppUpdateModal() {
         if (!mounted || !result || !result.hasUpdate) return;
 
         // Check if user has already been notified of this release
-        const alreadyNotified = localStorage.getItem(`odyssey_update_notified_${result.latestVersionCode}`);
+        const alreadyNotified = readString(`odyssey_update_notified_${result.latestVersionCode}`);
         if (alreadyNotified) {
           return;
         }
 
         // Mark as notified so it NEVER pops up again on future app launches
-        localStorage.setItem(`odyssey_update_notified_${result.latestVersionCode}`, "true");
+        writeString(`odyssey_update_notified_${result.latestVersionCode}`, "true");
 
         setUpdateInfo(result);
         setIsOpen(true);
@@ -93,7 +93,7 @@ export function AppUpdateModal() {
 
   const handleDismiss = () => {
     try {
-      localStorage.setItem(`odyssey_update_notified_${updateInfo.latestVersionCode}`, "true");
+      writeString(`odyssey_update_notified_${updateInfo.latestVersionCode}`, "true");
     } catch (e) { logWarn("app-update-modal", "could not write to storage", e); }
     setIsOpen(false);
   };

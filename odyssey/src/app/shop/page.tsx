@@ -1,5 +1,6 @@
 "use client";
 
+import { readString, writeString } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { RewardCelebrationModal } from "@/components/shop/reward-celebration-modal";
@@ -34,7 +35,7 @@ export default function ShopPage() {
 
   useEffect(() => {
     fetchUser();
-    const savedChest = localStorage.getItem(`odyssey_chest_${new Date().toISOString().split("T")[0]}`);
+    const savedChest = readString(`odyssey_chest_${new Date().toISOString().split("T")[0]}`);
     if (savedChest) setChestClaimed(true);
   }, [fetchUser]);
 
@@ -111,7 +112,7 @@ export default function ShopPage() {
     await addXp(50);
     await fetchUser();
     setChestClaimed(true);
-    localStorage.setItem(`odyssey_chest_${new Date().toISOString().split("T")[0]}`, "true");
+    writeString(`odyssey_chest_${new Date().toISOString().split("T")[0]}`, "true");
     setIsCelebrationOpen(true);
   };
 

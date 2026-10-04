@@ -1,5 +1,6 @@
 "use client";
 
+import { readString } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -239,8 +240,8 @@ export default function JourneyPage() {
     if (typeof window === "undefined") return "";
     try {
       return (
-        localStorage.getItem(`odyssey_day_name_day_${dayNum}`) ||
-        (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
+        readString(`odyssey_day_name_day_${dayNum}`) ||
+        (dateStr ? readString(`odyssey_day_name_${dateStr}`) : null) ||
         ""
       );
     } catch {

@@ -1,3 +1,4 @@
+import { readString, writeString } from "@/lib/utils/logger";
 import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
@@ -236,7 +237,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const key = `odyssey_claimed_habit_rewards_${userId}`;
     let claimedDates: string[] = [];
     try {
-      claimedDates = JSON.parse(localStorage.getItem(key) || '[]');
+      claimedDates = JSON.parse(readString(key) || '[]');
     } catch {
       claimedDates = [];
     }
@@ -294,13 +295,13 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const key = `odyssey_claimed_habit_rewards_${userId}`;
       let claimed: string[] = [];
       try {
-        claimed = JSON.parse(localStorage.getItem(key) || '[]');
+        claimed = JSON.parse(readString(key) || '[]');
       } catch {
         claimed = [];
       }
 
       const updatedClaimed = Array.from(new Set([...claimed, ...unclaimedDays.map(d => d.date)]));
-      localStorage.setItem(key, JSON.stringify(updatedClaimed));
+      writeString(key, JSON.stringify(updatedClaimed));
     }
 
     await get().fetchTemporaryWallet(userId);

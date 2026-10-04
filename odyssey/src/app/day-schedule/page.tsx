@@ -1,6 +1,6 @@
 "use client";
 
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -257,8 +257,8 @@ function DayScheduleContent() {
     if (typeof window !== "undefined") {
       try {
         const saved =
-          localStorage.getItem(`odyssey_day_name_day_${displayDay}`) ||
-          (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
+          readString(`odyssey_day_name_day_${displayDay}`) ||
+          (dateStr ? readString(`odyssey_day_name_${dateStr}`) : null) ||
           "";
         setDayName(saved);
       } catch (e) { logWarn("storage call failed: localStorage.getItem", "storage call failed: localStorage.getItem", e); }
@@ -269,9 +269,9 @@ function DayScheduleContent() {
     setDayName(newName);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(`odyssey_day_name_day_${displayDay}`, newName);
+        writeString(`odyssey_day_name_day_${displayDay}`, newName);
         if (dateStr) {
-          localStorage.setItem(`odyssey_day_name_${dateStr}`, newName);
+          writeString(`odyssey_day_name_${dateStr}`, newName);
         }
       } catch (e) { logWarn("storage call failed: localStorage.setItem", "storage call failed: localStorage.setItem", e); }
     }

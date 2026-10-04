@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { logWarn, readString } from "@/lib/utils/logger";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";

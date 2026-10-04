@@ -1,6 +1,6 @@
 "use client";
 
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -38,7 +38,7 @@ import {
 const getCachedBlocks = (dateStr: string): ScheduleBlock[] => {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(`odyssey_blocks_cache_${dateStr}`);
+    const raw = readString(`odyssey_blocks_cache_${dateStr}`);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -50,7 +50,7 @@ const getCachedBlocks = (dateStr: string): ScheduleBlock[] => {
 const setCachedBlocks = (dateStr: string, blocksList: ScheduleBlock[]) => {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(`odyssey_blocks_cache_${dateStr}`, JSON.stringify(blocksList));
+    writeString(`odyssey_blocks_cache_${dateStr}`, JSON.stringify(blocksList));
   } catch (e) { logWarn("page", "could not write to storage", e); }
 };
 
@@ -316,7 +316,7 @@ function PlannerContent() {
   const handleSelectDate = useCallback((dateStr: string) => {
     setSelectedDate(dateStr);
     try {
-      localStorage.setItem("odyssey_planner_selected_date", dateStr);
+      writeString("odyssey_planner_selected_date", dateStr);
       if (typeof window !== "undefined" && window.location.search) {
         window.history.replaceState(null, "", window.location.pathname);
       }

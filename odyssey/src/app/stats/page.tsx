@@ -1,6 +1,6 @@
 "use client";
 
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, writeString } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -334,7 +334,7 @@ export default function StatsPage() {
         }
       } catch (e) { logWarn("page", "browser call failed: window.getSelection", e); }
       try {
-        localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
+        writeString("odyssey_planner_selected_date", cell.dateStr);
       } catch (e) { logWarn("page", "could not write to storage", e); }
       router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
     }, 450);
@@ -517,7 +517,7 @@ export default function StatsPage() {
                   onContextMenu={(e) => {
                     e.preventDefault();
                     try {
-                      localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
+                      writeString("odyssey_planner_selected_date", cell.dateStr);
                     } catch (e) { logWarn("page", "could not write to storage", e); }
                     router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
                   }}
@@ -806,7 +806,7 @@ export default function StatsPage() {
                 const targetDay = popupDayStats.dayNumber;
                 setPopupDate(null);
                 try {
-                  localStorage.setItem("odyssey_planner_selected_date", targetDate);
+                  writeString("odyssey_planner_selected_date", targetDate);
                 } catch (e) { logWarn("page", "could not write to storage", e); }
                 router.push(`/planner?date=${targetDate}&day=${targetDay}`);
               }}

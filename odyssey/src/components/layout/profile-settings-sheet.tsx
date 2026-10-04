@@ -1,5 +1,6 @@
 "use client";
 
+import { readString, writeString } from "@/lib/utils/logger";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -51,7 +52,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           }
         })
         .catch(() => {});
-      const saved = localStorage.getItem("odyssey_hourly_alerts");
+      const saved = readString("odyssey_hourly_alerts");
       if (saved !== null) {
         setHourlyAlertsEnabled(saved === "true");
       }
@@ -67,7 +68,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
 
   const handleToggleHourlyAlerts = (checked: boolean) => {
     setHourlyAlertsEnabled(checked);
-    localStorage.setItem("odyssey_hourly_alerts", String(checked));
+    writeString("odyssey_hourly_alerts", String(checked));
     showToast(checked ? "Hourly XX:57 Heads-Up Alerts enabled." : "Hourly alerts paused.");
   };
 
