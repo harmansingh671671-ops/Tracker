@@ -66,7 +66,19 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         renderAdaptiveCanvas(canvas, width, height, rawJson)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK or WallpaperManager.FLAG_SYSTEM)
+            // Apply to LOCK and SYSTEM separately. Passing
+            // `FLAG_LOCK or FLAG_SYSTEM` in one call overwrote BOTH screens and
+            // defeated the app's own isolated lock/home wallpaper feature.
+            try {
+                wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not set lock-screen wallpaper: ${e.message}")
+            }
+            try {
+                wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not set home-screen wallpaper: ${e.message}")
+            }
         } else {
             wallpaperManager.setBitmap(bitmap)
         }
@@ -795,6 +807,16 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
 
         fun scheduleNextHourlyUpdate(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+
+            // Respect the master wallpaper switch. Scheduling this alarm while the
+            // wallpaper is switched off would wake the device every hour to do
+            // work the user has explicitly disabled.
+            val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("wallpaper_enabled", false)) {
+                Log.d(TAG, "Master wallpaper switch is off - not scheduling hourly update")
+                return
+            }
+
             val intent = Intent(context, OdysseyHourlyWallpaperWorker::class.java).apply {
                 action = ALARM_ACTION
             }

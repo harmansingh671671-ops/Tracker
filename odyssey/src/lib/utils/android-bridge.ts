@@ -36,6 +36,8 @@ declare global {
       clearAlternateWallpaper?: (targetScreen: string) => boolean;
       applyAlternateWallpaper?: (targetScreen: string) => boolean;
       clearLockscreenWallpaper?: () => boolean;
+      isWallpaperEnabled?: () => boolean;
+      setWallpaperMasterEnabled?: (enabled: boolean) => boolean;
       syncSchedule?: (scheduleJson: string) => boolean | void;
       syncScheduleWithResult?: (scheduleJson: string) => string;
       getSyncedSchedule?: () => string;

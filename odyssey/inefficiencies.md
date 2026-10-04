@@ -497,7 +497,32 @@ That single issue is very likely an order of magnitude larger than everything th
 
 ---
 
-## 8. METHODOLOGY & LIMITATIONS
+## 8. RESOLVED — WHAT WAS CHANGED (2026-10-04, phase P8)
+
+| # | Finding | Resolution |
+|---|---|---|
+| 2.1 | Per-frame JSON re-parse + `SharedPreferences` read | **Partly fixed.** `CachedSchedule` caches the parsed model; invalidated on sync broadcast and on day rollover. The ~900-line full redraw, and the per-frame `Paint`/`Typeface`/gradient allocation, are **still open** — this is the real remaining cost and is the next P8 item. |
+| 2.2 | "Zero battery drain" claim | **Fixed.** Comment reworded to describe actual behaviour. |
+| 2.3 | Hourly alarm wakes device even when wallpaper is off | **Fixed.** `scheduleNextHourlyUpdate` returns early when the master switch is off. |
+| 2.4 | Unused `WAKE_LOCK` | **Fixed.** Removed from the manifest after confirming 0 call sites. |
+| 2.6 | Preview clock ticks 60× too fast | **Fixed.** Now re-arms on the minute boundary. |
+| 3.6 | `FLAG_LOCK or FLAG_SYSTEM` defeats isolated wallpapers | **Fixed.** Lock and system are applied in separate, individually guarded calls. |
+| — | **Wallpaper defaulted to enabled and could not be stopped** | **New.** A fail-closed, default-off master switch (P8-E1). Off = hides Studio, guards `/wallpaper`, stops the loop, cancels the alarm, restores the user's lock/home wallpapers. Native authoritative; bridge errors resolve to OFF. |
+
+### 8.1 Two defects this work surfaced
+
+Both were invisible to `tsc`, `lint` and the test suite, which is why they are recorded here:
+
+1. **`nativeEnabled || webEnabled`** — with native authoritative, `||` silently turns "native says
+   no" into "on" whenever the browser's `localStorage` is stale. This would have defeated the entire
+   feature while every test stayed green. Now `nativeEnabled === null ? webEnabled : nativeEnabled`.
+2. **Uncompiled Kotlin.** There is no `gradlew` in this repo, so a `CachedSchedule` class nested
+   inside an `inner class` (illegal in Kotlin) passed a fully green web gate. It was only caught by
+   running `:app:compileDebugKotlin`. See `DEVELOPMENT_PLAN.md` rule 6.6 step 5 and risk R12.
+
+---
+
+## 9. METHODOLOGY & LIMITATIONS
 
 **How counts were obtained:** direct instrumentation over the source tree via `Select-String` and
 byte-level UTF-8 decoding. No figures are estimated or extrapolated except where explicitly labelled
@@ -507,11 +532,17 @@ as arithmetic on measured counts.
 - **No profiling was performed.** This is a static read of the code, not a measurement of a running
   device. The §2 findings are structural and provable from source, but a real
   `adb shell dumpsys batterystats` capture would be needed to put a percentage on the drain.
-- **The Kotlin code was not compiled or executed.** Findings are from reading.
+- **No device or emulator verification.** The wallpaper disable path (restore of the user's lock and
+  home wallpapers, alarm cancellation, loop stop) is verified by compilation and by reading
+  `clearLockscreenWallpaper()` / `cancelHourlyUpdate()`, **not** by running it on hardware. This
+  remains open and is the single most important manual check before release.
 - **The Chromium WebView impact was reasoned** from known `backdrop-filter` and timer behaviour, not
   measured on device. `MainActivity`'s `onPause`/`onResume` pairing bounds it correctly, which is the
   key mitigating fact.
 - No visual UI review was performed; findings are from source and DOM/computed-style inspection.
+
+**Corrected since first write:** the original review stated the Kotlin was not compiled. That is no
+longer true — `:app:compileDebugKotlin` now exits 0 and is a required gate (rule 6.6 step 5).
 
 **Confidence:** the live-wallpaper finding (2.1) is the highest-confidence item here. The 30 FPS
 loop, the full-scene re-render and the single-sine-variable are all directly readable in the source,

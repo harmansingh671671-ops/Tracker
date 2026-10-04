@@ -12,7 +12,9 @@
 
     <!-- Normal install-time permission: ZERO runtime popup dialogs (100% user trust & safety) -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- NOTE: WAKE_LOCK was declared here but is never used anywhere in the
+         codebase (0 occurrences of newWakeLock/PowerManager). Removed rather
+         than kept as an unused permission. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

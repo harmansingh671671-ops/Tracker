@@ -41,8 +41,23 @@ export function WallpaperPreview({
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    // The preview only ever displays HH:MM, so a 1-second tick re-rendered the
+    // whole preview subtree 60x more often than the value could change. Schedule
+    // the next tick on the minute boundary instead: same result, 60x less work.
+    let timer: ReturnType<typeof setTimeout>;
+
+    const scheduleTick = () => {
+      const now = new Date();
+      // ms until the start of the next minute, +50ms so we land after the flip
+      const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50;
+      timer = setTimeout(() => {
+        setCurrentTime(new Date());
+        scheduleTick();
+      }, msToNextMinute);
+    };
+
+    scheduleTick();
+    return () => clearTimeout(timer);
   }, []);
 
   const timeStr = useMemo(() => {

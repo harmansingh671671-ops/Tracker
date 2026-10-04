@@ -286,6 +286,69 @@ class OdysseyWallpaperBridge(
     }
 
     /**
+     * Master switch for the entire Odyssey wallpaper mechanism.
+     *
+     * Turning it OFF must stand the whole thing down, not merely hide it:
+     *   - clears `wallpaper_enabled`, which the live wallpaper engine reads and
+     *     which stops its continuous render loop
+     *   - cancels the hourly auto-update alarm so the device is not woken every
+     *     hour for wallpaper work the user has switched off
+     *   - restores the user's own lock + home wallpapers
+     *
+     * Turning it ON only flips the flag. It deliberately does NOT re-arm the
+     * hourly alarm, because the user still has to pick a wallpaper in Wallpaper
+     * Studio; the alarm is armed there, once something is actually applied.
+     */
+    @JavascriptInterface
+    fun setWallpaperMasterEnabled(enabled: Boolean): Boolean {
+        return try {
+            if (!enabled) {
+                // clearLockscreenWallpaper already clears the flag, broadcasts
+                // to the live engine, and restores the user's own lock + home
+                // wallpapers -- so reuse it rather than duplicating that logic.
+                val restored = clearLockscreenWallpaper()
+
+                // Stand the background alarm down too. Without this the device
+                // keeps waking hourly for a feature the user has switched off.
+                try {
+                    OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Failed to cancel hourly alarm: ${e.message}")
+                }
+
+                // Report honestly. The flag is down either way, but if the user's
+                // own wallpapers could not be put back they should know the
+                // switch did not fully take effect rather than see a clean "off".
+                Log.d("OdysseyWallpaper", "Master wallpaper switch OFF (restored=$restored)")
+                restored
+            } else {
+                prefs.edit().putBoolean("wallpaper_enabled", true).apply()
+                // Tell the live engine to re-read the flag immediately.
+                try {
+                    val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
+                        setPackage(context.packageName)
+                    }
+                    context.sendBroadcast(intent)
+                } catch (e: Exception) {}
+                Log.d("OdysseyWallpaper", "Master wallpaper switch set to true")
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("OdysseyWallpaper", "Failed to set master wallpaper switch: ${e.message}")
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun isWallpaperEnabled(): Boolean {
+        return try {
+            prefs.getBoolean("wallpaper_enabled", false)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
      * Clears custom schedule wallpaper and completely replaces Odyssey on Lock and Home screens
      * with the user's individually selected alternate wallpapers.
      */

@@ -231,13 +231,15 @@ directories. This table is the status record -- update it when you ship.
 ---
 ## 4. PHASE PLAN
 
-Eight phases. **Each has an exit gate that must be objectively verifiable.** Do not start a phase
+Nine phases. **Each has an exit gate that must be objectively verifiable.** Do not start a phase
 until the previous gate is met and recorded in git.
 
 ```
 P0 Stabilise -> P1 Daily Clarity -> P2 Routines -> P3 Progression & Ambient
                                                           |
       P7 Expansion <- P6 Launch <- P5 Social <- P4 AI (local) <-+
+                                                          |
+                 P8 Efficiency & Battery Hardening (cross-cutting)
 ```
 
 | Phase | Theme | Scope | Est. |
@@ -250,6 +252,7 @@ P0 Stabilise -> P1 Daily Clarity -> P2 Routines -> P3 Progression & Ambient
 | **P5** | Social | Accounts, feed, moderation -- GATED | 8-12 wks |
 | **P6** | Launch | Play Store, subscriptions, OTA | 4-6 wks |
 | **P7** | Expansion | Calendar sync, Wear OS, marketplace | open |
+| **P8** | Efficiency & Battery Hardening | Default-off background features, render cost. **Gates P6/P7.** | ongoing |
 
 ---
 
@@ -430,6 +433,52 @@ backup with conflict handling and deletion/export.
 
 ---
 
+### PHASE 8 -- EFFICIENCY & BATTERY HARDENING (final phase, cross-cutting)
+
+**Status: ACTIVE.** This is the final development phase. It started during P3 and is **binding on
+P6 and P7** -- a feature that fails this phase does not ship, regardless of how complete it is.
+
+**Why it exists.** Odyssey ships background work: a live wallpaper that redraws continuously while
+the app is closed, and an hourly alarm that wakes the device. The full audit is in
+`inefficiencies.md`. The headline finding: the dominant battery cost was **not** Chromium, it was the
+native live wallpaper. `MainActivity` already calls `webView.onPause()` when backgrounded, so
+WebView cost is bounded to foreground use.
+
+**P8-E1 -- Wallpaper master switch (delivered).** A fail-closed, default-off master switch for the
+entire wallpaper mechanism.
+
+- **Default is OFF**, everywhere. `prefs.getBoolean("wallpaper_enabled", false)` -- the `true`
+  default that previously existed made "enabled" the fallback for any unreadable state.
+- **Hiding is not enough.** Turning it off hides the Wallpaper Studio card on Stats *and* guards the
+  `/wallpaper` route, because a bookmark or back-button entry would otherwise still reach the
+  controls.
+- **Turning it off stands the mechanism down, it does not just hide it:** stops the render loop,
+  cancels the hourly alarm, detaches the Odyssey wallpaper and restores the user's own chosen lock
+  and home wallpapers.
+- **Native is authoritative.** The bridge wins whenever it can answer -- *including* `false`. A
+  stale browser `localStorage` value must never resurrect a wallpaper the user switched off. The
+  previous `nativeEnabled || webEnabled` did exactly that, so `localStorage` is now consulted only
+  when there is no bridge at all (the web preview).
+- **Fail closed on error.** If the bridge exists but throws, the state is treated as OFF. An unknown
+  state must never resolve to "on" for a background service.
+
+**P8-E2 -- Render cost.** The schedule JSON was re-parsed and re-read from `SharedPreferences` on
+*every one* of the ~30 frames per second, although it only changes when the app syncs or the day
+rolls over. Now cached in a `CachedSchedule` and invalidated on sync and on day rollover.
+
+**P8-E3 -- Power-claim honesty.** Source comments claimed "zero battery drain". They now describe
+what the engine actually does. Do not write a power claim you have not measured.
+
+**P8-E4 -- Open, tracked in `inefficiencies.md`.** Per-frame `Paint`/`Typeface`/gradient allocation
+and the full-scene redraw itself are **not** solved by E2 -- E2 only removes the data-layer waste.
+The 30 FPS full redraw is the real remaining cost.
+
+**EXIT GATE:** every background subsystem is default-off and reachable only through an explicit
+user opt-in; disabling it measurably reduces wakeups and CPU; the Kotlin bridge compiles; the web
+build, lint, typecheck and tests all pass.
+
+---
+
 ## 5. ENGINEERING CONVENTIONS (binding on all code)
 
 ### 5.1 Stack (verified -- do not substitute)
@@ -505,6 +554,13 @@ Framer Motion 13 | Recharts 3
 - Permissions: prefer install-time/normal. Runtime prompts only on explicit user action, with an
   explanation screen first (Regain's pattern is the reference -- see `UI_UX_review.md` section 23).
 - Any wallpaper change requires visual verification on a real device or emulator.
+- **Every background feature is default-off.** See rule 6.6 step 2. Ship `getBoolean(key, false)`.
+- **Turning a feature off must actually stop it**, not merely hide its UI: stop the loop, cancel
+  the alarm, release the wakeup, restore whatever it replaced.
+- **Do not remove a permission that is unused** without confirming zero call sites -- an unused
+  permission in the manifest is both Play-review surface and a false claim to the user.
+- **Kotlin is not covered by `tsc`.** Any native change is unverified until `:app:compileDebugKotlin`
+  exits 0. See rule 6.6 step 5.
 
 ### 5.8 Accessibility and performance floors
 
@@ -525,10 +581,15 @@ npm run build        # must succeed
 npm test             # must pass (from P0-T5 onward)
 ```
 
+- **Native/Kotlin changes additionally require `:app:compileDebugKotlin` to exit 0** (rule 6.6
+  step 5). None of the four commands above read Kotlin, so a green set of them says nothing about
+  the bridge.
 - **UI work:** verify light and dark, three screen widths (360 / 390 / 430), keyboard nav, reduced motion.
 - **Native work:** verify the web fallback still works with the bridge absent.
 - **Data work:** verify against **existing** IndexedDB data, not just fresh installs.
 - **Schema work:** add a written ADR to `docs/adr/`.
+- **Background work:** verify the default is OFF on a fresh install, that the feature genuinely
+  stops when switched off, and that a bridge failure resolves to OFF.
 
 ---
 
@@ -586,6 +647,65 @@ A feature is **done** only when all of these are true:
 - [ ] **Committed** -- an uncommitted feature is not done, it is in progress
 ---
 
+### 6.6 Efficiency-first agent workflow (binding, from P8 onward)
+
+**Motivation.** On this codebase an agent that only asks "does it work?" shipped a feature that
+burned battery continuously with the app closed, and separately shipped a Kotlin file that had
+never been compiled. Both were invisible to `tsc`, `lint` and the test suite. The workflow below is
+the cheapest way to catch both classes of defect.
+
+**Step 1 -- Ask the battery question before writing code, not after.**
+
+For any feature that runs when the app is *closed*, answer these first, in writing:
+
+- What wakes the device? (alarm, service, timer, broadcast)
+- How often, and what does each wake cost?
+- What is the **default** if state is unreadable, missing, or the bridge fails?
+- What exactly happens when the user turns it off?
+
+If the feature has no answer to "what happens when the user turns it off", it is not finished. A
+feature that cannot be stopped is a feature that can only be uninstalled.
+
+**Step 2 -- Default-off is a rule, not a preference.** Every new persistent flag ships as
+`getBoolean(key, false)`. Any default that resolves to *doing work* is wrong, because it makes
+"enabled" the fallback for every failure mode -- unreadable preferences, a bridge that throws, a
+half-written store. Encode it in a test (`wallpaper-toggle-store.test.ts` is the pattern), not in a
+comment.
+
+**Step 3 -- Hide the UI *and* guard the route.** Hiding an entry point is presentation, not
+enforcement. Anything a user can reach by URL, by bookmark or by the back button needs its own
+guard.
+
+**Step 4 -- One source of truth, and it must be the authoritative one.** Native state wins over a
+browser mirror whenever native can answer -- *including* when it answers "no". `a || b` where `a` is
+authoritative silently converts "authoritative no" into "yes".
+
+**Step 5 -- Compile what you changed. Do not assume.** `tsc` does not read Kotlin. This repo has no
+`gradlew` checked in, so native changes are unverified until you compile them:
+
+```bash
+cd android
+# Use the Gradle distribution already in the wrapper cache, or Android Studio's.
+$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
+$env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
+& "$env:USERPROFILE\.gradle\wrapper\dists\gradle-8.4-bin\*\gradle-8.4\bin\gradle.bat" `
+    :app:compileDebugKotlin --console=plain `
+    '-Dkotlin.compiler.execution.strategy=in-process' '-Pkotlin.incremental=false'
+```
+
+If the Kotlin daemon dies with `Could not flush incremental caches`, that is the daemon, not your
+code -- the two flags above avoid it. **Exit code 0 is the gate.** Shipping uncompiled Kotlin is not
+acceptable, and this step has already caught a real syntax error that every web-side check missed.
+
+**Step 6 -- Run the cheapest gate that can fail, first.** `tsc` -> `lint` -> `test` -> `build` ->
+Kotlin compile. `lint` in particular catches hook-order violations (`rules-of-hooks`) that `tsc`
+accepts and that only otherwise appear at runtime.
+
+**Step 7 -- Report honestly.** If a check could not be run, say so in the summary. Never describe
+unverified work as verified.
+
+---
+
 ## 7. RISK REGISTER
 
 | ID | Risk | Severity | Mitigation |
@@ -601,6 +721,8 @@ A feature is **done** only when all of these are true:
 | **R9** | Research numbers treated as guaranteed uplift | Medium | Rule 6 in section 5.3. Always show confidence and sample size. |
 | **R10** | Knowledge graph stale, leading to wrong impact analysis | Medium | P0-T2, then re-run after each phase. |
 | **R11** | **Half-finished work left uncommitted** -- already happened once (the theme system sat uncommitted across multiple sessions) | High | Rule 6.1. One feature at a time, committed before moving on. |
+| **R12** | **Unverified native code shipped** -- there is no `gradlew` in the repo, so Kotlin can look "done" while never having been compiled. A real syntax error shipped through a fully green web test suite. | High | Rule 6.6 step 5. Compile `:app:compileDebugKotlin` before committing any `.kt` change. Consider committing the Gradle wrapper so this stops depending on local caches. |
+| **R13** | **Background battery burn** -- the live wallpaper drew continuously with the app closed, defaulted to enabled, and could not be turned off from the UI. | High | Rule 6.6 steps 1-4, phase P8. Default-off, route-guarded, native-authoritative, fail-closed. |
 
 ---
 
@@ -642,20 +764,24 @@ exit gate is met.
 |---|---|---|
 | 2026-10-03 | Plan created. Reconciled 8 contradictions across the Market Research corpus: feature-ID collision, phase collision, schema divergence, Next.js version error, XP curve, checkbox drift, git-ignore, and plan-vs-reality. Verified baseline against `6b42b74`. | Cline |
 | 2026-10-03 | Added the one-feature-at-a-time delivery rule (6.1, reinforced in 4, 6.5, Quick Reference) and logged it as risk R11. Restored content lost during an edit. | Cline |
+| 2026-10-04 | Opened **P8 Efficiency & Battery Hardening** as the final, cross-cutting phase (gates P6/P7). Landed the wallpaper master switch: default-off everywhere, `/wallpaper` route-guarded as well as hidden, disable stops loop + cancels hourly alarm + restores the user's lock/home wallpapers, native authoritative over stale `localStorage`, fail-closed on bridge error. Cached the schedule JSON per change instead of per frame. Removed the unused `WAKE_LOCK` permission. Split the `FLAG_LOCK or FLAG_SYSTEM` apply. Added rule 6.6 (efficiency-first agent workflow), risks R12/R13, and the Kotlin-compile gate in 5.9. | Cline |
 
 ---
 
 ## 10. QUICK REFERENCE
 
 ```
+CURRENT PHASE ........ P8 Efficiency & Battery Hardening (ACTIVE, gates P6/P7)
 NEXT UP ............ P0-T1 -- land the in-flight theme work
 BIGGEST BUG ........ D4 -- theme-store matchMedia listener leak
 BIGGEST RISK ....... R1 -- AccessibilityService and Play policy
+BATTERY RULE ....... Default OFF, must be stoppable, native authoritative (6.6)
 DELIVERY ........... ONE FEATURE AT A TIME. Implement, verify, commit, then next.
 CANONICAL SCHEMA ... src/lib/db.ts  (NOT MASTER_TODO_REVISED section 20.1)
 CANONICAL AI IDS ... MASTER_TODO_REVISED.md AI-1..AI-23  (NOT AI_TODO.md)
 FRAMEWORK .......... Next.js 16.3.5 -- read node_modules/next/dist/docs/ first
 VALIDATE ........... npx tsc --noEmit && npm run lint && npm run build && npm test
+KOTLIN ............. cd android && :app:compileDebugKotlin  (tsc does NOT check .kt)
 ```
 
 *End. If reality and this document disagree, reality is right -- update this document in the same PR.*

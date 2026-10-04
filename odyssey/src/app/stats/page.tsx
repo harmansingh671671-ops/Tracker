@@ -7,6 +7,7 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { calculateRank, getRankInfo, getNextRank } from "@/lib/utils/gamification";
 import { getJourneyStartDate, getJourneyDayNumberForDate } from "@/lib/utils/journey";
+import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import {
   evaluateDayCompletion,
   getHeatmapCellStyles,
@@ -48,6 +49,8 @@ const WEEKDAY_NAMES = ["M", "T", "W", "T", "F", "S", "S"];
 export default function StatsPage() {
   const router = useRouter();
   const { user, fetchUser } = useUserStore();
+  // Master wallpaper switch -- gates the Wallpaper Studio entry point.
+  const wallpaperToggle = useWallpaperToggle();
   const [totalPlannedHours, setTotalPlannedHours] = useState(0);
   const [allBlocks, setAllBlocks] = useState<ScheduleBlock[]>([]);
 
@@ -77,10 +80,13 @@ export default function StatsPage() {
 
   useEffect(() => {
     fetchUser();
+    wallpaperToggle.refresh();
     db.scheduleBlocks.toArray().then((blocks) => {
       setAllBlocks(blocks);
       setTotalPlannedHours(blocks.length);
     });
+    // refresh is stable on the zustand store; mount-only read is intentional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUser]);
 
   // Compute day completion stats for all recorded dates
@@ -509,11 +515,14 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* WALLPAPER STUDIO GATEWAY CARD */}
-      <Link
-        href="/wallpaper"
-        className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-surface-container-low via-surface-container-low to-background border border-primary/30 hover:border-primary/60 p-4 sm:p-5 shadow-[0_0_24px_rgba(108,0,255,0.08)] hover:shadow-[0_0_32px_rgba(108,0,255,0.18)] transition-all duration-300 block"
-      >
+      {/* WALLPAPER STUDIO GATEWAY CARD -- hidden entirely when the wallpaper
+          master switch is off, so the feature is unreachable rather than
+          merely inert. */}
+      {wallpaperToggle.enabled && (
+        <Link
+          href="/wallpaper"
+          className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-surface-container-low via-surface-container-low to-background border border-primary/30 hover:border-primary/60 p-4 sm:p-5 shadow-[0_0_24px_rgba(108,0,255,0.08)] hover:shadow-[0_0_32px_rgba(108,0,255,0.18)] transition-all duration-300 block"
+        >
         <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-primary/15 blur-2xl pointer-events-none group-hover:bg-primary/25 transition-all" />
         <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/10 rounded-full blur-xl pointer-events-none" />
 
@@ -537,7 +546,8 @@ export default function StatsPage() {
             <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
-      </Link>
+        </Link>
+      )}
 
       {/* 2x2 KPI Matrix (Akiflow Obsidian Glass) */}
       <div className="grid grid-cols-2 gap-3">

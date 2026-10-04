@@ -62,6 +62,27 @@ data class WallpaperCategoryBadge(
  * - Fully utilizes screen height from top to bottom (no wasted space, no squeezed content).
  * - Zero battery drain: sleeps and removes callbacks whenever screen is off.
  */
+// ---- Cached schedule data -----------------------------------------------
+// The breathing animation drives a frame every 33ms, but the schedule behind it
+// changes only when the app syncs or the day rolls over. Re-reading
+// SharedPreferences and re-parsing the schedule JSON 30x a second was pure
+// waste; this cache collapses that to once per change.
+//
+// Declared at file level (like ScheduleBlockItem/HobbyItem above) because
+// Kotlin does not permit nested classes inside an `inner class`.
+private data class CachedSchedule(
+    val dateStr: String,
+    val rawJson: String?,
+    val chapter: Int,
+    val activeDay: Int,
+    val rankName: String,
+    val rankBadge: String,
+    val userLevel: Int,
+    val userStreak: Int,
+    val blocks: List<ScheduleBlockItem>,
+    val habits: List<HobbyItem>
+)
+
 @SuppressLint("NewApi")
 class OdysseyLiveWallpaperService : WallpaperService() {
 
@@ -73,22 +94,38 @@ class OdysseyLiveWallpaperService : WallpaperService() {
         private var visible = false
         private val handler = Handler(Looper.getMainLooper())
 
+        private var cachedSchedule: CachedSchedule? = null
+
+        /** Drops the cache so the next frame re-reads from SharedPreferences. */
+        private fun invalidateScheduleCache() {
+            cachedSchedule = null
+        }
+
         private val updateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 Log.d("OdysseyLiveWallpaper", "ACTION_WALLPAPER_DATA_UPDATED received! Refreshing canvas immediately...")
+                invalidateScheduleCache()
                 drawFrame()
             }
         }
 
         private val pulseRunnable = object : Runnable {
             override fun run() {
-                if (visible) {
-                    val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
-                    val isEnabled = prefs.getBoolean("wallpaper_enabled", true)
-                    drawFrame()
-                    if (isEnabled) {
-                        handler.postDelayed(this, 33) // ~30 FPS silky-smooth organic breathing
-                    }
+                if (!visible) return
+                // Nothing to draw into: a destroyed surface makes lockCanvas()
+                // throw, and the frame would be wasted regardless.
+                val holder = surfaceHolder
+                if (holder == null || !holder.surface.isValid) return
+
+                val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
+                // Default false, not true: a user who has never enabled the
+                // wallpaper must never have it animate. See the master switch.
+                val isEnabled = prefs.getBoolean("wallpaper_enabled", false)
+                drawFrame()
+                if (isEnabled) {
+                    // ~30 FPS. The breath cycle is 2.4s, so 30 FPS is already far
+                    // more than the motion needs; see inefficiencies.md 2.1.
+                    handler.postDelayed(this, 33)
                 }
             }
         }
@@ -203,7 +240,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val height = canvas.height.toFloat()
 
             val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
-            val isEnabled = prefs.getBoolean("wallpaper_enabled", true)
+            val isEnabled = prefs.getBoolean("wallpaper_enabled", false)
 
             // When user turned off Odyssey wallpaper, restore custom photo or render sleek clean canvas
             if (!isEnabled) {
@@ -284,6 +321,9 @@ class OdysseyLiveWallpaperService : WallpaperService() {
 
             // Load Synced Schedule Data from SharedPreferences
             val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            // Reused across frames. The schedule only changes when the app syncs
+            // or the day rolls over, so re-parsing it 30x a second was pure waste.
+            var scheduleCache = cachedSchedule?.takeIf { it.dateStr == todayDateStr }
             val rawJson = prefs.getString("schedule_json_$todayDateStr", null) ?: prefs.getString("latest_schedule_json", null)
             var chapter = 1
             var activeDay = 1
@@ -295,7 +335,7 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             val userBlocks = mutableListOf<ScheduleBlockItem>()
             val userHabits = mutableListOf<HobbyItem>()
 
-            if (!rawJson.isNullOrEmpty()) {
+            if (scheduleCache == null && !rawJson.isNullOrEmpty()) {
                 try {
                     val obj = JSONObject(rawJson)
                     chapter = obj.optInt("chapter", 1)
@@ -344,6 +384,36 @@ class OdysseyLiveWallpaperService : WallpaperService() {
                 } catch (e: Exception) {
                     Log.w("OdysseyLiveWallpaper", "JSON parse error: ${e.message}")
                 }
+            }
+
+            if (scheduleCache == null) {
+                // First frame of this day (or just after a sync): publish what we
+                // just parsed so the next 30 FPS frame reuses it.
+                scheduleCache = CachedSchedule(
+                    dateStr = todayDateStr,
+                    rawJson = rawJson,
+                    chapter = chapter,
+                    activeDay = activeDay,
+                    rankName = rankName,
+                    rankBadge = rankBadge,
+                    userLevel = userLevel,
+                    userStreak = userStreak,
+                    blocks = userBlocks.toList(),
+                    habits = userHabits.toList()
+                )
+                cachedSchedule = scheduleCache
+            } else {
+                // Warm path: restore the model without touching the JSON.
+                chapter = scheduleCache.chapter
+                activeDay = scheduleCache.activeDay
+                rankName = scheduleCache.rankName
+                rankBadge = scheduleCache.rankBadge
+                userLevel = scheduleCache.userLevel
+                userStreak = scheduleCache.userStreak
+                userBlocks.clear()
+                userBlocks.addAll(scheduleCache.blocks)
+                userHabits.clear()
+                userHabits.addAll(scheduleCache.habits)
             }
 
             val cardPad = width * 0.040f

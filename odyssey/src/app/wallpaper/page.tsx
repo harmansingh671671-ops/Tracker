@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
+import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
@@ -41,6 +43,16 @@ export default function WallpaperPage() {
   const { user, fetchUser } = useUserStore();
   const { habits, fetchHabits } = useHabitStore();
 
+  // The master switch is the single source of truth. Hiding the Stats entry
+  // point is not sufficient on its own: a bookmarked /wallpaper URL, or a
+  // back-button entry, would still reach these controls and could re-arm the
+  // very wallpaper the user switched off. So the route is guarded too.
+  // Selectors are used individually so the guard effect cannot loop on the
+  // store object identity.
+  const refreshToggle = useWallpaperToggle((s) => s.refresh);
+  const wallpaperEnabled = useWallpaperToggle((s) => s.enabled);
+  const router = useRouter();
+
   const [activeEngine, setActiveEngine] = useState<"live" | "static">("live");
   const [screenTarget, setScreenTarget] = useState<"lock" | "home">("lock");
   const [simMode, setSimMode] = useState<"clean" | "guide">("clean");
@@ -54,6 +66,25 @@ export default function WallpaperPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const customFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Resolve the authoritative state before rendering any control. Until this
+  // settles we must NOT show the studio, because `false` is the default and a
+  // brief flash of controls would contradict it.
+  //
+  // NB: the actual early return for this guard lives *after* every other hook
+  // below -- returning earlier would break the Rules of Hooks.
+  const [toggleResolved, setToggleResolved] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    refreshToggle().finally(() => {
+      if (cancelled) return;
+      setToggleResolved(true);
+      if (!useWallpaperToggle.getState().enabled) router.replace("/stats");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToggle, router]);
 
   useEffect(() => {
     activeAltTabRef.current = selectedAltTab;
@@ -323,6 +354,17 @@ export default function WallpaperPage() {
 
   const currentAltWallpaper = selectedAltTab === "home" ? homeWallpaper : lockWallpaper;
   const currentAltLabel = selectedAltTab === "home" ? "Home Screen" : "Lock Screen";
+
+  // Master-switch guard. Placed after every hook in the component so hook order
+  // stays stable across renders.
+  if (!toggleResolved || !wallpaperEnabled) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <span className="sr-only">Checking wallpaper settings</span>
+      </main>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-12 pt-2 space-y-6">

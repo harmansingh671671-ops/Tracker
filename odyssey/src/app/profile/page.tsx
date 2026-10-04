@@ -19,10 +19,13 @@ import {
   Heart,
   Target,
   Palette,
+  Smartphone,
 } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getRankInfo, calculateRank, RANKS } from "@/lib/utils/gamification";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import { Switch } from "@/components/ui/switch";
+import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -40,6 +43,16 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
+
+  // Master wallpaper switch. OFF by default -- the wallpaper is a background
+  // service that keeps burning CPU with the app closed, so it must never run
+  // unless the user has explicitly turned it on.
+  const wallpaperToggle = useWallpaperToggle();
+  useEffect(() => {
+    wallpaperToggle.refresh();
+    // Intentionally mount-only: the store owns the state from here on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -374,7 +387,58 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* 6. Account & Data Actions */}
+        {/* 5b. Wallpaper Control -- OFF by default */}
+      <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-surface-container border border-outline/15 flex items-center justify-center text-primary shrink-0">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-on-surface">Odyssey Wallpaper</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Schedule your day onto your Lock and Home screens.
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={wallpaperToggle.enabled}
+            onCheckedChange={(next: boolean) => {
+              void wallpaperToggle.setEnabled(next);
+            }}
+            aria-label="Toggle Odyssey wallpaper"
+            aria-describedby="wallpaper-toggle-desc"
+          />
+        </div>
+
+        <p id="wallpaper-toggle-desc" className="text-[11px] font-mono text-on-surface-variant/80 leading-relaxed">
+          {wallpaperToggle.enabled ? (
+            <>
+              On. Your lock and home screens show your live schedule. The wallpaper updates
+              continuously in the background, so it uses battery while the app is closed. Turning
+              it off restores the lock and home wallpapers you picked yourself and stops all
+              background wallpaper work.
+            </>
+          ) : (
+            <>
+              Off. Nothing runs in the background and your own wallpapers are left untouched.
+              Turn this on, then choose a wallpaper in Wallpaper Studio.
+            </>
+          )}
+        </p>
+
+        {wallpaperToggle.enabled && (
+          <Link
+            href="/wallpaper"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container border border-outline/15 text-xs font-mono font-semibold text-on-surface hover:border-primary/40 transition-colors active:scale-95"
+          >
+            <Palette className="w-3.5 h-3.5 text-primary" />
+            <span>Open Wallpaper Studio</span>
+          </Link>
+        )}
+      </section>
+
+      {/* 6. Account & Data Actions */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
