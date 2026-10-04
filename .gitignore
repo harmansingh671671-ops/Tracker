@@ -21,3 +21,6 @@ hindsight-server.log
 hindsight-server.err.log
 hindsight-test-runs.txt
 *.pid
+
+# Hindsight tooling artifact - lives at the repo root but belongs to a different project
+test_hindsight.py
