@@ -17,7 +17,7 @@
  * can never corrupt or resurrect deleted data.
  */
 
-import { logWarn } from "@/lib/utils/logger";
+import { readString, remove, writeString } from "@/lib/utils/logger";
 import { type Habit, type HabitLog } from "@/lib/db";
 
 /** Cache is scoped per user so one profile can never show another's habits. */
@@ -49,9 +49,9 @@ const storageUsable = (): boolean =>
 
 export function readHabitCache(userId: string): HabitCache | null {
   if (!storageUsable()) return null;
+  const raw = readString(cacheKey(userId));
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(cacheKey(userId));
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<HabitCache>;
     // Validate shape. A cache from an older build, or a partial write, must
     // degrade to "no cache" rather than feed malformed data into the store.
@@ -69,24 +69,17 @@ export function readHabitCache(userId: string): HabitCache | null {
 
 export function writeHabitCache(userId: string, cache: HabitCache): void {
   if (!storageUsable()) return;
-  try {
-    const payload = JSON.stringify(cache);
-    if (payload.length > MAX_CACHE_BYTES) {
-      // Too large to mirror safely. Drop any stale copy so we stop carrying it.
-      try {
-        localStorage.removeItem(cacheKey(userId));
-      } catch (e) { logWarn("habit-cache", "could not clear storage", e); }
-      return;
-    }
-    localStorage.setItem(cacheKey(userId), payload);
-  } catch {
-    /* Quota or private-mode failure. The cache is an optimisation only. */
+  const payload = JSON.stringify(cache);
+  if (payload.length > MAX_CACHE_BYTES) {
+    // Too large to mirror safely. Drop any stale copy so we stop carrying it.
+    remove(cacheKey(userId));
+    return;
   }
+  // Quota or private-mode failure is handled inside; the cache is only an
+  // optimisation, so a failure here must never propagate.
+  writeString(cacheKey(userId), payload);
 }
 
 export function clearHabitCache(userId: string): void {
-  if (!storageUsable()) return;
-  try {
-    localStorage.removeItem(cacheKey(userId));
-  } catch (e) { logWarn("habit-cache", "could not clear storage", e); }
+  remove(cacheKey(userId));
 }

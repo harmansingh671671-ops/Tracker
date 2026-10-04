@@ -1,3 +1,4 @@
+import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { create } from "zustand";
 
 export type ThemeMode = "light" | "dark" | "system";
@@ -50,7 +51,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   initTheme: () => {
     if (typeof window === "undefined") return;
-    const stored = (localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode) || "system";
+    const stored = (readString(THEME_STORAGE_KEY) as ThemeMode) || "system";
     const systemTheme = getSystemTheme();
     const resolved = stored === "system" ? systemTheme : stored;
 
@@ -83,7 +84,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   setTheme: (mode: ThemeMode) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(THEME_STORAGE_KEY, mode);
+    writeString(THEME_STORAGE_KEY, mode);
     const systemTheme = getSystemTheme();
     const resolved = mode === "system" ? systemTheme : mode;
     applyThemeClass(resolved);

@@ -1,18 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getJourneyStartDate, getJourneyDayNumber } from "./journey";
 
-/**
- * These functions only touch localStorage when a `window` global exists, so a
- * bare localStorage stub is not enough -- `window` has to be stubbed too or the
- * whole storage branch is skipped. Stubbing both keeps the fast node
- * environment instead of pulling in jsdom just for these two cases.
- */
-let store: Record<string, string>;
-
-beforeEach(() => {
-  store = {};
-  vi.stubGlobal("window", {});
-  vi.stubGlobal("localStorage", {
+/** Fresh in-memory Storage stub, shared by `window.localStorage` and the bare global. */
+function mkStorage(): Storage {
+  return {
     getItem: (k: string) => (k in store ? store[k] : null),
     setItem: (k: string, v: string) => {
       store[k] = v;
@@ -23,7 +14,27 @@ beforeEach(() => {
     clear: () => {
       store = {};
     },
-  });
+    key: (i: number) => Object.keys(store)[i] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  } as Storage;
+}
+
+/**
+ * These functions only touch localStorage when a `window` global exists, so a
+ * bare localStorage stub is not enough -- `window` has to be stubbed too or the
+ * whole storage branch is skipped. Stubbing both keeps the fast node
+ * environment instead of pulling in jsdom just for these two cases.
+ */
+let store: Record<string, string>;
+
+beforeEach(() => {
+  store = {};
+  // The storage layer reads `window.localStorage`, so the stub has to live
+  // ON the window object -- stubbing bare `localStorage` is not enough.
+  vi.stubGlobal("window", { localStorage: mkStorage() });
+  vi.stubGlobal("localStorage", mkStorage());
 });
 
 afterEach(() => {

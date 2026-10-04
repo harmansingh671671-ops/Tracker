@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readString } from "@/lib/utils/logger";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
@@ -47,7 +47,8 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var stored = localStorage.getItem('odyssey_theme_mode') || 'system';
+                  const stored = readString('odyssey_theme_mode') || 'system';
+                  const stored = readString(THEME_STORAGE_KEY) || 'system';
                   var isDark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                   var root = document.documentElement;
                   if (isDark) {

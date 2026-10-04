@@ -1,4 +1,5 @@
-import { logWarn } from "@/lib/utils/logger";
+import { readString, writeString } from "@/lib/utils/logger";
+
 /**
  * Utility functions for calculating Odyssey Journey days and mapping them to calendar dates.
  */
@@ -11,20 +12,14 @@ export function getJourneyStartDate(createdAt?: string): string {
       const m = String(cd.getMonth() + 1).padStart(2, "0");
       const d = String(cd.getDate()).padStart(2, "0");
       const dateStr = `${y}-${m}-${d}`;
-      if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
-        try {
-          localStorage.setItem("odyssey_journey_start_date", dateStr);
-        } catch (e) { logWarn("journey", "could not write to storage", e); }
-      }
+      writeString("odyssey_journey_start_date", dateStr);
       return dateStr;
     }
   }
 
-  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
-    const stored = localStorage.getItem("odyssey_journey_start_date");
-    if (stored && /^\d{4}-\d{2}-\d{2}$/.test(stored)) {
-      return stored;
-    }
+  const stored = readString("odyssey_journey_start_date");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(stored)) {
+    return stored;
   }
 
   const today = new Date();

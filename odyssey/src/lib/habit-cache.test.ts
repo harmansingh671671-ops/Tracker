@@ -2,18 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readHabitCache, writeHabitCache, clearHabitCache, type HabitCache } from "./habit-cache";
 import { type Habit } from "./db";
 
-/**
- * `window` must be stubbed alongside `localStorage` -- the helpers gate on
- * both, and a bare localStorage stub skips the whole storage branch.
- */
-let store: Record<string, string>;
-let quotaFails = false;
-
-beforeEach(() => {
-  store = {};
-  quotaFails = false;
-  vi.stubGlobal("window", {});
-  vi.stubGlobal("localStorage", {
+/** Fresh in-memory Storage stub, shared by `window.localStorage` and the bare global. */
+function mkStorage(): Storage {
+  return {
     getItem: (k: string) => (k in store ? store[k] : null),
     setItem: (k: string, v: string) => {
       if (quotaFails) throw new Error("QuotaExceededError");
@@ -22,7 +13,25 @@ beforeEach(() => {
     removeItem: (k: string) => {
       delete store[k];
     },
-  });
+    key: (i: number) => Object.keys(store)[i] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  } as Storage;
+}
+
+/**
+ * `window` must be stubbed alongside `localStorage` -- the storage layer reads
+ * `window.localStorage`, and a bare global stub is not seen by it.
+ */
+let store: Record<string, string>;
+let quotaFails = false;
+
+beforeEach(() => {
+  store = {};
+  quotaFails = false;
+  vi.stubGlobal("window", { localStorage: mkStorage() });
+  vi.stubGlobal("localStorage", mkStorage());
 });
 
 afterEach(() => {

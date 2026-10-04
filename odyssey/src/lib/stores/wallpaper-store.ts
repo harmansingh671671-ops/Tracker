@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, writeJson } from "@/lib/utils/logger";
 
 export interface WallpaperSettings {
   enabled: boolean;
@@ -49,10 +49,7 @@ function loadSavedSettings(): WallpaperSettings {
 }
 
 function saveSettings(settings: WallpaperSettings) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch (e) { logWarn("wallpaper-store", "could not write to storage", e); }
+  writeJson(STORAGE_KEY, settings);
 }
 
 export const useWallpaperStore = create<WallpaperStoreState>((set, get) => {

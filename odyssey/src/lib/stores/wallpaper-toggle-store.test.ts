@@ -18,16 +18,24 @@ const reset = () => {
   useWallpaperToggle.setState({ loaded: false, enabled: false });
 };
 
+let localStorage: Storage;
+
 beforeEach(() => {
   reset();
-  vi.stubGlobal("localStorage", {
+  localStorage = {
     getItem: (k: string) => (k in store ? store[k] : null),
     setItem: (k: string, v: string) => {
       store[k] = v;
     },
-  });
+    key: (i: number) => Object.keys(store)[i] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  } as Storage;
+  vi.stubGlobal("localStorage", localStorage);
   // The store reads window.OdysseyAndroid, which is how addJavascriptInterface
   // exposes the native bridge -- so the stub has to live ON the window object.
+  // The storage layer reads window.localStorage for the same reason.
   vi.stubGlobal("window", {
     OdysseyAndroid: {
       isWallpaperEnabled: () => {
@@ -40,6 +48,7 @@ beforeEach(() => {
         return true;
       },
     },
+    localStorage,
   });
 });
 

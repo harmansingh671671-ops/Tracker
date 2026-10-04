@@ -1,3 +1,4 @@
+﻿import { readBool, writeString } from "@/lib/utils/logger";
 /**
  * First-run gate for the landing page.
  *
@@ -16,19 +17,13 @@
 export const ONBOARDING_STORAGE_KEY = "odyssey_onboarding_complete";
 
 export function hasCompletedOnboarding(): boolean {
-  if (typeof window === "undefined" || typeof localStorage === "undefined") return false;
-  try {
-    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
+  // Absence of storage reads as "not completed" -- the safe direction, since it
+  // only re-shows onboarding.
+  return readBool(ONBOARDING_STORAGE_KEY, false);
 }
 
 export function markOnboardingComplete(): void {
-  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
-  try {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-  } catch {
-    /* Private-mode / quota failures must not block entry into the app. */
-  }
+  // Private-mode / quota failures must not block entry into the app, which is
+  // why this returns a boolean nobody checks.
+  writeString(ONBOARDING_STORAGE_KEY, "true");
 }

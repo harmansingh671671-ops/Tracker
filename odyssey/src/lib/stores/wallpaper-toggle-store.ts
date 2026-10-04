@@ -18,10 +18,15 @@
  */
 
 import { create } from "zustand";
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readBool, writeString } from "@/lib/utils/logger";
 
 /** Mirrors the native `odyssey_prefs:wallpaper_enabled` preference. */
 export const WALLPAPER_ENABLED_KEY = "odyssey_wallpaper_enabled";
+
+/** Reads the stored preference. `false` whenever it is absent or unreadable. */
+function readStored(): boolean {
+  return readBool(WALLPAPER_ENABLED_KEY, false);
+}
 
 interface WallpaperToggleState {
   /** False until `refresh` resolves, so UI never flashes the wrong state. */
@@ -58,33 +63,20 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
     const nativeEnabled = readNativeFlag();
     // Web fallback so the setting still reflects a choice made in the browser
     // preview, where no native bridge exists.
-    let webEnabled = false;
-    try {
-      webEnabled = localStorage.getItem(WALLPAPER_ENABLED_KEY) === "true";
-    } catch (e) {
-      logWarn("wallpaper-toggle-store", "could not read stored preference", e);
-    }
+    const webEnabled = readStored();
 
     // Native is authoritative whenever it can answer -- including a `false`.
-    // A stale `localStorage` value must never resurrect a wallpaper the user
-    // switched off, which is exactly what `nativeEnabled || webEnabled` did.
+    // A stale stored value must never resurrect a wallpaper the user switched
+    // off, which is exactly what `nativeEnabled || webEnabled` did.
     const enabled = nativeEnabled === null ? webEnabled : nativeEnabled;
-    try {
-      localStorage.setItem(WALLPAPER_ENABLED_KEY, String(enabled));
-    } catch (e) {
-      logWarn("wallpaper-toggle-store", "could not mirror preference to storage", e);
-    }
+    writeString(WALLPAPER_ENABLED_KEY, String(enabled));
     set({ loaded: true, enabled });
   },
 
   setEnabled: async (enabled: boolean) => {
     // Optimistic for instant feedback, reconciled by the native result below.
     set({ loaded: true, enabled });
-    try {
-      localStorage.setItem(WALLPAPER_ENABLED_KEY, String(enabled));
-    } catch (e) {
-      logWarn("wallpaper-toggle-store", "could not persist preference", e);
-    }
+    writeString(WALLPAPER_ENABLED_KEY, String(enabled));
 
     if (typeof window === "undefined") return enabled;
 
@@ -95,19 +87,16 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
         // Native is authoritative -- it may refuse (e.g. restore failed).
         set({ enabled: ok ? enabled : !enabled });
         if (!ok) {
-          try {
-            localStorage.setItem(WALLPAPER_ENABLED_KEY, String(!enabled));
-          } catch (e) {
-            logWarn("wallpaper-toggle-store", "could not correct mirror after refusal", e);
-          }
+          writeString(WALLPAPER_ENABLED_KEY, String(!enabled));
         }
         return ok;
       }
-      // No native bridge (web preview): the localStorage flag above is enough.
+      // No native bridge (web preview): the stored flag above is enough.
       return enabled;
-    } catch {
-      // Bridge threw. Fall back to whatever the localStorage mirror says so the
-      // UI stays consistent with what the rest of the app will read.
+    } catch (e) {
+      logWarn("wallpaper-toggle-store", "bridge call setWallpaperMasterEnabled failed", e);
+      // Bridge threw. Fall back to the stored value so the UI stays consistent
+      // with what the rest of the app will read.
       const settled = !get().enabled ? enabled : !enabled;
       set({ enabled: settled });
       return settled;

@@ -5,21 +5,30 @@ import {
   markOnboardingComplete,
 } from "./onboarding";
 
+/** Fresh in-memory Storage stub, shared by `window.localStorage` and the bare global. */
+function mkStorage(): Storage {
+  return {
+    getItem: (k: string) => (k in store ? store[k] : null),
+    setItem: (k: string, v: string) => {
+      store[k] = v;
+    },
+    key: (i: number) => Object.keys(store)[i] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  } as Storage;
+}
+
 /**
- * `window` has to be stubbed as well as `localStorage` -- the helpers gate on
- * both, and a bare localStorage stub would skip the whole storage branch.
+ * `window` has to be stubbed as well as `localStorage` -- the storage layer
+ * reads `window.localStorage`, and a bare global stub would not be seen.
  */
 let store: Record<string, string>;
 
 beforeEach(() => {
   store = {};
-  vi.stubGlobal("window", {});
-  vi.stubGlobal("localStorage", {
-    getItem: (k: string) => (k in store ? store[k] : null),
-    setItem: (k: string, v: string) => {
-      store[k] = v;
-    },
-  });
+  vi.stubGlobal("window", { localStorage: mkStorage() });
+  vi.stubGlobal("localStorage", mkStorage());
 });
 
 afterEach(() => {
@@ -66,12 +75,16 @@ describe("onboarding first-run gate", () => {
   });
 
   it("falls back to first launch when storage throws", () => {
-    vi.stubGlobal("localStorage", {
-      getItem: () => {
-        throw new Error("SecurityError");
-      },
-      setItem: () => {
-        throw new Error("QuotaExceededError");
+    // The throwing stub has to sit on `window` -- the storage layer reads
+    // `window.localStorage`, so stubbing the bare global would not be seen.
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: () => {
+          throw new Error("SecurityError");
+        },
+        setItem: () => {
+          throw new Error("QuotaExceededError");
+        },
       },
     });
     expect(hasCompletedOnboarding()).toBe(false);
