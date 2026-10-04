@@ -594,9 +594,9 @@ npm run build        # must succeed
 npm test             # must pass (from P0-T5 onward)
 ```
 
-- **Native/Kotlin changes additionally require `:app:compileDebugKotlin` to exit 0** (rule 6.6
+- **Native/Kotlin changes additionally require `:app:assembleDebug` to exit 0** (rule 6.6
   step 5). None of the four commands above read Kotlin, so a green set of them says nothing about
-  the bridge.
+  the bridge -- and this is the command that produces the APK.
 - **UI work:** verify light and dark, three screen widths (360 / 390 / 430), keyboard nav, reduced motion.
 - **Native work:** verify the web fallback still works with the bridge absent.
 - **Data work:** verify against **existing** IndexedDB data, not just fresh installs.
@@ -694,21 +694,30 @@ browser mirror whenever native can answer -- *including* when it answers "no". `
 authoritative silently converts "authoritative no" into "yes".
 
 **Step 5 -- Compile what you changed. Do not assume.** `tsc` does not read Kotlin. This repo has no
-`gradlew` checked in, so native changes are unverified until you compile them:
+`gradlew` checked in, and **this machine's Android Studio ships JBR 25 while the project is pinned to
+Kotlin 1.9.22 / AGP 8.2.2 / Gradle 8.4** (all 2023-era). Left alone, every Android build fails with:
+
+```
+Daemon compilation failed: null
+java.lang.IllegalArgumentException: 25.0.3
+```
+
+The Kotlin daemon cannot even parse the JDK version string. The permanent fix is already committed in
+`android/gradle.properties` -- `kotlin.compiler.execution.strategy=in-process` bypasses the daemon.
+So Android Studio builds work normally now, and from the CLI:
 
 ```bash
 cd android
-# Use the Gradle distribution already in the wrapper cache, or Android Studio's.
 $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
-& "$env:USERPROFILE\.gradle\wrapper\dists\gradle-8.4-bin\*\gradle-8.4\bin\gradle.bat" `
-    :app:compileDebugKotlin --console=plain `
-    '-Dkotlin.compiler.execution.strategy=in-process' '-Pkotlin.incremental=false'
+& "$env:USERPROFILE\.gradle\wrapper\dists\gradle-8.4-bin\*\gradle-8.4\bin\gradle.bat" assembleDebug
+# -> android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-If the Kotlin daemon dies with `Could not flush incremental caches`, that is the daemon, not your
-code -- the two flags above avoid it. **Exit code 0 is the gate.** Shipping uncompiled Kotlin is not
-acceptable, and this step has already caught a real syntax error that every web-side check missed.
+**Exit code 0 is the gate.** If this ever regresses, the properly supported fix is to install a
+**JDK 17** and set `org.gradle.java.home` to it, rather than upgrading Kotlin -- upgrading to 2.x
+means migrating `kotlinOptions` to the `compilerOptions` DSL and is a separate change with its own
+risk.
 
 **Step 6 -- Run the cheapest gate that can fail, first.** `tsc` -> `lint` -> `test` -> `build` ->
 Kotlin compile. `lint` in particular catches hook-order violations (`rules-of-hooks`) that `tsc`
@@ -734,7 +743,8 @@ unverified work as verified.
 | **R9** | Research numbers treated as guaranteed uplift | Medium | Rule 6 in section 5.3. Always show confidence and sample size. |
 | **R10** | Knowledge graph stale, leading to wrong impact analysis | Medium | P0-T2, then re-run after each phase. |
 | **R11** | **Half-finished work left uncommitted** -- already happened once (the theme system sat uncommitted across multiple sessions) | High | Rule 6.1. One feature at a time, committed before moving on. |
-| **R12** | **Unverified native code shipped** -- there is no `gradlew` in the repo, so Kotlin can look "done" while never having been compiled. A real syntax error shipped through a fully green web test suite. | High | Rule 6.6 step 5. Compile `:app:compileDebugKotlin` before committing any `.kt` change. Consider committing the Gradle wrapper so this stops depending on local caches. |
+| **R12** | **Unverified native code shipped** -- there is no `gradlew` in the repo, so Kotlin can look "done" while never having been compiled. A real syntax error shipped through a fully green web test suite. | High | Rule 6.6 step 5. Compile `:app:assembleDebug` before committing any `.kt` change. Consider committing the Gradle wrapper so this stops depending on local caches. |
+| **R14** | **JDK/toolchain drift breaks all Android builds** -- Android Studio's bundled JBR moved to JDK 25, but the project is pinned to Kotlin 1.9.22 / AGP 8.2.2. The Kotlin daemon fails with `IllegalArgumentException: 25.0.3` and no APK is produced. Silent until the *next* Android Studio update. | High | Fixed via `kotlin.compiler.execution.strategy=in-process` in `android/gradle.properties`. Proper remedy is a JDK 17 toolchain pin (`org.gradle.java.home`) once a JDK 17 is installed. Re-check this after any Android Studio or Gradle upgrade. |
 | **R13** | **Background battery burn** -- the live wallpaper drew continuously with the app closed, defaulted to enabled, and could not be turned off from the UI. | High | Rule 6.6 steps 1-4, phase P8. Default-off, route-guarded, native-authoritative, fail-closed. |
 
 ---
@@ -779,6 +789,7 @@ exit gate is met.
 | 2026-10-03 | Added the one-feature-at-a-time delivery rule (6.1, reinforced in 4, 6.5, Quick Reference) and logged it as risk R11. Restored content lost during an edit. | Cline |
 | 2026-10-04 | Opened **P8 Efficiency & Battery Hardening** as the final, cross-cutting phase (gates P6/P7). Landed the wallpaper master switch: default-off everywhere, `/wallpaper` route-guarded as well as hidden, disable stops loop + cancels hourly alarm + restores the user's lock/home wallpapers, native authoritative over stale `localStorage`, fail-closed on bridge error. Cached the schedule JSON per change instead of per frame. Removed the unused `WAKE_LOCK` permission. Split the `FLAG_LOCK or FLAG_SYSTEM` apply. Added rule 6.6 (efficiency-first agent workflow), risks R12/R13, and the Kotlin-compile gate in 5.9. | Cline |
 | 2026-10-04 | Made the live wallpaper **static** (P8-E2, closing 2.1). Removed the ~30 FPS loop: renders once, re-renders on the minute boundary to keep the clock correct, re-arms on the boundary rather than a flat 60s. Freezes the beacon glow at a fixed value. Draws nothing further when the user has an alternate wallpaper. ~30 renders/sec -> 1/min, and zero wakeups while the screen is off. | Cline |
+| 2026-10-04 | Fixed a build-blocking JDK mismatch (R14): Android Studio ships JBR 25, but Kotlin 1.9.22's compile daemon cannot start on it (`IllegalArgumentException: 25.0.3`, "Daemon compilation failed"). Set `kotlin.compiler.execution.strategy=in-process` in `android/gradle.properties` and raised `org.gradle.jvmargs` to 4096m to match. Verified with a from-scratch `clean assembleDebug` -> BUILD SUCCESSFUL, 11.32 MB APK. | Cline |
 
 ---
 
