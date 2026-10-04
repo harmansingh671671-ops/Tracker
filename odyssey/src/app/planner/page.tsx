@@ -75,10 +75,15 @@ function PlannerContent() {
     return `${year}-${month}-${day}`;
   };
 
-  const [currentHour, setCurrentHour] = useState<number>(0);
+  // Frame-0 correctness: these three must be right on the FIRST paint, not
+  // after effects run. currentHour used to start at 0, so the rail briefly
+  // highlighted midnight before snapping to the real hour. blocks now seeds
+  // from the synchronous local cache, so a returning user sees their real
+  // schedule immediately instead of an empty timeline that fills in later.
+  const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
-  const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
   const [isMounted, setIsMounted] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

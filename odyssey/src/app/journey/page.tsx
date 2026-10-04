@@ -31,7 +31,7 @@ export default function JourneyPage() {
   const [allBlocks, setAllBlocks] = useState<ScheduleBlock[]>([]);
 
   // Dynamic day range: allows extending infinitely forward and scrolling back to Day 1
-  const [pastDaysCount, setPastDaysCount] = useState<number>(3);
+  const [pastDaysCount, setPastDaysCount] = useState<number>(1);
   const [futureDaysCount, setFutureDaysCount] = useState<number>(7);
 
   const [curvePaths, setCurvePaths] = useState<{
@@ -94,10 +94,10 @@ export default function JourneyPage() {
         cycle === 0
           ? "translate-x-0"
           : cycle === 1
-          ? "-translate-x-14 sm:-translate-x-20"
+          ? "-translate-x-10 sm:-translate-x-14"
           : cycle === 2
           ? "translate-x-0"
-          : "translate-x-14 sm:translate-x-20";
+          : "translate-x-10 sm:translate-x-14";
 
       list.push({ day: d, isPast, isCurrent, isMilestone, offset });
     }
@@ -190,13 +190,9 @@ export default function JourneyPage() {
     }
   }, []);
 
-  // Center Today on initial arrival
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToToday(false);
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [scrollToToday]);
+  // NOTE: no auto-scroll on mount. The page opens at the top and Today sits
+  // near the top of the trail (pastDaysCount = 1), so centring it used to yank
+  // the header card off-screen on every arrival.
 
   // Track if Today is in the user's viewport
   useEffect(() => {
@@ -267,14 +263,11 @@ export default function JourneyPage() {
             </div>
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-on-surface">Odyssey Trail</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface text-xs font-mono font-semibold border border-outline/10">
-                <span>{rankInfo.badge}</span>
-                <span className="text-primary">{rankInfo.name}</span>
-                <span className="text-on-surface-variant">• Level {currentLevel}</span>
-              </div>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-bold tracking-tight text-on-surface">Odyssey</h2>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface text-xs font-mono font-semibold border border-outline/10">
+              <span>{rankInfo.badge}</span>
+              <span className="text-primary">{rankInfo.name}</span>
             </div>
           </div>
 
@@ -297,7 +290,7 @@ export default function JourneyPage() {
       </div>
 
       {/* Gamified Winding Journey Road Canvas */}
-      <div ref={containerRef} className="relative w-full flex flex-col items-center py-6">
+      <div ref={containerRef} className="relative w-full flex flex-col items-center py-3">
         {/* Fluid Curved Path Background SVG passing through the exact center of every icon (No glow) */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
@@ -329,7 +322,7 @@ export default function JourneyPage() {
 
         {/* Top Earlier Days Expanders */}
         {startDay > 1 ? (
-          <div className="pb-8 flex flex-col items-center z-10 animate-in fade-in duration-200">
+          <div className="pb-4 flex flex-col items-center z-10 animate-in fade-in duration-200">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -349,7 +342,7 @@ export default function JourneyPage() {
             </div>
           </div>
         ) : (
-          <div className="pb-8 flex flex-col items-center z-10 animate-in fade-in duration-200">
+          <div className="pb-4 flex flex-col items-center z-10 animate-in fade-in duration-200">
             <span className="px-3.5 py-1 rounded-full bg-surface-container-low border border-outline/15 text-[11px] font-mono text-on-surface-variant flex items-center gap-1.5 shadow-sm">
               <span>🚀</span>
               <span>Journey Origin • Day 1</span>
@@ -358,7 +351,7 @@ export default function JourneyPage() {
         )}
 
         {/* Nodes Flow */}
-        <div className="w-full flex flex-col items-center space-y-10 z-10">
+        <div className="w-full flex flex-col items-center space-y-5 z-10">
           {nodes.map((node) => {
             const dateStr = getDateForJourneyDay(node.day, user?.createdAt);
             const dayStat = dayStatsMap[node.day] || evaluateDayCompletion([], dateStr, node.day);
@@ -373,16 +366,16 @@ export default function JourneyPage() {
                 >
                   {/* Today's Radiant Pulsing Beacon */}
                   <div className="relative flex items-center justify-center">
-                    <div className="absolute w-20 h-20 rounded-full bg-primary/20 animate-ping" />
-                    <div className="absolute w-16 h-16 rounded-full bg-primary/30 blur-md" />
+                    <div className="absolute w-16 h-16 rounded-full bg-primary/20 animate-ping" />
+                    <div className="absolute w-14 h-14 rounded-full bg-primary/30 blur-md" />
                     <button
                       data-journey-node={node.day}
                       type="button"
                       onClick={() => handleOpenDaySchedule(node.day)}
-                      className="relative w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary flex items-center justify-center shadow-lg shadow-primary/40 hover:scale-110 active:scale-95 transition-all cursor-pointer group"
+                      className="relative w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary flex items-center justify-center shadow-lg shadow-primary/40 hover:scale-110 active:scale-95 transition-all cursor-pointer group"
                       title={`Open Today's Schedule (Day ${node.day})`}
                     >
-                      <Bolt className="w-7 h-7 fill-current group-hover:scale-110 transition-transform" />
+                      <Bolt className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
                     </button>
                   </div>
 
@@ -405,7 +398,7 @@ export default function JourneyPage() {
                     type="button"
                     data-journey-node={node.day}
                     onClick={() => handleOpenDaySchedule(node.day)}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 ${
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 ${
                       dayStat.status === "fully_completed"
                         ? "font-black border-2 shadow-emerald-500/30 hover:ring-primary/40"
                         : dayStat.status === "planned_unreviewed"
@@ -422,13 +415,13 @@ export default function JourneyPage() {
                     title={`Open Day ${node.day} Schedule (${dayStat.status})`}
                   >
                     {dayStat.status === "fully_completed" ? (
-                      <Check className="w-6 h-6 stroke-[3] group-hover:scale-110 transition-transform" style={{ color: "var(--journey-node-completed-text)" }} />
+                      <Check className="w-5 h-5 stroke-[3] group-hover:scale-110 transition-transform" style={{ color: "var(--journey-node-completed-text)" }} />
                     ) : dayStat.status === "planned_unreviewed" ? (
-                      <Clock className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                      <Clock className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
                     ) : dayStat.status === "mostly_reviewed" || dayStat.status === "partially_reviewed" ? (
-                      <Sparkles className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                      <Sparkles className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
                     ) : (
-                      <CircleDot className="w-5 h-5 text-on-surface-variant group-hover:scale-110 transition-transform" />
+                      <CircleDot className="w-4 h-4 text-on-surface-variant group-hover:scale-110 transition-transform" />
                     )}
                   </button>
                   <button
@@ -471,7 +464,7 @@ export default function JourneyPage() {
                   type="button"
                   data-journey-node={node.day}
                   onClick={() => handleOpenDaySchedule(node.day)}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center border-2 hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40 ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center border-2 hover:scale-110 active:scale-95 transition-all cursor-pointer group hover:ring-2 hover:ring-primary/40 ${
                     node.isMilestone
                       ? "bg-secondary text-on-secondary border-secondary-container shadow-md hover:bg-secondary/90"
                       : "bg-surface-container-high border-outline/30 text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
@@ -479,9 +472,9 @@ export default function JourneyPage() {
                   title={`Plan Day ${node.day} Schedule`}
                 >
                   {node.isMilestone ? (
-                    <Gift className="w-6 h-6 text-on-secondary group-hover:scale-110 transition-transform" />
+                    <Gift className="w-5 h-5 text-on-secondary group-hover:scale-110 transition-transform" />
                   ) : (
-                    <Lock className="w-5 h-5 text-on-surface-variant group-hover:scale-110 transition-transform" />
+                    <Lock className="w-4 h-4 text-on-surface-variant group-hover:scale-110 transition-transform" />
                   )}
                 </button>
                 <button
