@@ -51,7 +51,7 @@ export default function ShopPage() {
         category: "protection",
         price: 15,
         icon: "🛡️",
-        desc: "Protects your active streak for 24 hours if a daily habit or review is missed.",
+        desc: "Protects your streak for 24h if you miss a day.",
         badge: (user?.streakFreezeCount ?? 0) > 0 ? `${user?.streakFreezeCount} Active` : undefined,
       },
       {
@@ -60,7 +60,7 @@ export default function ShopPage() {
         category: "boost",
         price: 25,
         icon: "⚡",
-        desc: "Doubles all XP earned from schedule blocks and habit check-ins for 24 hours.",
+        desc: "Doubles all XP earned for 24h.",
       },
       {
         id: "instant-xp",
@@ -68,7 +68,7 @@ export default function ShopPage() {
         category: "boost",
         price: 20,
         icon: "✨",
-        desc: "Instantly claim 100 XP towards advancing to the next Division.",
+        desc: "Instantly claim 100 XP toward your next rank.",
       },
       {
         id: "titan-crest",
@@ -76,7 +76,7 @@ export default function ShopPage() {
         category: "custom",
         price: 50,
         icon: "👑",
-        desc: "Golden profile crest displayed across your journey and rank cards.",
+        desc: "Golden crest for your journey and rank cards.",
       },
     ],
     [user?.streakFreezeCount]
