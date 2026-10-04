@@ -1,4 +1,4 @@
-import { logWarn, readString, writeString } from "@/lib/utils/logger";
+import { readString, writeString } from "@/lib/utils/logger";
 import { create } from "zustand";
 
 export type ThemeMode = "light" | "dark" | "system";

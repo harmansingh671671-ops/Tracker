@@ -1,4 +1,4 @@
-﻿import { readBool, writeString } from "@/lib/utils/logger";
+import { readBool, writeString } from "@/lib/utils/logger";
 /**
  * First-run gate for the landing page.
  *

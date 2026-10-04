@@ -1,4 +1,4 @@
-import { db, type Habit, type Profile } from './db';
+import { db, type Profile } from './db';
 import { logWarn, remove } from "@/lib/utils/logger";
 import { v4 as uuidv4 } from 'uuid';
 
