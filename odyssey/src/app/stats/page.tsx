@@ -19,7 +19,6 @@ import {
   TrendingUp,
   Clock,
   ShieldCheck,
-  Award,
   Smartphone,
   ArrowRight,
   ChevronLeft,
@@ -368,11 +367,6 @@ export default function StatsPage() {
                 <h3 className="text-base font-bold text-on-surface truncate">{rankInfo.name}</h3>
               </div>
               <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-mono text-on-surface-variant mt-1">
-                <span className="inline-flex items-center gap-1 text-primary whitespace-nowrap font-semibold">
-                  <Award className="w-3.5 h-3.5 shrink-0" />
-                  <span>Top Tier</span>
-                </span>
-                <span className="text-outline/40">•</span>
                 <span className="inline-flex items-center gap-1 text-sky-400 whitespace-nowrap font-semibold">
                   <Zap className="w-3.5 h-3.5 shrink-0" />
                   <span>Lv. {currentLevel}</span>
