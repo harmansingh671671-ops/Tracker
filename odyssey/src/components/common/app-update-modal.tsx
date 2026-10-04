@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 import { Sparkles, Download, X, ArrowUpCircle, CheckCircle2, RefreshCw, Smartphone } from "lucide-react";
 import { checkForAppUpdate, downloadAndInstallNativeApk, isAndroidNativeApp, AppUpdateCheckResult } from "@/lib/utils/android-bridge";
@@ -38,7 +39,7 @@ export function AppUpdateModal() {
 
         setUpdateInfo(result);
         setIsOpen(true);
-      } catch {}
+      } catch (e) { logWarn("storage call failed: localStorage.setItem", "storage call failed: localStorage.setItem", e); }
     }
 
     // Run in idle background time without delaying startup
@@ -61,7 +62,7 @@ export function AppUpdateModal() {
             setUpdateInfo(result);
             setIsOpen(true);
           }
-        } catch {}
+        } catch (e) { logWarn("app-update-modal", "manual update check failed", e); }
       }
     };
 
@@ -90,7 +91,7 @@ export function AppUpdateModal() {
   const handleDismiss = () => {
     try {
       localStorage.setItem(`odyssey_update_notified_${updateInfo.latestVersionCode}`, "true");
-    } catch {}
+    } catch (e) { logWarn("app-update-modal", "could not write to storage", e); }
     setIsOpen(false);
   };
 

@@ -18,6 +18,7 @@
  */
 
 import { create } from "zustand";
+import { logWarn } from "@/lib/utils/logger";
 
 /** Mirrors the native `odyssey_prefs:wallpaper_enabled` preference. */
 export const WALLPAPER_ENABLED_KEY = "odyssey_wallpaper_enabled";
@@ -60,7 +61,9 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
     let webEnabled = false;
     try {
       webEnabled = localStorage.getItem(WALLPAPER_ENABLED_KEY) === "true";
-    } catch {}
+    } catch (e) {
+      logWarn("wallpaper-toggle-store", "could not read stored preference", e);
+    }
 
     // Native is authoritative whenever it can answer -- including a `false`.
     // A stale `localStorage` value must never resurrect a wallpaper the user
@@ -68,7 +71,9 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
     const enabled = nativeEnabled === null ? webEnabled : nativeEnabled;
     try {
       localStorage.setItem(WALLPAPER_ENABLED_KEY, String(enabled));
-    } catch {}
+    } catch (e) {
+      logWarn("wallpaper-toggle-store", "could not mirror preference to storage", e);
+    }
     set({ loaded: true, enabled });
   },
 
@@ -77,7 +82,9 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
     set({ loaded: true, enabled });
     try {
       localStorage.setItem(WALLPAPER_ENABLED_KEY, String(enabled));
-    } catch {}
+    } catch (e) {
+      logWarn("wallpaper-toggle-store", "could not persist preference", e);
+    }
 
     if (typeof window === "undefined") return enabled;
 
@@ -90,7 +97,9 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
         if (!ok) {
           try {
             localStorage.setItem(WALLPAPER_ENABLED_KEY, String(!enabled));
-          } catch {}
+          } catch (e) {
+            logWarn("wallpaper-toggle-store", "could not correct mirror after refusal", e);
+          }
         }
         return ok;
       }

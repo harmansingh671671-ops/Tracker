@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -197,7 +198,7 @@ export default function LandingPage() {
             if (typeof window !== "undefined" && navigator?.vibrate) {
               navigator.vibrate([40, 60, 100]);
             }
-          } catch {}
+          } catch (e) { logWarn("page", "haptic feedback failed", e); }
           setTimeout(() => {
             router.push("/planner");
           }, 600);

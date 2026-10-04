@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logWarn } from "@/lib/utils/logger";
 import versionConfig from "../../../../version.json";
 
 export interface AppVersionInfo {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     if (url.origin && !url.origin.includes("localhost") && !url.origin.includes("127.0.0.1")) {
       origin = url.origin;
     }
-  } catch {}
+  } catch (e) { logWarn("route", "could not determine origin from request URL", e); }
 
   const versionData: AppVersionInfo = {
     versionCode: versionConfig.versionCode || 8,

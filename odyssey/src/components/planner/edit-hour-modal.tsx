@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { useState, useEffect } from "react";
 import { type ScheduleBlock } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
@@ -103,7 +104,7 @@ export function EditHourModal({
       if (typeof window !== "undefined" && window.getSelection) {
         try {
           window.getSelection()?.removeAllRanges();
-        } catch {}
+        } catch (e) { logWarn("edit-hour-modal", "could not clear text selection", e); }
       }
       setShouldRender(true);
       setIsClosing(false);

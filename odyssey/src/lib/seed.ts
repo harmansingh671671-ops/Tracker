@@ -1,4 +1,5 @@
 import { db, type Habit, type Profile } from './db';
+import { logWarn } from "@/lib/utils/logger";
 import { v4 as uuidv4 } from 'uuid';
 
 export async function seedInitialData(userId: string): Promise<void> {
@@ -18,7 +19,7 @@ export async function resetAllDataToZero(): Promise<Profile> {
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem('odyssey_journey_start_date');
-    } catch {}
+    } catch (e) { logWarn("seed", "could not clear storage", e); }
   }
 
   const newUser: Profile = {

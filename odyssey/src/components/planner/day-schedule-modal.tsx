@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { useState, useEffect, useMemo } from "react";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
@@ -97,7 +98,7 @@ export function DayScheduleModal({
       if (typeof window !== "undefined" && window.getSelection) {
         try {
           window.getSelection()?.removeAllRanges();
-        } catch {}
+        } catch (e) { logWarn("day-schedule-modal", "could not clear text selection", e); }
       }
       loadBlocks();
     }

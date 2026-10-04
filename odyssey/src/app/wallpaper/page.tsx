@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -287,7 +288,7 @@ export default function WallpaperPage() {
       if (e?.target) {
         try {
           e.target.value = "";
-        } catch {}
+        } catch (e) { logWarn("page", "could not reset file input", e); }
       }
       setIsProcessing(false);
     }

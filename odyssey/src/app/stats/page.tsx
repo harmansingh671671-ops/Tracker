@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -325,16 +326,16 @@ export default function StatsPage() {
       if (typeof window !== "undefined" && window.getSelection) {
         try {
           window.getSelection()?.removeAllRanges();
-        } catch { }
+        } catch (e) { logWarn("page", "could not clear text selection", e); }
       }
       try {
         if (typeof window !== "undefined" && navigator?.vibrate) {
           navigator.vibrate(40);
         }
-      } catch { }
+      } catch (e) { logWarn("page", "browser call failed: window.getSelection", e); }
       try {
         localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
-      } catch { }
+      } catch (e) { logWarn("page", "could not write to storage", e); }
       router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
     }, 450);
   };
@@ -517,7 +518,7 @@ export default function StatsPage() {
                     e.preventDefault();
                     try {
                       localStorage.setItem("odyssey_planner_selected_date", cell.dateStr);
-                    } catch { }
+                    } catch (e) { logWarn("page", "could not write to storage", e); }
                     router.push(`/planner?date=${cell.dateStr}&day=${cell.journeyDay}`);
                   }}
                   onClick={() => handleCellClick(cell)}
@@ -806,7 +807,7 @@ export default function StatsPage() {
                 setPopupDate(null);
                 try {
                   localStorage.setItem("odyssey_planner_selected_date", targetDate);
-                } catch { }
+                } catch (e) { logWarn("page", "could not write to storage", e); }
                 router.push(`/planner?date=${targetDate}&day=${targetDay}`);
               }}
               className="w-full py-2.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-95"

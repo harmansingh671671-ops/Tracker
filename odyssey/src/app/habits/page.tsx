@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
@@ -162,7 +163,7 @@ export default function HabitsPage() {
         if (typeof window !== "undefined" && navigator?.vibrate) {
           navigator.vibrate(40);
         }
-      } catch {}
+      } catch (e) { logWarn("page", "haptic feedback failed", e); }
       await addXp(15);
       await addDiamonds(1);
       await fetchUser();
@@ -243,7 +244,7 @@ export default function HabitsPage() {
         if (typeof window !== "undefined" && navigator?.vibrate) {
           navigator.vibrate(50);
         }
-      } catch {}
+      } catch (e) { logWarn("page", "haptic feedback failed", e); }
       setEditingHabit(habit);
     }, 400);
   };

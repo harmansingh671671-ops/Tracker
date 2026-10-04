@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -42,7 +43,7 @@ const getCachedBlocks = (dateStr: string): ScheduleBlock[] => {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch {}
+  } catch (e) { logWarn("storage call failed: localStorage.getItem", "storage call failed: localStorage.getItem", e); }
   return [];
 };
 
@@ -50,7 +51,7 @@ const setCachedBlocks = (dateStr: string, blocksList: ScheduleBlock[]) => {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(`odyssey_blocks_cache_${dateStr}`, JSON.stringify(blocksList));
-  } catch {}
+  } catch (e) { logWarn("page", "could not write to storage", e); }
 };
 
 export default function PlannerPage() {
@@ -319,7 +320,7 @@ function PlannerContent() {
       if (typeof window !== "undefined" && window.location.search) {
         window.history.replaceState(null, "", window.location.pathname);
       }
-    } catch {}
+    } catch (e) { logWarn("storage call failed: localStorage.setItem", "storage call failed: localStorage.setItem", e); }
     const cached = getCachedBlocks(dateStr);
     if (cached.length > 0) {
       setBlocks(cached);
@@ -676,13 +677,13 @@ function PlannerContent() {
         if (typeof window !== "undefined" && window.getSelection) {
           try {
             window.getSelection()?.removeAllRanges();
-          } catch {}
+          } catch (e) { logWarn("page", "could not clear text selection", e); }
         }
         try {
           if (typeof window !== "undefined" && navigator?.vibrate) {
             navigator.vibrate(40);
           }
-        } catch {}
+        } catch (e) { logWarn("page", "browser call failed: window.getSelection", e); }
         handleOpenHour(slot.hour, slot.block, slot.hour + 1);
       }, 450);
     };
@@ -710,7 +711,7 @@ function PlannerContent() {
         if (typeof window !== "undefined" && window.getSelection) {
           try {
             window.getSelection()?.removeAllRanges();
-          } catch {}
+          } catch (e) { logWarn("page", "could not clear text selection", e); }
         }
         handleOpenHour(slot.hour, slot.block, slot.hour + 1);
       }, 450);

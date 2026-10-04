@@ -1,3 +1,4 @@
+import { logWarn } from "@/lib/utils/logger";
 /**
  * Utility functions for calculating Odyssey Journey days and mapping them to calendar dates.
  */
@@ -13,7 +14,7 @@ export function getJourneyStartDate(createdAt?: string): string {
       if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
         try {
           localStorage.setItem("odyssey_journey_start_date", dateStr);
-        } catch {}
+        } catch (e) { logWarn("journey", "could not write to storage", e); }
       }
       return dateStr;
     }

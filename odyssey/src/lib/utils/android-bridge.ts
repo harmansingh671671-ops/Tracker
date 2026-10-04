@@ -1,4 +1,5 @@
 import { type WallpaperData, generateWallpaperCanvas, build24HourlyBlocks } from "./wallpaper-generator";
+import { logWarn } from "@/lib/utils/logger";
 import { db } from "../db";
 import { calculateRank, getRankInfo } from "./gamification";
 
@@ -268,7 +269,7 @@ export async function syncScheduleDataToNative(data: WallpaperData): Promise<boo
   // Save to web local cache
   try {
     localStorage.setItem("odyssey_native_schedule_cache", payload);
-  } catch {}
+  } catch (e) { logWarn("android-bridge", "could not write to storage", e); }
 
   // Push to Android native bridge if present
   if (window.OdysseyAndroid?.syncSchedule) {
@@ -305,7 +306,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
   // Cache to web storage
   try {
     localStorage.setItem("odyssey_native_schedule_cache", payload);
-  } catch {}
+  } catch (e) { logWarn("android-bridge", "could not write to storage", e); }
 
   // 1. Native Android APK Bridge Check
   if (typeof window !== "undefined" && window.OdysseyAndroid) {
@@ -328,7 +329,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
               timestamp: timeFormatted,
             };
           }
-        } catch {}
+        } catch (e) { logWarn("android-bridge", "JSON.parse failed", e); }
       }
 
       // Fallback: standard syncSchedule + verifySync
@@ -419,12 +420,12 @@ export function launchLiveWallpaperPicker(): boolean {
     try {
       window.OdysseyAndroid.launchLiveWallpaperPicker();
       return true;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call launchLiveWallpaperPicker failed", e); }
   } else if (window.Android?.launchLiveWallpaperPicker) {
     try {
       window.Android.launchLiveWallpaperPicker();
       return true;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call launchLiveWallpaperPicker failed", e); }
   }
 
   return false;
@@ -444,11 +445,11 @@ export async function enableNativeHourlyAutoUpdate(data?: WallpaperData): Promis
   if (window.OdysseyAndroid?.enableHourlyAutoUpdate) {
     try {
       return window.OdysseyAndroid.enableHourlyAutoUpdate() !== false;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call enableHourlyAutoUpdate failed", e); }
   } else if (window.Android?.enableHourlyAutoUpdate) {
     try {
       return window.Android.enableHourlyAutoUpdate() !== false;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call enableHourlyAutoUpdate failed", e); }
   }
 
   return false;
@@ -463,11 +464,11 @@ export function disableNativeHourlyAutoUpdate(): boolean {
   if (window.OdysseyAndroid?.disableHourlyAutoUpdate) {
     try {
       return window.OdysseyAndroid.disableHourlyAutoUpdate() !== false;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call disableHourlyAutoUpdate failed", e); }
   } else if (window.Android?.disableHourlyAutoUpdate) {
     try {
       return window.Android.disableHourlyAutoUpdate() !== false;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call disableHourlyAutoUpdate failed", e); }
   }
 
   return false;
@@ -482,11 +483,11 @@ export function checkNativeAutoUpdateStatus(): boolean {
   if (window.OdysseyAndroid?.isHourlyAutoUpdateEnabled) {
     try {
       return Boolean(window.OdysseyAndroid.isHourlyAutoUpdateEnabled());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call isHourlyAutoUpdateEnabled failed", e); }
   } else if (window.Android?.isHourlyAutoUpdateEnabled) {
     try {
       return Boolean(window.Android.isHourlyAutoUpdateEnabled());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call isHourlyAutoUpdateEnabled failed", e); }
   }
 
   return false;
@@ -501,7 +502,7 @@ export function clearNativeLockscreen(): boolean {
   if (window.OdysseyAndroid?.clearLockscreenWallpaper) {
     try {
       return Boolean(window.OdysseyAndroid.clearLockscreenWallpaper());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call clearLockscreenWallpaper failed", e); }
   }
 
   return false;
@@ -515,12 +516,12 @@ export function triggerNativeTestNotification(): boolean {
   if (window.OdysseyAndroid?.triggerTestNotification) {
     try {
       return Boolean(window.OdysseyAndroid.triggerTestNotification());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call triggerTestNotification failed", e); }
   }
   if (window.Android?.triggerTestNotification) {
     try {
       return Boolean(window.Android.triggerTestNotification());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call triggerTestNotification failed", e); }
   }
   return false;
 }
@@ -534,12 +535,12 @@ export function pickNativeCustomWallpaperPhoto(targetScreen: "lock" | "home" = "
   if (window.OdysseyAndroid?.pickCustomWallpaperPhoto) {
     try {
       return Boolean(window.OdysseyAndroid.pickCustomWallpaperPhoto(targetScreen));
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call pickCustomWallpaperPhoto failed", e); }
   }
   if (window.Android?.pickCustomWallpaperPhoto) {
     try {
       return Boolean(window.Android.pickCustomWallpaperPhoto(targetScreen));
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call pickCustomWallpaperPhoto failed", e); }
   }
   return false;
 }
@@ -553,12 +554,12 @@ export function openSystemWallpaperPicker(): boolean {
   if (window.OdysseyAndroid?.openSystemWallpaperChooser) {
     try {
       return Boolean(window.OdysseyAndroid.openSystemWallpaperChooser());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call openSystemWallpaperChooser failed", e); }
   }
   if (window.Android?.openSystemWallpaperChooser) {
     try {
       return Boolean(window.Android.openSystemWallpaperChooser());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call openSystemWallpaperChooser failed", e); }
   }
   return false;
 }
@@ -573,12 +574,12 @@ export function enableCadenceNotifications(): boolean {
   if (window.OdysseyAndroid?.enableCadenceNotifications) {
     try {
       return Boolean(window.OdysseyAndroid.enableCadenceNotifications());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call enableCadenceNotifications failed", e); }
   }
   if (window.Android?.enableCadenceNotifications) {
     try {
       return Boolean(window.Android.enableCadenceNotifications());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call enableCadenceNotifications failed", e); }
   }
   return false;
 }
@@ -591,12 +592,12 @@ export function disableCadenceNotifications(): boolean {
   if (window.OdysseyAndroid?.disableCadenceNotifications) {
     try {
       return Boolean(window.OdysseyAndroid.disableCadenceNotifications());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call disableCadenceNotifications failed", e); }
   }
   if (window.Android?.disableCadenceNotifications) {
     try {
       return Boolean(window.Android.disableCadenceNotifications());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call disableCadenceNotifications failed", e); }
   }
   return false;
 }
@@ -609,12 +610,12 @@ export function isCadenceNotificationsEnabled(): boolean {
   if (window.OdysseyAndroid?.isCadenceNotificationsEnabled) {
     try {
       return Boolean(window.OdysseyAndroid.isCadenceNotificationsEnabled());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call isCadenceNotificationsEnabled failed", e); }
   }
   if (window.Android?.isCadenceNotificationsEnabled) {
     try {
       return Boolean(window.Android.isCadenceNotificationsEnabled());
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call isCadenceNotificationsEnabled failed", e); }
   }
   return true;
 }
@@ -629,12 +630,12 @@ export function setCustomTargetWallpaper(base64Image: string, target: "lock" | "
   if (window.OdysseyAndroid?.setCustomWallpaper) {
     try {
       return Boolean(window.OdysseyAndroid.setCustomWallpaper(base64Image, target));
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call setCustomWallpaper failed", e); }
   }
   if (window.Android?.setCustomWallpaper) {
     try {
       return Boolean(window.Android.setCustomWallpaper(base64Image, target));
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call setCustomWallpaper failed", e); }
   }
   return false;
 }
@@ -678,13 +679,13 @@ export function getNativeAlternateWallpaper(target: "lock" | "home" = "lock"): s
     try {
       const val = window.OdysseyAndroid.getAlternateWallpaper(target);
       if (val && val.length > 0) return val;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call getAlternateWallpaper failed", e); }
   }
   if (window.Android?.getAlternateWallpaper) {
     try {
       const val = window.Android.getAlternateWallpaper(target);
       if (val && val.length > 0) return val;
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call getAlternateWallpaper failed", e); }
   }
   try {
     const key = `odyssey_alt_wallpaper_${target}`;
@@ -694,7 +695,7 @@ export function getNativeAlternateWallpaper(target: "lock" | "home" = "lock"): s
       const legacy = localStorage.getItem("odyssey_custom_restoration_wallpaper");
       if (legacy) return legacy;
     }
-  } catch {}
+  } catch (e) { logWarn("storage call failed: localStorage.getItem", "storage call failed: localStorage.getItem", e); }
   return "";
 }
 
@@ -708,16 +709,16 @@ export function clearNativeAlternateWallpaper(target: "lock" | "home" = "lock"):
     if (target === "lock") {
       localStorage.removeItem("odyssey_custom_restoration_wallpaper");
     }
-  } catch {}
+  } catch (e) { logWarn("storage call failed: localStorage.removeItem", "storage call failed: localStorage.removeItem", e); }
   if (window.OdysseyAndroid?.clearAlternateWallpaper) {
     try {
       window.OdysseyAndroid.clearAlternateWallpaper(target);
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call clearAlternateWallpaper failed", e); }
   }
   if (window.Android?.clearAlternateWallpaper) {
     try {
       window.Android.clearAlternateWallpaper(target);
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call clearAlternateWallpaper failed", e); }
   }
   return true;
 }
@@ -753,12 +754,12 @@ export function applyNativeAlternateWallpaper(target: "lock" | "home" = "lock", 
   if (window.OdysseyAndroid?.applyAlternateWallpaper) {
     try {
       return Boolean(window.OdysseyAndroid.applyAlternateWallpaper(target));
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call applyAlternateWallpaper failed", e); }
   }
   if (window.Android?.applyAlternateWallpaper) {
     try {
       return Boolean(window.Android.applyAlternateWallpaper(target));
-    } catch {}
+    } catch (e) { logWarn("android-bridge", "bridge call applyAlternateWallpaper failed", e); }
   }
   return Boolean(imageToApply && imageToApply.length > 0);
 }
@@ -817,7 +818,7 @@ export function getNativeAppVersion(): { versionCode: number; versionName: strin
         isNative: true,
       };
     }
-  } catch {}
+  } catch (e) { logWarn("android-bridge", "bridge call getAppVersionCode failed", e); }
 
   return { versionCode: 0, versionName: "Web", isNative: false };
 }
@@ -1022,6 +1023,5 @@ export function sendTestNotificationToAndroid(
   }
   return false;
 }
-
 
 

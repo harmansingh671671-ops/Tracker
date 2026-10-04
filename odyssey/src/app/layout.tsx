@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { logWarn } from "@/lib/utils/logger";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
@@ -58,7 +59,7 @@ export default function RootLayout({
                     root.classList.add('light');
                     root.style.colorScheme = 'light';
                   }
-                } catch (e) {}
+                } catch (e) { logWarn("layout", "browser call failed: window.matchMedia", e); }
               })();
             `,
           }}

@@ -200,7 +200,9 @@ class OdysseyLiveWallpaperService : WallpaperService() {
             handler.removeCallbacks(refreshRunnable)
             try {
                 unregisterReceiver(updateReceiver)
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                Log.w("OdysseyLiveWallpaper", "Could not restore the user's wallpaper", e)
+            }
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {

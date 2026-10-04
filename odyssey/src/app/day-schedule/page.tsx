@@ -1,5 +1,6 @@
 "use client";
 
+import { logWarn } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -260,7 +261,7 @@ function DayScheduleContent() {
           (dateStr ? localStorage.getItem(`odyssey_day_name_${dateStr}`) : null) ||
           "";
         setDayName(saved);
-      } catch {}
+      } catch (e) { logWarn("storage call failed: localStorage.getItem", "storage call failed: localStorage.getItem", e); }
     }
   }, [displayDay, dateStr]);
 
@@ -272,7 +273,7 @@ function DayScheduleContent() {
         if (dateStr) {
           localStorage.setItem(`odyssey_day_name_${dateStr}`, newName);
         }
-      } catch {}
+      } catch (e) { logWarn("storage call failed: localStorage.setItem", "storage call failed: localStorage.setItem", e); }
     }
   };
 
@@ -572,7 +573,7 @@ function DayScheduleContent() {
           if (typeof window !== "undefined" && navigator?.vibrate) {
             navigator.vibrate(40);
           }
-        } catch {}
+        } catch (e) { logWarn("page", "haptic feedback failed", e); }
         await addXp(10);
       } else if (current === "completed") {
         await addXp(-10);

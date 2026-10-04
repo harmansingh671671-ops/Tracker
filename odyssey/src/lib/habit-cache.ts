@@ -17,6 +17,7 @@
  * can never corrupt or resurrect deleted data.
  */
 
+import { logWarn } from "@/lib/utils/logger";
 import { type Habit, type HabitLog } from "@/lib/db";
 
 /** Cache is scoped per user so one profile can never show another's habits. */
@@ -74,7 +75,7 @@ export function writeHabitCache(userId: string, cache: HabitCache): void {
       // Too large to mirror safely. Drop any stale copy so we stop carrying it.
       try {
         localStorage.removeItem(cacheKey(userId));
-      } catch {}
+      } catch (e) { logWarn("habit-cache", "could not clear storage", e); }
       return;
     }
     localStorage.setItem(cacheKey(userId), payload);
@@ -87,5 +88,5 @@ export function clearHabitCache(userId: string): void {
   if (!storageUsable()) return;
   try {
     localStorage.removeItem(cacheKey(userId));
-  } catch {}
+  } catch (e) { logWarn("habit-cache", "could not clear storage", e); }
 }

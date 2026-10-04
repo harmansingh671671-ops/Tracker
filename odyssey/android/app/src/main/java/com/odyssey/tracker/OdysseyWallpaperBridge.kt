@@ -180,7 +180,7 @@ class OdysseyWallpaperBridge(
                 val b64 = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
                 prefs.edit().putString(key, b64).commit()
                 return b64
-            } catch (e: Exception) {}
+            } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not read alternate wallpaper as base64", e) }
         }
         return ""
     }
@@ -329,7 +329,7 @@ class OdysseyWallpaperBridge(
                         setPackage(context.packageName)
                     }
                     context.sendBroadcast(intent)
-                } catch (e: Exception) {}
+                } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not notify wallpaper engine of state change", e) }
                 Log.d("OdysseyWallpaper", "Master wallpaper switch set to true")
                 true
             }
@@ -364,7 +364,7 @@ class OdysseyWallpaperBridge(
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(intent)
-            } catch (e: Exception) {}
+            } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not notify wallpaper engine of disable", e) }
 
             // 1. Restore separate Lock Screen alternate wallpaper
             val lockApplied = applyAlternateWallpaper("lock")
@@ -380,8 +380,8 @@ class OdysseyWallpaperBridge(
                         val backupBitmap = BitmapFactory.decodeFile(backupFile.absolutePath)
                         if (backupBitmap != null) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK) } catch (e: Exception) {}
-                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_SYSTEM) } catch (e: Exception) {}
+                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_LOCK) } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not restore backup bitmap", e) }
+                                try { wallpaperManager.setBitmap(backupBitmap, null, true, WallpaperManager.FLAG_SYSTEM) } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not restore backup bitmap", e) }
                             } else {
                                 wallpaperManager.setBitmap(backupBitmap)
                             }
@@ -759,7 +759,7 @@ class OdysseyWallpaperBridge(
                     if (id == downloadId) {
                         try {
                             context.unregisterReceiver(this)
-                        } catch (e: Exception) {}
+                        } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not unregister broadcast receiver", e) }
 
                         try {
                             val apkUri = FileProvider.getUriForFile(

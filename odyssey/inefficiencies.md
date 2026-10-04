@@ -569,7 +569,7 @@ full `eslint` run. Every number below is counted, not estimated.
 
 **Totals: 157 lint findings (58 errors, 99 warnings) across the tree.**
 
-### 10.2 C1 — Silent failures · CRITICAL
+### 10.2 C1 — Silent failures · CRITICAL · **RESOLVED (Pass 1)**
 
 **70 TypeScript `try` blocks have a `catch` that does nothing. That is 67% of all 104 `try` blocks.**
 7 more on the Kotlin side. Total **77**.
@@ -683,6 +683,7 @@ outside the date module · raw hex outside colour tokens.
 | Date | Pass | Result |
 |---|---|---|
 | 2026-10-04 | Audit | Recorded. Nothing changed yet. |
+| 2026-10-04 | **Pass 1** | **77/77 empty catches eliminated.** Added `src/lib/utils/logger.ts` (`logWarn`/`logError`). TS: 70 → 0 across 16 files. Kotlin: 7 → 0 across 2 files. Messages name the actual failed operation rather than a generic string. **Zero behaviour change.** |
 
 ---
 Related: **1** `exhaustive-deps` violation, **2** `no-location-assign` (internal navigation via

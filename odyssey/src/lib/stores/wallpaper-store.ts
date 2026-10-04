@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { logWarn } from "@/lib/utils/logger";
 
 export interface WallpaperSettings {
   enabled: boolean;
@@ -38,7 +39,7 @@ function loadSavedSettings(): WallpaperSettings {
         deviceRatio: parsed.deviceRatio || "phone",
       };
     }
-  } catch {}
+  } catch (e) { logWarn("wallpaper-store", "JSON.parse failed", e); }
   return {
     enabled: true,
     showClockGuide: true,
@@ -51,7 +52,7 @@ function saveSettings(settings: WallpaperSettings) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {}
+  } catch (e) { logWarn("wallpaper-store", "could not write to storage", e); }
 }
 
 export const useWallpaperStore = create<WallpaperStoreState>((set, get) => {
