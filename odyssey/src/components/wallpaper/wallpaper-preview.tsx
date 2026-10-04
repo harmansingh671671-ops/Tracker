@@ -7,6 +7,7 @@ import {
   getCenteredHourlyWindow,
   resolveHobbyEmoji,
   selectDynamicHabits,
+  placeholderHabits,
   type HourlyBlock,
 } from "@/lib/utils/wallpaper-generator";
 import {
@@ -362,10 +363,7 @@ export function WallpaperPreview({
       {data.includeHobbies !== false && (() => {
         const rawHabits = (data.habits && data.habits.length > 0)
           ? data.habits
-          : [
-              { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" } as any,
-              { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" } as any,
-            ];
+          : placeholderHabits();
         const userHobbies = selectDynamicHabits(rawHabits, activeHour, 4);
         const count = userHobbies.length;
 

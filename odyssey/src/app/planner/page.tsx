@@ -477,7 +477,7 @@ function PlannerContent() {
     if (data.id) {
       await db.scheduleBlocks.update(data.id, {
         title: data.title,
-        category: data.category as any,
+        category: data.category,
         startTime: data.startTime,
         endTime: data.endTime,
         status: blockStatus,
@@ -488,7 +488,7 @@ function PlannerContent() {
         id: crypto.randomUUID(),
         userId: user?.id || "default",
         title: data.title,
-        category: data.category as any,
+        category: data.category,
         startTime: data.startTime,
         endTime: data.endTime,
         date: data.date,

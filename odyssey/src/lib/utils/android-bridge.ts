@@ -36,7 +36,7 @@ declare global {
     Android?: LegacyAndroidBridge;
     /** @deprecated Historical alias. Read via `nativeBridge()`. */
     AndroidWallpaper?: LegacyAndroidBridge;
-    Capacitor?: any;
+    Capacitor?: { Plugins?: { Wallpaper?: { setWallpaper?: (opts: { image: string; target: string }) => Promise<{ success?: boolean }> } } };
   }
 }
 
@@ -85,6 +85,17 @@ export interface OdysseyBridge {
  * method and the alias silently types as `{}`.
  */
 type LegacyAndroidBridge = OdysseyBridge;
+
+/** Best-effort message for an unknown thrown value, without asserting a type. */
+function errText(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e) ?? String(e);
+  } catch {
+    return String(e);
+  }
+}
 
 /**
  * The native bridge, whichever name it answers to. `null` in a plain browser.
@@ -148,7 +159,9 @@ export function isAndroidApp(): boolean {
   // 3. Android WebView User-Agent signature
   const ua = navigator.userAgent || "";
   const isAndroid = /Android/i.test(ua);
-  const isWebView = /wv|Version\/[0-9.]+/i.test(ua) || Boolean((window as any).chrome?.webview);
+  const isWebView =
+    /wv|Version\/[0-9.]+/i.test(ua) ||
+    Boolean((window as unknown as { chrome?: { webview?: unknown } }).chrome?.webview);
 
   return isAndroid && isWebView;
 }
@@ -215,7 +228,7 @@ export async function setNativeLockscreen(data: WallpaperData, targetScreen: "lo
         method: "native_bridge",
         message: "Lockscreen updated via Capacitor!",
       };
-    } catch (e: any) {
+    } catch (e) {
       console.warn("Capacitor Wallpaper error:", e);
     }
   }
@@ -316,8 +329,12 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
   const timeFormatted = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const payload = buildNativeSchedulePayload(data);
   const parsed = JSON.parse(payload);
-  const taskNames = (parsed.blocks || []).map((b: any) => b.title).filter(Boolean);
-  const habitNames = (parsed.habits || []).map((h: any) => `${h.name} ${h.icon}`).filter(Boolean);
+  const taskNames = ((parsed.blocks ?? []) as { title?: string }[])
+    .map((b) => b.title)
+    .filter((t): t is string => Boolean(t));
+  const habitNames = ((parsed.habits ?? []) as { name?: string; icon?: string }[])
+    .map((h) => `${h.name ?? ""} ${h.icon ?? ""}`.trim())
+    .filter(Boolean);
 
   // Cache to web storage
   try {
@@ -367,7 +384,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
           : `Synced to native Android engine (${taskNames.length} tasks, ${habitNames.length} hobbies).`,
         timestamp: timeFormatted,
       };
-    } catch (e: any) {
+    } catch (e) {
       return {
         success: false,
         isNativeBridge: true,
@@ -376,7 +393,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
         taskNames,
         habitNames,
         streak: data.userStreak || 1,
-        message: `Native bridge error during sync: ${e?.message || e}`,
+        message: `Native bridge error during sync: ${errText(e)}`,
         error: String(e),
         timestamp: timeFormatted,
       };
@@ -809,5 +826,4 @@ export function sendTestNotificationToAndroid(
   }
   return false;
 }
-
 

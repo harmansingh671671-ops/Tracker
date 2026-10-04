@@ -43,8 +43,11 @@ export function AppUpdateModal() {
     }
 
     // Run in idle background time without delaying startup
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      (window as any).requestIdleCallback(() => checkOnceOnLaunch(), { timeout: 3000 });
+    const idle = (window as unknown as {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void;
+    }).requestIdleCallback;
+    if (typeof idle === "function") {
+      idle(() => checkOnceOnLaunch(), { timeout: 3000 });
     } else {
       setTimeout(checkOnceOnLaunch, 1500);
     }

@@ -451,7 +451,7 @@ function DayScheduleContent() {
           } else {
             await updateBlock(block.id, {
               title: titleToSave,
-              category: catToSave as any,
+              category: catToSave,
             });
           }
         } else if (titleToSave) {
@@ -461,7 +461,7 @@ function DayScheduleContent() {
             startTime: sTime,
             endTime: eTime,
             title: titleToSave,
-            category: catToSave as any,
+            category: catToSave,
             status: "pending",
             isCommitted: true,
           });
@@ -490,7 +490,7 @@ function DayScheduleContent() {
       const currentTitle = (editingValues[hour] ?? "").trim();
 
       if (block) {
-        await updateBlock(block.id, { category: newCat as any });
+        await updateBlock(block.id, { category: newCat });
         syncCurrentScheduleToNative(dateStr);
       } else if (currentTitle) {
         handleSaveBlock(hour, currentTitle, newCat);

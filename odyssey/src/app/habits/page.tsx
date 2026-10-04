@@ -10,7 +10,7 @@ import { HabitHeatmap } from "@/components/habits/habit-heatmap";
 import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
-import { type Habit } from "@/lib/db";
+import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import {
@@ -188,7 +188,7 @@ export default function HabitsPage() {
     await addHabit({
       userId: user.id,
       name: data.name,
-      category: data.category as any,
+      category: data.category,
       frequency: "daily",
       targetDaysPerWeek: data.targetDays?.length || 7,
       targetDays: data.targetDays || [1, 2, 3, 4, 5, 6, 7],
@@ -208,7 +208,7 @@ export default function HabitsPage() {
     updates: {
       name: string;
       icon: string;
-      category: any;
+      category: HabitCategory | (string & {});
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
       targetDays?: number[];

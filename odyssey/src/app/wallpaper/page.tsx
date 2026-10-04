@@ -130,7 +130,10 @@ export default function WallpaperPage() {
     const savedHome = getNativeAlternateWallpaper("home");
     if (savedHome) setHomeWallpaper(savedHome);
 
-    const onNativePhotoSelected = (e: any) => {
+    // Native posts a CustomEvent whose `detail` carries the picked photo.
+    const onNativePhotoSelected = (
+      e: CustomEvent<{ base64?: string; target?: string }>
+    ) => {
       if (e.detail?.base64) {
         const target: "lock" | "home" =
           e.detail.target === "home" || e.detail.target === "lock"
@@ -147,10 +150,10 @@ export default function WallpaperPage() {
         showToast(`Alternate ${target === "home" ? "Home" : "Lock"} Screen wallpaper stored successfully!`);
       }
     };
-    window.addEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected);
+    window.addEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected as EventListener);
 
     return () => {
-      window.removeEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected);
+      window.removeEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected as EventListener);
     };
   }, [fetchUser, fetchHabits, user?.id]);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { type Habit } from "@/lib/db";
+import { type HabitCategory, type Habit } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -32,7 +32,7 @@ interface EditHabitModalProps {
     updates: {
       name: string;
       icon: string;
-      category: any;
+      category: HabitCategory | (string & {});
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
       targetDays?: number[];
@@ -487,7 +487,7 @@ export function EditHabitModal({
                   <button
                     key={slot.id}
                     type="button"
-                    onClick={() => setTimeOfDay(slot.id as any)}
+                    onClick={() => setTimeOfDay(slot.id as "morning" | "afternoon" | "evening" | "anytime")}
                     className={`p-3 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
                       timeOfDay === slot.id
                         ? "bg-primary/15 border border-primary/40 shadow-sm"

@@ -120,6 +120,47 @@ export function resolveHobbyEmoji(icon?: string, name?: string): string {
   return "🎯";
 }
 
+/**
+ * Placeholder habits shown when the user has none yet.
+ *
+ * Typed properly rather than `as any`: a placeholder is still a `Habit`, so it
+ * carries every required field. `userId` is empty and streak/completion counts
+ * are 0 because no placeholder has ever been completed -- previously they
+ * claimed the user's real streak via `data.userStreak`, which rendered a
+ * fabricated number on the wallpaper.
+ */
+export function placeholderHabits(): Habit[] {
+  const base = {
+    userId: "",
+    frequency: "daily" as const,
+    longestStreak: 0,
+    totalCompletions: 0,
+    createdAt: new Date().toISOString(),
+  };
+  return [
+    {
+      ...base,
+      id: "def-1",
+      name: "Mindful Focus",
+      icon: "🧘",
+      category: "Habit Track",
+      period: "morning" as const,
+      timeOfDay: "08:00 AM",
+      currentStreak: 0,
+    },
+    {
+      ...base,
+      id: "def-2",
+      name: "Daily Hydration",
+      icon: "💧",
+      category: "Vitality Track",
+      period: "afternoon" as const,
+      timeOfDay: "01:00 PM",
+      currentStreak: 0,
+    },
+  ];
+}
+
 export function selectDynamicHabits(
   habits: Habit[] = [],
   currentHour: number = new Date().getHours(),
@@ -596,10 +637,7 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   const hobSectionStartY = nextY + nextCardH + Math.round(usableH * 0.020);
   const rawHabits = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
     ? data.habits
-    : [
-        { id: "def-1", name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" } as any,
-        { id: "def-2", name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" } as any,
-      ];
+    : placeholderHabits();
   const userHobbies = selectDynamicHabits(rawHabits, currentHour, 4);
 
   if (userHobbies.length > 0) {

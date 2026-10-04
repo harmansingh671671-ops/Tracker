@@ -140,7 +140,7 @@ export function EditHourModal({
       startTime: startTimeStr,
       endTime: endTimeStr,
       date: initialDate,
-      status: (existingBlock?.status as any) || "planned",
+      status: (existingBlock?.status ?? "planned") as "planned" | "completed" | "skipped",
       habitId: selectedHabitId || undefined,
     });
     handleClose();

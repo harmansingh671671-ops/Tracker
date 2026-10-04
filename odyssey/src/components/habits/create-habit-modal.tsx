@@ -327,7 +327,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                   <button
                     key={slot.id}
                     type="button"
-                    onClick={() => setTimeOfDay(slot.id as any)}
+                    onClick={() => setTimeOfDay(slot.id as "morning" | "afternoon" | "evening" | "anytime")}
                     className={`p-3 rounded-xl text-left flex flex-col gap-0.5 transition-all cursor-pointer ${
                       timeOfDay === slot.id
                         ? "bg-primary/15 border border-primary/40 shadow-sm"
