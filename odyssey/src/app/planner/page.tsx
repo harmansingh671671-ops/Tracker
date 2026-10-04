@@ -559,15 +559,27 @@ function PlannerContent() {
     syncCurrentScheduleToNative();
   };
 
+  /**
+   * Category styling for one hour block.
+   *
+   * Every value carries an explicit light and dark pair. The previous values
+   * were dark-only: `bg-indigo-950/20` over a near-white page renders as a
+   * muddy grey with no category identity, and `text-indigo-400` / `400` shades
+   * fail contrast on white. Light mode therefore gets a real tint from the
+   * 50-scale and the 600-scale text shade; the dark values are preserved
+   * verbatim behind `dark:` so dark mode is unchanged.
+   */
   const getCatStyle = (cat: string, isCustom: boolean) => {
     if (!isCustom || !cat) {
       return {
         label: "Open Slot",
         Icon: Clock,
-        color: "text-on-surface-variant/40",
-        badgeBg: "bg-surface-container-lowest border border-outline/[0.06] text-on-surface-variant/40",
-        cardBorder: "border-dashed border-outline/[0.08] hover:border-primary/40",
-        cardBg: "bg-surface-container-low/40 hover:bg-surface-container-low/70",
+        color: "text-on-surface-variant/60 dark:text-on-surface-variant/40",
+        badgeBg:
+          "bg-surface-container-lowest border border-outline/20 text-on-surface-variant/60 dark:border-outline/[0.06] dark:text-on-surface-variant/40",
+        cardBorder:
+          "border-dashed border-outline/25 hover:border-primary/50 dark:border-outline/[0.08] dark:hover:border-primary/40",
+        cardBg: "bg-surface-container-low/70 hover:bg-surface-container-low dark:bg-surface-container-low/40 dark:hover:bg-surface-container-low/70",
         leftBorder: "border-l-transparent",
         accentGlow: "",
       };
@@ -577,10 +589,13 @@ function PlannerContent() {
       return {
         label: "Rest & Sleep",
         Icon: Moon,
-        color: "text-indigo-400",
-        badgeBg: "bg-indigo-500/15 border border-indigo-500/30 text-indigo-400",
-        cardBorder: "border-indigo-500/25 hover:border-indigo-500/50",
-        cardBg: "bg-indigo-950/20 hover:bg-indigo-950/30",
+        color: "text-indigo-600 dark:text-indigo-400",
+        badgeBg:
+          "bg-indigo-500/15 border border-indigo-500/35 text-indigo-600 dark:border-indigo-500/30 dark:text-indigo-400",
+        cardBorder:
+          "border-indigo-500/30 hover:border-indigo-500/60 dark:border-indigo-500/25 dark:hover:border-indigo-500/50",
+        cardBg:
+          "bg-indigo-50/70 hover:bg-indigo-50 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/30",
         leftBorder: "border-l-indigo-500",
         accentGlow: "shadow-[0_0_16px_rgba(99,102,241,0.15)]",
       };
@@ -589,11 +604,14 @@ function PlannerContent() {
       return {
         label: "Vitality",
         Icon: Heart,
-        color: "text-emerald-400",
-        badgeBg: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400",
-        cardBorder: "border-emerald-500/25 hover:border-emerald-500/50",
-        cardBg: "bg-emerald-950/20 hover:bg-emerald-950/30",
-        leftBorder: "border-l-emerald-400",
+        color: "text-emerald-600 dark:text-emerald-400",
+        badgeBg:
+          "bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 dark:border-emerald-500/30 dark:text-emerald-400",
+        cardBorder:
+          "border-emerald-500/30 hover:border-emerald-500/60 dark:border-emerald-500/25 dark:hover:border-emerald-500/50",
+        cardBg:
+          "bg-emerald-50/70 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30",
+        leftBorder: "border-l-emerald-500",
         accentGlow: "shadow-[0_0_16px_rgba(52,211,153,0.15)]",
       };
     }
@@ -601,11 +619,14 @@ function PlannerContent() {
       return {
         label: "Active Sync",
         Icon: MessageSquare,
-        color: "text-sky-400",
-        badgeBg: "bg-sky-500/15 border border-sky-500/30 text-sky-400",
-        cardBorder: "border-sky-500/25 hover:border-sky-500/50",
-        cardBg: "bg-sky-950/20 hover:bg-sky-950/30",
-        leftBorder: "border-l-sky-400",
+        color: "text-sky-600 dark:text-sky-400",
+        badgeBg:
+          "bg-sky-500/15 border border-sky-500/35 text-sky-600 dark:border-sky-500/30 dark:text-sky-400",
+        cardBorder:
+          "border-sky-500/30 hover:border-sky-500/60 dark:border-sky-500/25 dark:hover:border-sky-500/50",
+        cardBg:
+          "bg-sky-50/70 hover:bg-sky-50 dark:bg-sky-950/20 dark:hover:bg-sky-950/30",
+        leftBorder: "border-l-sky-500",
         accentGlow: "shadow-[0_0_16px_rgba(56,189,248,0.15)]",
       };
     }
@@ -613,11 +634,14 @@ function PlannerContent() {
       return {
         label: "Renewal",
         Icon: Coffee,
-        color: "text-amber-400",
-        badgeBg: "bg-amber-500/15 border border-amber-500/30 text-amber-400",
-        cardBorder: "border-amber-500/25 hover:border-amber-500/50",
-        cardBg: "bg-amber-950/20 hover:bg-amber-950/30",
-        leftBorder: "border-l-amber-400",
+        color: "text-amber-700 dark:text-amber-400",
+        badgeBg:
+          "bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:border-amber-500/30 dark:text-amber-400",
+        cardBorder:
+          "border-amber-500/35 hover:border-amber-500/65 dark:border-amber-500/25 dark:hover:border-amber-500/50",
+        cardBg:
+          "bg-amber-50/70 hover:bg-amber-50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30",
+        leftBorder: "border-l-amber-500",
         accentGlow: "shadow-[0_0_16px_rgba(251,191,36,0.15)]",
       };
     }
@@ -626,8 +650,13 @@ function PlannerContent() {
       Icon: Brain,
       color: "text-primary",
       badgeBg: "bg-primary/15 border border-primary/30 text-primary",
-      cardBorder: "border-primary/25 hover:border-primary/50",
-      cardBg: "bg-background/80 hover:bg-background/90",
+      cardBorder:
+        "border-primary/35 hover:border-primary/60 dark:border-primary/25 dark:hover:border-primary/50",
+      // `bg-background/80` sat almost exactly on the page colour in light mode,
+      // so the Deep Focus block had no identity at all. A primary wash at 5%
+      // gives it the same weight as the other categories without the heavy fill.
+      cardBg:
+        "bg-primary/5 hover:bg-primary/10 dark:bg-background/80 dark:hover:bg-background/90",
       leftBorder: "border-l-primary",
       accentGlow: "shadow-[0_0_16px_rgba(108,0,255,0.15)]",
     };
@@ -734,7 +763,12 @@ function PlannerContent() {
           onMouseLeave={handleMouseUp}
           onContextMenu={(e) => e.preventDefault()}
           className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${
-            options?.isInsideGroup ? "bg-surface-container-high/60 hover:bg-surface-container-high" : cat.cardBg
+            // A card sitting inside a category group must read as a layer above the
+            // group container, so it uses a near-white plate in light mode. Dark
+            // mode keeps the original raised-surface treatment.
+            options?.isInsideGroup
+              ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
+              : cat.cardBg
           } backdrop-blur-xl my-1 shadow-sm ${
             isRecentlySaved
               ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
@@ -806,7 +840,7 @@ function PlannerContent() {
                 }}
                 aria-label={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
                 title={options.expandToggle.isExpanded ? "Collapse sleep hours" : "Expand sleep hours"}
-                className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/25 flex items-center justify-center text-indigo-300 hover:text-on-surface transition-all cursor-pointer"
+                className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/30 flex items-center justify-center text-indigo-600 hover:text-on-surface dark:border-indigo-500/25 dark:text-indigo-300 transition-all cursor-pointer"
               >
                 {options.expandToggle.isExpanded ? (
                   <ChevronUp className="w-4 h-4" />
@@ -820,7 +854,7 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Completed ✓ (tap to mark missed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer dark:text-emerald-400"
               >
                 <CheckCircle2 className="w-5 h-5 shadow-[0_0_12px_rgba(52,211,153,0.4)]" />
               </button>
@@ -829,7 +863,7 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Missed ✕ (tap to reset to unreviewed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer dark:text-rose-400"
               >
                 <XCircle className="w-5 h-5 shadow-[0_0_12px_rgba(244,63,94,0.4)]" />
               </button>
@@ -847,7 +881,7 @@ function PlannerContent() {
                 type="button"
                 onClick={(e) => handleToggleBlockStatus(e, slot.hour, slot.block, slot.status)}
                 title="Unreviewed (tap to mark completed)"
-                className="w-7 h-7 rounded-full border border-outline/20 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-7 h-7 rounded-full border border-outline/25 hover:border-emerald-500 hover:text-emerald-600 text-on-surface-variant/50 flex items-center justify-center transition-colors cursor-pointer dark:border-outline/20 dark:hover:border-emerald-400 dark:hover:text-emerald-400 dark:text-on-surface-variant/40"
               >
                 <Circle className="w-3.5 h-3.5" />
               </button>

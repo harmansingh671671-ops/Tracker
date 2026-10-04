@@ -32,6 +32,7 @@ import {
   Sliders,
   Sun,
 } from "lucide-react";
+import { hasCompletedOnboarding, markOnboardingComplete } from "@/lib/utils/onboarding";
 
 // Interactive Circadian Time Segments for Dial Simulation
 const TIME_SLICES = [
@@ -99,6 +100,29 @@ const TIME_SLICES = [
 
 export default function LandingPage() {
   const router = useRouter();
+
+  // First-run gate. The landing page is the install-time pitch, so it is shown
+  // once and then handed off to the planner forever after. `isChecking` starts
+  // true and only clears on a browser pass, which keeps the server render and
+  // the first client render identical -- a returning user sees the splash
+  // below, never a flash of the landing page before the redirect lands.
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    if (hasCompletedOnboarding()) {
+      router.replace("/planner");
+      return;
+    }
+    // One extra render, once, on mount. This is not a cascading update: there
+    // is no second effect or subscription that can re-trigger it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsChecking(false);
+  }, [router]);
+
+  // Any deliberate entry into the app counts as "seen it" -- otherwise a user
+  // who skips the press-and-hold ritual and taps a footer link would be shown
+  // the landing page again on the next launch.
+  const enterApp = () => markOnboardingComplete();
 
   // Active Circadian Slice on Dial
   const [selectedSliceIndex, setSelectedSliceIndex] = useState(1); // Default to 09:00 Deep Work
@@ -168,6 +192,7 @@ export default function LandingPage() {
         if (next >= 100) {
           clearInterval(holdIntervalRef.current!);
           setHasCommitted(true);
+          markOnboardingComplete();
           try {
             if (typeof window !== "undefined" && navigator?.vibrate) {
               navigator.vibrate([40, 60, 100]);
@@ -200,6 +225,19 @@ export default function LandingPage() {
   }, []);
 
   const completedHabitsCount = demoHabits.filter((h) => h.completed).length;
+
+  // Neutral splash shown while the first-run flag is read. Deliberately plain
+  // so it reads as loading, not as a second landing page.
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-on-surface">
+        <div className="w-12 h-12 rounded-2xl bg-primary/15 border border-primary/40 flex items-center justify-center text-primary">
+          <Compass className="w-6 h-6 animate-spin-slow" />
+        </div>
+        <span className="text-sm font-mono font-bold tracking-tight">ODYSSEY</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-transparent text-on-surface overflow-x-hidden relative selection:bg-primary/30 selection:text-primary">
@@ -234,6 +272,7 @@ export default function LandingPage() {
           {/* Header Action Link */}
           <Link
             href="/planner"
+            onClick={enterApp}
             className="py-1.5 px-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline/[0.12] text-xs font-mono font-semibold text-on-surface transition-all active:scale-95 flex items-center gap-1.5"
           >
             <span>Launch App</span>
@@ -287,6 +326,7 @@ export default function LandingPage() {
           >
             <Link
               href="/planner"
+              onClick={enterApp}
               className="w-full sm:w-auto py-3.5 px-7 rounded-2xl bg-primary hover:bg-primary/95 text-on-primary font-bold text-sm sm:text-base shadow-[0_0_24px_rgba(108,0,255,0.35)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono"
             >
               <span>Begin Your Odyssey</span>
@@ -295,6 +335,7 @@ export default function LandingPage() {
 
             <Link
               href="/habits"
+              onClick={enterApp}
               className="w-full sm:w-auto py-3.5 px-6 rounded-2xl bg-surface-container/90 hover:bg-surface-container-high text-on-surface border border-outline/[0.12] text-sm font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-mono"
             >
               <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400" />
@@ -655,11 +696,11 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center flex-wrap gap-4">
-            <Link href="/planner" className="hover:text-primary transition-colors">Planner</Link>
-            <Link href="/day-schedule" className="hover:text-primary transition-colors">Daily Schedule</Link>
-            <Link href="/habits" className="hover:text-primary transition-colors">Habits</Link>
-            <Link href="/stats" className="hover:text-primary transition-colors">Stats</Link>
-            <Link href="/wallpaper" className="hover:text-primary transition-colors">Wallpaper Studio</Link>
+            <Link href="/planner" onClick={enterApp} className="hover:text-primary transition-colors">Planner</Link>
+            <Link href="/day-schedule" onClick={enterApp} className="hover:text-primary transition-colors">Daily Schedule</Link>
+            <Link href="/habits" onClick={enterApp} className="hover:text-primary transition-colors">Habits</Link>
+            <Link href="/stats" onClick={enterApp} className="hover:text-primary transition-colors">Stats</Link>
+            <Link href="/wallpaper" onClick={enterApp} className="hover:text-primary transition-colors">Wallpaper Studio</Link>
           </div>
         </footer>
       </main>

@@ -87,6 +87,14 @@ export const CATEGORY_OPTIONS = [
   },
 ];
 
+/**
+ * Category styling for one hour block.
+ *
+ * Mirrors the planner's schedule rail, including the light/dark pairs: the old
+ * values were dark-only tints (`bg-indigo-950/20`) with 400-shade text, which
+ * collapse to muddy grey and unreadable labels on a near-white page. Light mode
+ * uses the 50-scale tint and a 600-scale text shade; dark keeps the original.
+ */
 export const getCatStyle = (cat?: string, isCustom?: boolean) => {
   if (!isCustom || !cat) {
     return {
@@ -94,10 +102,12 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       label: "Open Slot",
       shortLabel: "Open",
       Icon: Clock,
-      color: "text-on-surface-variant/40",
-      badgeBg: "bg-surface-container-lowest border border-outline/[0.06] text-on-surface-variant/40",
-      cardBorder: "border-dashed border-outline/[0.08] hover:border-primary/40",
-      cardBg: "bg-surface-container-low/40 hover:bg-surface-container-low/70",
+      color: "text-on-surface-variant/60 dark:text-on-surface-variant/40",
+      badgeBg:
+        "bg-surface-container-lowest border border-outline/20 text-on-surface-variant/60 dark:border-outline/[0.06] dark:text-on-surface-variant/40",
+      cardBorder:
+        "border-dashed border-outline/25 hover:border-primary/50 dark:border-outline/[0.08] dark:hover:border-primary/40",
+      cardBg: "bg-surface-container-low/70 hover:bg-surface-container-low dark:bg-surface-container-low/40 dark:hover:bg-surface-container-low/70",
       leftBorder: "border-l-transparent",
       dotClass: "bg-surface-container-highest",
     };
@@ -109,10 +119,12 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       label: "Rest & Sleep",
       shortLabel: "Sleep",
       Icon: Moon,
-      color: "text-indigo-400",
-      badgeBg: "bg-indigo-500/15 border border-indigo-500/30 text-indigo-400",
-      cardBorder: "border-indigo-500/25 hover:border-indigo-500/50",
-      cardBg: "bg-indigo-950/20 hover:bg-indigo-950/30",
+      color: "text-indigo-600 dark:text-indigo-400",
+      badgeBg:
+        "bg-indigo-500/15 border border-indigo-500/35 text-indigo-600 dark:border-indigo-500/30 dark:text-indigo-400",
+      cardBorder:
+        "border-indigo-500/30 hover:border-indigo-500/60 dark:border-indigo-500/25 dark:hover:border-indigo-500/50",
+      cardBg: "bg-indigo-50/70 hover:bg-indigo-50 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/30",
       leftBorder: "border-l-indigo-500",
       dotClass: "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]",
     };
@@ -123,12 +135,14 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       label: "Vitality",
       shortLabel: "Vitality",
       Icon: Heart,
-      color: "text-emerald-400",
-      badgeBg: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400",
-      cardBorder: "border-emerald-500/25 hover:border-emerald-500/50",
-      cardBg: "bg-emerald-950/20 hover:bg-emerald-950/30",
-      leftBorder: "border-l-emerald-400",
-      dotClass: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]",
+      color: "text-emerald-600 dark:text-emerald-400",
+      badgeBg:
+        "bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 dark:border-emerald-500/30 dark:text-emerald-400",
+      cardBorder:
+        "border-emerald-500/30 hover:border-emerald-500/60 dark:border-emerald-500/25 dark:hover:border-emerald-500/50",
+      cardBg: "bg-emerald-50/70 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30",
+      leftBorder: "border-l-emerald-500 dark:border-l-emerald-400",
+      dotClass: "bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.5)]",
     };
   }
   if (c.includes("sync") || c.includes("meeting") || c.includes("social") || c.includes("admin")) {
@@ -137,12 +151,14 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       label: "Active Sync",
       shortLabel: "Sync",
       Icon: MessageSquare,
-      color: "text-sky-400",
-      badgeBg: "bg-sky-500/15 border border-sky-500/30 text-sky-400",
-      cardBorder: "border-sky-500/25 hover:border-sky-500/50",
-      cardBg: "bg-sky-950/20 hover:bg-sky-950/30",
-      leftBorder: "border-l-sky-400",
-      dotClass: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]",
+      color: "text-sky-600 dark:text-sky-400",
+      badgeBg:
+        "bg-sky-500/15 border border-sky-500/35 text-sky-600 dark:border-sky-500/30 dark:text-sky-400",
+      cardBorder:
+        "border-sky-500/30 hover:border-sky-500/60 dark:border-sky-500/25 dark:hover:border-sky-500/50",
+      cardBg: "bg-sky-50/70 hover:bg-sky-50 dark:bg-sky-950/20 dark:hover:bg-sky-950/30",
+      leftBorder: "border-l-sky-500 dark:border-l-sky-400",
+      dotClass: "bg-sky-500 shadow-[0_0_8px_rgba(56,189,248,0.5)]",
     };
   }
   if (c.includes("renewal") || c.includes("buffer") || c.includes("leisure")) {
@@ -151,12 +167,14 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
       label: "Renewal",
       shortLabel: "Renewal",
       Icon: Coffee,
-      color: "text-amber-400",
-      badgeBg: "bg-amber-500/15 border border-amber-500/30 text-amber-400",
-      cardBorder: "border-amber-500/25 hover:border-amber-500/50",
-      cardBg: "bg-amber-950/20 hover:bg-amber-950/30",
-      leftBorder: "border-l-amber-400",
-      dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]",
+      color: "text-amber-700 dark:text-amber-400",
+      badgeBg:
+        "bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:border-amber-500/30 dark:text-amber-400",
+      cardBorder:
+        "border-amber-500/35 hover:border-amber-500/65 dark:border-amber-500/25 dark:hover:border-amber-500/50",
+      cardBg: "bg-amber-50/70 hover:bg-amber-50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30",
+      leftBorder: "border-l-amber-500 dark:border-l-amber-400",
+      dotClass: "bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.5)]",
     };
   }
   return {
@@ -166,8 +184,8 @@ export const getCatStyle = (cat?: string, isCustom?: boolean) => {
     Icon: Brain,
     color: "text-primary",
     badgeBg: "bg-primary/15 border border-primary/30 text-primary",
-    cardBorder: "border-primary/25 hover:border-primary/50",
-    cardBg: "bg-background/80 hover:bg-background/90",
+    cardBorder: "border-primary/35 hover:border-primary/60 dark:border-primary/25 dark:hover:border-primary/50",
+    cardBg: "bg-primary/5 hover:bg-primary/10 dark:bg-background/80 dark:hover:bg-background/90",
     leftBorder: "border-l-primary",
     dotClass: "bg-primary shadow-[0_0_8px_rgba(108,0,255,0.5)]",
   };
@@ -740,7 +758,7 @@ function DayScheduleContent() {
                 type="button"
                 onClick={() => handleToggleComplete(slot.block, slot.hour)}
                 title="Completed ✓ (tap to mark missed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 hover:bg-emerald-500/10 transition-colors cursor-pointer dark:text-emerald-400"
               >
                 <CheckCircle2 className="w-5 h-5" />
               </button>
@@ -749,7 +767,7 @@ function DayScheduleContent() {
                 type="button"
                 onClick={() => handleToggleComplete(slot.block, slot.hour)}
                 title="Missed ✕ (tap to reset to unreviewed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer dark:text-rose-400"
               >
                 <XCircle className="w-5 h-5" />
               </button>
@@ -767,7 +785,7 @@ function DayScheduleContent() {
                 type="button"
                 onClick={() => handleToggleComplete(slot.block, slot.hour)}
                 title="Unreviewed (tap to mark completed)"
-                className="w-7 h-7 rounded-full border border-outline/30 hover:border-emerald-400 hover:text-emerald-400 text-on-surface-variant/40 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-7 h-7 rounded-full border border-outline/25 hover:border-emerald-500 hover:text-emerald-600 text-on-surface-variant/50 flex items-center justify-center transition-colors cursor-pointer dark:border-outline/30 dark:hover:border-emerald-400 dark:hover:text-emerald-400 dark:text-on-surface-variant/40"
               >
                 <Circle className="w-3.5 h-3.5" />
               </button>
@@ -860,7 +878,7 @@ function DayScheduleContent() {
               Day {displayDay} Focus &amp; Title
             </span>
             {dayName && (
-              <span className="text-[10px] text-emerald-400 font-semibold">Saved</span>
+              <span className="text-[10px] text-emerald-600 font-semibold dark:text-emerald-400">Saved</span>
             )}
           </div>
           <input
