@@ -11,9 +11,7 @@ import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
 import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
-import { InboxDrawer } from "@/components/planner/inbox-drawer";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
-import { type InboxItem } from "@/lib/db";
 import {
   Clock,
   CheckCircle2,
@@ -32,7 +30,6 @@ import {
   XCircle,
   Circle,
   Radio,
-  Inbox,
   Zap,
 } from "lucide-react";
 
@@ -85,7 +82,6 @@ function PlannerContent() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
   const [editingEndHour, setEditingEndHour] = useState<number>(10);
@@ -102,27 +98,6 @@ function PlannerContent() {
     setTimeout(() => {
       setHintToast((curr) => (curr === msg ? null : curr));
     }, 2000);
-  };
-
-  const handleScheduleInboxItem = (item: InboxItem) => {
-    // Find first open/unscheduled slot from current hour or 9 AM
-    const targetH = Math.max(0, Math.min(23, currentHour));
-    const durationHours = Math.max(1, Math.ceil((item.estimatedMinutes || 30) / 60));
-    setEditingHour(targetH);
-    setEditingEndHour(Math.min(24, targetH + durationHours));
-    setEditingBlock({
-      id: crypto.randomUUID(),
-      userId: user?.id || "default",
-      title: item.title,
-      category: (item.category as any) || "work",
-      startTime: `${String(targetH).padStart(2, "0")}:00`,
-      endTime: `${String(Math.min(24, targetH + durationHours)).padStart(2, "0")}:00`,
-      date: selectedDate,
-      status: "pending",
-      isCommitted: true,
-      createdAt: new Date().toISOString(),
-    });
-    setIsEditModalOpen(true);
   };
 
   const handleToggleBlockStatus = async (
@@ -937,6 +912,16 @@ function PlannerContent() {
             </span>
           </div>
         </div>
+
+        {/* The "Unstructured Inbox / Backlog" trigger bar lived here, together
+            with the selected-date label beside it. Both were removed in P0 to
+            cut chrome off the planner.
+
+            The inbox is NOT cancelled -- it is recorded as a Phase 2 item in
+            DEVELOPMENT_PLAN.md ("Unstructured Inbox / Backlog", IDs HD16, M17)
+            and re-homed there. Its component still exists at
+            components/planner/inbox-drawer.tsx and its `inboxItems` table is
+            still in lib/db.ts, so re-adding it is a mount point, not a rebuild. */}
       </div>
     );
   };
@@ -997,22 +982,7 @@ function PlannerContent() {
           </div>
         </div>
 
-        {/* Quick-Capture Inbox Trigger Bar */}
-        <div className="flex items-center justify-between gap-2 px-1">
-          <button
-            type="button"
-            onClick={() => setIsInboxOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline/[0.1] text-xs font-mono font-semibold text-on-surface transition-all active:scale-95 cursor-pointer"
-          >
-            <Inbox className="w-3.5 h-3.5 text-primary" />
-            <span>Unstructured Inbox / Backlog</span>
-          </button>
-
-          <span className="text-[10px] font-mono text-on-surface-variant/60">
-            {isSelectedToday ? "Today Active" : selectedDate}
-          </span>
         </div>
-      </div>
 
       {/* 24-Hour Chrono Stream Timeline - Structured Vertical Rail */}
       <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
@@ -1100,14 +1070,6 @@ function PlannerContent() {
         dateStr={selectedDate}
         categoryStats={categoryStats}
         blocks={blocks}
-      />
-
-      {/* Unstructured Inbox / Backlog Drawer */}
-      <InboxDrawer
-        isOpen={isInboxOpen}
-        onClose={() => setIsInboxOpen(false)}
-        onScheduleItem={handleScheduleInboxItem}
-        selectedDate={selectedDate}
       />
 
       {/* Scheduled Confirmation Toast Feedback */}

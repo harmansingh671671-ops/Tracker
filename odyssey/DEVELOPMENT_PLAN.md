@@ -313,6 +313,7 @@ journey, stats and wallpaper; schema migration tested against existing data.
 | Flexibility | HD17, HD18, HD19 | Rollover, vacation/freeze, auto-archive. **Requires additive migration (see 2.4)** |
 | Analytics depth | HD21-HD24 | 52-week heatmap, deep-work accumulator, time-of-day graph, best/worst day |
 | Category picker | HD5 | User-customisable colours, accessible contrast preserved |
+| **Unstructured Inbox / Backlog** (**reinstated here**) | HD16, M17 | **Removed from the planner in P0 and deliberately re-homed here, not cancelled.** The "Unstructured Inbox / Backlog" trigger bar and its `InboxDrawer` were stripped from `src/app/planner/page.tsx` to cut P0 chrome; the `inboxItems` Dexie table and the `InboxItem` type are still in `src/lib/db.ts` and the component still exists at `src/components/planner/inbox-drawer.tsx`, so nothing was lost but a mount point. Rebuild it as a first-class quick-capture: capture without scheduling, triage, then schedule into an open hour. It belongs to Phase 2 because an inbox is the entry point for overloaded weeks, which is this phase's goal. |
 
 **P2 platform rules -- non-negotiable:**
 
