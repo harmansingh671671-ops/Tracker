@@ -19,12 +19,16 @@ interface CompletionFractionHeaderProps {
 }
 
 /**
- * M9 - sticky completion fraction header.
+ * M9 - completion fraction header.
  *
- * The date strip already prints "3/5" in each day pill, but that scrolls away
- * with the strip. This bar sits directly beneath the strip and stays pinned
- * while the 24-hour timeline scrolls, so the day's standing is always one
- * glance away.
+ * The date strip already prints "3/5" in each day pill, but that number is
+ * small and easy to miss among the pills. This row sits directly beneath the
+ * strip and states it in words ("3/5 Habits Done - 60%").
+ *
+ * It scrolls away with the rest of the page rather than pinning to the top.
+ * The header already occupies a fixed spot above the timeline, so pinning it
+ * would cost a permanently occluded band of screen without adding anything
+ * the user cannot get by scrolling back up.
  *
  * Renders the SELECTED day's numbers, matching the strip pill that is
  * highlighted - the header answers "how is the day I am looking at going",
@@ -56,12 +60,10 @@ export function CompletionFractionHeader({
     return (
       <div
         aria-hidden="true"
-        className="sticky top-14 sm:top-16 z-30 -mx-4 px-4 py-2 bg-surface/85 backdrop-blur-xl border-y border-outline/10"
+        className="flex items-center gap-3"
       >
-        <div className="max-w-xl mx-auto flex items-center gap-3">
-          <div className="h-4 w-32 rounded-full bg-surface-container-highest animate-pulse" />
-          <div className="flex-1 h-1.5 rounded-full bg-surface-container-highest animate-pulse" />
-        </div>
+        <div className="h-4 w-32 rounded-full bg-surface-container-highest animate-pulse" />
+        <div className="flex-1 h-1.5 rounded-full bg-surface-container-highest animate-pulse" />
       </div>
     );
   }
@@ -75,56 +77,52 @@ export function CompletionFractionHeader({
   const fillWidth = percent === null ? 0 : percent;
 
   return (
-    <div
-      className="sticky top-14 sm:top-16 z-30 -mx-4 px-4 py-2 bg-surface/85 backdrop-blur-xl border-y border-outline/10"
-    >
-      <div className="max-w-xl mx-auto flex items-center gap-3">
-        {isAllCompleted ? (
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-        ) : (
-          <Sparkles
-            className={`w-4 h-4 shrink-0 ${
-              isRestDay ? "text-on-surface-variant/40" : "text-primary"
-            }`}
-          />
-        )}
-
-        <span
-          className={`text-xs font-semibold whitespace-nowrap ${
-            isAllCompleted
-              ? "text-emerald-400"
-              : isRestDay
-              ? "text-on-surface-variant/60"
-              : "text-on-surface"
+    <div className="flex items-center gap-3">
+      {isAllCompleted ? (
+        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+      ) : (
+        <Sparkles
+          className={`w-4 h-4 shrink-0 ${
+            isRestDay ? "text-on-surface-variant/40" : "text-primary"
           }`}
-        >
-          {isRestDay ? (
-            "No habits scheduled"
-          ) : (
-            <>
-              <span className="font-mono font-bold">{fraction}</span> Habits
-              Done
-              {percent !== null && (
-                <span className="text-on-surface-variant font-mono">
-                  {" "}
-                  · {percent}%
-                </span>
-              )}
-            </>
-          )}
-        </span>
+        />
+      )}
 
+      <span
+        className={`text-xs font-semibold whitespace-nowrap ${
+          isAllCompleted
+            ? "text-emerald-400"
+            : isRestDay
+            ? "text-on-surface-variant/60"
+            : "text-on-surface"
+        }`}
+      >
+        {isRestDay ? (
+          "No habits scheduled"
+        ) : (
+          <>
+            <span className="font-mono font-bold">{fraction}</span> Habits
+            Done
+            {percent !== null && (
+              <span className="text-on-surface-variant font-mono">
+                {" "}
+                · {percent}%
+              </span>
+            )}
+          </>
+        )}
+      </span>
+
+      <div
+        aria-hidden="true"
+        className="flex-1 h-1.5 rounded-full bg-surface-container-highest overflow-hidden"
+      >
         <div
-          aria-hidden="true"
-          className="flex-1 h-1.5 rounded-full bg-surface-container-highest overflow-hidden"
-        >
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              isAllCompleted ? "bg-emerald-400" : "bg-primary"
-            }`}
-            style={{ width: `${fillWidth}%` }}
-          />
-        </div>
+          className={`h-full rounded-full transition-all duration-500 ${
+            isAllCompleted ? "bg-emerald-400" : "bg-primary"
+          }`}
+          style={{ width: `${fillWidth}%` }}
+        />
       </div>
     </div>
   );

@@ -2,11 +2,11 @@ import { type Habit, type HabitLog } from "@/lib/db";
 import { isHabitScheduledOnDate } from "./habit-colors";
 
 /**
- * M9 - sticky completion fraction header.
+ * M9 - completion fraction header.
  *
  * The planner date strip already prints "3/5" inside each day pill, but that
- * number scrolls away with the strip. This is the pure calculation behind the
- * header that stays on screen while the 24-hour timeline is scrolled.
+ * number is small and easy to miss. This is the pure calculation behind the
+ * header row that spells it out beneath the strip.
  *
  * Kept separate from the strip's inline copy so both surfaces are guaranteed
  * to agree, and so the arithmetic (in particular the empty-day case) is
@@ -63,8 +63,8 @@ export function isHabitCompletedOnDate(
 /**
  * Computes the completion fraction for a single calendar day.
  *
- * Mirrors the arithmetic the planner date strip uses per pill, so the sticky
- * header and the pills can never disagree.
+ * Mirrors the arithmetic the planner date strip uses per pill, so the header
+ * row and the pills can never disagree.
  */
 export function getDayHabitProgress(
   habits: Habit[] | undefined | null,

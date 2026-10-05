@@ -947,8 +947,8 @@ function PlannerContent() {
         loading={habitsLoading || !user?.id}
       />
 
-      {/* M9 - Sticky completion fraction ("3/5 Habits Done · 60%"). Stays
-          pinned under the date strip while the 24-hour timeline scrolls. */}
+      {/* M9 - Completion fraction ("3/5 Habits Done · 60%"). Scrolls with the
+          page; sits directly beneath the date strip. */}
       <CompletionFractionHeader
         selectedDate={selectedDate}
         todayStr={todayStr}
