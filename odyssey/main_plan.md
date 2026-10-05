@@ -233,7 +233,7 @@ src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 - [ ] **M6** — First-open welcome banner (3 pillars). `NOT BUILT` · also: `A8`
 - [ ] **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15`
 - [ ] **M8** — Daily capacity indicator. `NOT BUILT` · also: `C5`
-- [ ] **M9** — Sticky completion fraction header. `PARTIAL` — renders, not sticky · also: `C4`
+- [x] **M9** — Sticky completion fraction header. `BUILT` — `CompletionFractionHeader` pinned under the date strip; arithmetic lives in `lib/utils/habit-progress.ts` (unit-tested, no NaN on empty days) · also: `C4`
 - **M10** — Wallpaper completion gauge → **Phase 5** (`§7.5`). `PARTIAL` — `G2` already ships the fraction; the gauge render on the wallpaper does not exist · also: `G2`
 - [ ] **M11** — Time-period colour accents. `NOT BUILT` · also: `C1`
 - [ ] **M12** — "Up next in 35 min" ticker. `PARTIAL` — nextBlock computed, no ticker · also: `C4`

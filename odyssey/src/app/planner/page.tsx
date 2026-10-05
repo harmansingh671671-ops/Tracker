@@ -12,6 +12,7 @@ import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
 import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
+import { CompletionFractionHeader } from "@/components/planner/completion-fraction-header";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import {
   Clock,
@@ -939,6 +940,17 @@ function PlannerContent() {
       <InfiniteDateStrip
         selectedDate={selectedDate}
         onSelectDate={handleSelectDate}
+        todayStr={todayStr}
+        habits={habits}
+        todayLogs={todayLogs}
+        historyLogs={historyLogs}
+        loading={habitsLoading || !user?.id}
+      />
+
+      {/* M9 - Sticky completion fraction ("3/5 Habits Done · 60%"). Stays
+          pinned under the date strip while the 24-hour timeline scrolls. */}
+      <CompletionFractionHeader
+        selectedDate={selectedDate}
         todayStr={todayStr}
         habits={habits}
         todayLogs={todayLogs}
