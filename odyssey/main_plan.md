@@ -234,7 +234,7 @@ src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 - [ ] **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15`
 - [ ] **M8** — Daily capacity indicator. `NOT BUILT` · also: `C5`
 - [ ] **M9** — Sticky completion fraction header. `PARTIAL` — renders, not sticky · also: `C4`
-- [ ] **M10** — Wallpaper completion gauge. `NOT BUILT` · → **Phase 5** · also: `G2`
+- **M10** — Wallpaper completion gauge → **Phase 5** (`§7.5`). `PARTIAL` — `G2` already ships the fraction; the gauge render on the wallpaper does not exist · also: `G2`
 - [ ] **M11** — Time-period colour accents. `NOT BUILT` · also: `C1`
 - [ ] **M12** — "Up next in 35 min" ticker. `PARTIAL` — nextBlock computed, no ticker · also: `C4`
 - [ ] **M13** — Warm microcopy across toasts/counters. `NOT BUILT`
@@ -277,7 +277,7 @@ src: `MASTER_TODO_REVISED.md §19 L979–1006`
 
 ### 3.5 Cross-surface consistency (Phase 0 carry-over)
 
-- [ ] **CONS-1** — Habit colour + period must match across card, date strip, planner and wallpaper. `PARTIAL` — category casing unified; colour mapping still defined **4×** (**BUG-1**, now in Phase 5 §7.2) · src: `MASTER_TODO_REVISED.md §8 L510`, `§15.4 L763`
+- [ ] **CONS-1** — Habit colour + period must match across card, date strip, planner and wallpaper. `PARTIAL` — category casing unified; colour mapping still defined **4×** (**BUG-1**, now in Phase 5 §7.2) · **stays in Phase 1:** only its wallpaper half moved to Phase 5; card/strip/planner remain here · src: `MASTER_TODO_REVISED.md §8 L510`, `§15.4 L763`
 - [ ] **CONS-2** — Narrow-screen sweep across all 5 main surfaces. `PARTIAL` — only `sm:` breakpoints in use, no `md:`; 4 fixed pixel widths remain · src: `MASTER_TODO_REVISED.md §8 L510`
 - [x] **CONS-3** — Navigation reachability. `SHIPPED` — all 5 nav destinations resolve; `/profile` correctly excluded as a dead route
 
@@ -306,7 +306,7 @@ catalogue lands here.
 - [ ] **B2** — Clean create/edit form, core fields first, expandable detail. `PARTIAL` — basic CRUD form exists; no priority/energy/cue/why/identity fields · also: `S4`–`S7`
 - [ ] **B3** — Habit types: binary / measurable / avoid / time-limit, type-matched controls + undo. `NOT BUILT` — currently binary only · also: `S9`, `S13`
 - [ ] **B4** — Swipe/slide completion with visible button alternative + feedback. `NOT BUILT` · also: `S11`, `S12`
-- [ ] **B5** — Stable per-habit colour across card, strip, schedule, wallpaper. `PARTIAL` — see **BUG-1** / **CONS-1** · also: `S10`, `HD5`
+- [ ] **B5** — Stable per-habit colour across card, strip, schedule, wallpaper. `PARTIAL` — see **BUG-1** / **CONS-1** · **stays in Phase 2:** the wallpaper share of this is Phase 5 §7.2; card/strip/schedule remain here · also: `S10`, `HD5`
 - [ ] **B6** — Grid / List / Heatmap view switcher, saved preference. `NOT BUILT` · also: `HD1`
 - [ ] **B7** — Challenge-linked habits with preview + confirm. `NOT BUILT`
 - [ ] **B8** — Habit motivation fields (note/Why/identity/cue/routine/reward/2-min). `NOT BUILT` · also: `S4`–`S8`
@@ -323,7 +323,7 @@ catalogue lands here.
 - [ ] **C1** — Single-day visual timeline, current-time line, period colours. `PARTIAL` — timeline + time line shipped (`S16`); period colours not (`M11`) · also: `S15`, `S16`
 - [ ] **C2** — Duration sizing + drag/reschedule + edit modal. `PARTIAL` — drag reschedule shipped; **overlap detection** missing · also: `S18`
 - [ ] **C3** — Today at a Glance header (day, done/total, streak, capacity, Start). `NOT BUILT` · also: `M8`, `M9`
-- [ ] **C4** — Up Next line + done/total in header and wallpaper. `PARTIAL` — wallpaper NOW/NEXT shipped; no ticker · also: `M12`
+- [ ] **C4** — Up Next line + done/total in header and wallpaper. `PARTIAL` — wallpaper NOW/NEXT shipped; no ticker · **stays in Phase 2:** header work is Phase 2; the wallpaper gauge share is Phase 5 §7.5 (`M10`) · also: `M12`
 - [ ] **C5** — Capacity and buffer warnings (never block saving). `NOT BUILT` · also: `M8`, `S17`
 - [ ] **C6** — Availability windows, conflict suggestions, ideal week. `NOT BUILT`
 - [ ] **C8** — Morning planning and evening shutdown flows. `PARTIAL` — evening modal exists but is a **nudge, not a ritual** · also: `HD11`, `HD12`
@@ -356,7 +356,7 @@ catalogue lands here.
 - [ ] **E9** — Identity + compound effect projection. `NOT BUILT`
 - [ ] **E10** — Parallel Self weekly actual-vs-perfect. `NOT BUILT` · also: `FD7`
 - [ ] **E11** — Habit Weather forecast with reasons + uncertainty. `NOT BUILT` · → **Phase 7** · also: `I14`, `FD8`
-- [ ] **E12** — Schedule replay + cue latency. `NOT BUILT` · → **Phase 5** · also: `XL15`
+- **E12** — Schedule replay + cue latency → **Phase 5** (`§7.5`), merged into `G11` / `XL15`. `NOT BUILT` · also: `XL15`
 - [ ] **E13** — Monthly Essentialism audit (Commit/Pause/Archive). `NOT BUILT` · also: `I20`, `FD11`
 
 ### 4.6 Medium implementations — Tier 3 (4–8 hrs each)
@@ -541,7 +541,7 @@ Systems" but are wallpaper features.
 - [ ] **FD18** — Circadian sky gradient background. `NOT BUILT` · also: `G5`
 - [ ] **FD19** — Ghost schedule overlay. `NOT BUILT` · also: `G7`
 
-### 7.3 Widgets & ambient surfaces
+### 7.4 Widgets & ambient surfaces
 
 - [ ] **XL12** — Android Glance home-screen widgets (2×2 and 4×1). `NOT BUILT` · src: `§12 L606`
 - [ ] **XL13** — Persistent notification-shade progress HUD. `NOT BUILT` · src: `§12 L607`
@@ -552,6 +552,17 @@ closed. Step 5 of the workflow applies in full: each needs a documented wake
 source, a **default-off** flag, a route guard as well as hidden UI, and a defined
 "what happens when the user turns it off". The existing wallpaper master switch
 (`P8-E1`) is the reference pattern.
+
+### 7.5 Wallpaper items relocated from Phases 1–2
+
+Both were tagged `→ Phase 5` but sat in earlier phases. Neither is a background
+service, so the battery gate above does not apply.
+
+- [ ] **M10** — Wallpaper completion gauge: render the completion percentage and
+  fraction directly on the wallpaper. `PARTIAL` — `G2` ships the fraction in the
+  data layer, but nothing renders the gauge · src: `MASTER_TODO_REVISED.md §19 L982` · also: `G2`
+- [ ] **E12** — Schedule replay + cue latency. `NOT BUILT` — **same feature as `G11`
+  and `XL15`**, do not build three times · src: `MASTER_TODO_REVISED.md §19 L1095` · also: `XL15`, `G11`
 
 **Phase 5 exit gate:** spectrum contradiction resolved (**C2**); widgets default-off with route guards; decay/decoration features behind explicit opt-in.
 
@@ -737,7 +748,23 @@ splitting or an explicit owner decision.
 and `TODO.md` are frozen archives — never cite an `AI-n` ID without the
 MASTER_TODO_REVISED definition attached. src: `DEVELOPMENT_PLAN.md §2.1 L67`
 
-### C8 — Schema proposal vs live schema · **RESOLVED**
+### C8 — `XL-n` ID collision · **RESOLVED**
+
+`XL14` carries **three different meanings** across the sources:
+
+- `MASTER_TODO_REVISED.md §19 L1094` — Interactive Landing & Onboarding (canonical)
+- `PRODUCTION_PLAN.md L196` — Social media blocker with stakes
+- `PHASE_0_AUDIT_REPORT.md L297` — Cinematic Onboarding Experience
+
+Also broken: `MASTER_TODO_REVISED.md L67` maps the `/wallpaper` route to `M3` and `S14`,
+but those IDs mean *Habits empty state* and *Commitment ritual* everywhere else — a
+second collision in the same table.
+
+**Decision:** `MASTER_TODO_REVISED.md` IDs are canonical. This file tracks `XL14` as
+*Interactive Landing & Onboarding*, routed to Phase 2 as `A1`. Never cite an `XL-n`,
+`M-n` or `S-n` ID from a source other than `MASTER_TODO_REVISED.md`. Same rule as **C7**.
+
+### C9 — Schema proposal vs live schema · **RESOLVED**
 
 `MASTER_TODO_REVISED.md §20.1` proposes a new `Habit` schema that **does not match
 the live one** (`title` vs `name`, `streakCurrent` vs `currentStreak`).
@@ -745,7 +772,7 @@ the live one** (`title` vs `name`, `streakCurrent` vs `currentStreak`).
 migration**; never adopt §20.1 wholesale. Any deviation needs an ADR in
 `docs/adr/`. src: `DEVELOPMENT_PLAN.md §2.4 L106`
 
-### C9 — Checkboxes are unreliable as status · **RESOLVED**
+### C10 — Checkboxes are unreliable as status · **RESOLVED**
 
 Every research checkbox is `- [ ]` (452 total, **zero ticked**), yet Phase 1 shipped
 via git without ticking any. **Status lives only in this file.**
@@ -794,3 +821,4 @@ superseded archives contribute no features that are absent above.
 |---|---|
 | 2026-10-05 | **Created.** Migrated the status record from `DEVELOPMENT_PLAN.md` §3 (reconciled against `6b42b74`); consolidated all six backlog docs into the 7 owner-defined phases; recorded 9 contradictions (4 open). Market Research docs un-ignored so they are tracked. |
 | 2026-10-05 | **Propagated the new rules across all docs.** `AGENTS.md` now mandates `main_plan.md` first (status rule, code-beats-docs, battery question added as non-negotiables); `.clinerules` gained a §0 Source of Truth section; `FEATURES.md` dropped its "canonical status of record" claim; `MASTER_TODO_REVISED`, `PRODUCTION_PLAN`, `MASTER_TODO`, `TODO`, `AI_TODO` and `PHASE_0_AUDIT_REPORT` all carry headers pointing here and marking their own phase numbers non-binding; `DEVELOPMENT_PLAN.md` §4 maps its P0–P8 onto Phases 1–7. |
+| 2026-10-05 | **Consolidated all wallpaper work into Phase 5.** Audited Phase 0 carry-overs through Phase 4. `BUG-1`/`BUG-2` → new §7.2 (defects first). `M10` and `E12` moved out of Phases 1–2 into new §7.5 — both had been tagged `→ Phase 5` for weeks without ever being moved; `E12` is the same feature as `G11`/`XL15` and is now marked do-not-build-three-times. `M10` corrected `NOT BUILT` → `PARTIAL` because `G2` already ships the fraction. `CONS-1`, `B5` and `C4` mention the wallpaper but span card/strip/planner/header too, so they **stay** in their phases with a note naming the Phase 5 share. Phase 4 (Social) has no wallpaper work. Fixed two pre-existing numbering bugs: two sections both numbered 7.3, and two contradiction entries both numbered C9 (now C10). Added **C8** — `XL14` means three different things across three sources, same class of bug as C7. |
