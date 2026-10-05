@@ -214,11 +214,12 @@ first: cheap, de-risks later phases, and several are correctness bugs.
 - [ ] **P0-T7** — Remove dead code `seedInitialData()` (D8). `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §4 L278`
 - [ ] **DEBT** — D2 split `useUserStore`; D5 unify data access; D6 refresh graph. `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §3.3 L217`
 
-### 3.2 Known defects found by audit (fix before new features)
+### 3.2 Known defects found by audit
 
-- [ ] **BUG-1** — Category colour defined 3× independently; the wallpaper imports `habit-colors.ts` **zero** times, so a category can be green in-app and amber on the lockscreen. `NOT BUILT` · src: `wallpaper-generator.ts:506` `getCatDetails()`, `planner/page.tsx:552` `getCatStyle()`, canonical `habit-colors.ts`
-- [ ] **BUG-2** — 24-hour spectrum contradiction: generator draws it (`wallpaper-generator.ts:386`), preview says removed (`wallpaper-preview.tsx:253`). `PARTIAL` · see **C2**
+Both remaining defects proved to be **wallpaper** defects, so both moved to Phase 5.
+
 - [x] **BUG-3** — `initTheme()` `matchMedia` listener without cleanup. `SHIPPED` · src: `DEVELOPMENT_PLAN.md §3.3 L224`
+- **BUG-1, BUG-2** → **Phase 5** (`§7.2 Wallpaper correctness`). BUG-2 is already tracked there as `G12`.
 
 ### 3.3 Micro polish — Tier 1 (30 min – 2 hrs each)
 
@@ -276,11 +277,11 @@ src: `MASTER_TODO_REVISED.md §19 L979–1006`
 
 ### 3.5 Cross-surface consistency (Phase 0 carry-over)
 
-- [ ] **CONS-1** — Habit colour + period must match across card, date strip, planner and wallpaper. `PARTIAL` — category casing unified; colour mapping still triplicated (**BUG-1**) · src: `MASTER_TODO_REVISED.md §8 L510`, `§15.4 L763`
+- [ ] **CONS-1** — Habit colour + period must match across card, date strip, planner and wallpaper. `PARTIAL` — category casing unified; colour mapping still defined **4×** (**BUG-1**, now in Phase 5 §7.2) · src: `MASTER_TODO_REVISED.md §8 L510`, `§15.4 L763`
 - [ ] **CONS-2** — Narrow-screen sweep across all 5 main surfaces. `PARTIAL` — only `sm:` breakpoints in use, no `md:`; 4 fixed pixel widths remain · src: `MASTER_TODO_REVISED.md §8 L510`
 - [x] **CONS-3** — Navigation reachability. `SHIPPED` — all 5 nav destinations resolve; `/profile` correctly excluded as a dead route
 
-**Phase 1 exit gate:** `tsc`/`lint`/`test`/`build` clean; BUG-1 fixed; P0-T6 adapter landed; no uncommitted work.
+**Phase 1 exit gate:** `tsc`/`lint`/`test`/`build` clean; P0-T6 adapter landed; CONS-2 narrow-screen sweep done; no uncommitted work. **BUG-1/BUG-2 no longer gate this phase** — they moved to Phase 5 §7.2.
 
 ---
 ## 4. PHASE 2 — Real feature work added to the app
@@ -508,7 +509,28 @@ Odyssey's **core differentiator** — the product is defined by it
 - [ ] **G12** — Duration-weighted spectrum + live countdown. `PARTIAL` — spectrum drawn but **not duration-weighted**; contradiction **C2** · also: `G1`
 - [ ] **G13** — Wallpaper-exclusive cues, user-controlled and readable. `NOT BUILT`
 
-### 7.2 Wallpaper state items (relocated from the gamification phase)
+### 7.2 Wallpaper correctness — do these **first** in this phase
+
+These are defects, not features. Fix them before adding any new wallpaper capability,
+because every new visual below draws category colours and would inherit the drift.
+
+- [ ] **BUG-1** — Category colour defined **4× independently**, and the four disagree.
+  The wallpaper imports `habit-colors.ts` **zero** times, so the same category shows a
+  different colour in-app vs on the lockscreen. `NOT BUILT` · also: `P0-T3`
+  - `wallpaper-generator.ts:506` `getCatDetails()` — hex, own taxonomy (Rest/Vitality/Sync/Renewal/Focus)
+  - `planner/page.tsx:552` `getCatStyle()` — Tailwind classes, private local copy
+  - `day-schedule/page.tsx:99` `getCatStyle()` — Tailwind classes, exported near-duplicate of the planner's
+  - `habit-colors.ts` — canonical hex map, ~50 alias strings
+  - **Confirmed drift:** `Rest` is `#F59E0B` amber in-app but `#818cf8` indigo on wallpaper;
+    `Sleep` is `#8B5CF6` violet in-app but indigo on wallpaper; `Sync` has no in-app mapping at all.
+  - **Note:** the canvas needs hex, the UI needs Tailwind classes — so the fix is one colour
+    map plus one *derived* class map, not one file serving both blindly.
+  - **DoD:** a test asserts planner, day-schedule and wallpaper resolve the same category
+    to the same colour, so this cannot silently regress.
+- [ ] **BUG-2** — 24-hour spectrum contradiction: generator draws it (`wallpaper-generator.ts:386`),
+  preview says removed (`wallpaper-preview.tsx:253`). `PARTIAL` · see **C2** · tracked as **`G12`**
+
+### 7.3 Wallpaper state items (relocated from the gamification phase)
 
 src: `MASTER_TODO_REVISED.md §19 Tier 4 L1061–1065` — these sat under "Behavioral
 Systems" but are wallpaper features.
