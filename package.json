@@ -1,0 +1,14 @@
+{
+  "name": "tracker-workspace-root",
+  "private": true,
+  "description": "Workspace root. The app itself lives in ./odyssey - these scripts delegate there so `npm run dev` works from this directory. No dependencies are installed here.",
+  "scripts": {
+    "dev": "npm --prefix odyssey run dev",
+    "build": "npm --prefix odyssey run build",
+    "start": "npm --prefix odyssey run start",
+    "lint": "npm --prefix odyssey run lint",
+    "typecheck": "npm --prefix odyssey run typecheck",
+    "test": "npm --prefix odyssey run test",
+    "test:watch": "npm --prefix odyssey run test:watch"
+  }
+}

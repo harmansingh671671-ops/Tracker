@@ -115,6 +115,19 @@ there). Live on Vercel, APK at `/downloads/odyssey-latest.apk`.
 is: existing repo code → standard library → already-installed dependency →
 new package last (Ponytail rule, `.clinerules` §2).
 
+### Where to run commands
+
+The app is `odyssey/`. **`npm run dev` from the workspace root (`C:\PROJECTS`)
+works** — a root `package.json` delegates every script into `odyssey/` via
+`npm --prefix odyssey run <script>`. It installs nothing and has no
+`node_modules`, so there is no second install to drift out of sync.
+
+Run scripts from either location; both work. Prefer `odyssey/` when you need
+`node_modules` resolution or relative paths to resolve naturally. Do **not** add
+a `workspaces` field to the root `package.json` — the app is not set up for
+workspace hoisting, and declaring one would move dependency resolution out of
+`odyssey/node_modules` and break the install.
+
 ---
 
 ## 3. ROUTES (9, all shipped — `main_plan.md` §2.1)
@@ -340,7 +353,8 @@ to v2.0 (ECON-2, contradiction C3).
 ### Shell — Windows / PowerShell 5.1
 
 - Commands run from the working directory; use the tool's `workdir` parameter
-  rather than `cd`. Quote paths containing spaces (`'Market Research'`).
+  rather than `cd`. Default to `workdir: C:\PROJECTS\odyssey` — the app root.
+  Quote paths containing spaces (`'Market Research'`).
 - **Not available:** `head`, `wc`, `chmod`, heredocs (`<<EOF`), `cat -n`.
   Use `Get-Content`, `Select-Object`, `Set-Content`.
 - Dependent commands: `cmd1; if ($?) { cmd2 }`. `&&` does not work in PS 5.1.
@@ -483,6 +497,19 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-07 — Root `package.json` launcher
+
+`npm run dev` from `C:\PROJECTS` failed with `ENOENT … package.json`, because the
+app and its manifest live in `odyssey/`. Added a root `package.json` that
+delegates all eight scripts via `npm --prefix odyssey run <script>`, so the same
+commands work from either directory.
+
+Deliberately **not** a workspaces setup: no `workspaces` field, no root
+`node_modules`, nothing installed. A root launcher cannot drift from the app's
+real script list the way a duplicated script block would, and adding
+`workspaces` would hoist dependency resolution out of `odyssey/node_modules` and
+break the install.
+
 ### 2026-10-07 — M2 habits empty state, and a headless-verification trap
 
 **Shipped:** the zero-habit state on `/habits` is now a keystone-block
@@ -587,13 +614,13 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `b72842d` — *"Context.md"* (the agent-entry-point commit:
-  `context.md` rewritten and adopted, `AGENTS.md`/`main_plan.md`/
-  `FEATURE_WORKFLOW.md` wired to it, `.gitignore` no longer ignoring it).
-- Working tree: M2 in progress — `src/components/habits/habits-empty-state.tsx`
-  (new), `src/app/habits/page.tsx`, `src/app/globals.css`, `main_plan.md`,
-  and this file. Verified: `tsc` 0, lint 0 errors, 110/110 tests, `next build`
-  clean, and visual/interaction verification at 360/390/430 in light and dark.
+- HEAD at last update: `31933ca` — *"feat(habits): M2 keystone empty state
+  replaces the generic 'No Habits Yet'"*. Before that, `b72842d` adopted
+  `context.md` as the agent entry point and wired `AGENTS.md` /
+  `main_plan.md` / `FEATURE_WORKFLOW.md` to it.
+- Working tree: clean as of this update. The root `package.json` launcher (see
+  §2, "Where to run commands") is the only file added outside `odyssey/` — it
+  holds no dependencies and delegates to `odyssey/`.
 - `npm run lint` reports **0 errors, 96 warnings** — all pre-existing
   `no-unused-vars` hits (e.g. `Coffee` in `habits/page.tsx:26`, `getDisplayHobbies`
   in `wallpaper-generator.ts:222`), none introduced by this work.
