@@ -1,10 +1,14 @@
 # ODYSSEY — MAIN PLAN
 
 > **Status of this file:** the single authoritative index of what gets built, in what
-> order, and what state each feature is in. **Check this file FIRST**, before any other
-> document or any code.
+> order, and what state each feature is in.
 >
-> **Last reconciled:** 2026-10-05 · baseline migrated from `DEVELOPMENT_PLAN.md` §3
+> **Read `Market Research/context.md` FIRST**, before this file and before any code.
+> It carries the product brief, stack, data model, environment, durable
+> learnings and live task state, so no agent has to be prompted for context.
+> This file remains the only record of **feature order and status**.
+>
+> **Last reconciled:** 2026-10-07 · baseline migrated from `DEVELOPMENT_PLAN.md` §3
 > (which was reconciled against source at commit `6b42b74`).
 
 ---
@@ -14,12 +18,18 @@
 ### 0.1 Authority order (binding)
 
 ```
-1. main_plan.md            <- THIS FILE. Order, priority, status. Authoritative.
-2. ACTUAL CODE             <- reality. Code always beats any document.
-3. DEVELOPMENT_PLAN.md     <- engineering conventions + workflow rules (still canonical for HOW)
-4. MASTER_TODO_REVISED.md  <- full feature specs + rationale (read for WHAT and WHY)
-5. All other Market Research docs -> evidence only, non-binding
+1. Market Research/context.md  <- agent entry point. Orientation + durable learnings.
+2. main_plan.md                <- THIS FILE. Order, priority, status. Authoritative.
+3. ACTUAL CODE                 <- reality. Code always beats any document.
+4. DEVELOPMENT_PLAN.md         <- engineering conventions + workflow rules (still canonical for HOW)
+5. MASTER_TODO_REVISED.md      <- full feature specs + rationale (read for WHAT and WHY)
+6. All other Market Research docs -> evidence only, non-binding
 ```
+
+`context.md` sits above this file for **orientation only** — product, stack,
+schema, environment, learnings, and where the work currently stands. It never
+carries feature status. Where the two disagree on order or status, **this file
+wins**; where either disagrees with the code, **the code wins**.
 
 If this file and a research doc disagree, **this file wins on order and status**.
 If this file and the **code** disagree, **stop and reconcile** before continuing.
@@ -71,9 +81,14 @@ advisory. Follow it in order.
 
 ### Step 1 — Always start here
 
-Before touching anything, open **this file** and find the feature. Never start work
-from a research document directly. The research docs are ~350 KB and contradict each
-other; this file is the index that already resolved that.
+Open **`Market Research/context.md` first**, then **this file**, and find the
+feature. Never start work from a research document directly. The research docs
+are ~350 KB and contradict each other; `context.md` is the orientation layer and
+this file is the index that already resolved the conflicts.
+
+**Do not ask the owner to repeat context that is already written down.** If
+something is missing from `context.md`, that is a defect in that file — add it
+(Step 9b) rather than requesting it again.
 
 If the feature is **not listed here**, stop and add it before implementing it.
 
@@ -135,11 +150,26 @@ Lint catches hook-order violations `tsc` accepts.
 Use Puppeteer at phone width (390px). Screenshot before/after. For light **and**
 dark. Do not assert a visual change works — measure it or screenshot it.
 
-### Step 9 — Update this file in the same commit
+### Step 9 — Update the status record in the same commit
 
 Change the checkbox and the status. This file is the status record; there is no
 other one. A feature is **not done** until it is committed and its status here
 reflects reality.
+
+### Step 9b — Write back to `context.md` in the same commit
+
+`Market Research/context.md` is only worth reading if it stays true. Before the
+same commit lands:
+
+- **Shipped a feature** → add a `§9 Session Log` entry (facts, not narration).
+- **Learned a non-obvious constraint, or a bug and its real fix** → log it, and
+  add it to `§11 Rules` if it is a permanent rule.
+- **Found a wrong fact in `context.md`** → fix it in place. Never leave a
+  known-wrong line, and never accumulate a changelog of corrections.
+- **Moved the working tree, HEAD, or the next feature** → update `§10`.
+
+Verify before writing — every line in that file was read out of the code, not
+recalled. No secrets, no API keys, no PII. Full protocol in `context.md` §0.2.
 
 ### Step 10 — Report honestly
 
@@ -157,6 +187,7 @@ verified.** If something could not be proven (e.g. a clock-dependent fix tested 
 - [ ] No analytics or telemetry added — this is a zero-tracking product
 - [ ] Any new schema field documented in `src/lib/db.ts` with a migration note
 - [ ] **This file updated** (checkbox + status) in the same commit
+- [ ] **`context.md` written back** (§0.2) in the same commit
 - [ ] **Committed** — an uncommitted feature is in progress, not done
 
 ---
@@ -210,7 +241,7 @@ first: cheap, de-risks later phases, and several are correctness bugs.
 - [ ] **P0-T3** — Category normalisation: promote `normalizeCategory()` to a shared util, narrow the union, document alias retirement. `PARTIAL` — cleanup landed the helper, but the type is still dual-case and `habit-colors.ts` still carries ~50 aliases · src: `DEVELOPMENT_PLAN.md §4 L274`, `§2.5 L135`
 - [x] **P0-T4** — Specify reward economy (closes D9). `SHIPPED` · src: `docs/adr/0001-reward-economy.md`
 - [x] **P0-T5** — First tests. `SHIPPED` — 8 suites · src: `DEVELOPMENT_PLAN.md §4 L276`
-- [ ] **P0-T6** — Native bridge adapter pattern (closes D1). `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §4 L277`
+- [ ] **P0-T6** — Native bridge adapter pattern (closes D1). `PARTIAL` — the alias-resolution adapter **has landed**: `nativeBridge()` / `hasNative()` / `callNative()` / `callNativeBool()` in `src/lib/utils/android-bridge.ts`, with `odyssey/bridge-boundary` in ESLint making direct `window.OdysseyAndroid` access a lint error (59 duplicated blocks removed). **What remains:** the module is still one 829-line file holding all 34 methods, so D1's "god-node" half is unclosed — it needs splitting by concern, behaviour-preserving · src: `DEVELOPMENT_PLAN.md §4 L277`
 - [ ] **P0-T7** — Remove dead code `seedInitialData()` (D8). `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §4 L278`
 - [ ] **DEBT** — D2 split `useUserStore`; D5 unify data access; D6 refresh graph. `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §3.3 L217`
 
@@ -783,7 +814,8 @@ src: `DEVELOPMENT_PLAN.md §2.8 L167`
 
 | Document | Role | Authority |
 |---|---|---|
-| **`main_plan.md`** (this file) | Order, priority, status | **CANONICAL** |
+| **`Market Research/context.md`** | Agent entry point: product, stack, schema, environment, durable learnings, live task state. Written back every session (Step 9b) | **CANONICAL for orientation** — never for status |
+| **`main_plan.md`** (this file) | Order, priority, status | **CANONICAL for status** |
 | `DEVELOPMENT_PLAN.md` | Engineering conventions §5, workflow §6, risks §7 | **CANONICAL for HOW** |
 | `Market Research/MASTER_TODO_REVISED.md` | 140-item catalogue §5, matrix §19, schemas §20 | Reference — full specs |
 | `Market Research/PRODUCTION_PLAN.md` | Phase 0–7 framing, exit gates | Reference — superseded on conflict |
@@ -819,6 +851,7 @@ superseded archives contribute no features that are absent above.
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | **Adopted `Market Research/context.md` as the agent entry point.** It existed but was structurally corrupted — text severed mid-sentence and re-appended at the end — so every fact was re-verified against source and the file rewritten whole (product, stack, routes, schema, stores, reward economy, pure-logic modules, 7 phases, environment/toolchain/tests/design system, people/memory/research, session log, git + live task state, binding rules). New **§0** defines the mechanism: read `context.md` → `main_plan.md` → cited spec at session start; write back at session end. Propagated here — §0 header + authority order now put `context.md` first **for orientation only**; **Step 1** requires reading it and forbids asking the owner for context already written down; new **Step 9b** requires the write-back in the same commit; **Definition of Done** gained a checkbox; §11 source index and `AGENTS.md` non-negotiables point at it. Status remains exclusive to this file (C10). `.gitignore` no longer ignores `context.md`, so a fresh clone gets it. |
 | 2026-10-05 | **Created.** Migrated the status record from `DEVELOPMENT_PLAN.md` §3 (reconciled against `6b42b74`); consolidated all six backlog docs into the 7 owner-defined phases; recorded 9 contradictions (4 open). Market Research docs un-ignored so they are tracked. |
 | 2026-10-05 | **Propagated the new rules across all docs.** `AGENTS.md` now mandates `main_plan.md` first (status rule, code-beats-docs, battery question added as non-negotiables); `.clinerules` gained a §0 Source of Truth section; `FEATURES.md` dropped its "canonical status of record" claim; `MASTER_TODO_REVISED`, `PRODUCTION_PLAN`, `MASTER_TODO`, `TODO`, `AI_TODO` and `PHASE_0_AUDIT_REPORT` all carry headers pointing here and marking their own phase numbers non-binding; `DEVELOPMENT_PLAN.md` §4 maps its P0–P8 onto Phases 1–7. |
 | 2026-10-05 | **Consolidated all wallpaper work into Phase 5.** Audited Phase 0 carry-overs through Phase 4. `BUG-1`/`BUG-2` → new §7.2 (defects first). `M10` and `E12` moved out of Phases 1–2 into new §7.5 — both had been tagged `→ Phase 5` for weeks without ever being moved; `E12` is the same feature as `G11`/`XL15` and is now marked do-not-build-three-times. `M10` corrected `NOT BUILT` → `PARTIAL` because `G2` already ships the fraction. `CONS-1`, `B5` and `C4` mention the wallpaper but span card/strip/planner/header too, so they **stay** in their phases with a note naming the Phase 5 share. Phase 4 (Social) has no wallpaper work. Fixed two pre-existing numbering bugs: two sections both numbered 7.3, and two contradiction entries both numbered C9 (now C10). Added **C8** — `XL14` means three different things across three sources, same class of bug as C7. |

@@ -10,7 +10,23 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ---
 
-# ⚠️ MANDATORY: Read `main_plan.md` BEFORE writing any code
+# ⚠️ MANDATORY: Read `Market Research/context.md` FIRST, then `main_plan.md`
+
+**`Market Research/context.md` is the entry point for every session.** It carries the product
+brief, stack, routes, data model, environment quirks, durable learnings and the live task
+state, so you never have to ask for context you could have read.
+
+Read it before anything else, then `main_plan.md` for feature order and status, then the
+spec each feature cites. **Do not ask the owner to repeat context that is already written
+down** — if something is missing, add it.
+
+**At the end of every session, write back to `context.md` in the same commit as your code:**
+a §9 session-log entry for anything shipped, a fix in place for any fact you found wrong,
+and a §10 update for the working tree / HEAD / next feature. Protocol in `context.md` §0.2.
+
+`context.md` never holds feature status — `main_plan.md` is the only status record.
+
+---
 
 **`main_plan.md` is the single source of truth for what gets built, in what order, and its
 status.** Read it before starting any task. It contains:
@@ -39,8 +55,10 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
 6. **Every UI change must work in light AND dark mode.**
 7. **Status lives only in `main_plan.md`.** Update that feature's line (checkbox **and** status)
    in the same commit as the code. Do not maintain status in any other document.
-8. **Code beats documents.** If `main_plan.md` disagrees with the code, the code is right —
-   fix `main_plan.md`.
+8. **Code beats documents.** If `main_plan.md` or `context.md` disagrees with the code, the code
+   is right — fix the document in the same commit.
+8a. **Never re-request context that `context.md` already records.** Missing context is a defect
+   in that file: add it (§0.2), don't ask for it again.
 9. **Phase gates are hard.** Proposing to skip a gate is a decision for the plan owner, not an
    implementation detail.
 10. **Ask the battery question before coding** anything that runs while the app is closed:

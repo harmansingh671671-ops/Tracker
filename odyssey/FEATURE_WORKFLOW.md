@@ -84,7 +84,7 @@ Then **stop**. Wait for the user to decide what happens next.
 
 A feature may begin only when **all** of these are true:
 
-- [ ] The feature has an ID from `DEVELOPMENT_PLAN.md` section 4 (e.g. `M2`, `HD13`, `P0-T1`).
+- [ ] The feature has an ID from `main_plan.md` (e.g. `M2`, `HD13`, `P0-T1`), and its phase matches the current one.
 - [ ] It belongs to the **current phase**. Phases run in order; do not jump ahead.
 - [ ] The **previous feature is committed**, not left in progress.
 - [ ] The phase exit gate for the current phase is either met or not required for this item.
@@ -119,5 +119,11 @@ AFTER   ->  plain-language report, honest about visibility, committed, then STOP
 
 *(None awaiting approval. The next feature to brief is recorded here once proposed.)*
 
-**To find the next feature:** read `FEATURES.md` → section **NEXT UP**. Do not dig through the code
-or the research corpus to decide. `FEATURES.md` is the status of record.
+**To find the next feature:** read `Market Research/context.md` → §10 → "Where the work is
+right now" first (that table is refreshed every session), then confirm against
+`main_plan.md` → **Phase 1** → the first unchecked line in plan order. Do not dig through the
+code or the research corpus to decide.
+
+> `FEATURES.md` used to be named here as the status of record. That moved to `main_plan.md`
+> (contradiction C10). `FEATURES.md` remains useful for its NEXT UP table and the P8 cleanup
+> record, but its status columns are not authoritative.
