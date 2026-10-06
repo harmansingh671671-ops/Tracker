@@ -62,8 +62,8 @@ export default function WallpaperPage() {
   // Independent Lock Screen vs Home Screen Alternate Wallpapers
   const [selectedAltTab, setSelectedAltTab] = useState<"lock" | "home">("lock");
   const activeAltTabRef = useRef<"lock" | "home">("lock");
-  const [lockWallpaper, setLockWallpaper] = useState<string | null>(null);
-  const [homeWallpaper, setHomeWallpaper] = useState<string | null>(null);
+  const [lockWallpaper, setLockWallpaper] = useState<string | null>(() => getNativeAlternateWallpaper("lock"));
+  const [homeWallpaper, setHomeWallpaper] = useState<string | null>(() => getNativeAlternateWallpaper("home"));
   const [isProcessing, setIsProcessing] = useState(false);
 
   const customFileInputRef = useRef<HTMLInputElement>(null);
@@ -87,14 +87,10 @@ export default function WallpaperPage() {
     };
   }, [refreshToggle, router]);
 
+  // Both wallpapers are loaded lazily above; this only keeps the ref in sync.
   useEffect(() => {
     activeAltTabRef.current = selectedAltTab;
-    const saved = getNativeAlternateWallpaper(selectedAltTab);
-    if (saved) {
-      if (selectedAltTab === "home" && !homeWallpaper) setHomeWallpaper(saved);
-      if (selectedAltTab === "lock" && !lockWallpaper) setLockWallpaper(saved);
-    }
-  }, [selectedAltTab, homeWallpaper, lockWallpaper]);
+  }, [selectedAltTab]);
 
   const handleOpenPhotoPicker = (targetScreen: "lock" | "home" = selectedAltTab) => {
     activeAltTabRef.current = targetScreen;
@@ -110,6 +106,11 @@ export default function WallpaperPage() {
 
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
 
+  const showToast = (text: string, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => setToastMessage(null), 3800);
+  };
+
   useEffect(() => {
     fetchUser();
     const todayStr = new Date().toISOString().split("T")[0];
@@ -122,13 +123,6 @@ export default function WallpaperPage() {
     }
 
     db.scheduleBlocks.where("date").equals(todayStr).toArray().then(setBlocks);
-
-    // Load separate Lock & Home wallpapers
-    const savedLock = getNativeAlternateWallpaper("lock");
-    if (savedLock) setLockWallpaper(savedLock);
-
-    const savedHome = getNativeAlternateWallpaper("home");
-    if (savedHome) setHomeWallpaper(savedHome);
 
     // Native posts a CustomEvent whose `detail` carries the picked photo.
     const onNativePhotoSelected = (
@@ -156,11 +150,6 @@ export default function WallpaperPage() {
       window.removeEventListener("odyssey:custom-wallpaper-selected", onNativePhotoSelected as EventListener);
     };
   }, [fetchUser, fetchHabits, user?.id]);
-
-  const showToast = (text: string, isError = false) => {
-    setToastMessage({ text, isError });
-    setTimeout(() => setToastMessage(null), 3800);
-  };
 
   const activeDay = useMemo(() => {
     return getJourneyDayNumber(user?.createdAt);

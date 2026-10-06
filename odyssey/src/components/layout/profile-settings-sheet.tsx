@@ -22,11 +22,18 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
   const [totalBlocks, setTotalBlocks] = useState(0);
   const [totalHabits, setTotalHabits] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [nativeVersion, setNativeVersion] = useState<{ versionCode: number; versionName: string; isNative: boolean }>({
-    versionCode: 0,
-    versionName: "Web",
-    isNative: false,
-  });
+  const nativeVersion = getNativeAppVersion();
+
+  // Read the saved alert preference when the sheet opens. Done during render so
+  // React Compiler doesn't flag a synchronous setState in an effect.
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      const saved = readString("odyssey_hourly_alerts");
+      if (saved !== null) setHourlyAlertsEnabled(saved === "true");
+    }
+  }
   const [latestRelease, setLatestRelease] = useState<{ versionCode: number; versionName: string } | null>(null);
 
   // Master wallpaper switch. This sheet is the ONLY settings surface reachable
@@ -44,7 +51,6 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
       // Resolve the authoritative (native) wallpaper state every time the sheet
       // opens, so the toggle can never show a stale value.
       void refreshWallpaperToggle();
-      setNativeVersion(getNativeAppVersion());
       fetch("/api/app-version", { cache: "no-store" })
         .then((res) => res.json())
         .then((data) => {
@@ -53,10 +59,6 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           }
         })
         .catch(() => {});
-      const saved = readString("odyssey_hourly_alerts");
-      if (saved !== null) {
-        setHourlyAlertsEnabled(saved === "true");
-      }
       db.scheduleBlocks.count().then(setTotalBlocks);
       db.habits.count().then(setTotalHabits);
     }

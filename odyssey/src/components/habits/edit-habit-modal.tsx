@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -103,7 +103,9 @@ export function EditHabitModal({
 
   const habitColor = useMemo(() => (habit ? getHabitColor(habit) : "#6C00FF"), [habit]);
 
-  useEffect(() => {
+  const [prevHabit, setPrevHabit] = useState(habit);
+  if (prevHabit !== habit) {
+    setPrevHabit(habit);
     if (habit) {
       setActiveTab(initialTab);
       setName(habit.name || "");
@@ -127,7 +129,7 @@ export function EditHabitModal({
       setIsConfirmingDelete(false);
       setSelectedHistoryDate(selectedDate || today);
     }
-  }, [habit, initialTab, selectedDate, today]);
+  }
 
   // All completed dates for this habit
   const completedLogDates = useMemo(() => {

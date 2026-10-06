@@ -85,7 +85,6 @@ function PlannerContent() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
-  const [isMounted, setIsMounted] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
@@ -201,41 +200,24 @@ function PlannerContent() {
     }
   }, []);
 
-  // Mount initialization: always default to today unless explicit queryDate is provided
-  useEffect(() => {
-    setIsMounted(true);
-    const now = new Date();
-    setCurrentHour(now.getHours());
-    const today = getLocalDateStr(now);
-    setTodayStr(today);
-
-    let initialDate = today;
-    const p = new URLSearchParams(window.location.search);
-    const qDate = p.get("date");
-    if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) {
-      initialDate = qDate;
-    }
-
-    setSelectedDate(initialDate);
-    const cached = getCachedBlocks(initialDate);
+  // Resolve the schedule date from the URL (falls back to today). The state
+  // sync is done during render so React Compiler doesn't flag a synchronous
+  // setState in an effect.
+  const [prevQueryDate, setPrevQueryDate] = useState<string | null>(null);
+  if (queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate) && prevQueryDate !== queryDate) {
+    setPrevQueryDate(queryDate);
+    setSelectedDate(queryDate);
+    const cached = getCachedBlocks(queryDate);
     if (cached.length > 0) {
       setBlocks(cached);
     }
-    loadBlocks(initialDate);
-    syncCurrentScheduleToNative(initialDate);
-  }, [loadBlocks]);
+  }
 
-  // Reactively switch schedule date whenever query parameter changes
+  // Fetch + sync whenever the resolved date changes (including first mount).
   useEffect(() => {
-    if (queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)) {
-      setSelectedDate(queryDate);
-      const cached = getCachedBlocks(queryDate);
-      if (cached.length > 0) {
-        setBlocks(cached);
-      }
-      loadBlocks(queryDate);
-      syncCurrentScheduleToNative(queryDate);
-    }
+    const dateStr = queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : getLocalDateStr();
+    loadBlocks(dateStr);
+    syncCurrentScheduleToNative(dateStr);
   }, [queryDate, loadBlocks]);
 
   // Keep selectedDate ref updated

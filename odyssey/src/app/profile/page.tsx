@@ -55,15 +55,15 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      setDisplayName(user.displayName || "");
-      setUsername(user.username || "");
-      setAge(user.age !== undefined && user.age !== null ? String(user.age) : "");
-      setMotto(user.motto || "");
-      setBio(user.bio || "");
-    }
-  }, [user]);
+  const [prevUser, setPrevUser] = useState(user);
+  if (prevUser !== user) {
+    setPrevUser(user);
+    setDisplayName(user?.displayName || "");
+    setUsername(user?.username || "");
+    setAge(user?.age !== undefined && user?.age !== null ? String(user.age) : "");
+    setMotto(user?.motto || "");
+    setBio(user?.bio || "");
+  }
 
   const rankInfo = useMemo(() => {
     return getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -54,7 +54,9 @@ export function HabitMonthCalendar({
   });
 
   // Keep view aligned if selectedDate jumps to a different month
-  useEffect(() => {
+  const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate);
+  if (prevSelectedDate !== selectedDate) {
+    setPrevSelectedDate(selectedDate);
     if (selectedDate) {
       const [y, m] = selectedDate.split("-").map(Number);
       if (y && m) {
@@ -62,7 +64,7 @@ export function HabitMonthCalendar({
         setViewMonth(m - 1);
       }
     }
-  }, [selectedDate]);
+  }
 
   const handlePrevMonth = (e: React.MouseEvent) => {
     e.stopPropagation();

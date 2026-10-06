@@ -140,19 +140,21 @@ export function DistributionModal({
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
 
+  if (isOpen && !shouldRender) {
+    setShouldRender(true);
+    setIsClosing(false);
+  } else if (!isOpen && shouldRender && !isClosing) {
+    setIsClosing(true);
+  }
+
   useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true);
+    if (!isClosing) return;
+    const timer = setTimeout(() => {
+      setShouldRender(false);
       setIsClosing(false);
-    } else if (shouldRender) {
-      setIsClosing(true);
-      const timer = setTimeout(() => {
-        setShouldRender(false);
-        setIsClosing(false);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, shouldRender]);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [isClosing]);
 
   const handleClose = () => {
     setIsClosing(true);

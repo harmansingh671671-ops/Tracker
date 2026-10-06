@@ -94,14 +94,14 @@ export function DayScheduleModal({
   };
 
   useEffect(() => {
-    if (isOpen) {
-      if (typeof window !== "undefined" && window.getSelection) {
-        try {
-          window.getSelection()?.removeAllRanges();
-        } catch (e) { logWarn("day-schedule-modal", "could not clear text selection", e); }
-      }
-      loadBlocks();
+    if (!isOpen) return;
+    if (typeof window !== "undefined" && window.getSelection) {
+      try {
+        window.getSelection()?.removeAllRanges();
+      } catch (e) { logWarn("day-schedule-modal", "could not clear text selection", e); }
     }
+    const t = setTimeout(() => { void loadBlocks(); }, 0);
+    return () => clearTimeout(t);
   }, [isOpen, date, userId]);
 
   // Hourly allocation map (0 to 23)

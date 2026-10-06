@@ -131,12 +131,6 @@ export function JourneyDaySchedule({
   // Group Collapses (Sleep collapsed by default)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  // Client mount check for React Portal
-  const [mounted, setMounted] = useState<boolean>(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Prevent background scrolling while edit modal is open
   useEffect(() => {
     if (isEditModalOpen) {
@@ -1009,7 +1003,7 @@ export function JourneyDaySchedule({
       </div>
 
       {/* Edit Modal for Blocks (Rendered via React Portal directly into document.body to avoid parent container transform/scroll clipping) */}
-      {isEditModalOpen && mounted && createPortal(
+      {isEditModalOpen && createPortal(
         <div
           onClick={() => setIsEditModalOpen(false)}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"

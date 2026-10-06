@@ -77,20 +77,24 @@ export function InfiniteDateStrip({
   }, [todayStr]);
 
   // Expand range dynamically if selectedDate lies beyond the current window
-  useEffect(() => {
-    if (!selectedDate || !todayStr) return;
-    const [sy, sm, sd] = selectedDate.split("-").map(Number);
-    const [ty, tm, td] = todayStr.split("-").map(Number);
-    const sTime = new Date(sy, sm - 1, sd).getTime();
-    const tTime = new Date(ty, tm - 1, td).getTime();
-    const diffDays = Math.round((sTime - tTime) / (1000 * 60 * 60 * 24));
+  const [prevRangeKey, setPrevRangeKey] = useState<string | null>(null);
+  const rangeKey = `${selectedDate ?? ""}|${todayStr ?? ""}`;
+  if (prevRangeKey !== rangeKey) {
+    setPrevRangeKey(rangeKey);
+    if (selectedDate && todayStr) {
+      const [sy, sm, sd] = selectedDate.split("-").map(Number);
+      const [ty, tm, td] = todayStr.split("-").map(Number);
+      const sTime = new Date(sy, sm - 1, sd).getTime();
+      const tTime = new Date(ty, tm - 1, td).getTime();
+      const diffDays = Math.round((sTime - tTime) / (1000 * 60 * 60 * 24));
 
-    if (diffDays < -pastDaysOffset) {
-      setPastDaysOffset(Math.abs(diffDays) + 15);
-    } else if (diffDays > futureDaysOffset) {
-      setFutureDaysOffset(diffDays + 20);
+      if (diffDays < -pastDaysOffset) {
+        setPastDaysOffset(Math.abs(diffDays) + 15);
+      } else if (diffDays > futureDaysOffset) {
+        setFutureDaysOffset(diffDays + 20);
+      }
     }
-  }, [selectedDate, todayStr, pastDaysOffset, futureDaysOffset]);
+  }
 
   // Generate date items array
   const dateItems = useMemo(() => {

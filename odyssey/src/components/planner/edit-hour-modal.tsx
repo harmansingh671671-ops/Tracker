@@ -69,7 +69,10 @@ export function EditHourModal({
   );
   const [selectedHabitId, setSelectedHabitId] = useState<string>("");
 
-  useEffect(() => {
+  const editSyncKey = `${isOpen}|${existingBlock?.id ?? "new"}|${initialHour}|${initialEndHour ?? "auto"}`;
+  const [prevEditSyncKey, setPrevEditSyncKey] = useState<string | null>(null);
+  if (prevEditSyncKey !== editSyncKey) {
+    setPrevEditSyncKey(editSyncKey);
     if (existingBlock) {
       setTitle(existingBlock.title || "");
       setCategory(existingBlock.category || "work");
@@ -94,29 +97,31 @@ export function EditHourModal({
       setCategory(s < 6 || s >= 23 ? "sleep" : s in [6, 7] ? "vitality" : s in [12, 13] ? "renewal" : "work");
       setSelectedHabitId("");
     }
-  }, [existingBlock, initialHour, initialEndHour, isOpen]);
+  }
 
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
 
+  if (isOpen && !shouldRender) {
+    setShouldRender(true);
+    setIsClosing(false);
+  } else if (!isOpen && shouldRender && !isClosing) {
+    setIsClosing(true);
+  }
+
   useEffect(() => {
-    if (isOpen) {
-      if (typeof window !== "undefined" && window.getSelection) {
-        try {
-          window.getSelection()?.removeAllRanges();
-        } catch (e) { logWarn("edit-hour-modal", "could not clear text selection", e); }
-      }
-      setShouldRender(true);
-      setIsClosing(false);
-    } else if (shouldRender) {
-      setIsClosing(true);
-      const timer = setTimeout(() => {
-        setShouldRender(false);
-        setIsClosing(false);
-      }, 200);
-      return () => clearTimeout(timer);
+    if (isOpen && typeof window !== "undefined" && window.getSelection) {
+      try {
+        window.getSelection()?.removeAllRanges();
+      } catch (e) { logWarn("edit-hour-modal", "could not clear text selection", e); }
     }
-  }, [isOpen, shouldRender]);
+    if (!isClosing) return;
+    const timer = setTimeout(() => {
+      setShouldRender(false);
+      setIsClosing(false);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [isOpen, isClosing]);
 
   const handleClose = () => {
     setIsClosing(true);

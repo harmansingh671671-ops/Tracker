@@ -31,12 +31,13 @@ export default function ShopPage() {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [toastMsg, setToastMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
-  const [chestClaimed, setChestClaimed] = useState(false);
+  const [chestClaimed, setChestClaimed] = useState(() => {
+    const savedChest = readString(`odyssey_chest_${new Date().toISOString().split("T")[0]}`);
+    return !!savedChest;
+  });
 
   useEffect(() => {
     fetchUser();
-    const savedChest = readString(`odyssey_chest_${new Date().toISOString().split("T")[0]}`);
-    if (savedChest) setChestClaimed(true);
   }, [fetchUser]);
 
   const showToast = (text: string, isError = false) => {

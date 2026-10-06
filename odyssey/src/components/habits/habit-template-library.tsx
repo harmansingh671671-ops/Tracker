@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Search,
   Sparkles,
@@ -268,7 +268,10 @@ export function HabitTemplateLibrary({
   const [scrollTop, setScrollTop] = useState(0);
 
   // Sync permanently removed ids if an existing habit was deleted by user so it reappears
-  useEffect(() => {
+  const syncKey = `${existingHabitNames.map((n) => n.trim().toLowerCase()).sort().join(",")}||${Object.keys(exitingIds).sort().join(",")}`;
+  const [prevSyncKey, setPrevSyncKey] = useState<string | null>(null);
+  if (prevSyncKey !== syncKey) {
+    setPrevSyncKey(syncKey);
     setPermanentlyRemovedIds((prev) => {
       const existingNorm = new Set(existingHabitNames.map((n) => n.trim().toLowerCase()));
       const updated = { ...prev };
@@ -283,7 +286,7 @@ export function HabitTemplateLibrary({
       }
       return changed ? updated : prev;
     });
-  }, [existingHabitNames, exitingIds]);
+  }
 
   // 1. Filter out habits the user has already added OR that have finished exiting
   const unaddedTemplates = useMemo(() => {

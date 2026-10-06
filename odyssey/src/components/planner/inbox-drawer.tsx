@@ -60,9 +60,9 @@ export function InboxDrawer({
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      loadItems();
-    }
+    if (!isOpen) return;
+    const t = setTimeout(() => { void loadItems(); }, 0);
+    return () => clearTimeout(t);
   }, [isOpen, loadItems]);
 
   const handleAddItem = async (e: React.FormEvent) => {

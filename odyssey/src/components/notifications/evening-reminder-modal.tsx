@@ -89,10 +89,13 @@ export function EveningReminderModal() {
   }, [user]);
 
   useEffect(() => {
-    checkTomorrowSchedule();
+    // Deferred to the next tick: the check is async, so its state updates are
+    // not synchronous, but the compiler flags any call to a state-setting
+    // function in an effect body.
+    const immediate = setTimeout(() => { void checkTomorrowSchedule(); }, 0);
     // Check every 60 seconds
     const interval = setInterval(checkTomorrowSchedule, 60000);
-    return () => clearInterval(interval);
+    return () => { clearTimeout(immediate); clearInterval(interval); };
   }, [checkTomorrowSchedule]);
 
   const handleDismiss = () => {
@@ -137,10 +140,10 @@ export function EveningReminderModal() {
         {/* Title & Description */}
         <div className="space-y-1.5">
           <h3 className="text-lg sm:text-xl font-bold text-on-surface tracking-tight">
-            Plan Tomorrow's Schedule
+            Plan Tomorrow&apos;s Schedule
           </h3>
           <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-            It's past 20:00! Your schedule for{" "}
+            It&apos;s past 20:00! Your schedule for{" "}
             <span className="font-bold text-on-surface">
               {tomorrowFormatted}
             </span>{" "}
@@ -155,7 +158,7 @@ export function EveningReminderModal() {
         {/* Quick Status Bar */}
         <div className="p-3 rounded-2xl bg-surface-container border border-outline/15 space-y-1.5">
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-on-surface-variant font-medium">Tomorrow's Schedule</span>
+            <span className="text-on-surface-variant font-medium">Tomorrow&apos;s Schedule</span>
             <span className="text-amber-400 font-bold">{plannedHours} / 24 hrs</span>
           </div>
           <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">

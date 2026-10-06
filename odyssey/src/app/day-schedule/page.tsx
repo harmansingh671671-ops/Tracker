@@ -237,6 +237,7 @@ function DayScheduleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
+  const userId = user?.id;
   const {
     blocks,
     fetchBlocksForDate,
@@ -252,18 +253,21 @@ function DayScheduleContent() {
 
   const displayDay = dayNum || (user?.createdAt ? getJourneyDayNumber(user.createdAt) : 1);
   const [dayName, setDayName] = useState<string>("");
-
-  useEffect(() => {
+  const [prevDayNameKey, setPrevDayNameKey] = useState<string | null>(null);
+  const dayNameKey = `${displayDay}|${dateStr ?? ""}`;
+  if (prevDayNameKey !== dayNameKey) {
+    setPrevDayNameKey(dayNameKey);
+    let saved = "";
     if (typeof window !== "undefined") {
       try {
-        const saved =
+        saved =
           readString(`odyssey_day_name_day_${displayDay}`) ||
           (dateStr ? readString(`odyssey_day_name_${dateStr}`) : null) ||
           "";
-        setDayName(saved);
       } catch (e) { logWarn("storage call failed: localStorage.getItem", "storage call failed: localStorage.getItem", e); }
     }
-  }, [displayDay, dateStr]);
+    setDayName(saved);
+  }
 
   const handleUpdateDayName = (newName: string) => {
     setDayName(newName);
@@ -278,6 +282,14 @@ function DayScheduleContent() {
   };
 
   const [loading, setLoading] = useState(true);
+
+  // Reloading shows the spinner again; done during render so React Compiler
+  // doesn't flag a synchronous setState in an effect.
+  const [prevDateStr, setPrevDateStr] = useState<string | null>(null);
+  if (prevDateStr !== dateStr) {
+    setPrevDateStr(dateStr);
+    setLoading(true);
+  }
 
   // Controlled input values for every hour (0..23)
   const [editingValues, setEditingValues] = useState<Record<number, string>>(() => {
@@ -313,7 +325,6 @@ function DayScheduleContent() {
   // Load schedule blocks for selected date
   useEffect(() => {
     if (user?.id && dateStr) {
-      setLoading(true);
       fetchBlocksForDate(user.id, dateStr).finally(() => setLoading(false));
     }
   }, [user?.id, dateStr, fetchBlocksForDate]);
@@ -435,7 +446,7 @@ function DayScheduleContent() {
   // Save / Update / Delete block for a given hour
   const handleSaveBlock = useCallback(
     async (hour: number, explicitTitle?: string, explicitCat?: CategoryKey) => {
-      if (!user?.id || !dateStr) return;
+      if (!userId || !dateStr) return;
       const block = getBlockForHour(hour);
       const titleToSave = (explicitTitle !== undefined ? explicitTitle : (editingValues[hour] ?? "")).trim();
       const catToSave = explicitCat || hourCategories[hour] || normalizeCategory(undefined, hour);
@@ -456,7 +467,7 @@ function DayScheduleContent() {
           }
         } else if (titleToSave) {
           await addBlock({
-            userId: user.id,
+            userId: userId,
             date: dateStr,
             startTime: sTime,
             endTime: eTime,
@@ -477,7 +488,7 @@ function DayScheduleContent() {
         console.error("Error saving block:", err);
       }
     },
-    [user?.id, dateStr, getBlockForHour, editingValues, hourCategories, deleteBlock, updateBlock, addBlock]
+    [userId, dateStr, getBlockForHour, editingValues, hourCategories, deleteBlock, updateBlock, addBlock]
   );
 
   // Change category of a specific hour block
@@ -534,10 +545,10 @@ function DayScheduleContent() {
 
   // Handle auto-fill sleep
   const handleAutoFillSleep = useCallback(async () => {
-    if (!user?.id || !dateStr) return;
-    await autoFillSleep(user.id, dateStr);
+    if (!userId || !dateStr) return;
+    await autoFillSleep(userId, dateStr);
     syncCurrentScheduleToNative(dateStr);
-  }, [user?.id, dateStr, autoFillSleep]);
+  }, [userId, dateStr, autoFillSleep]);
 
   // Toggle completion status (3-state cycle: unreviewed -> completed -> missed -> unreviewed)
   const handleToggleComplete = useCallback(
