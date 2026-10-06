@@ -10,6 +10,7 @@ import { HabitHeatmap } from "@/components/habits/habit-heatmap";
 import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
+import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -329,12 +330,24 @@ export default function HabitsPage() {
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Cross-fades on day change. Implemented with a CSS transition rather
               than a keyed motion element: changing a React `key` remounts the
-              node, which leaves it on its initial state and never animates. */}
+              node, which leaves it on its initial state and never animates.
+
+              With no habits at all there is no denominator, so printing
+              "0/0 (0%)" would be a confident false zero — the same class of
+              lie the M9 header placeholder exists to avoid. Say so plainly
+              instead. */}
           <span
             key={formattedSelectedDate + percentage}
             className="text-xs font-mono font-bold text-on-surface animate-in fade-in slide-in-from-top-1 duration-300"
           >
-            {formattedSelectedDate}{isFutureSelectedDate ? " (Upcoming)" : ""}: {completed}/{total} ({percentage}%)
+            {habits.length === 0 ? (
+              <>Nothing scheduled yet</>
+            ) : (
+              <>
+                {formattedSelectedDate}
+                {isFutureSelectedDate ? " (Upcoming)" : ""}: {completed}/{total} ({percentage}%)
+              </>
+            )}
           </span>
           {selectedDate !== todayStr && (
             <button
@@ -395,19 +408,7 @@ export default function HabitsPage() {
 
       {/* Main Content Area Based on View Mode */}
       {habits.length === 0 ? (
-        <div className="p-8 rounded-2xl bg-surface-container-low border border-outline/10 text-center space-y-3">
-          <span className="text-3xl">🎯</span>
-          <h3 className="text-base font-bold text-on-surface">No Habits Yet</h3>
-          <p className="text-xs text-on-surface-variant max-w-xs mx-auto">
-            Build positive momentum by creating your first daily routine.
-          </p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="py-2.5 px-5 rounded-full bg-primary text-on-primary text-xs font-bold cursor-pointer"
-          >
-            Add First Habit
-          </button>
-        </div>
+        <HabitsEmptyState onAddFirst={() => setIsCreateModalOpen(true)} />
       ) : viewMode === "list" ? (
         /* 1. LIST VIEW: Full-width interactive cards for selected date */
         /* Each card is keyed by `${selectedDate}-${h.id}` so switching days

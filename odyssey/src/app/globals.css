@@ -511,6 +511,34 @@ button, a, input, select {
   animation: pulseGlow 3s ease-in-out infinite;
 }
 
+/* M2 -- the (+) on the habits keystone empty state. Keyframes live inside a
+   `no-preference` query so reduced motion gets a still ring rather than an
+   animation that has to be cancelled after first paint. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes keystonePulse {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0
+        color-mix(in srgb, var(--primary) 45%, transparent);
+    }
+    50% {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 10px color-mix(in srgb, var(--primary) 0%, transparent);
+    }
+  }
+}
+
+.keystone-pulse {
+  animation: keystonePulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keystone-pulse {
+    animation: none;
+  }
+}
+
 .animate-spin-slow {
   animation: spin 20s linear infinite;
 }

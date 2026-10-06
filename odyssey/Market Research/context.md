@@ -483,6 +483,46 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-07 — M2 habits empty state, and a headless-verification trap
+
+**Shipped:** the zero-habit state on `/habits` is now a keystone-block
+illustration with a pulsing (+) and the line *"Your journey begins with one
+keystone habit."* New component `src/components/habits/habits-empty-state.tsx`.
+The keystone is an inline SVG filled with `var(--primary-container)` /
+`var(--primary)`, so it re-themes with light/dark — no raw hex in a component.
+The pulse is a new `keystonePulse` keyframe in `globals.css` whose keyframes sit
+inside `@media (prefers-reduced-motion: no-preference)`, matching how
+`date-ring-pulse` already does it. Verified reduced-motion actually silences it
+(`animationName: "none"`), not just that the class was applied.
+
+**Also removed a false zero.** The day readout above the list printed
+`0/0 (0%)` when there were no habits at all. With no denominator, that is a
+confident false zero — the exact failure the M9 header placeholder was built to
+prevent. It now reads "Nothing scheduled yet".
+
+**The trap — worth knowing before you trust any browser verification here:**
+against `next dev` on port 3010, **no click worked at all.** The create-habit
+modal did not open from the new CTA, did not open from the pre-existing
+"New Habit" header button, and the List→Grid view switcher did not toggle. The
+cause was not app code: the DOM nodes carried **no React expando keys** and
+`#__next` was absent, i.e. the page never hydrated. Re-running the identical
+script against `next start` (production build, port 3100) gave
+`reactExpandos: 2`, `onClickPresent: true`, the view switcher toggling, and the
+modal opening with its backdrop.
+
+**Transferable lessons:**
+- **Verify interaction against a production build, not `next dev`.** A
+  non-hydrated dev page fails every click identically, which reads exactly like
+  a broken button. Check for React expandos on a node before believing a click
+  did nothing.
+- **Always run a control.** Comparing the pre-existing button against the new one
+  is what proved this was environmental rather than a regression. Without that
+  control the obvious conclusion — "my new button is broken" — would have been
+  wrong.
+- **A confident zero needs a null state.** `percent: null` (habit-progress) and
+  "Nothing scheduled yet" are the same idea in two places. When a denominator
+  does not exist, say so.
+
 ### 2026-10-07 — `context.md` adopted as the agent entry point
 
 The file existed but was **structurally corrupted**: text was severed
@@ -547,15 +587,19 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `635182a` — *"chore(lint): clear all React Compiler
-  errors"* (17 files, React Compiler violations fixed across day-schedule,
-  planner, profile, shop, wallpaper, and the habit/planner/journey components).
-- Working tree: modified — `.gitignore` (the `context.md` ignore rule removed,
-  with a note explaining why it must stay tracked), `AGENTS.md`, `main_plan.md`,
-  `FEATURE_WORKFLOW.md`, and this file. Nothing committed yet.
-- `npm run lint` reports **0 errors, 96 warnings** — the warnings are
-  pre-existing `no-unused-vars` hits, not introduced by the doc work. `tsc` and
-  all 110 tests are green.
+- HEAD at last update: `b72842d` — *"Context.md"* (the agent-entry-point commit:
+  `context.md` rewritten and adopted, `AGENTS.md`/`main_plan.md`/
+  `FEATURE_WORKFLOW.md` wired to it, `.gitignore` no longer ignoring it).
+- Working tree: M2 in progress — `src/components/habits/habits-empty-state.tsx`
+  (new), `src/app/habits/page.tsx`, `src/app/globals.css`, `main_plan.md`,
+  and this file. Verified: `tsc` 0, lint 0 errors, 110/110 tests, `next build`
+  clean, and visual/interaction verification at 360/390/430 in light and dark.
+- `npm run lint` reports **0 errors, 96 warnings** — all pre-existing
+  `no-unused-vars` hits (e.g. `Coffee` in `habits/page.tsx:26`, `getDisplayHobbies`
+  in `wallpaper-generator.ts:222`), none introduced by this work.
+- **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
+  On this machine a `next dev` page renders but never hydrates, so every click
+  silently no-ops.
 - `.clinerules` lives at the workspace **parent** (`C:\PROJECTS`), with paths
   prefixed `odyssey/`. It is itself git-ignored.
 - `Market Research/` **is** tracked (deliberate; decision recorded in the
@@ -566,8 +610,8 @@ to know where things stand.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M2** — Habits page empty state. A generic empty state exists at `src/app/habits/page.tsx:397` ("No Habits Yet" + 🎯); the spec wants a keystone framing and an animated (+) pulse |
-| Also open in Phase 1 | P0-T2 (graph stale: last built from `dda4383d`, HEAD `635182a`), P0-T3 (blocked, `FEATURES.md` §5), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
+| Next feature | **M3** — Planner empty state, "clean slate". Spec copy: *"Your day is a clean slate. Tap + or import a routine template to begin."* Same shape as M2, different surface — the planner timeline, not the habits list |
+| Also open in Phase 1 | P0-T2 (graph stale: last built from `dda4383d`), P0-T3 (blocked, `FEATURES.md` §5), P0-T6 (adapter landed; 829-line file still to split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
 | Phase 1 exit gate | Gates clean · P0-T6 adapter landed · CONS-2 sweep done · no uncommitted work |
 | Next after Phase 1 | Phase 2 — onboarding `A1`/`XL14` is the largest gap between the app and its own research |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |

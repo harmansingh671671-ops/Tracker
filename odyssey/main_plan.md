@@ -257,7 +257,7 @@ Both remaining defects proved to be **wallpaper** defects, so both moved to Phas
 src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 
 - [x] **M1** — Local-data trust badge. `BUILT` — copy is owner-set: *"Your data will not leave your device without your consent."* (supersedes both research drafts); `LocalDataTrustBadge` renders on **Profile** and inside Settings' **Local Vault** card. **Onboarding surface not built — there is no `/onboarding` route, see `A1`** · also: `A8`
-- [ ] **M2** — Habits page empty state. `NOT BUILT` · also: `A8`
+- [x] **M2** — Habits page empty state. `BUILT` — `HabitsEmptyState` component: keystone-block illustration drawn with CSS-var tokens (re-themes light/dark), pulsing (+) ring on a new `keystonePulse` keyframe gated on `prefers-reduced-motion` in `globals.css`, copy "Your journey begins with one keystone habit" + "Pick the one habit that holds the rest up", CTA "Add your keystone habit" opens the existing create modal. Also removed a **false zero** on this screen: the day readout printed `0/0 (0%)` with no habits at all, which is the same confident-false-zero class the M9 header placeholder exists to prevent — it now reads "Nothing scheduled yet" · also: `A8`
 - [ ] **M3** — Planner empty state "clean slate". `NOT BUILT` · also: `A8`
 - [ ] **M4** — All-habits-done celebration card (+50 XP). `NOT BUILT`
 - [ ] **M5** — Creation confirmation toast naming first milestone. `NOT BUILT` · also: `B15`
