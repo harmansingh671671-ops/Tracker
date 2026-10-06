@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   getDayHabitProgress,
+  getHeaderSlotKeys,
   isHabitCompletedOnDate,
 } from "./habit-progress";
 import type { Habit } from "@/lib/db";
@@ -133,5 +134,76 @@ describe("isHabitCompletedOnDate - store selection", () => {
 
   it("treats a missing entry as not completed", () => {
     expect(isHabitCompletedOnDate(h, PAST, TODAY, {}, history())).toBe(false);
+  });
+});
+
+describe("getHeaderSlotKeys - slot uniqueness", () => {
+  // Regression. Both slots render into ONE AnimatePresence, so their keys
+  // have to be unique against each other, not just within a slot. They used
+  // to be the bare values, which made the icon and the label both "rest" on
+  // an empty day and threw React's "Encountered two children with the same
+  // key" on every rest day.
+  it("does not collide on a rest day", () => {
+    // TODAY is a Monday; this habit is scheduled only on a Friday.
+    const keys = getHeaderSlotKeys(
+      getDayHabitProgress([habit("a", [5])], TODAY, TODAY, {}, {})
+    );
+
+    expect(keys.icon).toBe("icon:rest");
+    expect(keys.label).toBe("label:rest");
+    expect(keys.icon).not.toBe(keys.label);
+  });
+
+  it("does not collide when there are no habits at all", () => {
+    for (const input of [[], null, undefined]) {
+      const keys = getHeaderSlotKeys(getDayHabitProgress(input, TODAY, TODAY));
+      expect(keys.icon).not.toBe(keys.label);
+    }
+  });
+
+  it("does not collide on a partial day", () => {
+    const habits = [habit("a", [1]), habit("b", [1])];
+    const keys = getHeaderSlotKeys(
+      getDayHabitProgress(habits, TODAY, TODAY, doneToday("a"), {})
+    );
+
+    expect(keys.icon).not.toBe(keys.label);
+    expect(keys.icon).toBe("icon:pending");
+    expect(keys.label).toBe("label:1/2:50");
+  });
+
+  it("does not collide when the day is complete", () => {
+    const habits = [habit("a", [1]), habit("b", [1])];
+    const keys = getHeaderSlotKeys(
+      getDayHabitProgress(habits, TODAY, TODAY, doneToday("a", "b"), {})
+    );
+
+    expect(keys.icon).not.toBe(keys.label);
+    expect(keys.icon).toBe("icon:done");
+    expect(keys.label).toBe("label:2/2:100");
+  });
+
+  it("changes the label key when the fraction changes so it cross-fades", () => {
+    const habits = [habit("a", [1]), habit("b", [1])];
+    const before = getHeaderSlotKeys(
+      getDayHabitProgress(habits, TODAY, TODAY, {}, {})
+    );
+    const after = getHeaderSlotKeys(
+      getDayHabitProgress(habits, TODAY, TODAY, doneToday("a"), {})
+    );
+
+    expect(before.label).not.toBe(after.label);
+  });
+
+  it("keeps the icon key stable while the day fills in so it does not blink", () => {
+    const habits = [habit("a", [1]), habit("b", [1])];
+    const before = getHeaderSlotKeys(
+      getDayHabitProgress(habits, TODAY, TODAY, {}, {})
+    );
+    const after = getHeaderSlotKeys(
+      getDayHabitProgress(habits, TODAY, TODAY, doneToday("a"), {})
+    );
+
+    expect(before.icon).toBe(after.icon);
   });
 });

@@ -6,6 +6,7 @@ import { CheckCircle2, Sparkles } from "lucide-react";
 
 import {
   getDayHabitProgress,
+  getHeaderSlotKeys,
   type DayHabitProgress,
 } from "@/lib/utils/habit-progress";
 import { type Habit, type HabitLog } from "@/lib/db";
@@ -39,6 +40,10 @@ interface HeaderSlot {
    * Stable identity for AnimatePresence, keyed on the VALUE being displayed.
    * That is what makes a segment cross-fade when its content changes (date
    * switched, a habit completed) instead of snapping to the new string.
+   *
+   * Must be namespaced by slot id - see getHeaderSlotKeys(). Every slot here
+   * shares one AnimatePresence, so two slots showing the same value ("rest"
+   * on an empty day) would otherwise collide and throw.
    */
   key: string;
   /** Layout classes for this segment. */
@@ -114,10 +119,11 @@ export function CompletionFractionHeader({
   // it is hidden from assistive tech to avoid announcing the value twice.
   const fillWidth = percent === null ? 0 : percent;
 
-  // Keyed on the displayed value, so each readout cross-fades exactly when
-  // what it says actually changes - and stays put when it does not.
-  const iconKey = isAllCompleted ? "done" : isRestDay ? "rest" : "pending";
-  const labelKey = isRestDay ? "rest" : `${fraction}:${percent ?? 0}`;
+  // Namespaced by slot id. Both slots live in one AnimatePresence, and on a
+  // rest day the icon and the label would otherwise both be "rest" - React
+  // threw a duplicate-key error on every empty day. Still keyed on the
+  // displayed value, so each readout cross-fades exactly when it changes.
+  const { icon: iconKey, label: labelKey } = getHeaderSlotKeys(progress);
 
   const slots: HeaderSlot[] = [
     {

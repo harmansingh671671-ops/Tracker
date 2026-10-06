@@ -114,3 +114,38 @@ export function getDayHabitProgress(
     isAllCompleted: scheduledCount > 0 && completedCount >= scheduledCount,
   };
 }
+
+export interface HeaderSlotKeys {
+  icon: string;
+  label: string;
+}
+
+/**
+ * Slot keys for the completion header.
+ *
+ * Both slots are rendered into ONE AnimatePresence, so their keys must be
+ * unique against each other - not merely unique within a slot. They are
+ * therefore namespaced by slot id.
+ *
+ * This is not defensive noise: the icon and the label can legitimately hold
+ * the same value. On a rest day both used to resolve to the bare string
+ * "rest", which threw React's "Encountered two children with the same key"
+ * on every empty day. `isAllCompleted` cannot save you there - it requires a
+ * non-empty day, so on a rest day the icon is always "rest".
+ *
+ * Returned from here rather than inlined in the component because this
+ * project runs vitest in a plain node environment with no jsdom
+ * (vitest.config.ts), so a pure function is the only place the uniqueness
+ * invariant can be tested.
+ */
+export function getHeaderSlotKeys(progress: DayHabitProgress): HeaderSlotKeys {
+  const { isAllCompleted, hasHabits, fraction, percent } = progress;
+
+  const iconState = isAllCompleted ? "done" : !hasHabits ? "rest" : "pending";
+  const labelState = hasHabits ? `${fraction}:${percent ?? 0}` : "rest";
+
+  return {
+    icon: `icon:${iconState}`,
+    label: `label:${labelState}`,
+  };
+}
