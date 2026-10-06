@@ -9,6 +9,7 @@ import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNat
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette, Image as ImageIcon } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import { LocalDataTrustBadge } from "@/components/common/local-data-trust-badge";
 
 interface ProfileSettingsSheetProps {
   isOpen: boolean;
@@ -344,6 +345,9 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
               </div>
             </div>
           </div>
+
+          {/* M1 - trust badge: the promise this card already makes, stated in full. */}
+          <LocalDataTrustBadge variant="inline" />
 
           <div className="p-2.5 rounded-xl bg-surface-container text-xs text-on-surface-variant font-mono flex items-center justify-between">
             <span>Storage:</span>

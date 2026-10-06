@@ -225,7 +225,7 @@ Both remaining defects proved to be **wallpaper** defects, so both moved to Phas
 
 src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 
-- [ ] **M1** — Local-first trust badge. `NOT BUILT` · also: `A8`
+- [x] **M1** — Local-data trust badge. `BUILT` — copy is owner-set: *"Your data will not leave your device without your consent."* (supersedes both research drafts); `LocalDataTrustBadge` renders on **Profile** and inside Settings' **Local Vault** card. **Onboarding surface not built — there is no `/onboarding` route, see `A1`** · also: `A8`
 - [ ] **M2** — Habits page empty state. `NOT BUILT` · also: `A8`
 - [ ] **M3** — Planner empty state "clean slate". `NOT BUILT` · also: `A8`
 - [ ] **M4** — All-habits-done celebration card (+50 XP). `NOT BUILT`

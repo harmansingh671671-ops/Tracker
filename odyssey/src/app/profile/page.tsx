@@ -24,6 +24,7 @@ import {
 import { useUserStore } from "@/lib/stores/user-store";
 import { getRankInfo, calculateRank, RANKS } from "@/lib/utils/gamification";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import { LocalDataTrustBadge } from "@/components/common/local-data-trust-badge";
 import { Switch } from "@/components/ui/switch";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 
@@ -437,6 +438,9 @@ export default function ProfilePage() {
           </Link>
         )}
       </section>
+
+      {/* M1 - Local-data trust badge. Named surface: Profile. */}
+      <LocalDataTrustBadge />
 
       {/* 6. Account & Data Actions */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">
