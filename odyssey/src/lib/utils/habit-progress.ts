@@ -6,7 +6,7 @@ import { isHabitScheduledOnDate } from "./habit-colors";
  *
  * The planner date strip already prints "3/5" inside each day pill, but that
  * number is small and easy to miss. This is the pure calculation behind the
- * header row that spells it out beneath the strip.
+ * header row that spells it out above the strip.
  *
  * Kept separate from the strip's inline copy so both surfaces are guaranteed
  * to agree, and so the arithmetic (in particular the empty-day case) is

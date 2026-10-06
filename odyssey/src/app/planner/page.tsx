@@ -936,10 +936,12 @@ function PlannerContent() {
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
-      {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings */}
-      <InfiniteDateStrip
+      {/* M9 - Completion fraction ("3/5 Habits Done · 60%"). Sits above the
+          date strip so the day's standing is read first; animated and built
+          from swappable slots so further readouts can be added later. Scrolls
+          with the page rather than pinning (see C4). */}
+      <CompletionFractionHeader
         selectedDate={selectedDate}
-        onSelectDate={handleSelectDate}
         todayStr={todayStr}
         habits={habits}
         todayLogs={todayLogs}
@@ -947,10 +949,10 @@ function PlannerContent() {
         loading={habitsLoading || !user?.id}
       />
 
-      {/* M9 - Completion fraction ("3/5 Habits Done · 60%"). Scrolls with the
-          page; sits directly beneath the date strip. */}
-      <CompletionFractionHeader
+      {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings */}
+      <InfiniteDateStrip
         selectedDate={selectedDate}
+        onSelectDate={handleSelectDate}
         todayStr={todayStr}
         habits={habits}
         todayLogs={todayLogs}
