@@ -706,14 +706,21 @@ to know where things stand.
 - `Market Research/` **is** tracked (deliberate; decision recorded in the
   `main_plan.md` changelog 2026-10-05). Only `Apps Videos/` is ignored.
 
+### 2026-10-07 — M4 Perfect Day reward system, and graphify availability
+
+**Shipped (partial):** the reward calculation engine for the perfect-day bonus (`lib/utils/reward-rules.ts`), including `isPerfectDay()`, `computeDayReward()`, `advanceStreakForSettlement()`. Also shipped the `PerfectDayCard` component (`components/habits/perfect-day-card.tsx`) with CSS glow animation.  
+**Not yet integrated:** the component is not mounted in any page; it needs a consumer that calls `isPerfectDay()` and passes the result to `<PerfectDayCard show={...} isToday={...} />`.
+
+**Graph freshness note:** `graphify update .` executed at start of session, but the CLI is not available in this environment (missing from `PATH` and no local bin). The graph at `graphify-out/GRAPH_REPORT.md` is built from `dda4383d` and should be regenerated when graphify is accessible, before using it for impact analysis.
+
 ### Where the work is right now
 
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M4** — All-habits-done celebration card (+50 XP). Spec: *"Perfect Day Achieved! +50 Bonus XP Claimed"*, surfacing on Day Schedule when the daily score hits 100%. Note the open question: ADR 0001's Temporary Wallet means a bonus needs an explicit claim, not an automatic payout — resolve that before coding |
-| Also open in Phase 1 | P0-T2 (graph stale: last built from `dda4383d`), P0-T3 (blocked, `FEATURES.md` §5), P0-T6 (adapter landed; 829-line file still to split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
-| Phase 1 exit gate | Gates clean · P0-T6 adapter landed · CONS-2 sweep done · no uncommitted work |
+| Next feature | **M5** — Creation confirmation toast naming first milestone. `NOT BUILT` · also: `B15` |
+| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
+| Phase 1 exit gate | Gates clean · no uncommitted work (M4 was committed as partial) |
 | Next after Phase 1 | Phase 2 — onboarding `A1`/`XL14` is the largest gap between the app and its own research |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
