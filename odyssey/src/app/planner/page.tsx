@@ -17,6 +17,7 @@ import { PlannerEmptyState } from "@/components/planner/planner-empty-state";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
+import { getUpNextBlock, formatCountdown } from "@/lib/utils/up-next";
 import {
   Clock,
   CheckCircle2,
@@ -86,6 +87,14 @@ function PlannerContent() {
   // from the synchronous local cache, so a returning user sees their real
   // schedule immediately instead of an empty timeline that fills in later.
   const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
+  // M12 -- minutes past local midnight, for the "Up next in 35 min" line. Fed by
+  // the EXISTING 15s tick below rather than a second timer: one interval, one
+  // wake-up, and the countdown cannot drift out of step with the current-hour
+  // marker it sits next to.
+  const [nowMinutes, setNowMinutes] = useState<number>(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
@@ -295,6 +304,8 @@ function PlannerContent() {
       const now = new Date();
       setCurrentHour(now.getHours());
       setTodayStr(getLocalDateStr(now));
+      // M12: the countdown's clock.
+      setNowMinutes(now.getHours() * 60 + now.getMinutes());
     }, 15000);
     return () => clearInterval(timer);
   }, []);
@@ -368,6 +379,17 @@ function PlannerContent() {
 
   const isSelectedToday = selectedDate === todayStr;
   const isSelectedPastDay = selectedDate < todayStr;
+
+  // M12 -- what is happening now, or next. Only ever computed for TODAY: a
+  // countdown to a block three days out is not a countdown, and printing
+  // "in 35 min" over a browsed date would be a lie about the clock. Null on a
+  // past or future date, and null once the day's blocks are all behind us --
+  // in which case the line renders nothing at all, following the M7/M8
+  // precedent of saying nothing rather than printing a placeholder.
+  const upNext = useMemo(() => {
+    if (selectedDate !== todayStr) return null;
+    return getUpNextBlock(blocks, nowMinutes);
+  }, [blocks, nowMinutes, selectedDate, todayStr]);
 
   // Category summary counts - strictly from user scheduled blocks!
   const categoryStats = useMemo(() => {
@@ -965,6 +987,39 @@ function PlannerContent() {
         // disagree about the same day.
         plannedHours={categoryStats.plannedTotal}
       />
+
+      {/* M12 -- the "Up next in 35 min" line from MASTER_TODO_REVISED L984, with
+          C4's other half: a block already running reads "Now" rather than a
+          negative countdown.
+
+          Rendered BELOW the header, not as a fourth HeaderSlot, because it must
+          appear and disappear over the day as blocks start and finish, and a
+          slot is permanent chrome.
+
+          Deliberately not a pill. The header already carries the capacity badge
+          and the completion fraction; another coloured chip here would put three
+          rounded blobs in a row and read as a row of status rather than a
+          sentence about time.
+
+          Renders NOTHING -- no empty bar, no "Nothing scheduled" -- when the
+          day has no more blocks. A countdown that has nothing to count to is not
+          worth a line. */}
+      {upNext && (
+        <p className="flex items-baseline gap-1.5 -mt-1 px-1 text-[13px] text-on-surface-variant font-mono">
+          <span className="text-on-surface">
+            {upNext.kind === "now" ? "Now" : `Up next in ${formatCountdown(upNext.minutesUntil)}`}
+          </span>
+          {upNext.title && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="truncate">{upNext.title}</span>
+            </>
+          )}
+          {upNext.durationLabel && (
+            <span className="text-on-surface-variant/70 shrink-0">({upNext.durationLabel})</span>
+          )}
+        </p>
+      )}
 
       {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings */}
       <InfiniteDateStrip

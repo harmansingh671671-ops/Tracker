@@ -595,6 +595,60 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M12 "Up next in 35 min", and a clock that had three ways to lie
+
+**Shipped:** a line under the planner header — *"Up next in 35 min · Deep Work Session
+(2h)"*.
+
+**A countdown is a clock rendered as text, and clocks lie.** Three specific ways, each
+handled and tested rather than assumed:
+
+1. **"Up next in -15 min".** A block that started a quarter hour ago is not upcoming.
+   Anything started-and-unfinished is **`Now`** — which is also **C4**'s own other
+   wording (L255: *"Now" or "Up next in 45 min"*), not an addition of mine.
+2. **"Up next in 0 min".** Rounding a block that is 20 seconds away *down* to zero prints
+   a line that claims urgency the user cannot act on. The gap **rounds up**, so the
+   smallest possible value is "1 min" and `Now` covers the sub-minute case.
+3. **A 22:00 → 01:00 block read as minus twenty-one hours.** Midnight-crossing blocks get
+   their end pushed a day forward — and the comparison is a **strict `<`**, because the
+   rail's own hour matcher (`h >= sH && h < eH`) reads *equal* times as an **empty**
+   block. A `<=` would have turned a zero-length block into a 24-hour one. **My first
+   test run caught exactly that**, which is the argument for writing the empty-block case
+   at all.
+
+**Nothing is rendered when there is nothing to say.** Once the day's blocks are behind us
+the line disappears entirely — no empty bar, no "Nothing scheduled" — the M7/M8 precedent.
+It is also **today only**: browsing to a past or future date hides it, because "in 35 min"
+printed over a browsed date would be a lie about the clock. Blocks already `completed` or
+`missed` are skipped — being on deck for something you gave up on is nonsense.
+
+**One timer, not two.** The planner already had a 15s tick for the current hour and
+today's date; M12 feeds its clock from that rather than adding a 30s interval, so the
+countdown cannot drift out of step with the current-hour marker sitting beside it.
+
+**Plain text, not a pill.** The header already carries the M8 capacity badge and the
+completion fraction. A third coloured chip below would put three rounded blobs in a row
+and read as a row of status rather than a sentence about time.
+
+**Battery question (rule 10), answered before building:** the line exists only while the
+planner page is mounted in a foreground tab. **What wakes the device:** nothing — it cannot
+run while the app is closed. **Default when state is unreadable:** no line, since it is
+derived from the already-loaded blocks and has no state of its own. **What happens when
+the user turns it off:** there is nothing to turn off; it stops when the app is closed or
+the user navigates away, and adds no new wake-ups to the interval that was already there.
+
+26 new tests, **237 green** across 16 suites. Verified in-browser against **the real
+clock** across seven scenarios: +35 min, +5h, a finished block plus an upcoming one, a
+running block, a fully finished day, a `missed` block, and a 23:00→01:00 wrap — light and
+dark at 360/390, **0 console errors**.
+
+**Two of the first three browser "failures" were my test harness, not the app** — and one
+was worth keeping. At 03:00 the script asserted a block "5 hours ago" should be in the
+past; it was seeded as *tonight* and the app correctly said `Up next in 19h`. The harness
+had no notion that early in the day most times are still in the future, so it now skips
+scenarios the local clock cannot honestly express instead of asserting a falsehood.
+`C4` stays `PARTIAL`: the wallpaper gauge share is still Phase 5.
+
 ### 2026-10-08 — M11 time-period accents, built on a field the app never read
 
 **Shipped:** a small chip beside each habit's name — **Morning** / **Afternoon** /
@@ -1216,7 +1270,7 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `258f70f` (M8 capacity badge), on top of `8e1c0b1` (performance spec consolidated into
+- HEAD at last update: `efb3b55` (M11 time-period accents), on top of `258f70f` (M8 capacity badge) and `8e1c0b1` (performance spec consolidated into
   `inefficiencies.md` §11), on top of `2f8db6c`, `f820ed0` (§6.5 phase), `0ccf426`
   (status sweep + ADR 0002), `be5e44a` (process rules), `3663906` (A1/XL14 flow). The
   **M7 "last done"** commit lands on top of `8e1c0b1`.
@@ -1224,7 +1278,7 @@ to know where things stand.
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **15 suites, 211 tests, all green** (M11 adds `time-period.test.ts` with 11; M8 adds `day-capacity.test.ts` with 19).
+- Tests: **16 suites, 237 tests, all green** (M12 adds `up-next.test.ts` with 26; M11 adds `time-period.test.ts` with 11).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1265,7 +1319,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M12** — "Up next in 35 min" ticker. `PARTIAL` (nextBlock computed, no ticker) · also: `C4`. Queue agreed with owner: M8 (done) → M11 (done) → M12 → M13 → M14 → M16 |
+| Next feature | **M13** — warm microcopy across toasts/counters/empty states. `NOT BUILT` · also: `B14`. Queue agreed with owner: M8 → M11 → M12 → M13 → M14 → M16 (M8/M11/M12 done) |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |
