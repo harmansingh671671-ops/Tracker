@@ -17,6 +17,7 @@ import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { formatLastDone } from "@/lib/utils/last-done";
+import { getTimePeriodAccent } from "@/lib/utils/time-period";
 import {
   XP_CREATION_DIAMONDS,
   XP_CREATION_XP,
@@ -565,6 +566,10 @@ export default function HabitsPage() {
               // M7 -- computed once per card rather than twice in the JSX. Null for
               // a habit never completed, and then no line renders at all.
               const lastDone = lastDoneLabel(h.id);
+              // M11 -- null for a habit with no period set ("anytime"), and for a
+              // habit whose stored value is not one of the three known periods.
+              // Both render nothing rather than an undefined class.
+              const period = getTimePeriodAccent(h);
 
               return (
                 <motion.div
@@ -643,6 +648,17 @@ export default function HabitsPage() {
                           {!isScheduled && (
                             <span className="px-1.5 py-0.2 rounded-md bg-surface-container-highest text-on-surface-variant text-[9.5px] font-mono font-bold shrink-0">
                               Rest Day
+                            </span>
+                          )}
+                          {/* M11 -- ambient time-period accent. The WORD is
+                              rendered, not just the colour: accessibility rule
+                              5.3 #3, so a user who cannot tell amber from purple
+                              still reads which part of the day this belongs to. */}
+                          {period && (
+                            <span
+                              className={`px-1.5 py-0.2 rounded-md text-[9.5px] font-mono font-bold shrink-0 ${period.containerClass} ${period.accentClass}`}
+                            >
+                              {period.label}
                             </span>
                           )}
                         </div>

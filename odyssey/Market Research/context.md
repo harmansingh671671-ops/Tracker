@@ -595,6 +595,46 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M11 time-period accents, built on a field the app never read
+
+**Shipped:** a small chip beside each habit's name — **Morning** / **Afternoon** /
+**Evening**, in amber / blue / purple.
+
+**The field had been dead since day one.** `Habit.period` was in the schema from the
+start and the create form wrote it on every new habit, but **nothing anywhere in the app
+ever read it back** — it was stored, indexed, and ignored. M11 is its first reader, which
+is why the win is not just "three colours appeared".
+
+**The spec's four hex values are not used, on purpose.** Morning `#F59E0B`, Afternoon
+`#3B82F6`, Evening `#8B5CF6`, Night `#4F46E5` were chosen without reference to this app's
+surfaces, and §5.4 bans a raw hex in a component outright. The **hues** are kept — amber
+reads as morning, purple as evening — and the **values are re-tuned per theme** so the text
+still clears 4.5:1. Light-theme `#F59E0B` on a near-white card is roughly 2.1:1 and would
+have been a real accessibility failure; `--period-morning` is `#B45309` light and `#FBBF24`
+dark instead. Colours live only in `globals.css`, as everywhere else.
+
+**There is no Night, and that is a finding, not an omission.** The spec asks for four
+periods. The schema's union is `'morning' | 'afternoon' | 'evening'` and the create form
+offers no night option, so a night token would be **selectable by nothing** and untestable.
+Rather than ship a dead token or quietly invent a fourth period in the UI, M11 covers the
+three that exist and the gap is written on the M11 line and asserted in a test that pins
+the count to 3.
+
+**Colour is never the only signal** (§5.3 #3). Each accent returns a **label** as well as
+classes, and the chip renders the word — a user who cannot distinguish amber from purple
+still reads "Morning".
+
+**A value that is not one of the three renders nothing.** The union is compile-time, but the
+value round-trips through IndexedDB, which is not type-checked, so a habit written by an
+older build can hold anything. Verified in the browser with a habit seeded as
+`period: "night"`: it renders no chip and raises nothing, rather than an undefined class.
+
+11 new tests, one of which asserts **no accent string contains a hex or rgb literal** — the
+test that stops a future edit from leaking a raw colour into the component. **211 green
+overall** (15 suites). Verified at 360/390 in light and dark with the computed colour read
+back off the element to prove the token resolves, **0 console errors**. `C1` stays `PARTIAL`:
+the rail is still not coloured by period.
+
 ### 2026-10-08 — M8 daily capacity badge, and a label that argued with itself
 
 **Shipped:** a badge in the planner header — *"Light Day · N habits"* / *"Balanced · N habits"* /
@@ -1176,7 +1216,7 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `3085c7f` (M7 last-done), on top of `8e1c0b1` (performance spec consolidated into
+- HEAD at last update: `258f70f` (M8 capacity badge), on top of `8e1c0b1` (performance spec consolidated into
   `inefficiencies.md` §11), on top of `2f8db6c`, `f820ed0` (§6.5 phase), `0ccf426`
   (status sweep + ADR 0002), `be5e44a` (process rules), `3663906` (A1/XL14 flow). The
   **M7 "last done"** commit lands on top of `8e1c0b1`.
@@ -1184,7 +1224,7 @@ to know where things stand.
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **14 suites, 199 tests, all green** (M8 adds `day-capacity.test.ts` with 19; M7 adds `last-done.test.ts` with 13).
+- Tests: **15 suites, 211 tests, all green** (M11 adds `time-period.test.ts` with 11; M8 adds `day-capacity.test.ts` with 19).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1225,7 +1265,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M11** — time-period colour accents. `NOT BUILT` · also: `C1`. Queue agreed with owner: M8 (done) → M11 → M12 → M13 → M14 → M16 |
+| Next feature | **M12** — "Up next in 35 min" ticker. `PARTIAL` (nextBlock computed, no ticker) · also: `C4`. Queue agreed with owner: M8 (done) → M11 (done) → M12 → M13 → M14 → M16 |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |

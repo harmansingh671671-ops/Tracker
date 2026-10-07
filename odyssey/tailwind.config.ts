@@ -61,6 +61,16 @@ const config: Config = {
         "journey-node-completed-text": "var(--journey-node-completed-text)",
         "journey-node-completed-border": "var(--journey-node-completed-border)",
         tertiary: "var(--tertiary)",
+
+        // M11 -- time-period accents. Tokens only: the hex lives in globals.css
+        // and nothing here or in a component may contain a raw colour value.
+        // `--period-night` is deliberately absent -- see the note in globals.css.
+        "period-morning": "var(--period-morning)",
+        "period-morning-container": "var(--period-morning-container)",
+        "period-afternoon": "var(--period-afternoon)",
+        "period-afternoon-container": "var(--period-afternoon-container)",
+        "period-evening": "var(--period-evening)",
+        "period-evening-container": "var(--period-evening-container)",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "sans-serif"],

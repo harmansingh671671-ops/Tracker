@@ -54,6 +54,26 @@
   --journey-node-completed-bg: #6C00FF;
   --journey-node-completed-text: #FFFFFF;
   --journey-node-completed-border: #9B4DFF;
+
+  /* M11 -- time-period accents. The research specifies Morning #F59E0B,
+     Afternoon #3B82F6, Evening #8B5CF6, Night #4F46E5. Those exact values are
+     NOT used: they were chosen without checking contrast against this app's
+     surfaces, and a raw hex in a component is banned outright by
+     DEVELOPMENT_PLAN 5.4. The HUES are kept -- amber/blue/purple read as
+     morning/afternoon/evening -- and the values below are tuned per theme so
+     text drawn in them still clears 4.5:1. Every colour in the app lives in
+     this file; components reference tokens only.
+
+     NOTE: there is no --period-night. The schema's `period` union is
+     'morning' | 'afternoon' | 'evening' and the create flow offers no night
+     option, so a night value has nothing to attach to. Recorded as a gap on the
+     M11 line rather than shipped as a token nothing can select. */
+  --period-morning: #B45309;
+  --period-morning-container: #FEF3C7;
+  --period-afternoon: #1D4ED8;
+  --period-afternoon-container: #DBEAFE;
+  --period-evening: #7C3AED;
+  --period-evening-container: #EDE9FE;
   color-scheme: light;
 }
 
@@ -101,6 +121,16 @@
   --on-error-container: #ffdad6;
   --on-surface: #dae2fd;
   --on-surface-variant: #bbcac0;
+
+  /* M11 -- time-period accents, dark values. Lighter than the light-theme set
+     because these sit on a near-black surface, where the light-theme values
+     would fall below the 4.5:1 text contrast floor. Hues unchanged. */
+  --period-morning: #FBBF24;
+  --period-morning-container: #451A03;
+  --period-afternoon: #7DA9FF;
+  --period-afternoon-container: #172554;
+  --period-evening: #C4B5FD;
+  --period-evening-container: #2E1065;
   --on-background: #dae2fd;
   --inverse-surface: #dae2fd;
   --inverse-on-surface: #283044;
