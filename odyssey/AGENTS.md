@@ -64,6 +64,84 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
 10. **Ask the battery question before coding** anything that runs while the app is closed:
     what wakes the device, what is the default when state is unreadable, and what exactly
     happens when the user turns it off. A feature that cannot be stopped is unfinished.
+11. **Update `main_plan.md`, then `context.md`, then commit — in that order, always.**
+    The status record is not optional paperwork; a commit that ships code without it is
+    the same defect as uncommitted work, just harder to spot. See "The commit sequence"
+    below.
+12. **Never leave a background server running.** `Start-Process` returns immediately and
+    leaves the process alive forever, holding its port. See "Background servers" below.
+
+### The commit sequence — order matters
+
+No exceptions, no "I'll do the docs at the end". A commit is the boundary of a feature,
+and both documents describe that feature.
+
+```
+1. implement  →  2. verify (tsc, lint, test, build, visual)  →  3. update main_plan.md
+                                                                 status + checkbox for
+                                                                 every line this commit
+                                                                 touched
+                                                              →  4. update context.md
+                                                                 §9 session log,
+                                                                 §10 HEAD/next feature,
+                                                                 §11 rules if learned
+                                                              →  5. commit, all of it together
+```
+
+If step 3 or 4 is skipped the feature is **in progress**, not done — the same status an
+uncommitted diff has. `main_plan.md` is the only status record (rule 7); `context.md` is
+the only orientation record. A commit that updates neither leaves the next session
+guessing what happened, which is precisely the failure mode `context.md` §0.2 exists to
+prevent.
+
+### Background servers — do not get stuck here
+
+`Start-Process npx.cmd next start …` **returns as soon as the process is spawned and then
+leaves it running forever.** The tool call looks finished. That is the trap: an agent that
+treats the call's return as "done" walks away holding a port and a Node process, and the
+next `Start-Process` fails with `EADDRINUSE` while silently serving **stale output**.
+
+**The rule: never issue `Start-Process` on its own line.** Chain it into a single command
+that starts, verifies, uses, and kills:
+
+```powershell
+# start -> verify it is actually up -> (verification happens in later calls) -> kill
+Start-Process npx.cmd -ArgumentList "next","start","-p","3100" `
+  -WindowStyle Hidden -WorkingDirectory "C:\PROJECTS\odyssey" `
+  -RedirectStandardOutput "$env:TEMP\opencode\server.log" `
+  -RedirectStandardError  "$env:TEMP\opencode\server.err.log"
+Start-Sleep -Seconds 7
+if (Select-String -Path "$env:TEMP\opencode\server.log" -Pattern "Ready" -Quiet) {
+  "server ready"
+} else {
+  "NOT READY"; Get-Content "$env:TEMP\opencode\server.err.log" | Select-Object -Last 5
+}
+```
+
+**Then kill it by the port's owning PID, in the same command as whatever used it** — never
+leaving the kill for a later call that might not come:
+
+```powershell
+node verify.js
+Get-NetTCPConnection -State Listen -LocalPort 3100 |
+  Select-Object -ExpandProperty OwningProcess -Unique |
+  ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 1
+if (Get-NetTCPConnection -State Listen -LocalPort 3100 -ErrorAction SilentlyContinue) {
+  "PORT STILL OPEN"      # treat this as a hard failure, not a warning
+} else {
+  "server killed"
+}
+```
+
+Why the port's PID and not a remembered PID: `next start` spawns a child, so the process
+you started may already be gone and the one holding the port is not the one you know
+about. Why assert `Ready`: a server that failed to bind still answers requests, with the
+**previous** build — so "the page loaded" is not evidence you are testing your change.
+
+Kill **every** listener on 3000 / 3001 / 3100 before finishing a task, and say so in the
+report. A server left running is the one mistake that silently corrupts the *next* task
+rather than the current one.
 
 ### Before you finish
 
@@ -71,8 +149,15 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
 npx tsc --noEmit && npm run lint && npm run build
 ```
 
-…then satisfy the Definition of Done in `main_plan.md` §1 **and** `DEVELOPMENT_PLAN.md` §6.5.
-<!-- END:nextjs-agent-rules -->
+…then satisfy the Definition of Done in `main_plan.md` §1 **and** `DEVELOPMENT_PLAN.md` §6.5 —
+including the commit sequence above.
+
+---
+
+> A stray `<!-- END:nextjs-agent-rules -->` used to sit right here, inside the
+> hand-written body below the real block at the top of this file. The auto-generated
+> block is lines 1–9; a second END marker outside it is wrong and the generator may
+> rewrite the file around it. Removed.
 
 ---
 
@@ -92,6 +177,10 @@ approval), **DURING** (one feature, nothing else), **AFTER** (plain-language rep
    say so plainly rather than overselling it.
 6. **A phase is not a feature.** Work one feature from the current phase at a time, in phase order.
 7. After completing a feature, **stop** and let the user decide what is next.
+8. **Update `main_plan.md`, then `context.md`, then commit** — every feature, every time.
+   Status that is not written down before the commit did not ship. See "The commit sequence".
+9. **Leave no background server running.** Start it, assert `Ready`, use it, and kill it by the
+   port's owning PID inside one chained command. See "Background servers".
 ---
 
 # Project memory (Hindsight)

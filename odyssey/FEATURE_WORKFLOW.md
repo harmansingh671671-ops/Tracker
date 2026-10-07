@@ -71,12 +71,58 @@ The completion report is **plain language about the app**. No code, no file name
 1. **What the feature does** -- in user terms, as a small titled summary.
 2. **What was wrong before** and **what it is like now**.
 3. **What you will actually notice** -- stated honestly. If the answer is "almost nothing visible",
-   say so. Do not dress up an internal fix as a headline improvement.
-4. **Verification result** -- what was checked and what passed.
+   say so plainly. Do not dress up an internal fix as a headline improvement.
+4. **Verification result** -- what was checked and what passed, with counts and exit codes.
 5. **Status** -- committed, or still in progress.
 6. **An invitation to refine this feature**, not a pitch for the next one.
 
 Then **stop**. Wait for the user to decide what happens next.
+
+### The commit sequence -- both documents, then commit
+
+Binding. The report is not the last step; **updating the two documents is**.
+
+```
+implement → verify → main_plan.md → context.md → commit → report → STOP
+```
+
+| # | Step | What it means | Skipping it costs |
+|---|---|---|---|
+| 1 | `main_plan.md` | Flip the checkbox **and** write the status for every line this commit touched — including lines that turned out `PARTIAL`, `BLOCKED`, or deferred | The plan says a shipped feature is unbuilt, and the next session re-does it or skips it |
+| 2 | `context.md` | §9 session log entry · §10 HEAD + next feature + tree state · §7 if an environment surprise · §11 if a permanent rule was learned | The next session re-derives what was already learned, at full cost |
+| 3 | Commit | Code **and** both documents together, one commit | Two half-truths in history; the docs drift from the code permanently |
+
+A commit with code but no status update is **the same defect as uncommitted work** — it is
+just harder to notice, because `git status` is clean. `main_plan.md` is the only status
+record (C10) and `context.md` is the only orientation record, so if either is not updated
+in the commit, the knowledge did not ship. Feature ids that were planned but not built,
+or built under a different id, **must** say so in `main_plan.md` in the same commit — a
+silent drop is the traceability failure rule 7 exists to prevent.
+
+Order is main_plan **then** context, because `context.md` points at `main_plan.md` and
+should be written knowing what the status now says.
+
+### Process traps in this environment
+
+Recorded because each one cost real time this session.
+
+- **`Start-Process` never terminates.** It returns while the server keeps running
+  forever. Always chain start → assert `Ready` → use → **kill by the port's owning PID**
+  in one command. A stale server answers requests with the *previous* build, so a clean
+  page load is not proof you are testing your change. See `AGENTS.md` §Background servers.
+- **Headless Chrome reports `prefers-color-scheme: dark`.** A "light mode" pass that only
+  leaves the theme on `system` silently renders dark. Force both the emulation and
+  `odyssey_theme_mode`, then assert the rendered background.
+- **A fixed `z-50` overlay swallows real mouse clicks.** `AppShell` renders the OTA update
+  modal on every route. `page.click` hit-tests and lands on the backdrop, so the target
+  looks broken. Use a DOM `el.click()` via `evaluate`.
+- **Never edit markdown with PowerShell `Set-Content`.** It re-encodes the whole file
+  (BOM added, UTF-8 em-dashes become mojibake) and silently corrupts hundreds of lines.
+  It did this once to `context.md` here. Use the file tools.
+- **A failing assertion on the headline requirement needs a control before a fix.** The
+  A1 habit-persistence check reported the headline requirement broken; the script had
+  skipped the very step that created the data. Log state after each step before
+  believing a failure.
 
 ---
 
@@ -90,6 +136,7 @@ A feature may begin only when **all** of these are true:
 - [ ] The phase exit gate for the current phase is either met or not required for this item.
 - [ ] A briefing has been presented and **explicitly approved**.
 - [ ] Nothing in the feature depends on an unfinished decision.
+- [ ] `main_plan.md` and `context.md` will be updated **before** the commit, not after.
 
 **A phase is not a feature.** A phase is a container. One feature from it is worked at a time.
 
@@ -110,8 +157,11 @@ starts. See `DEVELOPMENT_PLAN.md` section 2 and the `docs/adr/` requirement in s
 ```
 BEFORE  ->  brief the feature  ->  user approves or adjusts  ->  STOP and wait
 DURING  ->  implement exactly one feature, verify everything
-AFTER   ->  plain-language report, honest about visibility, committed, then STOP
+AFTER   ->  main_plan.md  ->  context.md  ->  commit  ->  plain-language report  ->  STOP
 ```
+
+**The two documents are part of the feature, not follow-up work.** Status that is not
+written down before the commit did not ship.
 
 ---
 

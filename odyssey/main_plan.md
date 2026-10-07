@@ -171,6 +171,20 @@ same commit lands:
 Verify before writing — every line in that file was read out of the code, not
 recalled. No secrets, no API keys, no PII. Full protocol in `context.md` §0.2.
 
+**Order is mandatory: `main_plan.md` (this file) first, then `context.md`, then
+commit — all three in one commit.** `context.md` points at this file and must be
+written knowing what the status now says. The sequence is
+`implement → verify → main_plan.md → context.md → commit`.
+
+A commit carrying code but neither document is the **same defect as uncommitted
+work**, only harder to spot: `git status` is clean, so nothing prompts a follow-up,
+and the next session has no record of what shipped. Skipping either document means
+the feature is **in progress**, not done.
+
+The same rule covers knowledge that did *not* ship as planned. A feature id that was
+dropped, deferred, renamed, or built under a different id must say so here in the
+same commit — silence is the traceability failure rule 7 exists to prevent.
+
 ### Step 10 — Report honestly
 
 If a check could not be run, say so. **Never describe unverified work as
@@ -879,6 +893,7 @@ superseded archives contribute no features that are absent above.
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | **Process rules hardened, on owner instruction.** Two failures this session, both costing real time, are now enforced rather than merely noted. (1) **The commit sequence is mandatory and ordered**: `implement → verify → main_plan.md → context.md → commit`, all three in one commit — a commit with code but no status update is the same defect as uncommitted work, only harder to spot because `git status` is clean. Added to §1, to `AGENTS.md` non-negotiables 11 and to `FEATURE_WORKFLOW.md` Stage 3, with the rule extended to cover features that did *not* ship as planned (dropped, deferred, renamed) so silence never stands in for a decision. (2) **Background servers must never be left running**: `Start-Process` returns as soon as the process spawns and then leaves it alive forever, holding its port; the next start fails with `EADDRINUSE` while silently serving the **previous** build, so a clean page load is not evidence that the change under test is the change being tested. `AGENTS.md` gained a worked start/assert/kill chain and the rule to kill by the **port's owning PID** (not a remembered PID — `next start` spawns a child). Also recorded in `FEATURE_WORKFLOW.md` §Process traps: headless Chrome defaults to dark, the OTA update modal's fixed overlay swallows `page.click`, never edit markdown with PowerShell `Set-Content` (it re-encoded all of `context.md` once), and a failing assertion on the headline requirement needs a control before a fix. |
 | 2026-10-07 | **M3 shipped.** Planner zero-block state (`PlannerEmptyState`). Researched copy changed with owner approval because it promised a + button and a template import, neither of which exists — template import is `B1`/`HD29`, Phase 2. Added a `blocksLoading` flag so the state cannot fire on the pre-read `[]` that the planner holds on first paint for every day (D5: it bypasses the schedule store, so there was no loading flag to borrow). Logic extracted to `shouldShowPlannerEmptyState()` with 6 regression tests → 116 green. |
 | 2026-10-07 | **Adopted `Market Research/context.md` as the agent entry point.** It existed but was structurally corrupted — text severed mid-sentence and re-appended at the end — so every fact was re-verified against source and the file rewritten whole (product, stack, routes, schema, stores, reward economy, pure-logic modules, 7 phases, environment/toolchain/tests/design system, people/memory/research, session log, git + live task state, binding rules). New **§0** defines the mechanism: read `context.md` → `main_plan.md` → cited spec at session start; write back at session end. Propagated here — §0 header + authority order now put `context.md` first **for orientation only**; **Step 1** requires reading it and forbids asking the owner for context already written down; new **Step 9b** requires the write-back in the same commit; **Definition of Done** gained a checkbox; §11 source index and `AGENTS.md` non-negotiables point at it. Status remains exclusive to this file (C10). `.gitignore` no longer ignores `context.md`, so a fresh clone gets it. |
 | 2026-10-05 | **Created.** Migrated the status record from `DEVELOPMENT_PLAN.md` §3 (reconciled against `6b42b74`); consolidated all six backlog docs into the 7 owner-defined phases; recorded 9 contradictions (4 open). Market Research docs un-ignored so they are tracked. |

@@ -383,29 +383,48 @@ to v2.0 (ECON-2, contradiction C3).
 sometimes taken and the server has come up on **3001** — always verify with
 `Get-NetTCPConnection -LocalPort 3000,3001` rather than assuming.
 
-**Background servers MUST be killed within 5 seconds of "Ready".** Owner
-instruction. `Start-Process npx.cmd next start …` returns immediately but leaves
-the server running **forever**, holding the port and eating memory — the tool
-call finishes and looks complete, so it is easy to forget and leave a chain of
-them. When the log prints `Ready in Nms`, immediately kill it:
+**`Start-Process` NEVER terminates.** It returns as soon as the process spawns and
+then leaves the server running **forever**, holding its port. The tool call looks
+finished, which is exactly the trap — an agent that treats the call's return as
+"done" walks away holding a Node process. This happened three times in one
+session before it was written down.
+
+**The rule: never issue `Start-Process` on its own line.** Chain it into one
+command that starts, asserts `Ready`, and (in the *same* command as whatever
+used it) kills by the port's owning PID:
 
 ```powershell
-# start, capture the log, then poll for "Ready"
 Start-Process npx.cmd -ArgumentList "next","start","-p","3100" `
-  -WindowStyle Hidden `
-  -RedirectStandardOutput "$env:TEMP\opencode\next.log" `
-  -RedirectStandardError  "$env:TEMP\opencode\next.err.log"
-# ... run the verification against http://127.0.0.1:3100 ...
-# ALWAYS, in the same session, before moving on:
+  -WindowStyle Hidden -WorkingDirectory "C:\PROJECTS\odyssey" `
+  -RedirectStandardOutput "$env:TEMP\opencode\server.log" `
+  -RedirectStandardError  "$env:TEMP\opencode\server.err.log"
+Start-Sleep -Seconds 7
+if (Select-String -Path "$env:TEMP\opencode\server.log" -Pattern "Ready" -Quiet) {
+  "server ready"
+} else { "NOT READY"; Get-Content "$env:TEMP\opencode\server.err.log" | Select-Object -Last 5 }
+
+# …after the verification, in the SAME command…
 Get-NetTCPConnection -State Listen -LocalPort 3100 |
   Select-Object -ExpandProperty OwningProcess -Unique |
-  ForEach-Object { Stop-Process -Id $_ -Force }
+  ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 1
+if (Get-NetTCPConnection -State Listen -LocalPort 3100 -ErrorAction SilentlyContinue) {
+  "PORT STILL OPEN"     # treat as a hard failure, not a warning
+} else { "server killed" }
 ```
 
-Kill by the port's owning PID, not by guessing a PID — `next start` spawns a
-child, and the parent may already be gone. Also note `EADDRINUSE`: if a previous
-run was not killed, the new server silently fails to bind and you end up testing
-**stale output**. Check the new log actually says `Ready`.
+**Why the port's PID and not a remembered one:** `next start` spawns a child, so
+the process you started may already be gone and the one holding the port is not
+the one you know about.
+
+**Why assert `Ready`:** a server that failed to bind still answers requests —
+with the **previous** build. "The page loaded" is therefore not evidence that
+what you are testing is what you changed. `EADDRINUSE` in the error log means
+you are reading stale output.
+
+Kill **every** listener on 3000 / 3001 / 3100 before finishing, and say so in
+the report. A server left running is the one mistake that silently corrupts the
+*next* task rather than the current one.
 
 **Headless Chrome defaults to `prefers-color-scheme: dark`.** The theme resolves
 through that media query (`theme-store.ts` + the anti-FOUC script in
@@ -422,6 +441,13 @@ target reads as broken. Use a DOM click instead (`el.click()` via `evaluate`),
 which bypasses hit-testing. **Always run a control** before believing an
 interaction is broken: M6's dismiss button looked dead for two debug cycles
 because of this overlay, not because of the button.
+
+**Never edit markdown with PowerShell `Set-Content`.** It re-encodes the whole
+file — BOM added, UTF-8 em-dashes become mojibake — and silently corrupts
+hundreds of lines. It did exactly this to this file once (318 insertions / 227
+deletions of encoding noise). Fix: `git checkout --` the file and redo the edits
+with the file tools. `context.md` §7 already said to use the file tools; that line
+now has a scar on it.
 
 ### Gates — cheapest that can fail, first
 
@@ -559,6 +585,52 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-07 — Process rules: the commit sequence, and never leaving a server running
+
+Owner instruction after two failures in one session. Both were process failures, not
+code failures, which is why they are now enforced in `AGENTS.md` and
+`FEATURE_WORKFLOW.md` rather than merely noted here.
+
+**The commit sequence is mandatory and ordered:** `implement → verify → main_plan.md →
+context.md → commit`, all three in one commit. A commit carrying code but neither
+document is the **same defect as uncommitted work** — only harder to spot, because
+`git status` is clean so nothing prompts a follow-up, and the next session has no record
+of what shipped. Order is `main_plan.md` first because `context.md` points at it and must
+be written knowing what the status now says. Extended to features that did **not** ship
+as planned: dropped, deferred, renamed or built under a different id must say so, because
+silence is the traceability failure rule 7 exists to prevent.
+
+Worth being precise: this rule was **already followed** for `A1`/`XL14` and `M6` — both
+commits carried the doc updates. The gap was that it was a habit, not a rule, and the
+owner asked for it to be structural.
+
+**`Start-Process` never terminates, and that is the whole trap.** It returns as soon as
+the process spawns, then leaves the server running forever holding its port. The tool
+call *looks* finished, so an agent treating the return as "done" walks away. It happened
+three times here. Now encoded as: never issue `Start-Process` alone; chain start →
+assert `Ready` → use → **kill by the port's owning PID** in one command.
+
+Two details that make the rule actually work:
+
+- **Kill by the port's PID, not a remembered one.** `next start` spawns a child; the
+  process you started may already be gone and the one holding the port is not the one
+  you know about.
+- **Assert `Ready`, because a server that failed to bind still answers requests — with
+  the previous build.** `EADDRINUSE` means you are reading stale output, and "the page
+  loaded" is not evidence that what you are testing is what you changed. This is the
+  nastiest class of silent failure here: it produces a *plausible* wrong answer.
+
+Also promoted from session notes to permanent rules in `FEATURE_WORKFLOW.md`
+§Process traps: headless Chrome defaults to dark; the OTA update modal's fixed overlay
+swallows `page.click`; never edit markdown with PowerShell `Set-Content`; and a failing
+assertion on the headline requirement needs a control before a fix.
+
+**On the `Set-Content` one:** it re-encoded this entire file — BOM added, UTF-8 em-dashes
+turned to mojibake — producing 318 insertions and 227 deletions of pure encoding noise.
+Caught by checking the diff before committing. Fixed by `git checkout --` on the file and
+redoing the edits with the file tools. §7 already said to use the file tools; that line
+now has a scar on it.
 
 ### 2026-10-07 — A1/XL14 first-run flow, and M6 moved into it
 
@@ -887,10 +959,11 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `f4fa8c0` (M6 welcome card), on top of `673cf30`. The
-  **A1/XL14** first-run flow is committed on top of `f4fa8c0`.
-- Working tree: clean. The root `package.json` launcher (see §2, "Where to run
-  commands") is the only file outside `odyssey/` and holds no dependencies.
+- HEAD at last update: `3663906` (**A1/XL14** first-run flow), on top of `f4fa8c0`
+  (M6 welcome card) and `673cf30` (M5). The **process-rule hardening** commit lands on
+  top of `3663906`.
+- Working tree: clean after commit. The root `package.json` launcher (see §2, "Where to
+  run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
 - Tests: **12 suites, 168 tests, all green** (A1 adds
@@ -899,10 +972,9 @@ to know where things stand.
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
-- **Kill any background server within 5s of "Ready"** — owner instruction, see
-  §7 "Dev server". `Start-Process` returns immediately and leaves it running
-  forever; kill by the port's owning PID, and confirm the new log says `Ready`
-  or you are testing stale output.
+- **Kill any background server when the task ends, and say so in the report.**
+  Now a rule in `AGENTS.md` §Background servers and `FEATURE_WORKFLOW.md`
+  §Process traps, not just a note here — see §7 for the start/assert/kill chain.
 - **Hydration marker is a React-keyed node count, not `#__next`** — see §9,
   2026-10-07. The old `#__next` check reads `false` on a working production build.
   Count `Object.keys(n).filter(k => k.startsWith("__reactFiber"))` per element;
@@ -952,18 +1024,24 @@ above the vault banner. The follow-up task is closed.
 
 - Read this file → `main_plan.md` → the cited `src:` spec **in full** → every
   `also:` cross-reference.
+- **Update `main_plan.md`, then this file, then commit — in that order, every
+  time.** Status that is not written down before the commit did not ship. Code
+  plus no docs is the same defect as uncommitted work, only quieter.
 - Get the feature **ID and phase**, brief it in app terms, and get **explicit
   approval** before writing code.
 - Work **one feature per commit**; commit it before starting the next.
-- Update `main_plan.md` (checkbox + status) **and this file** (§0.2) in the same
-  commit as the code.
 - Reuse in this order: existing repo code → standard library → installed
   dependency → new package last.
 - Prefer line-range reads; **query Graphify before a broad scan**; run an
   impact analysis before editing a shared file.
 - Run the cheapest gate that can fail, first.
+- **Never leave a background server running.** Chain
+  `Start-Process → assert Ready → use → kill by the port's owning PID` into one
+  command. `Start-Process` returns while the server keeps running forever, and a
+  stale server answers with the **previous** build — a plausible wrong answer.
 - Visually verify at 360/390/430px, in light **and** dark, with reduced motion
-  checked — and screenshot rather than assert.
+  checked — and screenshot rather than assert. Force light mode explicitly;
+  headless Chrome defaults to dark.
 - Handle empty, loading, error, long-content and offline states.
 - Ask the **battery question** before writing anything that runs while the app
   is closed: what wakes the device, what is the default when state is
@@ -989,6 +1067,11 @@ above the vault banner. The follow-up task is closed.
 - Add analytics or telemetry — this is a zero-tracking product.
 - Let an AI feature auto-change, block, or diagnose anything.
 - Leave half-finished uncommitted work (R11 — the theme-system precedent).
+- **Commit without updating `main_plan.md` and this file** — see §11 DO, second rule.
+- **Leave a background server running**, or trust a `Start-Process` return as
+  "done".
+- **Edit markdown with PowerShell `Set-Content`** — it re-encodes the file and
+  silently corrupts every non-ASCII character.
 - Ship unverified native code (R12).
 - Claim tests pass without the counts and exit code.
 - Maintain status anywhere but `main_plan.md`.
