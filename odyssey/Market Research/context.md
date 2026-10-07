@@ -355,12 +355,13 @@ to v2.0 (ECON-2, contradiction C3).
    compliance **before any user publishes** (GATE-1..4). Social-before-AI is
    owner-chosen but an OPEN dispute (**C1**) — confirm before starting Phase 4.
 4.5. **Performance** — `PERF-0`…`PERF-18` in `main_plan.md` **§6.5**, spec in
-    `MASTER_TODO_REVISED.md` §23, origin `tracker-performance-master-prompt.md`.
-    **Unnumbered on purpose** (§6 is already Phase 4; a second "Phase 4" would
-    duplicate it) and **no phase renumbering** — §7–§12 carry 33 cross-references in
-    `main_plan.md` alone. Adds no features. Absorbs **`POL-1`** from Phase 6 (C12).
-    **Starts with `PERF-0`, a mandatory reconcile**: 5 of the 18 items are already
-    delivered and 4 of the audit's figures are wrong, so implementing the list as
+    `MASTER_TODO_REVISED.md` §23, **authority `inefficiencies.md` §11** (the 18-item
+    master prompt was deleted and imported there verbatim, so there is one source, not
+    two plus an anti-drift rule). **Unnumbered on purpose** (§6 is already Phase 4; a
+    second "Phase 4" would duplicate it) and **no phase renumbering** — §7–§12 carry 33
+    cross-references in `main_plan.md` alone. Adds no features. Absorbs **`POL-1`** from
+    Phase 6 (C12). **Starts with `PERF-0`, a mandatory reconcile**: 5 of the 18 items are
+    already delivered and 4 of the audit's figures are wrong, so implementing the list as
     written would optimise a 30 FPS loop that `P8-E2` removed.
 5. **Wallpaper + widgets** — G1–G12+, BUG-1/BUG-2 live here (§7.2). The core
    differentiator; the engine ships, this phase deepens it.
@@ -593,6 +594,46 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-08 — Performance spec consolidated into `inefficiencies.md` §11, master prompt deleted
+
+The performance phase had **two** authoritative documents — `main_plan.md` §6.5 and the
+restatement in `MASTER_TODO_REVISED.md` §23 — each bound to
+`tracker-performance-master-prompt.md` by an *"edit one, edit the other"* rule.
+
+**Managing two sources with a protocol is worse than not having two.** So the prompt's content
+was **imported verbatim into `inefficiencies.md` §11** and the file **deleted**. One authority;
+the drift rule disappears along with the drift. §6.5 and §23 remain as restatements and are
+still bound to §11.
+
+**Why `inefficiencies.md` is the right home, not an arbitrary one:** it is already the battery and
+render audit that `P8` turned into rules, it already carries a **§8 "what was changed"** table
+recording the delivered wallpaper fixes, and `main_plan.md` already cites it as a `src:` for
+`POL-1`. The performance work is the *continuation* of that audit, so it belongs there rather
+than in a separate file that would need its own status table.
+
+**Two stale figures in that audit corrected while I was in it** — the same reconciliation
+discipline applied to the document itself:
+
+- `backdrop-blur` occurrences **46 → 41 across 21 files**. The "22 heavy" sub-count is
+  explicitly marked **not re-verified** so it stands as a *floor* rather than passing off an
+  estimate as a measurement.
+- `SharedPreferences.commit()` **8 → 9** call sites.
+
+Both were originally sourced from the audit and had been quoted onward into `POL-1` (which said
+29), so the error had already propagated once. That is the argument for re-measuring at the point
+of use rather than trusting a number copied two documents away.
+
+**Import provenance is recorded, not erased.** §6.5, C12, `MASTER_TODO_REVISED.md` §23, the
+`inefficiencies.md` header and the `main_plan.md` changelog all still say where the content came
+from and that the file was deleted. Deleting the source without saying so would leave a future
+reader hunting for a file that no longer exists.
+
+The imported text is verbatim except that **Markdown heading levels are demoted two levels** so
+it nests under §11.1 instead of introducing top-level `#` headings that collide with the
+audit's own structure. No wording altered. Appended with explicit UTF-8 no-BOM — the earlier
+`Set-Content` corruption in this repo was UTF-8 mangling, and it was verified after the fact
+(0 replacement characters, 157 section signs intact, 12/12 diff on `main_plan.md`).
 
 ### 2026-10-08 — Performance phase added (§6.5), `POL-1` dissolved into it
 

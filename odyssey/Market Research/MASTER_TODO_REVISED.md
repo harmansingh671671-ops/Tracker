@@ -1319,11 +1319,16 @@ Do not begin with app blocking, cloud AI, social accounts, subscriptions, or the
 
 ## 23. Performance overhaul specification (Phase 6.5)
 
-> **Authority:** this section restates `tracker-performance-master-prompt.md` so the
-> specification is readable without opening that file. **On any conflict, the master
-> prompt is correct and this section is stale** — fix it in the same commit. Editing one
-> requires editing the other. This section adds **no** features; it makes what already
-> exists faster to load, smoother to render and cheaper to run.
+> **Authority:** `inefficiencies.md` **§11**, which holds the 18-item performance overhaul
+> imported verbatim from `tracker-performance-master-prompt.md` — that file has been **deleted**
+> and its content consolidated into the audit, so there is one authority rather than two
+> documents plus an anti-drift protocol. This section restates the specification so it is
+> readable without opening the audit. **On any conflict, `inefficiencies.md` §11 is correct and
+> this section is stale** — fix it in the same commit. Editing one requires editing the other,
+> and `main_plan.md` §6.5 is bound by the same rule.
+>
+> This section adds **no** features; it makes what already exists faster to load, smoother to
+> render and cheaper to run.
 >
 > **Status of record is `main_plan.md` §6.5** (`PERF-0`…`PERF-18`). This is the
 > specification; that file is the status. Never update status here.

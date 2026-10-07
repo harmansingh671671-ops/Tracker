@@ -582,19 +582,19 @@ adult-to-minor DMs. Reporting, blocking and moderation ship **with** the feature
 ---
 ## 6.5. PERFORMANCE PHASE — load speed, render cost and battery
 
-**Origin:** `tracker-performance-master-prompt.md` (repo root). That file is the
-**authority** on this work: 18 ranked items with sub-steps, priorities and acceptance
-criteria. This section is a **self-contained restatement** so an agent working here does
-**not** have to open the master prompt for routine work.
+**Origin:** `inefficiencies.md` **§11** — the 18-item performance overhaul, imported verbatim
+from `tracker-performance-master-prompt.md`, which has been **deleted**. That file is the
+**authority** on this work: 18 ranked items with sub-steps, priorities and acceptance criteria.
+This section is a **self-contained restatement** so an agent working here does **not** have to
+open the audit for routine work.
 
 **Two rules keep them from drifting:**
 
-1. **On any conflict, the master prompt wins.** If this section and
-   `tracker-performance-master-prompt.md` disagree, the master prompt is correct and
+1. **On any conflict, `inefficiencies.md` §11 wins.** If this section and that file disagree,
    **this section is the stale one** — fix it in the same commit.
-2. **Editing one requires editing the other.** Never change an item here without
-   checking the master prompt, and never change the master prompt without updating
-   here.
+2. **Editing one requires editing the other.** Never change an item here without checking
+   `inefficiencies.md` §11, and never change §11 without updating here. `MASTER_TODO_REVISED.md`
+   §23 is a third restatement and is bound by the same rule.
 
 ### 6.5.1 Why this phase exists, and what it does *not* do
 
@@ -633,7 +633,7 @@ and measurement phase first. **Do not "optimise" a 30 FPS loop that no longer ex
 Sub-steps are reproduced so this section stands alone. Item → master prompt mapping is
 1:1 and in the same order.
 
-- [ ] **PERF-0** — Baselines and reconciliation. `NOT BUILT` — **do this before PERF-1.** Re-verify every figure in §6.5.2 against source and record actuals, then capture baselines per §6.5.4. Android: `adb shell am start -W` (cold start), `dumpsys gfxinfo` (jank), `dumpsys batterystats`, `dumpsys alarm | grep <package>` (wakeups), Android Studio CPU/Memory profilers, Perfetto. Web: `chrome://inspect` against the WebView (Performance + Memory), React DevTools Profiler, bundle analyzer, Lighthouse on a **production** build. **Always release builds on a real mid/low-end device — not the emulator, not debug.** If profiling contradicts the §6.5.2 ranking, finish the measurement, report the conflict, and ask before reordering · src: `tracker-performance-master-prompt.md` §0
+- [ ] **PERF-0** — Baselines and reconciliation. `NOT BUILT` — **do this before PERF-1.** Re-verify every figure in §6.5.2 against source and record actuals, then capture baselines per §6.5.4. Android: `adb shell am start -W` (cold start), `dumpsys gfxinfo` (jank), `dumpsys batterystats`, `dumpsys alarm | grep <package>` (wakeups), Android Studio CPU/Memory profilers, Perfetto. Web: `chrome://inspect` against the WebView (Performance + Memory), React DevTools Profiler, bundle analyzer, Lighthouse on a **production** build. **Always release builds on a real mid/low-end device — not the emulator, not debug.** If profiling contradicts the §6.5.2 ranking, finish the measurement, report the conflict, and ask before reordering · src: `inefficiencies.md` §11 §0
 
 - [x] **PERF-1** — Stop re-rendering the whole wallpaper 30×/second. `BUILT` — **delivered by `P8-E2`**; 1a (cached static scene), 1b (invalidate on size/rotation/data/hour-rollover/theme/photo change), 1d (parse JSON once, cached), 1e (minute-boundary re-arm via `60_000 - now % 60_000`) and 1f (stop when not visible / on surface destroyed) are in the service; the beacon glow is frozen at a fixed mid-cycle value and **nothing is drawn at all when the user has applied an alternate wallpaper**. **Needs verification:** confirm zero drawing while invisible, confirm no allocation in the draw path, and re-measure wallpaper CPU. **Do not implement 1c/1h on the old 30 FPS reasoning** — `P8-E4` already classified that work as not worth doing at 1 render/minute. If a re-measure contradicts `P8-E4`, report it rather than quietly re-opening 1c · src: `OdysseyLiveWallpaperService.kt`, `DEVELOPMENT_PLAN.md §4 P8`, `inefficiencies.md`
 
@@ -669,7 +669,7 @@ Sub-steps are reproduced so this section stands alone. Item → master prompt ma
 
 - [ ] **PERF-17** — Storage layer modernisation. `NOT BUILT` — ⚪ **optional; skip unless measurement shows benefit.** If preferences are growing large or are accessed from multiple threads, migrate `SharedPreferences` to Jetpack **DataStore** (async, transactional). On the web side, confirm `localStorage` reads/writes are not in render paths and that large JSON is not re-serialised on every change — note the `odyssey/storage-boundary` ESLint rule already funnels all of it through `lib/utils/logger.ts`. Also note the deliberate counter-example: **reward settlement records must stay in IndexedDB, not `localStorage`** (ADR 0002) — do not migrate those. · src: `docs/adr/0002-reward-vault.md`
 
-- [ ] **PERF-18** — Performance regression guardrails. `NOT BUILT` — **there is no `PERFORMANCE.md` and no `.github/workflows` in the repo today.** **18a** add a bundle-size budget to CI that fails the build if a route's JS grows past an agreed threshold; **18b** add Lighthouse CI (or equivalent) on the production web build; **18c** add the Macrobenchmark startup test from PERF-13 to CI if feasible; **18d** write `PERFORMANCE.md` documenting the baselines, the final numbers, the rules (no allocations in draw loops, one shared clock, no wake-up alarms unless essential, a blur budget) and **how to re-measure**. Acceptance: a regression in bundle size or cold start fails CI rather than being discovered later · src: `tracker-performance-master-prompt.md`
+- [ ] **PERF-18** — Performance regression guardrails. `NOT BUILT` — **there is no `PERFORMANCE.md` and no `.github/workflows` in the repo today.** **18a** add a bundle-size budget to CI that fails the build if a route's JS grows past an agreed threshold; **18b** add Lighthouse CI (or equivalent) on the production web build; **18c** add the Macrobenchmark startup test from PERF-13 to CI if feasible; **18d** write `PERFORMANCE.md` documenting the baselines, the final numbers, the rules (no allocations in draw loops, one shared clock, no wake-up alarms unless essential, a blur budget) and **how to re-measure**. Acceptance: a regression in bundle size or cold start fails CI rather than being discovered later · src: `inefficiencies.md` §11
 
 ### 6.5.4 Honest measurement boundary — read before promising anything
 
@@ -1063,11 +1063,18 @@ A new phase was added for the 18-item performance overhaul in
    so the original location still records where the work went. **Its "29
    `backdrop-blur` surfaces" figure was stale — measured at 41 across 21 files.**
 
-3. **The master prompt is the authority; §6.5 is a self-contained restatement.** The
-   owner required that an agent working the phase not have to reopen
-   `tracker-performance-master-prompt.md` for routine work. That creates a drift risk, so
-   §6.5 carries two binding rules: on conflict the **master prompt wins** and §6.5 is the
-   stale side; and **editing one requires editing the other**.
+3. **`inefficiencies.md` §11 is the authority; §6.5 is a self-contained restatement.** The
+   owner required that an agent working the phase not have to reopen the master prompt for
+   routine work. That created a drift risk, so §6.5 carries two binding rules: on conflict
+   **`inefficiencies.md` §11 wins** and §6.5 is the stale side; and **editing one requires
+   editing the other**.
+
+   **Superseded 2026-10-08, later the same day:** the drift risk was removed at the source
+   rather than managed by rule. `tracker-performance-master-prompt.md` has been **deleted** and
+   its full content **imported verbatim into `inefficiencies.md` §11**, so there is now a
+   **single** authority rather than two documents plus an anti-drift protocol. The two rules
+   above still apply, now across three restatements: `inefficiencies.md` §11 (authority),
+   `MASTER_TODO_REVISED.md` §23, and this §6.5 (status of record).
 
 **The reconciliation finding is the point of this entry.** Applying the master prompt's
 own "verify before you change" rule before writing the phase found that **5 of its 18
@@ -1094,7 +1101,7 @@ device attached (see §6.5.4).
 | **`Market Research/context.md`** | Agent entry point: product, stack, schema, environment, durable learnings, live task state. Written back every session (Step 9b) | **CANONICAL for orientation** — never for status |
 | **`main_plan.md`** (this file) | Order, priority, status | **CANONICAL for status** |
 | `DEVELOPMENT_PLAN.md` | Engineering conventions §5, workflow §6, risks §7 | **CANONICAL for HOW** |
-| **`tracker-performance-master-prompt.md`** | 18-item performance overhaul, priorities and acceptance criteria | **CANONICAL for the performance phase (§6.5)** — on conflict, it wins and §6.5 is the stale side |
+| **`inefficiencies.md` §11** | 18-item performance overhaul, priorities and acceptance criteria, imported verbatim from the now-deleted `tracker-performance-master-prompt.md` | **CANONICAL for the performance phase (§6.5)** — on conflict, it wins and §6.5 is the stale side |
 | `PERFORMANCE.md` | Perf baselines, final numbers, the rules, how to re-measure | **Not yet written** — `PERF-18d` |
 | `Market Research/MASTER_TODO_REVISED.md` | 140-item catalogue §5, matrix §19, schemas §20 | Reference — full specs |
 | `Market Research/PRODUCTION_PLAN.md` | Phase 0–7 framing, exit gates | Reference — superseded on conflict |
@@ -1130,7 +1137,8 @@ superseded archives contribute no features that are absent above.
 
 | Date | Change |
 |---|---|
-| 2026-10-08 | **Added the performance phase (§6.5) and dissolved `POL-1` into it.** Owner instruction. §6.5 carries all 18 items of `tracker-performance-master-prompt.md` **in full, inline**, so an agent working the phase does not have to reopen the master prompt; two binding rules prevent drift (on conflict the master prompt wins, and editing one requires editing the other). **Unnumbered on purpose:** `§6` is already *PHASE 4 – Social tab*, and renumbering §7–§12 would touch **33 cross-references in this file alone** plus four more documents. `POL-1`'s wording is preserved verbatim in §6.5.5 and its Phase 6 line became a pointer, so nothing is lost — its stale "29 `backdrop-blur` surfaces" is corrected to the measured **41 across 21 files**. Recorded as **C12**. **Reconciling before writing changed the work:** 5 of 18 items are already delivered (`#1` core via `P8-E2`, `#2c`, `#4a`, `#15`, and `POL-1`'s master switch) and 4 figures are wrong (blur 22→41, `commit()` 8→9, the 1,710/sec allocation estimate, and `#3`'s bundled-asset assumption — the app serves a **remote** URL via `loadUrl(targetUrl)`). So `PERF-0` is a mandatory baselines-and-reconcile step, and delivered items are recorded `BUILT` **with what still needs verifying**. Added `BUILT` to the §0.2 legend, where it was already used on a dozen lines but never defined; it means *code exists, not yet verified*, deliberately weaker than `SHIPPED`. §6.5.4 states the measurement boundary plainly — no `gradlew`, no device, so native items stay `BUILT` + "unverified — needs a device" and must never be promoted on a green web suite alone (R12). |
+| 2026-10-08 | **Performance phase: authority consolidated into `inefficiencies.md` §11, master prompt deleted.** §6.5 and `MASTER_TODO_REVISED.md` §23 had each been bound to `tracker-performance-master-prompt.md` by an "edit one, edit the other" rule. Managing two sources with a protocol is worse than not having two, so the prompt's content was **imported verbatim into `inefficiencies.md` §11** and the file **deleted** — one authority, and the drift rule disappears with the drift. Also corrected two stale figures in that audit while I was in it: `backdrop-blur` occurrences **46 → 41 across 21 files** (the "22 heavy" sub-count is explicitly marked *not* re-verified, so it stands as a floor rather than a fact), and `SharedPreferences.commit()` **8 → 9**. §6.5's authority rules, C12 and the §11 source index were repointed; the provenance of the import is recorded in all three places rather than erased · src: `inefficiencies.md` §11, `main_plan.md` §6.5 |
+| 2026-10-08 | **Added the performance phase (§6.5) and dissolved `POL-1` into it.** Owner instruction. §6.5 carries all 18 items of the performance master prompt **in full, inline**, so an agent working the phase does not have to reopen it. **Unnumbered on purpose:** `§6` is already *PHASE 4 – Social tab*, and renumbering §7–§12 would touch **33 cross-references in this file alone** plus four more documents. `POL-1`'s wording is preserved verbatim in §6.5.5 and its Phase 6 line became a pointer, so nothing is lost — its stale "29 `backdrop-blur` surfaces" is corrected to the measured **41 across 21 files**. Recorded as **C12**. **Reconciling before writing changed the work:** 5 of 18 items are already delivered (`#1` core via `P8-E2`, `#2c`, `#4a`, `#15`, and `POL-1`'s master switch) and 4 figures are wrong (blur 22→41, `commit()` 8→9, the 1,710/sec allocation estimate, and `#3`'s bundled-asset assumption — the app serves a **remote** URL via `loadUrl(targetUrl)`). So `PERF-0` is a mandatory baselines-and-reconcile step, and delivered items are recorded `BUILT` **with what still needs verifying**. Added `BUILT` to the §0.2 legend, where it was already used on a dozen lines but never defined; it means *code exists, not yet verified*, deliberately weaker than `SHIPPED`. §6.5.4 states the measurement boundary plainly — no `gradlew`, no device, so native items stay `BUILT` + "unverified — needs a device" and must never be promoted on a green web suite alone (R12). |
 | 2026-10-07 | **Process rules hardened, on owner instruction.** Two failures this session, both costing real time, are now enforced rather than merely noted. (1) **The commit sequence is mandatory and ordered**: `implement → verify → main_plan.md → context.md → commit`, all three in one commit — a commit with code but no status update is the same defect as uncommitted work, only harder to spot because `git status` is clean. Added to §1, to `AGENTS.md` non-negotiables 11 and to `FEATURE_WORKFLOW.md` Stage 3, with the rule extended to cover features that did *not* ship as planned (dropped, deferred, renamed) so silence never stands in for a decision. (2) **Background servers must never be left running**: `Start-Process` returns as soon as the process spawns and then leaves it alive forever, holding its port; the next start fails with `EADDRINUSE` while silently serving the **previous** build, so a clean page load is not evidence that the change under test is the change being tested. `AGENTS.md` gained a worked start/assert/kill chain and the rule to kill by the **port's owning PID** (not a remembered PID — `next start` spawns a child). Also recorded in `FEATURE_WORKFLOW.md` §Process traps: headless Chrome defaults to dark, the OTA update modal's fixed overlay swallows `page.click`, never edit markdown with PowerShell `Set-Content` (it re-encoded all of `context.md` once), and a failing assertion on the headline requirement needs a control before a fix. |
 | 2026-10-07 | **M3 shipped.** Planner zero-block state (`PlannerEmptyState`). Researched copy changed with owner approval because it promised a + button and a template import, neither of which exists — template import is `B1`/`HD29`, Phase 2. Added a `blocksLoading` flag so the state cannot fire on the pre-read `[]` that the planner holds on first paint for every day (D5: it bypasses the schedule store, so there was no loading flag to borrow). Logic extracted to `shouldShowPlannerEmptyState()` with 6 regression tests → 116 green. |
 | 2026-10-07 | **Adopted `Market Research/context.md` as the agent entry point.** It existed but was structurally corrupted — text severed mid-sentence and re-appended at the end — so every fact was re-verified against source and the file rewritten whole (product, stack, routes, schema, stores, reward economy, pure-logic modules, 7 phases, environment/toolchain/tests/design system, people/memory/research, session log, git + live task state, binding rules). New **§0** defines the mechanism: read `context.md` → `main_plan.md` → cited spec at session start; write back at session end. Propagated here — §0 header + authority order now put `context.md` first **for orientation only**; **Step 1** requires reading it and forbids asking the owner for context already written down; new **Step 9b** requires the write-back in the same commit; **Definition of Done** gained a checkbox; §11 source index and `AGENTS.md` non-negotiables point at it. Status remains exclusive to this file (C10). `.gitignore` no longer ignores `context.md`, so a fresh clone gets it. |
