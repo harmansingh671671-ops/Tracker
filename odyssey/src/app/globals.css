@@ -539,6 +539,55 @@ button, a, input, select {
   }
 }
 
+/* M3 -- the planner clean-slate state. Two decorative motions: a highlight
+   travelling the empty rail so the blank day reads as somewhere to begin, and a
+   breathing (+) on the hour the copy points at. Keyframes live inside a
+   `no-preference` query for the same reason `keystonePulse` (M2) does. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes slateSweep {
+    0% {
+      transform: translateY(-14px);
+      opacity: 0;
+    }
+    15%,
+    60% {
+      opacity: 0.55;
+    }
+    100% {
+      transform: translateY(114px);
+      opacity: 0;
+    }
+  }
+
+  /* Opacity only. The target is a glow rect inside an SVG, which has no
+     box-shadow ring to expand; scaling it would distort its stroke and fight
+     the sweep travelling the same spine. */
+  @keyframes slateTapPulse {
+    0%,
+    100% {
+      opacity: 0.18;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+}
+
+.slate-sweep {
+  animation: slateSweep 3.4s ease-in-out infinite;
+}
+
+.slate-tap-pulse {
+  animation: slateTapPulse 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slate-sweep,
+  .slate-tap-pulse {
+    animation: none;
+  }
+}
+
 .animate-spin-slow {
   animation: spin 20s linear infinite;
 }

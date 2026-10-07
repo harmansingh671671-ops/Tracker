@@ -136,7 +136,7 @@ workspace hoisting, and declaring one would move dependency resolution out of
 |---|---|
 | `/` | Circadian landing page (marketing dial, **not** a first-run flow — onboarding gap is XL14/A1) |
 | `/habits` | Habit CRUD, categories, streaks, per-habit flame, completion toggle; create/edit modals; date strip, month calendar, heatmaps |
-| `/planner` | 24h visual timeline, duration distribution, drag/reschedule, edit-hour modal, live hour marker, infinite date strip, completion-fraction header |
+| `/planner` | 24h visual timeline, duration distribution, drag/reschedule, edit-hour modal, live hour marker, infinite date strip, completion-fraction header, clean-slate empty state |
 | `/journey` | Scrollable day map, SVG bézier curves, dynamic past/future counts, today-in-view, 9 ranks |
 | `/stats` | Month-navigable heatmap, tap-for-24h-overview, hold-to-open-planner, rank badge |
 | `/shop` | Diamond store, streak-freeze, XP boosts, daily mystery chest |
@@ -267,6 +267,9 @@ to v2.0 (ECON-2, contradiction C3).
   ~50 colour aliases remain (10.11).
 - `src/lib/utils/gamification.ts` — `calculateRank()`, `getRankInfo()`,
   `getNextRank()`; 9 ranks, Beginner → Legend.
+- `src/lib/utils/planner-empty-state.ts` — `shouldShowPlannerEmptyState()`
+  (M3): loading is checked first and short-circuits, so a screen that reads the
+  DB directly can never assert "this day is blank" during the read window.
 - `src/lib/utils/day-status.ts` — 18-hour fully-filled-day rule for block `status`.
 - `src/lib/utils/journey.ts` — `getJourneyDayNumber()`, `getDateForJourneyDay()`.
 - `src/lib/utils/wallpaper-generator.ts` — canvas render + `build24HourlyBlocks()`.
@@ -389,8 +392,8 @@ rather than implying it passed.
 and a DOM environment would only slow and fragilise them. Co-locate tests next
 to their source.
 
-Current: **9 suites, 110 tests, all green** (verified this session:
-`Test Files 9 passed (9)`, `Tests 110 passed (110)`, 1.19 s).
+Current: **10 suites, 116 tests, all green** (verified this session:
+`Test Files 10 passed (10)`, `Tests 116 passed (116)`).
 
 | Suite | Covers |
 |---|---|
@@ -403,6 +406,7 @@ Current: **9 suites, 110 tests, all green** (verified this session:
 | `src/lib/utils/wallpaper-toggle-store.test.ts` | battery-question behaviour |
 | `src/lib/categories.test.ts` | category normalisation |
 | `src/lib/habit-cache.test.ts` | localStorage mirror (`fake-indexeddb`) |
+| `src/lib/utils/planner-empty-state.test.ts` | the loading-vs-empty guard (M3) |
 
 ### ESLint guard rails (`eslint.config.mjs`)
 
@@ -433,15 +437,20 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 - Motion: framer-motion `AnimatePresence` + `motion`; keyframes in `globals.css`
   (`modalBackdropFadeIn/Out`, `modalSheetSlideUp/Down`, `floatSlow`,
   `radarWave`, `pulseGlow`, `shimmerGlow`, `pageFadeIn`, `viewSlideIn`) plus
-  `twFadeIn`/`twSlideInFromBottom`/`twZoomIn` compat utilities.
+  `twFadeIn`/`twSlideInFromBottom`/`twZoomIn` compat utilities. Decorative
+  animations (`date-ring-pulse`, `keystonePulse` M2, `slateSweep`/`slateTapPulse`
+  M3) put their keyframes inside `@media (prefers-reduced-motion: no-preference)`
+  and set `animation: none` under `reduce` — no JS, no hydration-time flash.
 - Layout: mobile-first flexbox, `sm:/md:/lg:` only, **no hardcoded pixel
   widths** (`w-full max-w-md`, layout `max-w-xl sm:max-w-2xl`).
 - Every interactive element needs explicit hover/focus/active/loading/disabled
   states, must be keyboard reachable with a visible focus ring, and must honour
   reduced motion.
-- **Visual verification:** Puppeteer at phone width (390px — also 360 and 430),
-  before/after screenshots, light **and** dark. *Do not assert a visual change
-  works — screenshot it or measure it.*
+- **Visual verification:** `puppeteer-core` + system Chrome at phone width
+  (390px — also 360 and 430), before/after screenshots, light **and** dark.
+  *Do not assert a visual change works — screenshot it or measure it.*
+  Screenshots catch things assertions miss: the M3 pulse rendered two (+)
+  marks side by side while every scripted assertion passed.
 
 ---
 
@@ -496,6 +505,65 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-07 — M3 planner clean-slate state, and a false zero the loading flag caught
+
+**Shipped:** a day on the planner with nothing on it now reads as a deliberate
+blank instead of 24 identical "Empty Slot" rows.
+`src/components/planner/planner-empty-state.tsx`. No button by design — the copy
+points at the tap-an-hour gesture that already works on every row, so no second
+path to the same action. Illustration is the planner's own rail spine with one
+highlighted hour, in CSS-var tokens. `slateSweep` (highlight travelling the
+spine) and `slateTapPulse` (glow behind the highlighted hour) are new keyframes
+in `globals.css`, gated inside `prefers-reduced-motion: no-preference` like
+`keystonePulse`. Verified reduced motion really silences them
+(`animationName: "none"`, not just the class applied).
+
+**The spec copy was wrong and was changed with owner approval.** Research says
+*"Tap + or import a routine template to begin."* Neither exists: there is no +
+button (you schedule by tapping an hour), and template import is `B1`/`HD29`,
+still `NOT BUILT` in Phase 2. Shipping it would have put a promise on screen
+that nothing backs. Now reads *"Tap any empty hour to schedule your first
+block."*
+
+**Also split the copy for past days.** "Your day is a clean slate" on a day that
+has already passed describes a choice the user did not make. Past blank days now
+read *"Nothing was scheduled on this day"*, with a shape that is otherwise
+identical.
+
+**The false zero this would have shipped — worth generalising:**
+`shouldShowPlannerEmptyState()` checks `blocksLoading` **first** and
+short-circuits. The planner reads `db` directly rather than through the schedule
+store (debt **D5**), so `blocks` is `[]` on first paint for **every** day,
+including days that have blocks. Testing `blocks.length === 0` alone asserts
+"this day is blank" during the window where the truth is "we have not looked
+yet" — a full day would flash "Your day is a clean slate" at the user. Same
+class as the habit readout printing `0/0 (0%)` with no habits and as
+`percent: null` in `habit-progress.ts`. The `finally` block clears the flag on
+the failure path too, so a **failed** read shows the timeline rather than
+claiming the day is empty. 6 tests → 116 green.
+
+**A design iteration, recorded because the first version was wrong:** the pulse
+originally floated as a separate (+) badge over the illustration, which put two
+(+) marks on screen and read as a duplicate control. It now animates the glow
+behind the single highlighted hour, opacity only — an SVG rect has no
+box-shadow ring to expand, and scaling it distorts its stroke.
+
+**Transferable lessons:**
+- Any surface that bypasses a store (D5) has no `loading` flag to inherit.
+  Write one before adding a state that asserts an empty result, or you will
+  render a confident claim during the read window.
+- Clear an ad-hoc loading flag in `finally`, not on the success path. "Could not
+  find out" must not render as "there is nothing there".
+- **Hydration marker, corrected:** `context.md` previously recorded checking
+  `#__next` and React expandos. On a **production** build in this app `#__next`
+  does **not** exist — the check reported `false` for a fully working, fully
+  hydrated page. The reliable signal is counting nodes carrying a
+  `__react*` expando key (864 on `/planner`). Believing the `#__next` check
+  would have meant re-diagnosing a working build as broken. React-keyed node
+  count is the marker to use.
+- Screenshots are the fastest way to catch a duplicate control. Every assertion
+  in the script passed while two (+) marks sat in the picture.
 
 ### 2026-10-07 — Root `package.json` launcher
 
@@ -614,19 +682,25 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `31933ca` — *"feat(habits): M2 keystone empty state
-  replaces the generic 'No Habits Yet'"*. Before that, `b72842d` adopted
-  `context.md` as the agent entry point and wired `AGENTS.md` /
-  `main_plan.md` / `FEATURE_WORKFLOW.md` to it.
-- Working tree: clean as of this update. The root `package.json` launcher (see
-  §2, "Where to run commands") is the only file added outside `odyssey/` — it
-  holds no dependencies and delegates to `odyssey/`.
-- `npm run lint` reports **0 errors, 96 warnings** — all pre-existing
-  `no-unused-vars` hits (e.g. `Coffee` in `habits/page.tsx:26`, `getDisplayHobbies`
-  in `wallpaper-generator.ts:222`), none introduced by this work.
+- HEAD at last update: `34ce528` — *"chore(root): add a package.json launcher so
+  npm scripts work from the workspace root"*, on top of `31933ca` (M2 habits
+  empty state). Before that, `b72842d` adopted `context.md` as the agent entry
+  point and wired `AGENTS.md` / `main_plan.md` / `FEATURE_WORKFLOW.md` to it.
+- Working tree: clean apart from the M3 work described above, which is staged for
+  its own commit. The root `package.json` launcher (see §2, "Where to run
+  commands") is the only file outside `odyssey/` and holds no dependencies.
+- Lint on the touched files: **0 errors, 10 warnings** — all pre-existing
+  `no-unused-vars` in `planner/page.tsx` (`useScheduleStore`, `ChevronLeft`,
+  `Flame`, `Check`, `Radio`, `Zap`, `CatIcon`, …). The M3 files add none.
+- Tests: **10 suites, 116 tests, all green** (M3 adds `planner-empty-state.test.ts`).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
+- **Hydration marker is a React-keyed node count, not `#__next`** — see §9,
+  2026-10-07. The old `#__next` check reads `false` on a working production build.
+- Puppeteer is **not** a project dependency. Verify with `puppeteer-core` driven
+  by the system Chrome (`C:\Program Files\Google\Chrome\Application\chrome.exe`),
+  installed outside the repo, so no dependency is added to the app.
 - `.clinerules` lives at the workspace **parent** (`C:\PROJECTS`), with paths
   prefixed `odyssey/`. It is itself git-ignored.
 - `Market Research/` **is** tracked (deliberate; decision recorded in the
@@ -637,7 +711,7 @@ to know where things stand.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M3** — Planner empty state, "clean slate". Spec copy: *"Your day is a clean slate. Tap + or import a routine template to begin."* Same shape as M2, different surface — the planner timeline, not the habits list |
+| Next feature | **M4** — All-habits-done celebration card (+50 XP). Spec: *"Perfect Day Achieved! +50 Bonus XP Claimed"*, surfacing on Day Schedule when the daily score hits 100%. Note the open question: ADR 0001's Temporary Wallet means a bonus needs an explicit claim, not an automatic payout — resolve that before coding |
 | Also open in Phase 1 | P0-T2 (graph stale: last built from `dda4383d`), P0-T3 (blocked, `FEATURES.md` §5), P0-T6 (adapter landed; 829-line file still to split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
 | Phase 1 exit gate | Gates clean · P0-T6 adapter landed · CONS-2 sweep done · no uncommitted work |
 | Next after Phase 1 | Phase 2 — onboarding `A1`/`XL14` is the largest gap between the app and its own research |

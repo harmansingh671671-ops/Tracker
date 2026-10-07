@@ -13,7 +13,9 @@ import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
 import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
 import { CompletionFractionHeader } from "@/components/planner/completion-fraction-header";
+import { PlannerEmptyState } from "@/components/planner/planner-empty-state";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
+import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
 import {
   Clock,
   CheckCircle2,
@@ -85,6 +87,14 @@ function PlannerContent() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
+
+  // The planner reads `db` directly rather than going through the schedule store
+  // (debt D5), so it has no store-provided `loading` flag to borrow. Without one,
+  // `blocks` is `[]` on first paint for EVERY day — including days that have
+  // blocks — and the M3 clean-slate state would flash "Your day is a clean slate"
+  // at a full schedule before the read resolves. That is the same confident-false-
+  // zero class the habit-progress null percent and the M2 readout both avoid.
+  const [blocksLoading, setBlocksLoading] = useState(true);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
@@ -197,6 +207,10 @@ function PlannerContent() {
       setCachedBlocks(dateStr, dayBlocks);
     } catch (err) {
       console.error("Failed to load blocks:", err);
+    } finally {
+      // Runs on the failure path too: a failed read means "we could not find
+      // out", not "this day is empty", and the empty state must not claim it.
+      setBlocksLoading(false);
     }
   }, []);
 
@@ -985,6 +999,14 @@ function PlannerContent() {
         </div>
 
         </div>
+
+      {/* M3 - Zero-block state for the selected day. Sits above the rail and
+          points at the gesture that already works (tap any hour), so it adds
+          no new button and no new path. Gated on `blocksLoading` so it cannot
+          claim a day is blank before the read resolves. */}
+      {shouldShowPlannerEmptyState(blocksLoading, blocks) && (
+        <PlannerEmptyState isPastDay={isSelectedPastDay} />
+      )}
 
       {/* 24-Hour Chrono Stream Timeline - Structured Vertical Rail */}
       <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
