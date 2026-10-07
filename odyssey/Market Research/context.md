@@ -586,6 +586,45 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-07 — Status sweep: three lines in `main_plan.md` were lying
+
+Owner flagged that implemented tasks' statuses were not being updated. The last two
+commits *did* carry `main_plan.md` edits, but the audit below found the statuses were
+**wrong in three places** — which is worse than absent, because a wrong status is
+authoritative-looking and nothing prompts anyone to re-check it.
+
+**`M4` said `PARTIAL` and *"no page mounts the component yet"*.** Untrue from the very
+commit that built it. The component **is** mounted, on `habits/page.tsx` above the vault
+banner, and the reward half is far past "component built" — the vault is now the only
+route for habit rewards. Now `BUILT`.
+
+**`F3` still said *"no first-day card"* after `M4` shipped one.** Now corrected.
+
+**`B15` gave no detail at all** — bare `PARTIAL`, while two of its three halves
+(creation confirm from `M5`, own-streak labelling from `M4`) had shipped and only
+last-done (`M7`) remained.
+
+**The mechanism that let all three go stale:** these ids are cross-referenced dozens of
+times in `main_plan.md`, and updating *your own line* was the whole of the previous
+rule. Nothing forced a look at the neighbours. The rule is now a **sweep**, recorded in
+`main_plan.md` §1 and `FEATURE_WORKFLOW.md`:
+
+```
+1. flip your own checkbox AND correct your own status wording
+2. grep the file for your id, and for every id the commit also touched
+3. fix each hit your change made false — even on another feature's line
+4. re-read your own line once, AFTER the code is in
+```
+
+**Step 4 is the load-bearing one.** Writing the status *before* the code is exactly how
+`M4` ended up describing a component that had not been mounted yet, and then was never
+revisited. **`BUILT` is a claim about shipped reality — write it last.** And a bare
+`PARTIAL` is not a status at all, it is a way of avoiding one; it must name what is
+missing.
+
+Note on the earlier commits: `M6`, `A1` and `XL14` statuses were updated correctly.
+This was a sweep that had not been performed, not a rule that was ignored.
+
 ### 2026-10-07 — Process rules: the commit sequence, and never leaving a server running
 
 Owner instruction after two failures in one session. Both were process failures, not
@@ -1027,6 +1066,11 @@ above the vault banner. The follow-up task is closed.
 - **Update `main_plan.md`, then this file, then commit — in that order, every
   time.** Status that is not written down before the commit did not ship. Code
   plus no docs is the same defect as uncommitted work, only quieter.
+- **Sweep the cross-references when you ship an id.** Flipping your own line
+  is the minimum; every line mentioning that id must be re-checked too, because
+  a stale neighbour reads as authoritative. Write `BUILT` **after** the code is
+  in — a status written beforehand describes what you intended, not what
+  shipped. `PARTIAL` must name what is missing.
 - Get the feature **ID and phase**, brief it in app terms, and get **explicit
   approval** before writing code.
 - Work **one feature per commit**; commit it before starting the next.

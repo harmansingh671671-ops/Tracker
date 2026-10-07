@@ -185,6 +185,39 @@ The same rule covers knowledge that did *not* ship as planned. A feature id that
 dropped, deferred, renamed, or built under a different id must say so here in the
 same commit — silence is the traceability failure rule 7 exists to prevent.
 
+### Updating a status means sweeping its cross-references, not just its own line
+
+**When you ship a feature id, every line in this file that mentions it must be
+re-checked in the same commit.** Ticking the box on your own line is the
+*minimum*, and it is not sufficient: these ids are cross-referenced dozens of
+times, and a stale neighbour is worse than a stale tick because it looks
+authoritative.
+
+Two ways it actually goes wrong, both caught in this repo:
+
+- **The line understates what you did.** `M4` sat at `PARTIAL` reading *"no page
+  mounts the component yet"* — untrue from the commit that built it. Nobody
+  re-read their own line after mounting the thing.
+- **The lines that cite it are now wrong.** `F3` still claimed *"no first-day
+  card"* after `M4` shipped one, and `B15` gave no detail at all once two of its
+  three halves landed.
+
+So the procedure for shipping any id is:
+
+```
+1. flip your own checkbox AND correct your own status wording
+2. grep this file for the id, and for every id your commit also touched
+3. fix each hit that your change made false, even if that line belongs to
+   another feature or another phase
+4. re-read your own line once, after the code is in, not before
+```
+
+Step 4 is not optional bookkeeping. Writing the status *before* the code is how
+`M4` ended up describing a component that had not been mounted yet, and then
+never revisited. **`BUILT` is a claim about shipped reality; write it last.**
+`PARTIAL` must name what is missing — a bare `PARTIAL` is not a status, it is a
+way of avoiding one.
+
 ### Step 10 — Report honestly
 
 If a check could not be run, say so. **Never describe unverified work as
@@ -273,7 +306,7 @@ src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 - [x] **M1** — Local-data trust badge. `BUILT` — copy is owner-set: *"Your data will not leave your device without your consent."* (supersedes both research drafts); `LocalDataTrustBadge` renders on **Profile** and inside Settings' **Local Vault** card. **Onboarding surface not built — there is no `/onboarding` route, see `A1`** · also: `A8`
 - [x] **M2** — Habits page empty state. `BUILT` — `HabitsEmptyState` component: keystone-block illustration drawn with CSS-var tokens (re-themes light/dark), pulsing (+) ring on a new `keystonePulse` keyframe gated on `prefers-reduced-motion` in `globals.css`, copy "Your journey begins with one keystone habit" + "Pick the one habit that holds the rest up", CTA "Add your keystone habit" opens the existing create modal. Also removed a **false zero** on this screen: the day readout printed `0/0 (0%)` with no habits at all, which is the same confident-false-zero class the M9 header placeholder exists to prevent — it now reads "Nothing scheduled yet" · also: `A8`
 - [x] **M3** — Planner empty state "clean slate". `BUILT` — `PlannerEmptyState` sits above the rail and points at the gesture that already works (tap any hour), so it adds no new button and no new path. Illustration is the planner's own rail spine with one highlighted hour, drawn with CSS-var tokens and animated by `slateSweep` + `slateTapPulse`, both gated on `prefers-reduced-motion` in `globals.css` the way `keystonePulse` is. **Spec copy changed with owner approval:** the researched line *"Tap + or import a routine template"* promised two things that do not exist — there is no + button and no template import (`B1`/`HD29`, still Phase 2) — so it now reads *"Tap any empty hour to schedule your first block."* A day in the past that was left blank was not a choice, so it gets different copy (*"Nothing was scheduled on this day"*) rather than being called a clean slate. Visibility is gated on a new `blocksLoading` flag, because the planner reads `db` directly (D5) and `blocks` is `[]` on first paint for **every** day — without it, a full day would flash "clean slate" before the read resolved · also: `A8`
-- [x] **M4** — All-habits-done celebration card (+50 XP). `PARTIAL` — `PerfectDayCard` component built with CSS glow animation; reward calculations in `reward-rules.ts`; habit-store imports but no page mounts the component yet · also: `FD1`
+- [x] **M4** — All-habits-done celebration card (+50 XP). `BUILT` — `PerfectDayCard` **is mounted**, on the **Habits** screen above the vault banner; this line previously read "no page mounts the component yet", which stopped being true in the very commit that built it. The reward work was the larger half: the vault is now the **only** route for habit rewards, so the double-count closed. Ticking a habit no longer credits the profile directly — it accrues, and the whole vault pays in at the day boundary and empties. The claim record moved out of `localStorage` into a new `rewardSettlements` table (defects 7.1/7.2, ADR 0002), so clearing site data can no longer make the app re-pay the same days, and the streak no longer jumps by the number of days skipped (defects 7.4/7.5, ADR 0001 §5). Rates are named constants per ADR 0001 §7 · also: `FD1`, `F3`, `B15`
 - [x] **M5** — Creation confirmation toast naming first milestone. `BUILT` — habit creation toast reads *"Your journey with {Habit Name} begins now. First milestone: 3-day streak."* · also: `B15`
 - [x] **M6** — First-open welcome banner (3 pillars). `BUILT`, then **relocated into the onboarding flow** when **A1** shipped (§10 C11) — the three pillars and the **M1** trust badge are now step 2 of `/`, not a card on the Habits tab. `WelcomeCard` and its `shouldShowWelcomeCard` visibility rule were **deleted** rather than left in two places: a dismissible banner makes no sense inside a guided flow, and its copy described itself in terms of a screen it no longer lived on. The rule it was built for survives as `lib/utils/onboarding-flow.ts`: any state that asserts "this is empty" must check loading first, because a store that loads starts empty for *every* user. Zero-habit users on `/habits` fall back to the **M2** keystone empty state. Wallpaper copy stays hedged — "if you want it there" — because P8-E1 made the wallpaper default-OFF · also: `A8`
 - [ ] **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15`
@@ -361,7 +394,7 @@ catalogue lands here.
 - [ ] **B12** — Flexible habits, rollover, hardening window. `NOT BUILT` · also: `HD17`
 - [ ] **B13** — Pause / archive / inactive review (14-day prompt). `PARTIAL` — freeze exists as a shop item only · also: `HD18`, `HD19`
 - [ ] **B14** — Quick-capture inbox/backlog. `NOT BUILT` — schema table `inboxItems` exists, no UI · also: `HD3`
-- [ ] **B15** — Completion labels (creation confirm, last-done, own streak). `PARTIAL` · also: `M5`, `M7`
+- [ ] **B15** — Completion labels (creation confirm, last-done, own streak). `PARTIAL` — **creation confirm shipped** (`M5`, names the first milestone) and **own streak / perfect-day labelling shipped** with `M4`; **last-done is still `NOT BUILT` and is `M7`, the next open line in Phase 1** · also: `M5`, `M7`, `M4`
 
 ### 4.3 Schedule & planner — `§5 C L234–254`
 
@@ -450,7 +483,7 @@ Progression, identity, cosmetics and the economy around them.
 
 - [ ] **F1** — Existing progression (XP/ranks/thresholds, rank messages, avatar scenes). `PARTIAL` — XP + 9 ranks shipped; unique rank dialogs missing (`M14`) · also: `M14`, `FD4`
 - [ ] **F2** — Achievement badge wall with visible conditions + earned date. `NOT BUILT` · also: `M15`, `FD1`
-- [ ] **F3** — Completion celebration (confetti, warm copy, first-day card). `PARTIAL` — confetti exists; no first-day card · also: `M4`
+- [ ] **F3** — Completion celebration (confetti, warm copy, first-day card). `PARTIAL` — confetti exists; **the celebration card shipped with `M4`** (`PerfectDayCard`, mounted on Habits, fires when every habit due for the day is complete), so "no first-day card" is no longer true. The warm-copy sweep across toasts and counters is what remains · also: `M4`
 - [ ] **F4** — Chapters and seasonal items (30-day arcs, themed packs). `NOT BUILT` · also: `FD3`, `G10`
 - [ ] **F5** — Avatar/pet/skills with grouped inventory. `NOT BUILT` · also: `XL1`
 - [ ] **F6** — Avatar house/world reacting to real follow-through. `NOT BUILT` — *the stated original differentiator* · also: `XL1`, `XL2`
@@ -471,7 +504,7 @@ Progression, identity, cosmetics and the economy around them.
 
 ### 5.3 Economy correctness (must precede shop expansion)
 
-- [x] **D9** — Dual XP accounting (profile vs Temporary Wallet). `SHIPPED` — specified in `docs/adr/0001-reward-economy.md`; **implementation still to verify** · src: `DEVELOPMENT_PLAN.md §3.3 L229`
+- [x] **D9** — Dual XP accounting (profile vs Temporary Wallet). `SHIPPED` — specified in `docs/adr/0001-reward-economy.md`, and the **implementation landed with `M4`** (this line previously said "implementation still to verify"). The double-count is closed: the vault is the only route for habit rewards, the claim record lives in IndexedDB (`rewardSettlements`, keyed `userId:date` so it is idempotent), payout and record share one transaction, and the streak advances by a consecutive-day rule rather than by days claimed. Decision of record: `docs/adr/0002-reward-vault.md` · src: `DEVELOPMENT_PLAN.md §3.3 L229`
 - [ ] **ECON-1** — `useUserStore` split into profile / wallet / inventory slices (D2). `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §3.3 L222`
 - [ ] **ECON-2** — XP curve: live is flat 500/level; research proposes `100 × L^1.5`. `DEFERRED` — flat curve ships for v1.4, curve change is a **v2.0 migration**. See **C3** · src: `DEVELOPMENT_PLAN.md §2.7 L158`
 

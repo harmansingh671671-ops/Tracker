@@ -88,9 +88,17 @@ implement → verify → main_plan.md → context.md → commit → report → S
 
 | # | Step | What it means | Skipping it costs |
 |---|---|---|---|
-| 1 | `main_plan.md` | Flip the checkbox **and** write the status for every line this commit touched — including lines that turned out `PARTIAL`, `BLOCKED`, or deferred | The plan says a shipped feature is unbuilt, and the next session re-does it or skips it |
+| 1 | `main_plan.md` | Flip the checkbox **and** correct the status wording for every line this commit touched — including lines that turned out `PARTIAL`, `BLOCKED`, or deferred | The plan says a shipped feature is unbuilt, and the next session re-does it or skips it |
+| 1b | `main_plan.md` cross-references | **Grep the file for your id** and for every id the commit also touched; fix each hit your change made false, even on another feature's line | A stale neighbour reads as authoritative and nothing prompts anyone to re-check it |
 | 2 | `context.md` | §9 session log entry · §10 HEAD + next feature + tree state · §7 if an environment surprise · §11 if a permanent rule was learned | The next session re-derives what was already learned, at full cost |
 | 3 | Commit | Code **and** both documents together, one commit | Two half-truths in history; the docs drift from the code permanently |
+
+**Write the status last, not first.** `BUILT` is a claim about shipped reality. A status
+written before the code lands describes what you *intended*, and it will not be revisited:
+`M4` sat at `PARTIAL` reading *"no page mounts the component yet"* from the very commit
+that mounted it, while `F3` still claimed *"no first-day card"* after that same commit
+shipped one. Ticking your own line is the minimum — grep for the id and fix the
+neighbours. And a bare `PARTIAL` is not a status; it must name what is missing.
 
 A commit with code but no status update is **the same defect as uncommitted work** — it is
 just harder to notice, because `git status` is clean. `main_plan.md` is the only status
