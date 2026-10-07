@@ -595,6 +595,57 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M16 goal category tags, and the tag that opened an empty form
+
+**Shipped:** the five labels from `MASTER_TODO_REVISED.md` L988/L902, verbatim —
+**Academic Excellence, Peak Health, Deep Focus, Mindfulness, Digital Detox** — as tappable
+chips on the onboarding habits step.
+
+**A tag that changes nothing is just a label.** Each chip carries a suggested habit (name,
+icon, category) and opens the add-habit form already filled in, which is the constraint the
+old contradiction note had set: a bare picker would have "promised tailoring it cannot yet
+deliver". It now performs the tailoring instead, so **C11's superseded paragraph and `A8`'s
+deferred "goal labels" half were both closed** and the reasoning written down rather than
+quietly deleted.
+
+**The browser caught the feature not working, twice, for two different reasons** — and both
+are the kind of bug no unit test would have found:
+
+1. **`prefilled name: ""`.** `CreateHabitModal` returns `null` while closed but keeps its
+   hooks, so `useState(defaults?.name ?? "")` ran **once** on first render — while
+   `defaults` was still null — and never re-read it. Tapping a tag opened an empty form.
+   Fixed by remounting the modal via `key`, which is also **why no `setState`-in-effect was
+   needed** — the obvious fix would have tripped the react-hooks lint rule (as it did in
+   `M14`).
+2. **`prefilled name: ""` again.** The modal opens on its **template browse** view, and the
+   name/icon/domain fields only exist in the **custom** view. So even with correct state, a
+   pre-filled form was hidden behind a template grid. Supplying `defaults` now opens the
+   custom view. This is the same failure mode as `M11`'s zero-streak label — *present,
+   correct, and not visible.*
+
+**Two lists in the source disagree and were not merged.** `A1` (L199) describes the goal
+question as **Focus, Health, Sleep, Balance, Digital Detox, Custom**; `M16` (L988) names
+**Academic Excellence, Peak Health, Deep Focus, Mindfulness, Digital Detox**. `M16`'s five are
+implemented verbatim; `A1`'s wording is recorded on both lines, because quietly unioning two
+conflicting lists is how a spec stops meaning anything. A test asserts M16's list has **not**
+absorbed A1's (`Sleep`, `Balance`, `Custom` must not appear).
+
+**Categories are the modal's four real `DOMAINS`** (`Mindful Focus`, `Vitality & Fitness`,
+`Renewal & Health`, `Craft & Skill`), asserted as a literal so a rename in the modal breaks
+the test rather than the feature. Two tags share `Mindful Focus` — four domains cannot cover
+five tags distinctly — and that collision is recorded rather than papered over with a
+category the picker does not offer.
+
+12 new tests, **283 green** across 19 suites. Verified end-to-end in-browser through the real
+five-step flow at 360/390 in light and dark: five chips with correct labels and blurbs, and
+tapping **Peak Health** produced a form with name `Workout`, the 🏋️ icon selected,
+**Vitality & Fitness** chosen and the Morning anchor intact. **0 console errors.**
+
+**A harness detail worth keeping:** the flow is `intro → circadian → welcome → habits →
+protocol`, so "Begin Your Odyssey" lands on *circadian*, not the habits step. The check now
+advances until the chip group actually exists rather than hard-coding a step number —
+otherwise it reported "0 chips" and looked like a broken feature.
+
 ### 2026-10-08 — M14 rank level-up dialogs, whose hard part is refusing to fire
 
 **Shipped:** a dialog carrying the newly earned rank's badge, division, milestone line and a
@@ -1391,7 +1442,7 @@ to know where things stand.
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **18 suites, 271 tests, all green** (M14 adds `rank-lore.test.ts` with 16; M13 adds `warm-copy.test.ts` with 18).
+- Tests: **19 suites, 283 tests, all green** (M16 adds `goal-tags.test.ts` with 12; M14 adds `rank-lore.test.ts` with 16).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1432,7 +1483,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M16** — onboarding goal category tags. `NOT BUILT` · also: `A1`. Queue agreed with owner: M8 → M11 → M12 → M13 → M14 → M16 (M8–M14 done; **M16 is last**) |
+| Next feature | **None from the owner's queue** — **M8, M11, M12, M13, M14 and M16 are all shipped and committed**, in that order. Next feature is now the owner's call; candidates still open in Phase 1/2 include `A2`, `A3`, `A5`, `A6`, `A7`, `M9`, `M10`, `M15`, `M17` |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |

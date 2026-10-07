@@ -17,6 +17,22 @@ interface CreateHabitModalProps {
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
   }) => void;
   existingHabitNames?: string[];
+  /**
+   * M16 -- pre-fills the form when a goal tag is tapped during onboarding.
+   * Additive and optional: with no `defaults` the modal behaves exactly as it
+   * did before, which is every existing call site.
+   *
+   * Supplying `defaults` also opens the **custom** view rather than the template
+   * browser. That is not cosmetic: the name, icon and domain fields only exist in
+   * the custom view, so a pre-filled form hidden behind a template grid is a tag
+   * that appears to do nothing.
+   */
+  defaults?: {
+    name?: string;
+    icon?: string;
+    /** Must be one of `DOMAINS`. An unknown value is ignored, not injected. */
+    category?: string;
+  };
 }
 
 const EMOJIS = [
@@ -51,12 +67,19 @@ const DOMAINS = [
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames = [] }: CreateHabitModalProps) {
-  const [view, setView] = useState<"browse" | "custom">("browse");
+export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames = [], defaults }: CreateHabitModalProps) {
+  const [view, setView] = useState<"browse" | "custom">(defaults ? "custom" : "browse");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [name, setName] = useState("");
-  const [icon, setIcon] = useState("🧘");
-  const [domain, setDomain] = useState("Vitality & Fitness");
+  const [name, setName] = useState(defaults?.name ?? "");
+  const [icon, setIcon] = useState(defaults?.icon ?? "🧘");
+  // M16 -- a `defaults.category` the picker does not offer would select nothing,
+  // so it is checked against DOMAINS rather than trusted. An unknown value falls
+  // back to the existing default rather than leaving the form in no state.
+  const [domain, setDomain] = useState(
+    defaults?.category && DOMAINS.some((d) => d.id === defaults.category)
+      ? defaults.category
+      : "Vitality & Fitness"
+  );
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon..Fri by default
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
 
@@ -65,7 +88,11 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   const handleClose = () => {
     setIsExpanded(false);
     setView("browse");
-    setName("");
+    // Reset to whatever the caller asked for, not to "". `defaults` is read once
+    // on mount (the parent remounts this component via `key` when the suggestion
+    // changes), so clearing here is what stops a dismissed tag from lingering.
+    setName(defaults?.name ?? "");
+    setIcon(defaults?.icon ?? "🧘");
     onClose();
   };
 

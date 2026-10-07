@@ -67,6 +67,11 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState<OnboardingStep>(FIRST_STEP);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  // M16 -- the goal tag tapped on the habits step, if any. Held as the modal's
+  // `defaults` shape so an unknown category from a tag can never be injected.
+  const [createDefaults, setCreateDefaults] = useState<
+    { name?: string; icon?: string; category?: string } | null
+  >(null);
 
   /**
    * Habits created *in this flow*. Deliberately not "all habits in the store":
@@ -201,7 +206,10 @@ export default function OnboardingPage() {
 
         {step === "welcome" && (
           <StepWelcomeHabits
-            onOpenCreate={() => setIsCreateOpen(true)}
+            onOpenCreate={(suggestion) => {
+          setCreateDefaults(suggestion ?? null);
+          setIsCreateOpen(true);
+        }}
             addedCount={created.length}
           />
         )}
@@ -210,7 +218,10 @@ export default function OnboardingPage() {
           <StepYourHabits
             habits={created}
             onRemove={handleRemoveHabit}
-            onAddMore={() => setIsCreateOpen(true)}
+            onAddMore={() => {
+          setCreateDefaults(null);
+          setIsCreateOpen(true);
+        }}
           />
         )}
 
@@ -218,10 +229,24 @@ export default function OnboardingPage() {
       </OnboardingShell>
 
       <CreateHabitModal
+        // M16 -- remount when the suggestion changes. This modal returns `null`
+        // while closed but keeps its hooks, so `useState(defaults ?? "")` ran
+        // once on first render with `defaults` still null and never re-read it --
+        // tapping a goal tag opened an EMPTY form. Changing the key gives the
+        // initialisers a fresh mount, which is also why no setState-in-effect was
+        // needed (that would trip the react-hooks lint rule).
+        key={createDefaults?.name ?? "blank"}
         isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCreateDefaults(null);
+        }}
         onSave={handleCreateHabit}
         existingHabitNames={created.map((h) => h.name)}
+        // M16 -- carries the tapped goal tag's suggestion. Cleared on close so
+        // the next plain "Add another habit" opens empty rather than inheriting
+        // the previous tag's name and category.
+        defaults={createDefaults ?? undefined}
       />
     </>
   );

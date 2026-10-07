@@ -15,6 +15,7 @@
 
 import { CalendarClock, ListChecks, Plus, Smartphone } from "lucide-react";
 import { LocalDataTrustBadge } from "@/components/common/local-data-trust-badge";
+import { GOAL_TAGS, type GoalTag } from "@/lib/utils/goal-tags";
 
 const PILLARS = [
   {
@@ -35,8 +36,8 @@ const PILLARS = [
 ] as const;
 
 interface StepWelcomeHabitsProps {
-  /** Opens the shared create-habit modal. */
-  onOpenCreate: () => void;
+  /** Opens the shared create-habit modal. M16 passes the tapped tag's suggestion. */
+  onOpenCreate: (suggestion?: GoalTag["suggestion"]) => void;
   /** How many habits they have added so far, for the live count. */
   addedCount: number;
 }
@@ -79,14 +80,38 @@ export function StepWelcomeHabits({ onOpenCreate, addedCount }: StepWelcomeHabit
         <div className="space-y-1">
           <h2 className="text-sm font-bold text-on-surface">Add your first habit</h2>
           <p className="text-xs leading-relaxed text-on-surface-variant">
-            It goes straight into your app — it will be waiting on the Habits tab when
-            you get there.
+            Pick what you are aiming at, or start from scratch — it goes straight into
+            your app and will be waiting on the Habits tab when you get there.
           </p>
+        </div>
+
+        {/* M16 -- the five goal category tags from MASTER_TODO_REVISED L988,
+            verbatim. Each one is a real button that opens the add-habit form
+            pre-filled, because a chip that only says a word back at the user is
+            decoration, not a control. The category is highlighted rather than
+            coloured so the choice is legible without relying on colour (5.3 #3),
+            and the blurb carries the meaning of each option rather than leaving
+            five labels to be interpreted. */}
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Goal categories">
+          {GOAL_TAGS.map((tag) => (
+            <button
+              key={tag.id}
+              type="button"
+              title={tag.blurb}
+              onClick={() => onOpenCreate(tag.suggestion)}
+              className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold font-mono bg-surface-container-high border border-outline/15 text-on-surface hover:border-primary/50 hover:bg-primary-container/40 active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span aria-hidden="true" className="mr-1">
+                {tag.suggestion.icon}
+              </span>
+              {tag.label}
+            </button>
+          ))}
         </div>
 
         <button
           type="button"
-          onClick={onOpenCreate}
+          onClick={() => onOpenCreate()}
           className="w-full py-3 px-5 rounded-full bg-primary text-on-primary text-sm font-bold transition-opacity hover:opacity-90 active:opacity-80 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" />
