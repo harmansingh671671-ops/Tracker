@@ -165,6 +165,32 @@ export interface InboxItem {
   createdAt: string;
 }
 
+/**
+ * One settled day of habit rewards (M4 / ADR 0002).
+ *
+ * This table is the record of what has been paid out. It replaces the
+ * `odyssey_claimed_habit_rewards_${userId}` localStorage list, which ADR 0001
+ * section 4 flagged as defect 7.1: browser storage is not a system of record, so
+ * clearing site data or switching device offered to pay the same days again.
+ *
+ * `id` is `${userId}:${date}` rather than a uuid. That makes the primary key
+ * itself the idempotency guard -- a second settlement of the same day fails the
+ * `add` outright instead of needing a read-then-write race to lose (defect 7.2).
+ */
+export interface RewardSettlement {
+  /** `${userId}:${date}` -- see above. Deterministic, and the uniqueness guard. */
+  id: string;
+  userId: string;
+  /** The calendar day whose rewards this settles. `YYYY-MM-DD`. */
+  date: string;
+  completedCount: number;
+  xp: number;
+  diamonds: number;
+  /** The perfect-day component of `xp`, kept separate so a card can label it. */
+  perfectBonusXp: number;
+  settledAt: string;
+}
+
 class OdysseyDB extends Dexie {
   profiles!: Table<Profile>;
   scheduleBlocks!: Table<ScheduleBlock>;
@@ -172,6 +198,7 @@ class OdysseyDB extends Dexie {
   habitLogs!: Table<HabitLog>;
   weeklyReports!: Table<WeeklyReport>;
   inboxItems!: Table<InboxItem>;
+  rewardSettlements!: Table<RewardSettlement>;
 
   constructor() {
     super('OdysseyDB');
@@ -183,6 +210,15 @@ class OdysseyDB extends Dexie {
       habitLogs: 'id, habitId, userId, date, [habitId+date], [userId+date]',
       weeklyReports: 'id, userId, weekStart, [userId+weekStart]',
       inboxItems: 'id, userId, timeHorizon, createdAt'
+    });
+
+    // Additive migration: a new table only. No existing table is modified, no
+    // field is removed or retyped, so `up()` has nothing to do -- Dexie creates
+    // the object store and leaves every existing row untouched. Declared
+    // separately from version 1 so an older install upgrades in place rather
+    // than being reset.
+    this.version(2).stores({
+      rewardSettlements: 'id, userId, date, [userId+date]'
     });
   }
 }

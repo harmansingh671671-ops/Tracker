@@ -8,12 +8,15 @@ export async function seedInitialData(userId: string): Promise<void> {
 }
 
 export async function resetAllDataToZero(): Promise<Profile> {
-  await db.transaction('rw', [db.profiles, db.habits, db.habitLogs, db.scheduleBlocks, db.weeklyReports], async () => {
+  await db.transaction('rw', [db.profiles, db.habits, db.habitLogs, db.scheduleBlocks, db.weeklyReports, db.rewardSettlements], async () => {
     await db.profiles.clear();
     await db.habits.clear();
     await db.habitLogs.clear();
     await db.scheduleBlocks.clear();
     await db.weeklyReports.clear();
+    // Without this the reset profile would inherit settlement records for days
+    // that no longer exist, and the new profile could never be paid for them.
+    await db.rewardSettlements.clear();
   });
 
   if (typeof window !== 'undefined') {

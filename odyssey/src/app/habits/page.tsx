@@ -1,7 +1,7 @@
 "use client";
 
 import { logWarn } from "@/lib/utils/logger";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
@@ -11,9 +11,17 @@ import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
+import { PerfectDayCard } from "@/components/habits/perfect-day-card";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
+import { getDayHabitProgress } from "@/lib/utils/habit-progress";
+import {
+  XP_CREATION_DIAMONDS,
+  XP_CREATION_XP,
+  XP_PER_COMPLETION,
+  XP_PERFECT_DAY_BONUS,
+} from "@/lib/utils/reward-rules";
 import {
   Plus,
   Flame,
@@ -37,6 +45,8 @@ export default function HabitsPage() {
     historyLogs,
     temporaryWallet,
     fetchHabits,
+    fetchTemporaryWallet,
+    settleElapsedRewards,
     toggleHabitLog,
     addHabit,
     updateHabit,
@@ -53,6 +63,16 @@ export default function HabitsPage() {
   const [selectedDate, setSelectedDate] = useState<string>(getLocalTodayStr);
 
   const isFutureSelectedDate = selectedDate > todayStr;
+
+  /**
+   * Declared before the effects below that call it, which is what the React
+   * Compiler lint rule requires. `useCallback` keeps its identity stable so the
+   * settlement effect's dependency list does not re-fire on every render.
+   */
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  }, []);
 
   // Long press / tap-and-hold timer refs
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -98,6 +118,57 @@ export default function HabitsPage() {
     };
   }, [user, fetchHabits]);
 
+  /**
+   * Settle elapsed rewards (ADR 0002).
+   *
+   * The app cannot run at 00:00 if it is closed, so "paid at midnight" means
+   * paid the first moment the app is alive after the date rolls over. This runs
+   * on three triggers, all of which are the same thing -- the app being open
+   * across a day boundary:
+   *   - mount, which catches a day that passed while the app was closed
+   *   - the existing day-change detector, which catches a rollover while open
+   *   - window focus, which covers the app being backgrounded over midnight
+   *
+   * Idempotent, so the overlap between these three is harmless.
+   */
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let cancelled = false;
+
+    const settle = async () => {
+      try {
+        const result = await settleElapsedRewards(user.id);
+        if (cancelled || !result.didSettle) return;
+        // One toast for the whole catch-up. A user returning after a week away
+        // should not get seven separate notifications.
+        showToast(
+          result.settledDays === 1
+            ? `Yesterday settled: +${result.xp} XP • +${result.diamonds} 💎`
+            : `${result.settledDays} days settled: +${result.xp} XP • +${result.diamonds} 💎`
+        );
+      } catch (e) {
+        // A failed settlement must not break the screen. It stays owed, and the
+        // next trigger retries it.
+        logWarn("habits", "reward settlement failed", e);
+      }
+    };
+
+    void settle();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void settle();
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.id, settleElapsedRewards, showToast]);
+
   useEffect(() => {
     fetchUser().then((u) => {
       if (u) {
@@ -105,11 +176,6 @@ export default function HabitsPage() {
       }
     });
   }, [fetchUser, fetchHabits, selectedDate]);
-
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
-  };
 
   // Track scheduled habits count for daily progress stats while keeping natural order
   const scheduledHabits = useMemo(() => {
@@ -123,6 +189,21 @@ export default function HabitsPage() {
       : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
   }).length;
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  // M4 -- the perfect-day state for the day being viewed. Derived from the same
+  // helper the M9 header uses, so the two can never disagree about what counts
+  // as complete. `isAllCompleted` already requires a non-empty day, so a rest day
+  // cannot satisfy it.
+  const selectedDayProgress = useMemo(
+    () => getDayHabitProgress(habits, selectedDate, todayStr, todayLogs, historyLogs),
+    [habits, selectedDate, todayStr, todayLogs, historyLogs]
+  );
+
+  const showPerfectDay =
+    selectedDayProgress.isAllCompleted &&
+    !isFutureSelectedDate &&
+    !habitsLoading &&
+    habits.length > 0;
 
   const formattedSelectedDate = useMemo(() => {
     if (selectedDate === todayStr) return "Today";
@@ -165,14 +246,34 @@ export default function HabitsPage() {
           navigator.vibrate(40);
         }
       } catch (e) { logWarn("page", "haptic feedback failed", e); }
-      await addXp(15);
-      await addDiamonds(1);
-      await fetchUser();
-      showToast(isScheduled ? "Habit completed! +15 XP • +1 💎" : "Rest-day completion registered! (!) +15 XP • +1 💎");
+
+      // No XP is credited here. Rewards accrue in the vault and are paid on
+      // rollover (ADR 0002). Crediting the profile at the moment of the tick AND
+      // settling the same day's accrual later was paying every completion twice.
+      await fetchTemporaryWallet(user.id);
+
+      // Read the *store*, not the `habits`/`historyLogs` captured in this
+      // closure: those are the values from before the toggle, so asking them
+      // whether the day is now complete would always answer "one short". The
+      // store has already been updated by toggleHabitLog.
+      const live = useHabitStore.getState();
+      const justCompletedTheDay = getDayHabitProgress(
+        live.habits,
+        targetDate,
+        todayStr,
+        live.todayLogs,
+        live.historyLogs
+      ).isAllCompleted;
+
+      showToast(
+        justCompletedTheDay
+          ? `Perfect day! +${XP_PERFECT_DAY_BONUS} bonus pending • pays at midnight`
+          : isScheduled
+            ? `Habit completed! +${XP_PER_COMPLETION} XP pending`
+            : `Rest-day completion registered! +${XP_PER_COMPLETION} XP pending`
+      );
     } else {
-      await addXp(-15);
-      await addDiamonds(-1);
-      await fetchUser();
+      await fetchTemporaryWallet(user.id);
       showToast("Habit reverted.");
     }
   };
@@ -197,11 +298,15 @@ export default function HabitsPage() {
       period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
       archivedAt: undefined,
     });
-    await addXp(30);
-    await addDiamonds(5);
+    // One-off rewards for creating a habit. Deliberately NOT routed through the
+    // vault: nothing was completed, so there is no day for it to accrue against.
+    // It stays an immediate credit.
+    await addXp(XP_CREATION_XP);
+    await addDiamonds(XP_CREATION_DIAMONDS);
     await fetchUser();
+    await fetchTemporaryWallet(user.id);
     await fetchHabits(user.id, selectedDate, { force: true });
-    showToast("New habit created! +30 XP • +5 💎 added");
+    showToast(`New habit created! +${XP_PER_COMPLETION} XP per completion pending • ${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
   };
 
   const handleUpdateHabit = async (
@@ -307,7 +412,18 @@ export default function HabitsPage() {
         loading={habitsLoading || !user?.id}
       />
 
-      {/* Reward Vault Banner */}
+      {/* M4 -- perfect-day celebration. Sits above the vault banner because it is
+          the reason the vault figure just went up. */}
+      <PerfectDayCard show={showPerfectDay} isToday={selectedDate === todayStr} />
+
+      {/* Reward Vault Banner
+
+          Shows what TODAY has earned and not yet paid. The previous version added
+          a flat 45 XP and 12 diamonds to this figure, which made the vault claim
+          a balance the user had not earned; it now shows only real accruals.
+
+          Nothing here is claimable yet: the day's rewards settle into the profile
+          at rollover (ADR 0002), which is why the copy says "pending". */}
       <div className="relative overflow-hidden rounded-2xl bg-surface-container-high p-3.5 flex items-center justify-between gap-2 border border-outline/10 shadow-sm">
         <div className="absolute -right-8 -top-8 w-28 h-28 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
         <div className="flex items-center gap-2 text-secondary">
@@ -317,10 +433,10 @@ export default function HabitsPage() {
         <div className="flex items-center gap-1.5">
           <span className="flex items-center gap-1 bg-surface-container px-2.5 py-0.5 rounded-full text-primary font-mono text-xs font-semibold">
             <Sparkles className="w-3 h-3" />
-            +{45 + (temporaryWallet?.todayAccruedXp || 0)} XP
+            +{temporaryWallet?.todayAccruedXp || 0} XP
           </span>
           <span className="flex items-center gap-1 bg-surface-container px-2.5 py-0.5 rounded-full text-secondary font-mono text-xs font-semibold">
-            💎 +{12 + (temporaryWallet?.todayAccruedDiamonds || 0)}
+            💎 +{temporaryWallet?.todayAccruedDiamonds || 0}
           </span>
         </div>
       </div>

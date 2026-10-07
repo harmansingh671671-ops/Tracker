@@ -588,6 +588,34 @@ button, a, input, select {
   }
 }
 
+/* M4 -- the perfect-day celebration card. A slow breathing glow so the card
+   reads as an event rather than a static panel. Keyframes sit inside a
+   `no-preference` query for the same reason `keystonePulse` (M2) and
+   `slateSweep` (M3) do: honouring reduced motion then costs no JS and no
+   hydration-time flash. Opacity only -- a `box-shadow` spread is the cheapest
+   thing to animate that cannot shift layout or require a repaint of children. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes perfectDayGlow {
+    0%,
+    100% {
+      box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--primary) 8%, transparent);
+    }
+    50% {
+      box-shadow: 0 2px 14px 0 color-mix(in srgb, var(--primary) 26%, transparent);
+    }
+  }
+}
+
+.perfect-day-glow {
+  animation: perfectDayGlow 3.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perfect-day-glow {
+    animation: none;
+  }
+}
+
 .animate-spin-slow {
   animation: spin 20s linear infinite;
 }

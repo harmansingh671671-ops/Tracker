@@ -1,29 +1,54 @@
-import { readString, writeString } from "@/lib/utils/logger";
 import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate } from '../utils/habit-colors';
 import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
+import {
+  DIAMONDS_PER_COMPLETION,
+  XP_PER_COMPLETION,
+  advanceStreakForSettlement,
+  computeDayReward,
+  isPerfectDay,
+} from '../utils/reward-rules';
 
 /**
- * Reward rates. Declared as named constants per ADR 0001 section 7 -- the
- * values are NOT yet a settled product decision, so they must live in one
- * place and never be inlined at a call site.
+ * Reward rates live in `lib/utils/reward-rules.ts` and are re-exported here so
+ * existing importers keep working. Named constants per ADR 0001 section 7 -- the
+ * values are not a settled product decision and must never be inlined at a call
+ * site.
  */
-export const XP_PER_COMPLETION = 15;
-export const DIAMONDS_PER_COMPLETION = 1;
+export { XP_PER_COMPLETION, DIAMONDS_PER_COMPLETION };
 
 export interface TemporaryWallet {
+  /**
+   * Days that have ended, carry at least one earned completion, and have not
+   * been settled yet. Normally empty: settlement runs automatically on rollover.
+   * It is non-empty only when the app was closed across a day boundary and the
+   * settlement has not run yet.
+   */
   unclaimedDays: Array<{
     date: string;
     completedCount: number;
     xp: number;
     diamonds: number;
+    perfectBonusXp: number;
   }>;
   totalXp: number;
   totalDiamonds: number;
   todayAccruedXp: number;
   todayAccruedDiamonds: number;
+  /** The perfect-day bonus included in `todayAccruedXp`, for labelling it. */
+  todayPerfectBonusXp: number;
+  /** True when today has at least one due habit and all of them are done. */
+  todayPerfect: boolean;
+}
+
+export interface SettlementResult {
+  settledDays: number;
+  xp: number;
+  diamonds: number;
+  /** True when work was actually done -- lets a caller avoid a spurious toast. */
+  didSettle: boolean;
 }
 
 interface HabitState {
@@ -44,6 +69,12 @@ interface HabitState {
   ) => Promise<void>;
   fetchTemporaryWallet: (userId: string) => Promise<void>;
   claimTemporaryWallet: (userId: string) => Promise<{ claimedXp: number; claimedDiamonds: number }>;
+  /**
+   * Pays every unsettled day that has ended into the profile, then empties the
+   * wallet. Safe to call repeatedly -- the settlement ledger is keyed by
+   * `userId:date`, so a day can only ever be paid once (ADR 0002).
+   */
+  settleElapsedRewards: (userId: string) => Promise<SettlementResult>;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'currentStreak' | 'longestStreak' | 'totalCompletions'>) => Promise<Habit>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitLog: (userId: string, habitId: string, date: string) => Promise<boolean>;
@@ -57,6 +88,8 @@ const initialWallet: TemporaryWallet = {
   totalDiamonds: 0,
   todayAccruedXp: 0,
   todayAccruedDiamonds: 0,
+  todayPerfectBonusXp: 0,
+  todayPerfect: false,
 };
 
 export const useHabitStore = create<HabitState>((set, get) => ({
@@ -210,6 +243,9 @@ export const useHabitStore = create<HabitState>((set, get) => ({
    *
    * Unscheduled completions are worth nothing -- otherwise a once-a-week habit
    * marked done on all seven days would earn seven days of rewards.
+   *
+   * Settlement is read from the `rewardSettlements` table, not localStorage:
+   * browser storage is not a system of record (ADR 0001 section 4, defect 7.1).
    */
   fetchTemporaryWallet: async (userId) => {
     const today = getLocalTodayStr();
@@ -222,42 +258,44 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
     // Count only completions of habits that were actually due that day.
     // Read habits from the database rather than store state: the wallet is
-    // called from several places (including a claim) and must not silently drop
-    // rewards when it runs before fetchHabits has populated `habits`.
+    // called from several places (including settlement) and must not silently
+    // drop rewards when it runs before fetchHabits has populated `habits`.
     const allHabits = await db.habits.toArray();
     const habitsById = new Map(allHabits.map(h => [h.id, h]));
     const countsByDate: Record<string, number> = {};
+    const completedIdsByDate: Record<string, Set<string>> = {};
     allLogs.forEach(l => {
       const habit = habitsById.get(l.habitId);
       if (!habit) return; // habit hard-deleted -> cannot verify it was due
       if (!isHabitScheduledOnDate(habit, l.date)) return; // ADR 0001 section 6.2
       countsByDate[l.date] = (countsByDate[l.date] || 0) + 1;
+      if (!completedIdsByDate[l.date]) completedIdsByDate[l.date] = new Set();
+      completedIdsByDate[l.date].add(l.habitId);
     });
 
-    const key = `odyssey_claimed_habit_rewards_${userId}`;
-    let claimedDates: string[] = [];
-    try {
-      claimedDates = JSON.parse(readString(key) || '[]');
-    } catch {
-      claimedDates = [];
-    }
+    const settledRows = await db.rewardSettlements.where('userId').equals(userId).toArray();
+    const settledDates = new Set(settledRows.map(r => r.date));
 
     const unclaimedDays: TemporaryWallet['unclaimedDays'] = [];
     Object.keys(countsByDate).forEach(d => {
-      if (d < today && !claimedDates.includes(d)) {
+      if (d < today && !settledDates.has(d)) {
         const count = countsByDate[d];
         if (count > 0) {
-          unclaimedDays.push({
-            date: d,
-            completedCount: count,
-            xp: count * XP_PER_COMPLETION,
-            diamonds: count * DIAMONDS_PER_COMPLETION,
-          });
+          const perfect = isPerfectDay(allHabits, d, completedIdsByDate[d]);
+          unclaimedDays.push({ date: d, completedCount: count, ...computeDayReward(count, perfect) });
         }
       }
     });
 
+    // Sort so the wallet reads chronologically and the streak rule sees a stable
+    // order. Object key order on a YYYY-MM-DD record happens to be sorted, but
+    // relying on that is a JS detail, not a guarantee.
+    unclaimedDays.sort((a, b) => a.date.localeCompare(b.date));
+
     const todayCount = countsByDate[today] || 0;
+    const todayPerfect = isPerfectDay(allHabits, today, completedIdsByDate[today] || new Set());
+    const todayReward = computeDayReward(todayCount, todayPerfect);
+
     const totalXp = unclaimedDays.reduce((sum, d) => sum + d.xp, 0);
     const totalDiamonds = unclaimedDays.reduce((sum, d) => sum + d.diamonds, 0);
 
@@ -266,46 +304,121 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         unclaimedDays,
         totalXp,
         totalDiamonds,
-        todayAccruedXp: todayCount * XP_PER_COMPLETION,
-        todayAccruedDiamonds: todayCount * DIAMONDS_PER_COMPLETION,
+        todayAccruedXp: todayReward.xp,
+        todayAccruedDiamonds: todayReward.diamonds,
+        todayPerfectBonusXp: todayReward.perfectBonusXp,
+        todayPerfect,
       }
     });
   },
 
-  claimTemporaryWallet: async (userId) => {
-    const { temporaryWallet } = get();
-    const { totalXp, totalDiamonds, unclaimedDays } = temporaryWallet;
+  /**
+   * Pays every ended-but-unsettled day into the profile, then empties the vault.
+   *
+   * Runs on rollover (see the habits screen's date-change detector) and on app
+   * resume. It is NOT a manual claim and has no button: the old explicit claim
+   * existed only because the wallet had no automatic trigger, and it is what
+   * ADR 0001 section 4 was written about.
+   *
+   * Idempotent. `rewardSettlements.id` is `${userId}:${date}`, so a second run
+   * hits a constraint error and skips that day rather than paying twice
+   * (defect 7.2). A crash mid-transaction rolls the whole batch back, because
+   * the ledger write and the profile write share one Dexie transaction.
+   */
+  settleElapsedRewards: async (userId) => {
+    // No local `today` here: the day boundary is resolved inside
+    // fetchTemporaryWallet (which anchors on getLocalTodayStr() and takes no date
+    // parameter, so no caller can move it -- ADR 0001 section 7.3). Deriving the
+    // list there means settlement cannot disagree with the wallet about which days
+    // have ended.
 
-    if (totalXp > 0 || totalDiamonds > 0) {
-      const { useUserStore } = await import('./user-store');
-      const uStore = useUserStore.getState();
+    // Read the wallet first: it is the derived, schedule-aware view of what is
+    // owed. Recomputing here instead of trusting stored state keeps one source of
+    // truth (rule 5.3 #1).
+    await get().fetchTemporaryWallet(userId);
+    const { unclaimedDays } = get().temporaryWallet;
 
-      if (totalXp > 0) await uStore.addXp(totalXp);
-      if (totalDiamonds > 0) await uStore.addDiamonds(totalDiamonds);
-
-      if (uStore.user) {
-        const daysClaimedCount = Math.max(1, unclaimedDays.length);
-        const newStreak = (uStore.user.streak || 0) + daysClaimedCount;
-        await uStore.updateUser({
-          streak: newStreak,
-          highestStreak: Math.max(newStreak, uStore.user.highestStreak || 0),
-        });
-      }
-
-      const key = `odyssey_claimed_habit_rewards_${userId}`;
-      let claimed: string[] = [];
-      try {
-        claimed = JSON.parse(readString(key) || '[]');
-      } catch {
-        claimed = [];
-      }
-
-      const updatedClaimed = Array.from(new Set([...claimed, ...unclaimedDays.map(d => d.date)]));
-      writeString(key, JSON.stringify(updatedClaimed));
+    if (unclaimedDays.length === 0) {
+      return { settledDays: 0, xp: 0, diamonds: 0, didSettle: false };
     }
 
+    const { useUserStore } = await import('./user-store');
+    const uStore = useUserStore.getState();
+    const profile = await db.profiles.get(userId);
+
+    let xp = 0;
+    let diamonds = 0;
+    const settledDates: string[] = [];
+    const now = new Date().toISOString();
+
+    // One transaction across both tables: either the payout and its record both
+    // land, or neither does. This is the fix for defect 7.2, where the balance
+    // was written before the claim record and a crash between them paid twice.
+    await db.transaction('rw', [db.rewardSettlements, db.profiles], async () => {
+      for (const day of unclaimedDays) {
+        // `add` on a deterministic primary key throws if the day is already
+        // recorded. Treat that as "already settled", not as an error.
+        try {
+          await db.rewardSettlements.add({
+            id: `${userId}:${day.date}`,
+            userId,
+            date: day.date,
+            completedCount: day.completedCount,
+            xp: day.xp,
+            diamonds: day.diamonds,
+            perfectBonusXp: day.perfectBonusXp,
+            settledAt: now,
+          });
+        } catch (e) {
+          if (e instanceof Error && e.name === 'ConstraintError') continue;
+          throw e;
+        }
+        xp += day.xp;
+        diamonds += day.diamonds;
+        settledDates.push(day.date);
+      }
+
+      if ((xp > 0 || diamonds > 0) && profile) {
+        const currentXp = typeof profile.xp === 'number' ? profile.xp : 0;
+        const newXp = currentXp + xp;
+
+        // ADR 0001 section 5: streak advances by an explicit consecutive-day
+        // rule, never by the number of days settled.
+        const newStreak = advanceStreakForSettlement(settledDates, profile.streak || 0);
+
+        await db.profiles.update(userId, {
+          xp: newXp,
+          // Same flat curve the rest of the app uses; see ADR 0001 section 2.7.
+          level: Math.floor(newXp / 500) + 1,
+          diamonds: (typeof profile.diamonds === 'number' ? profile.diamonds : 0) + diamonds,
+          streak: newStreak,
+          highestStreak: Math.max(newStreak, profile.highestStreak || 0),
+          militaryRank: (await import('../utils/gamification')).calculateRank(newStreak),
+        });
+      }
+    });
+
+    // Push the authoritative profile back into the store so every screen reading
+    // XP sees the settlement without needing its own refresh.
+    await uStore.fetchUser();
     await get().fetchTemporaryWallet(userId);
-    return { claimedXp: totalXp, claimedDiamonds: totalDiamonds };
+
+    return {
+      settledDays: settledDates.length,
+      xp,
+      diamonds,
+      didSettle: settledDates.length > 0,
+    };
+  },
+
+  /**
+   * Retained for callers that want an explicit payout, but it is now just a thin
+   * wrapper over settlement -- there is no separate localStorage claim list and
+   * no separate code path, so the two cannot drift.
+   */
+  claimTemporaryWallet: async (userId) => {
+    const result = await get().settleElapsedRewards(userId);
+    return { claimedXp: result.xp, claimedDiamonds: result.diamonds };
   },
 
   addHabit: async (habitData) => {

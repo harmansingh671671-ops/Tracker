@@ -9,6 +9,7 @@ import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
+import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import {
   ChevronLeft,
   ChevronDown,
@@ -585,9 +586,9 @@ function DayScheduleContent() {
             navigator.vibrate(40);
           }
         } catch (e) { logWarn("page", "haptic feedback failed", e); }
-        await addXp(10);
+        await addXp(XP_PER_BLOCK_COMPLETED);
       } else if (current === "completed") {
-        await addXp(-10);
+        await addXp(-XP_PER_BLOCK_COMPLETED);
       }
       await fetchUser();
       syncCurrentScheduleToNative(dateStr);
@@ -878,27 +879,11 @@ function DayScheduleContent() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 pt-3 space-y-4">
-        {/* Quick Day Naming / Focus Input */}
-        <section className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Day {displayDay} Focus &amp; Title
-            </span>
-            {dayName && (
-              <span className="text-[10px] text-emerald-600 font-semibold dark:text-emerald-400">Saved</span>
-            )}
-          </div>
-          <input
-            type="text"
-            value={dayName}
-            onChange={(e) => handleUpdateDayName(e.target.value)}
-            placeholder="e.g. Improve English, Be Happy, Enjoy Holidays..."
-            className="w-full py-1.5 px-3 rounded-xl bg-surface-container-lowest border border-outline/15 text-xs text-on-surface font-semibold focus:border-primary/50 focus:ring-1 focus:ring-primary/40 focus:outline-none placeholder:text-on-surface-variant/40 transition-all"
-          />
-        </section>
+        {/* 24-HOUR CATEGORY DISTRIBUTION BOX (Matching Planner Page)
 
-        {/* 24-HOUR CATEGORY DISTRIBUTION BOX (Matching Planner Page) */}
+            Above the day-title input: the allocation is the read-at-a-glance
+            summary of the day, while the title is a note the user writes about
+            it. Reading order now leads with the day's shape. */}
         <section className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5 shadow-sm">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-on-surface flex items-center gap-1.5">
@@ -942,6 +927,26 @@ function DayScheduleContent() {
             {categoryStats.restH > 0 && <span className="text-indigo-400 font-semibold">Sleep: {categoryStats.restH}h</span>}
             {categoryStats.remaining > 0 && <span className="text-outline font-semibold">{categoryStats.remaining}h Open</span>}
           </div>
+        </section>
+
+        {/* Quick Day Naming / Focus Input */}
+        <section className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              Day {displayDay} Focus &amp; Title
+            </span>
+            {dayName && (
+              <span className="text-[10px] text-emerald-600 font-semibold dark:text-emerald-400">Saved</span>
+            )}
+          </div>
+          <input
+            type="text"
+            value={dayName}
+            onChange={(e) => handleUpdateDayName(e.target.value)}
+            placeholder="e.g. Improve English, Be Happy, Enjoy Holidays..."
+            className="w-full py-1.5 px-3 rounded-xl bg-surface-container-lowest border border-outline/15 text-xs text-on-surface font-semibold focus:border-primary/50 focus:ring-1 focus:ring-primary/40 focus:outline-none placeholder:text-on-surface-variant/40 transition-all"
+          />
         </section>
 
         {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks (Structured Vertical Rail) */}

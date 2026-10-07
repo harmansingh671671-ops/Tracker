@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { type ScheduleBlock } from "@/lib/db";
+import { XP_PER_BLOCK_COMPLETED_JOURNEY } from "@/lib/utils/reward-rules";
 import {
   ArrowLeft,
   Calendar,
@@ -429,9 +430,9 @@ export function JourneyDaySchedule({
     });
 
     if (newStatus === "completed") {
-      addXp(25);
+      addXp(XP_PER_BLOCK_COMPLETED_JOURNEY);
     } else if (current === "completed") {
-      addXp(-25);
+      addXp(-XP_PER_BLOCK_COMPLETED_JOURNEY);
     }
 
     await fetchBlocksForDate(user!.id, dateStr);

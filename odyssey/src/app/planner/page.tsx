@@ -2,12 +2,12 @@
 
 import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { db, type ScheduleBlock } from "@/lib/db";
-import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
+import { getJourneyDayNumber, getDateForJourneyDay, getJourneyDayNumberForDate } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
 import { DistributionModal } from "@/components/planner/distribution-modal";
@@ -15,6 +15,7 @@ import { InfiniteDateStrip } from "@/components/planner/infinite-date-strip";
 import { CompletionFractionHeader } from "@/components/planner/completion-fraction-header";
 import { PlannerEmptyState } from "@/components/planner/planner-empty-state";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
+import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
 import {
   Clock,
@@ -67,6 +68,7 @@ export default function PlannerPage() {
 
 function PlannerContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const queryDate = searchParams ? searchParams.get("date") : null;
   const { user, fetchUser, addXp } = useUserStore();
   const { habits, todayLogs, historyLogs, fetchHabits, loading: habitsLoading } = useHabitStore();
@@ -153,7 +155,14 @@ function PlannerContent() {
     if (nextStatus === "completed") {
       triggerStreaksConfetti(e.clientX, e.clientY);
       if (user) {
-        addXp(10);
+        // Schedule-block rewards are a SEPARATE pool from the habit vault.
+        // The vault derives from `habitLogs`, so crediting here cannot double-pay
+        // a habit settlement -- these are different tables and different events.
+        //
+        // It stays an immediate credit rather than accruing to midnight: it has
+        // no habit log to accrue against. Making it settle would need schedule
+        // blocks in the settlement ledger, which is a separate decision.
+        addXp(XP_PER_BLOCK_COMPLETED);
       }
     }
 
@@ -929,6 +938,14 @@ function PlannerContent() {
     );
   };
 
+  // Open the quick scheduling window (day-schedule page) when user clicks empty slate
+  const handleOpenQuickSchedule = useCallback(() => {
+    if (!selectedDate || !user?.createdAt) return;
+    const dayNum = getJourneyDayNumberForDate(selectedDate, user.createdAt);
+    const dateStr = getDateForJourneyDay(dayNum, user.createdAt);
+    router.push(`/day-schedule?date=${dateStr}&day=${dayNum}`);
+  }, [selectedDate, user, router]);
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
@@ -1000,17 +1017,20 @@ function PlannerContent() {
 
         </div>
 
-      {/* M3 - Zero-block state for the selected day. Sits above the rail and
-          points at the gesture that already works (tap any hour), so it adds
-          no new button and no new path. Gated on `blocksLoading` so it cannot
-          claim a day is blank before the read resolves. */}
-      {shouldShowPlannerEmptyState(blocksLoading, blocks) && (
-        <PlannerEmptyState isPastDay={isSelectedPastDay} />
-      )}
-
-      {/* 24-Hour Chrono Stream Timeline - Structured Vertical Rail */}
-      <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
-        {hourGroups.map((group) => {
+      {/* M3 - Zero-block state for the selected day. 
+          Only shown when there are NO blocks - hides the 24-hour timeline.
+          Click opens the quick scheduling window (same behavior as journey page).
+          Gated on `blocksLoading` so it cannot claim a day is blank before the read resolves. */}
+      {shouldShowPlannerEmptyState(blocksLoading, blocks) ? (
+        <PlannerEmptyState
+          isPastDay={isSelectedPastDay}
+          onClick={handleOpenQuickSchedule}
+        />
+      ) : (
+        /* 24-Hour Chrono Stream Timeline - Structured Vertical Rail
+           Only shown when there ARE blocks */
+        <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
+          {hourGroups.map((group) => {
           const isSleep = group.type === "sleep";
           const isRecentlySaved =
             recentlySavedHour !== null &&
@@ -1073,7 +1093,8 @@ function PlannerContent() {
           // 3. Single Hour Slot
           return renderHourSlot(group.slots[0]);
         })}
-      </div>
+        </div>
+      )}
 
       {/* Edit Hour Modal Sheet */}
       <EditHourModal

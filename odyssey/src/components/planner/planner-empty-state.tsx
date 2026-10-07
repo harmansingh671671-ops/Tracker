@@ -6,6 +6,11 @@ interface PlannerEmptyStateProps {
    * so it must not be described as one. The copy differs; the shape does not.
    */
   isPastDay: boolean;
+  /**
+   * Optional click handler. When provided, the entire empty state becomes
+   * clickable for quick scheduling access.
+   */
+  onClick?: () => void;
 }
 
 /**
@@ -13,9 +18,8 @@ interface PlannerEmptyStateProps {
  *
  * A blank day is a legitimate starting point, not a missing thing, so the copy
  * says so plainly instead of leaving 24 identical "Empty Slot" rows to be
- * interpreted. There is no button here on purpose: the instruction is to tap an
- * hour, and adding a (+) button would be a second, redundant path to a gesture
- * that already works on all 24 rows.
+ * interpreted. The empty state is shown ONLY when there are no blocks scheduled,
+ * and it's clickable to open the quick scheduling window.
  *
  * The illustration is the planner's own rail — a spine with ticks and one
  * highlighted hour — so it reads as "this surface, empty" rather than as a
@@ -24,13 +28,21 @@ interface PlannerEmptyStateProps {
  * duplicate control. The pulse is now on that one hour.
  *
  * Both motions are decorative and `aria-hidden`; the real affordance is the
- * timeline below. They are gated on `prefers-reduced-motion` in `globals.css`,
- * matching `keystonePulse` (M2) and `date-ring-pulse`, so honouring reduced
- * motion costs no JS and no hydration-time flash.
+ * click handler when provided. They are gated on `prefers-reduced-motion` in
+ * `globals.css`, matching `keystonePulse` (M2) and `date-ring-pulse`, so
+ * honouring reduced motion costs no JS and no hydration-time flash.
  */
-export function PlannerEmptyState({ isPastDay }: PlannerEmptyStateProps) {
+export function PlannerEmptyState({ isPastDay, onClick }: PlannerEmptyStateProps) {
   return (
-    <div className="flex flex-col items-center text-center gap-4 rounded-2xl border border-outline/10 bg-surface-container-low px-6 py-8 sm:py-10">
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); } : undefined}
+      className={`flex flex-col items-center text-center gap-4 rounded-2xl border border-outline/10 bg-surface-container-low px-6 py-8 sm:py-10${
+        onClick ? " cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all" : ""
+      }`}
+    >
       <svg
         viewBox="0 0 56 120"
         className="w-14 h-28 sm:w-16 sm:h-32"
