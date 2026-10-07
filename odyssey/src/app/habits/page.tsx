@@ -12,6 +12,9 @@ import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { PerfectDayCard } from "@/components/habits/perfect-day-card";
+import { WelcomeCard } from "@/components/habits/welcome-card";
+import { shouldShowWelcomeCard } from "@/lib/utils/welcome-card";
+import { dismissWelcomeCard, hasDismissedWelcomeCard } from "@/lib/utils/onboarding";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -204,6 +207,34 @@ export default function HabitsPage() {
     !isFutureSelectedDate &&
     !habitsLoading &&
     habits.length > 0;
+
+  // M6 -- welcome card visibility.
+  //
+  // `welcomeDismissed` starts `true` so the card is never rendered from the
+  // server pass through to the first client render. Reading storage during render
+  // would break hydration: the server has no localStorage and would answer
+  // "not dismissed", so a real dismissal would flash the card before vanishing.
+  // Reading it in an effect keeps the first paint identical on both sides.
+  const [welcomeDismissed, setWelcomeDismissed] = useState(true);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWelcomeDismissed(hasDismissedWelcomeCard());
+  }, []);
+
+  const showWelcomeCard = shouldShowWelcomeCard({
+    habitsLoading: habitsLoading || !user?.id,
+    habitCount: habits.length,
+    dismissed: welcomeDismissed,
+  });
+
+  const handleDismissWelcome = useCallback(() => {
+    // Persist first, then update. If the write fails the card will return on the
+    // next visit, which is harmless -- the reverse order would hide it for this
+    // session and then bring it back, reading as a broken button.
+    dismissWelcomeCard();
+    setWelcomeDismissed(true);
+  }, []);
 
   const formattedSelectedDate = useMemo(() => {
     if (selectedDate === todayStr) return "Today";
@@ -522,8 +553,21 @@ export default function HabitsPage() {
         </div>
       </div>
 
-      {/* Main Content Area Based on View Mode */}
-      {habits.length === 0 ? (
+      {/* Main Content Area Based on View Mode
+
+          The welcome card (M6) and the keystone empty state (M2) share this one
+          slot deliberately. Stacking them would give two full-size cards each
+          carrying a "do this" button, and the user would have to work out which
+          one to obey -- the same duplicate-control mistake the M3 pulse made.
+          `shouldShowWelcomeCard` picks the winner; whichever loses is not
+          rendered at all, and dismissing hands the slot to M2 rather than
+          leaving it empty. */}
+      {showWelcomeCard ? (
+        <WelcomeCard
+          onAddFirstHabit={() => setIsCreateModalOpen(true)}
+          onDismiss={handleDismissWelcome}
+        />
+      ) : habits.length === 0 ? (
         <HabitsEmptyState onAddFirst={() => setIsCreateModalOpen(true)} />
       ) : viewMode === "list" ? (
         /* 1. LIST VIEW: Full-width interactive cards for selected date */

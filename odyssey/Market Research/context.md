@@ -369,6 +369,46 @@ to v2.0 (ECON-2, contradiction C3).
 sometimes taken and the server has come up on **3001** — always verify with
 `Get-NetTCPConnection -LocalPort 3000,3001` rather than assuming.
 
+**Background servers MUST be killed within 5 seconds of "Ready".** Owner
+instruction. `Start-Process npx.cmd next start …` returns immediately but leaves
+the server running **forever**, holding the port and eating memory — the tool
+call finishes and looks complete, so it is easy to forget and leave a chain of
+them. When the log prints `Ready in Nms`, immediately kill it:
+
+```powershell
+# start, capture the log, then poll for "Ready"
+Start-Process npx.cmd -ArgumentList "next","start","-p","3100" `
+  -WindowStyle Hidden `
+  -RedirectStandardOutput "$env:TEMP\opencode\next.log" `
+  -RedirectStandardError  "$env:TEMP\opencode\next.err.log"
+# ... run the verification against http://127.0.0.1:3100 ...
+# ALWAYS, in the same session, before moving on:
+Get-NetTCPConnection -State Listen -LocalPort 3100 |
+  Select-Object -ExpandProperty OwningProcess -Unique |
+  ForEach-Object { Stop-Process -Id $_ -Force }
+```
+
+Kill by the port's owning PID, not by guessing a PID — `next start` spawns a
+child, and the parent may already be gone. Also note `EADDRINUSE`: if a previous
+run was not killed, the new server silently fails to bind and you end up testing
+**stale output**. Check the new log actually says `Ready`.
+
+**Headless Chrome defaults to `prefers-color-scheme: dark`.** The theme resolves
+through that media query (`theme-store.ts` + the anti-FOUC script in
+`layout.tsx`), so a "light mode" screenshot pass that only leaves the mode on
+`system` silently renders **dark** — light mode looks verified when it was never
+loaded. Force both: `page.emulateMediaFeatures([{name:"prefers-color-scheme",
+value:"light"}])` **and** set `odyssey_theme_mode` in `evaluateOnNewDocument`.
+Assert the rendered background rather than trusting the run name.
+
+**A fixed `z-50` overlay swallows real mouse clicks.** `AppShell` renders
+`<AppUpdateModal />` on every route, and it appears on a fresh profile. Use
+`page.click` → nothing happens, because the click lands on the backdrop and the
+target reads as broken. Use a DOM click instead (`el.click()` via `evaluate`),
+which bypasses hit-testing. **Always run a control** before believing an
+interaction is broken: M6's dismiss button looked dead for two debug cycles
+because of this overlay, not because of the button.
+
 ### Gates — cheapest that can fail, first
 
 ```
@@ -505,6 +545,81 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-07 — M6 welcome card, and two verification traps that faked a failure
+
+**Shipped:** `src/components/habits/welcome-card.tsx` — heading, warm
+one-liner, three pillar rows (Habits / Schedule / Wallpaper), the **M1** trust
+badge inline, one CTA opening the existing create modal, and a `×` dismiss. That
+fills the onboarding surface the M1 badge comment had explicitly recorded as
+"deliberately absent", so **all three** M1 surfaces named at §19 L973 now exist.
+
+**It shares one slot with M2's empty state rather than stacking above it.** Both
+are full-size and both carry a "do this" button; two of them compete and the user
+has to work out which to obey — the same duplicate-control mistake the M3 pulse
+made. `shouldShowWelcomeCard()` picks a winner and the loser is not rendered at
+all. Dismissal hands the slot to M2, so dismissing is never a dead end. **The
+card never returns once a habit exists.**
+
+**Loading is checked first in that rule, and that is the whole point.** The habit
+store starts `loading: true` on purpose, so `habits` is `[]` on the first paint for
+*every* user including one with twenty habits. Testing `habits.length === 0`
+alone would flash the card at a returning user on **every visit**. This is now the
+fourth instance of the same class: `0/0 (0%)` with no habits, `percent: null` in
+`habit-progress.ts`, the M3 clean-slate card, and this. **Any new "this is empty"
+state on a store that loads must copy `planner-empty-state.ts` and short-circuit
+on loading first.**
+
+**Dismissal uses a SEPARATE flag from the landing page's.** `onboarding.ts` had
+`odyssey_onboarding_complete`, gating the landing pitch. It looks like the same
+fact — "this person has seen the intro" — but sharing a key means dismissing the
+card would let the landing page reappear, and finishing the pitch would hide the
+card. Two keys, one test asserting the independence.
+
+**localStorage is correct here, and the opposite of ADR 0002.** The reward ledger
+had to move into IndexedDB because it protects a balance — losing it pays twice. A
+dismissed banner protects nothing; the failure mode of losing the flag is that
+someone sees a welcome card once more, which is harmless. Different tier, and the
+comment says so so nobody "fixes" it.
+
+**The wallpaper copy is deliberately hedged.** P8-E1 made the wallpaper
+default-OFF, so "your plan on your lock screen" would promise a background
+service the user has not switched on. It reads *"if you want it there"*. Owner
+confirmed: keep it default-off.
+
+**Two verification traps, both of which first read as a broken feature:**
+
+1. **My React-hydration probe was wrong**, reporting `1` hydrated node on a page
+   that had **676**. `for (const k in node)` plus an early `return` walked the
+   tree wrongly. Correct form is `Object.keys(n).filter(k => k.startsWith("__reactFiber"))`
+   over every element. **A broken probe reporting "not hydrated" is
+   indistinguishable from a real bug** — that is the M2 trap again, one level up.
+2. **Headless Chrome defaults to `prefers-color-scheme: dark`**, so my first
+   "light mode" pass rendered dark and I nearly recorded light mode as verified.
+   The theme resolves through that media query. Force both the emulation and the
+   stored mode; do not trust the run's label. Added to §7.
+
+And a third, cost two debug cycles: **a fixed `z-50` overlay swallows real mouse
+clicks.** `AppShell` renders `<AppUpdateModal />` on every route, so on a fresh
+profile `page.click` on the dismiss button hit the modal backdrop and the card
+looked broken. `page.click` does hit-testing; `el.click()` via `evaluate` does
+not. **The M2 lesson again: run a control before concluding your code is
+broken.**
+
+Also worth recording: the create-habit modal opens on the **template browse**
+view, not the form — a `requestSubmit()` on the form finds nothing until
+"Create Custom Habit" is clicked. That is why the retire-on-first-habit check
+appeared to fail.
+
+**Found, reported, NOT fixed (out of scope — CONS-2 territory):** at **360px** the
+floating Feedback button overlaps the card's primary CTA by ~259px² of 10,584
+(2.4%, its top-right corner). A tap there hits the FAB. The FAB is `fixed` and
+overlaps content on every screen; the fix is bottom clearance so content clears
+it, which belongs to the narrow-screen sweep, not to M6.
+
+No animation on the card at all, so `prefers-reduced-motion` is honoured with no
+handling. 156 tests green (M6 adds `welcome-card.test.ts`, 9 tests, and 9 more to
+`onboarding.test.ts`).
 
 ### 2026-10-07 — M3 planner clean-slate state, and a false zero the loading flag caught
 
@@ -682,22 +797,27 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `34ce528` — *"chore(root): add a package.json launcher so
-  npm scripts work from the workspace root"*, on top of `31933ca` (M2 habits
-  empty state). Before that, `b72842d` adopted `context.md` as the agent entry
-  point and wired `AGENTS.md` / `main_plan.md` / `FEATURE_WORKFLOW.md` to it.
-- Working tree: clean apart from the M3 work described above, which is staged for
-  its own commit. The root `package.json` launcher (see §2, "Where to run
+- HEAD at last update: `673cf30` (M5 creation toast docs), on top of `5d4edc2`
+  (M5), `1feae91` (M4 docs), `5a40a2b` (**M4** reward unification), `2481609`
+  (M3). The **M6** welcome card is committed on top of `673cf30`.
+- Working tree: clean. The root `package.json` launcher (see §2, "Where to run
   commands") is the only file outside `odyssey/` and holds no dependencies.
-- Lint on the touched files: **0 errors, 10 warnings** — all pre-existing
-  `no-unused-vars` in `planner/page.tsx` (`useScheduleStore`, `ChevronLeft`,
-  `Flame`, `Check`, `Radio`, `Zap`, `CatIcon`, …). The M3 files add none.
-- Tests: **10 suites, 116 tests, all green** (M3 adds `planner-empty-state.test.ts`).
+- Lint on the touched files: **0 errors, 1 warning** — pre-existing
+  `no-unused-vars` for `Coffee` in `habits/page.tsx`. The M6 files add none.
+- Tests: **12 suites, 156 tests, all green** (M6 adds `welcome-card.test.ts` and 9
+  cases in `onboarding.test.ts`).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
+- **Kill any background server within 5s of "Ready"** — owner instruction, see
+  §7 "Dev server". `Start-Process` returns immediately and leaves it running
+  forever; kill by the port's owning PID, and confirm the new log says `Ready`
+  or you are testing stale output.
 - **Hydration marker is a React-keyed node count, not `#__next`** — see §9,
   2026-10-07. The old `#__next` check reads `false` on a working production build.
+  Count `Object.keys(n).filter(k => k.startsWith("__reactFiber"))` per element;
+  a probe built on `for…in` reports 1 on a page with 676 and looks like a real
+  hydration failure.
 - Puppeteer is **not** a project dependency. Verify with `puppeteer-core` driven
   by the system Chrome (`C:\Program Files\Google\Chrome\Application\chrome.exe`),
   installed outside the repo, so no dependency is added to the app.
@@ -709,7 +829,7 @@ to know where things stand.
 ### 2026-10-07 — M4 Perfect Day reward system, and graphify availability
 
 **Shipped (partial):** the reward calculation engine for the perfect-day bonus (`lib/utils/reward-rules.ts`), including `isPerfectDay()`, `computeDayReward()`, `advanceStreakForSettlement()`. Also shipped the `PerfectDayCard` component (`components/habits/perfect-day-card.tsx`) with CSS glow animation.  
-**Not yet integrated:** the component is not mounted in any page; it needs a consumer that calls `isPerfectDay()` and passes the result to `<PerfectDayCard show={...} isToday={...} />`.
+**Not yet integrated (corrected later the same day — this is now false):** the component is not mounted in any page; it needs a consumer that calls `isPerfectDay()` and passes the result to `<PerfectDayCard show={...} isToday={...} />`. It **was** mounted in the same M4 build, in `habits/page.tsx`.
 
 **Graph freshness note:** `graphify update .` executed at start of session, but the CLI is not available in this environment (missing from `PATH` and no local bin). The graph at `graphify-out/GRAPH_REPORT.md` is built from `dda4383d` and should be regenerated when graphify is accessible, before using it for impact analysis.
 
@@ -717,15 +837,18 @@ to know where things stand.
 
 **Shipped:** M5 creation confirmation toast now names the first milestone. Habit creation dialog shows: "Your journey with {Habit Name} begins now. First milestone: 3-day streak." This matches the spec in `MASTER_TODO_REVISED.md` §19.
 
-**M4 integration status:** the `PerfectDayCard` component remains unmounted. The reward engine (`reward-rules.ts`) is fully tested and working; finding the right consumer location (likely `habits/page.tsx` or `day-schedule`) is a follow-up task.
+**M4 integration status (corrected later the same day):** this originally said
+`PerfectDayCard` was "unmounted, finding the right consumer location is a
+follow-up task". It was mounted during the M4 build itself, on `habits/page.tsx`
+above the vault banner. The follow-up task is closed.
 
 ### Where the work is right now
 
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M6** — First-open welcome banner (3 pillars). `NOT BUILT` · also: `A8` |
-| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
+| Next feature | **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15` |
+| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep, not to any single feature |
 | Phase 1 exit gate | Gates clean · no uncommitted work |
 | Next after Phase 1 | Phase 2 — onboarding `A1`/`XL14` is the largest gap between the app and its own research |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |

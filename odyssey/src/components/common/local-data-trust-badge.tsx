@@ -19,10 +19,13 @@ import { cn } from "cn";
  *
  * `§19 L973` names three surfaces - Settings, Onboarding, Profile:
  *   - `variant="card"`   its own block, matching the Profile page's cards
- *   - `variant="inline"` nests inside an existing card (Settings' Local Vault)
+ *   - `variant="inline"` nests inside an existing card (Settings' Local Vault,
+ *                        and the M6 welcome card)
  *
- * Onboarding has no route yet (A1 is `NOT BUILT`), so that third surface is
- * deliberately absent rather than stubbed. Add it there when A1 lands.
+ * All three now exist. The onboarding surface was absent for the whole of M1's
+ * life because there is no `/onboarding` route (A1 is `NOT BUILT`); it arrived
+ * with M6, whose welcome card is the first-run surface inside the app. A future
+ * `/onboarding` route can reuse the same inline variant.
  *
  * Presentational only - no state, no tests needed. All behaviour lives in the
  * storage layer this is describing.
