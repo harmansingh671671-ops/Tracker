@@ -39,12 +39,19 @@ If this file and the **code** disagree, **stop and reconcile** before continuing
 | Status | Meaning |
 |---|---|
 | `SHIPPED` | Built, verified, committed, in the app |
+| `BUILT` | Code exists and is committed, but **not yet verified against a stated acceptance criterion in its current phase**. Used heavily in the performance phase (§6.5), where an item may already be delivered by earlier work but the measurement has not been re-taken |
 | `PARTIAL` | Some of it exists; the remainder is listed in the brief |
 | `NOT BUILT` | Researched and planned, zero code |
 | `BLOCKED` | Cannot start until a named dependency clears |
 | `GATED` | Legally/policy gated (Play Store, moderation, payments) |
 | `DEFERRED` | Deliberately parked to a later phase |
 | `NOT APPROVED` | Proposed but explicitly not a product commitment |
+
+> **`BUILT` vs `SHIPPED` is not cosmetic.** `SHIPPED` means someone measured or
+> verified it. `BUILT` means it is in the tree and nobody has yet checked it
+> against its acceptance criteria. Never promote `BUILT` to `SHIPPED` without a
+> before/after number or an explicit check. A line that says `BUILT` and names what
+> still needs verifying is honest; one that quietly says `SHIPPED` is not.
 
 ### 0.3 Source reference format
 
@@ -66,12 +73,19 @@ to implement twice, they are the same feature seen from two documents.
 | **2** | Real feature work added to the app |
 | **3** | Avatar, customisation, shop |
 | **4** | Social tab |
+| **Performance** | Load speed, render cost, battery, bundle and load-path — **§6.5**. Unnumbered because it must not collide with Phase 4; runs after Phase 4 and before Phase 5 |
 | **5** | Wallpaper and widgets |
 | **6** | Polish, non-AI Pro features, third-party integrations |
 | **7** | AI |
 
 This order is **deliberate and overrides** the phase numbering in `DEVELOPMENT_PLAN.md`
 §4 and `PRODUCTION_PLAN.md`. See contradiction **C1** in §9.
+
+**The performance phase is `DEFERRED`-friendly and GATED-free**: it needs no backend, no
+account, no Play policy decision, and no legal review. It is also the only phase that
+makes every later phase cheaper and safer to build, which is why it sits before the
+wallpaper work in Phase 5. See **C12** for why it is unnumbered and why `POL-1` was
+moved into it.
 
 ---
 ## 1. AI AGENT WORKFLOW (binding)
@@ -566,6 +580,149 @@ adult-to-minor DMs. Reporting, blocking and moderation ship **with** the feature
 **Phase 4 exit gate:** all four GATE items implemented *before* any user can publish content.
 
 ---
+## 6.5. PERFORMANCE PHASE — load speed, render cost and battery
+
+**Origin:** `tracker-performance-master-prompt.md` (repo root). That file is the
+**authority** on this work: 18 ranked items with sub-steps, priorities and acceptance
+criteria. This section is a **self-contained restatement** so an agent working here does
+**not** have to open the master prompt for routine work.
+
+**Two rules keep them from drifting:**
+
+1. **On any conflict, the master prompt wins.** If this section and
+   `tracker-performance-master-prompt.md` disagree, the master prompt is correct and
+   **this section is the stale one** — fix it in the same commit.
+2. **Editing one requires editing the other.** Never change an item here without
+   checking the master prompt, and never change the master prompt without updating
+   here.
+
+### 6.5.1 Why this phase exists, and what it does *not* do
+
+The master prompt's own ground rule #1 is *"verify before you change… if something is
+already fixed or described inaccurately, say so and move on."* Applying that rule to the
+current tree changed the shape of this phase before it was written, so read §6.5.2
+before touching anything.
+
+This phase **does not** add features. It makes what already exists load faster, render
+smoother and cost less battery. Any change that alters what the user sees or does is out
+of scope here and belongs to a feature phase — **except** where an item explicitly
+requires a visible difference, and then it must be called out in the report.
+
+### 6.5.2 ⚠️ RECONCILIATION — read this first, it changes what the work actually is
+
+The master prompt's figures came from a prior code review, not from measurement. Five of
+its eighteen items are **already delivered** and **four of its numbers are wrong** in this
+tree today. Verified against source on 2026-10-08:
+
+| # | Master prompt says | This tree, verified | Consequence |
+|---|---|---|---|
+| **#1** | Wallpaper redraws **30×/s**; ~**1,710 `Paint` allocs/sec** (~99% of redraw work wasted) | **Already delivered** by `P8-E2`. `OdysseyLiveWallpaperService.kt` uses `REFRESH_INTERVAL_MS = 60_000L` and re-arms on the minute boundary; the schedule JSON is cached, not re-parsed per frame | **The item's headline motivation no longer exists.** `P8-E4` already ruled the residual ~57 `Paint` allocations per render "a rounding error rather than a drain" at 1 render/minute. Sub-steps 1c/1h must **not** be implemented on the old reasoning |
+| **#2c** | Wallpaper needs an hourly alarm that can be replaced | **Already delivered** — the wallpaper uses `handler.postDelayed`, no alarm | But `RTC_WAKEUP` **still exists** at 2 sites in `OdysseyCadenceNotificationWorker.kt`, so #2a/2b/2d remain genuinely open |
+| **#4a** | `wallpaper-preview.tsx` runs `setInterval(…, 1000)` for a **minute-precision** clock | **Already fixed** — it re-arms on `msToNextMinute` | But there are **7 `setInterval` calls app-wide**, **no shared clock module exists**, and `journey-day-schedule.tsx` still ticks every **5 s** |
+| **#7** | "~22 stacked heavy blur layers" | **41 occurrences across 21 files** | Larger than estimated; budget accordingly |
+| **#12** | "8 instances" of `SharedPreferences.commit()` | **9** | Small drift, re-count before acting |
+| **#15** | Remove the unused `WAKE_LOCK` permission | **Already removed** — only a comment remains in the manifest | Verify against the **merged** manifest, then close |
+| **#3** | Assumes bundled assets vs remote URL is open | **Remote**: `MainActivity` calls `webView.loadUrl(targetUrl)` | The "bundled / `WebViewAssetLoader`" branch **does not apply**; the remote branch (caching, service worker, preconnect) does |
+| — | — | **No `gradlew` in the repo**, and the documented JDK-25 vs Kotlin-1.9.22 daemon failure (risk **R14**) | See §6.5.4 — native items cannot be signed off on this machine |
+
+**So the phase is ~4 delivered, ~3 partial, ~11 open.** Implement it as a verification
+and measurement phase first. **Do not "optimise" a 30 FPS loop that no longer exists.**
+
+### 6.5.3 The items — full detail, in priority order
+
+Sub-steps are reproduced so this section stands alone. Item → master prompt mapping is
+1:1 and in the same order.
+
+- [ ] **PERF-0** — Baselines and reconciliation. `NOT BUILT` — **do this before PERF-1.** Re-verify every figure in §6.5.2 against source and record actuals, then capture baselines per §6.5.4. Android: `adb shell am start -W` (cold start), `dumpsys gfxinfo` (jank), `dumpsys batterystats`, `dumpsys alarm | grep <package>` (wakeups), Android Studio CPU/Memory profilers, Perfetto. Web: `chrome://inspect` against the WebView (Performance + Memory), React DevTools Profiler, bundle analyzer, Lighthouse on a **production** build. **Always release builds on a real mid/low-end device — not the emulator, not debug.** If profiling contradicts the §6.5.2 ranking, finish the measurement, report the conflict, and ask before reordering · src: `tracker-performance-master-prompt.md` §0
+
+- [x] **PERF-1** — Stop re-rendering the whole wallpaper 30×/second. `BUILT` — **delivered by `P8-E2`**; 1a (cached static scene), 1b (invalidate on size/rotation/data/hour-rollover/theme/photo change), 1d (parse JSON once, cached), 1e (minute-boundary re-arm via `60_000 - now % 60_000`) and 1f (stop when not visible / on surface destroyed) are in the service; the beacon glow is frozen at a fixed mid-cycle value and **nothing is drawn at all when the user has applied an alternate wallpaper**. **Needs verification:** confirm zero drawing while invisible, confirm no allocation in the draw path, and re-measure wallpaper CPU. **Do not implement 1c/1h on the old 30 FPS reasoning** — `P8-E4` already classified that work as not worth doing at 1 render/minute. If a re-measure contradicts `P8-E4`, report it rather than quietly re-opening 1c · src: `OdysseyLiveWallpaperService.kt`, `DEVELOPMENT_PLAN.md §4 P8`, `inefficiencies.md`
+
+- [ ] **PERF-2** — Eliminate wasted device wake-ups. `PARTIAL` — **2c already delivered** (wallpaper uses `Handler.postDelayed`, no alarm). Still open: **2a** move the "is the live wallpaper active?" early-return **before** any alarm is scheduled, and cancel an existing alarm when the wallpaper is removed/deactivated; **2b** prefer inexact/non-waking scheduling (`WorkManager` periodic, `setInexactRepeating`, `setAndAllowWhileIdle` with a non-`WAKEUP` type) and keep a waking alarm **only** for user-visible notifications that truly must fire on time, with the correct exact-alarm API and permission for the target SDK; **2d** re-schedule correctly after reboot/time change only if still needed. `RTC_WAKEUP` remains at 2 sites in `OdysseyCadenceNotificationWorker.kt`. **The master prompt quotes both "~24 wasted wakeups/day" and "48 wakeups/day" — verify the real count with `dumpsys alarm` and report the true number.** Acceptance: no wake-up alarms for the wallpaper when it is not active; the early return happens before any alarm is set; notification timing still works · src: `OdysseyCadenceNotificationWorker.kt`
+
+- [ ] **PERF-3** — Cold-start and WebView load path. `NOT BUILT` — **the app is served from a remote URL** (`MainActivity` → `webView.loadUrl(targetUrl)`), so the bundled-asset branch does not apply. Do instead: **3a** add HTTP caching headers and/or a service worker for the shell and static assets, and preconnect early; **3b** warm the WebView up early (`Application.onCreate` via an idle handler, or first thing in the Activity) and **reuse a single instance**; **3c** never block the main thread at startup — defer analytics, non-first-screen bridges and alarm setup until after first frame (AndroidX App Startup or `Looper.myQueue().addIdleHandler`); **3d** native splash via the `SplashScreen` API, dismissed when the web side signals ready through a bridge `onAppReady()` after first paint, so the user never sees a white WebView; **3e** sensible WebView settings — `domStorageEnabled`, `cacheMode = LOAD_DEFAULT`, hardware acceleration on, `setWebContentsDebuggingEnabled(false)` in release; **3f** prefetch other routes **on idle**, not at startup. Acceptance: measurably lower cold-start-to-first-paint (via `am start -W` plus a JS `performance.mark` reported over the bridge), no white flash, no startup main-thread jank · src: `MainActivity.kt`
+
+- [ ] **PERF-4** — Redundant JS timers and clock re-renders. `PARTIAL` — **4a already delivered** in `wallpaper-preview.tsx` (`msToNextMinute` boundary re-arm). **7 `setInterval` calls app-wide, no shared clock.** Do: **4b** build one shared `useNow()` hook backed by `useSyncExternalStore` with **one timer total**, started when the first subscriber mounts and stopped when the last unmounts, replacing all the scattered timers; if a screen genuinely needs finer granularity, offer an **explicit opt-in** granularity rather than a private timer. `journey-day-schedule.tsx` at 5 s is the worst remaining offender; the 3 s day-change detectors on the planner and habits screens are date-boundary checks, not clocks — decide deliberately whether each is a clock or a boundary poll. **4c** pause while `document.hidden` and refresh immediately on `visibilitychange` to visible. **4d** isolate the clock display into a tiny component so a tick does not re-render a whole page. **4e** test minute rollover, midnight rollover, DST change and timezone change. Acceptance: exactly one active clock app-wide, ticks on minute boundaries, ~60× fewer renders on the preview screen, no timers while backgrounded · src: `wallpaper-preview.tsx`, `journey-day-schedule.tsx`, `planner/page.tsx`
+
+- [ ] **PERF-5** — Route-level code splitting and bundle diet. `NOT BUILT` — measured today: `planner/page.tsx` **48.3 KB**, `habits/page.tsx` **45.4 KB**, `journey-day-schedule.tsx` **44.9 KB**, `day-schedule/page.tsx` **39.5 KB**, `stats/page.tsx` **35.8 KB**. Do: **5a** add the bundle analyzer and record per-route JS baseline; **5b** confirm route-level splitting actually happens — heavy, below-the-fold or modal-only components use `next/dynamic` (with `ssr: false` where appropriate for a WebView app) or `React.lazy`; **5c** extract hooks and sub-components out of the five files above into `hooks/` and `components/`. **The onboarding flow is the proof this works: `app/page.tsx` was 710 lines and is now 8.2 KB after the A1 extraction** — follow that pattern; **5d** trim dependencies — replace heavy date libs with `date-fns`/dayjs (the app already uses `date-fns`), import icons individually via `optimizePackageImports`, remove unused packages, avoid importing whole utility libraries; **5e** production hygiene — minification on, source maps off in the shipped build, `compiler.removeConsole` for production, Tailwind purging unused CSS; **5f** enable the React Compiler only if the profiler shows benefit. Acceptance: smaller initial JS per route with KB before/after, route components load on demand, **no file over ~15–20 KB without good reason** · src: the five files above
+
+- [ ] **PERF-6** — JS ↔ Kotlin bridge and wallpaper sync efficiency. `NOT BUILT` — **6a** debounce/throttle wallpaper-sync calls from JS with a 300–500 ms trailing debounce; never sync per keystroke or per render; **6b** send only when data actually changed — compare a hash/version of the payload and skip no-op updates; **6c** batch multiple preference writes into a single `Editor` transaction; **6d** keep `@JavascriptInterface` methods fast — real work on a background thread/dispatcher, never on the bridge thread. Acceptance: editing a schedule triggers **at most one** bridge call and **one** cache rebuild per burst of edits · src: `OdysseyWallpaperBridge.kt`, `lib/utils/android-bridge.ts`
+
+- [ ] **PERF-7** — Reduce heavy `backdrop-filter` blur. `NOT BUILT` — **41 occurrences across 21 files** today (the master prompt's "~22 stacked" undercounts; `POL-1` said 29, also stale). Do: **7a** audit and list every `backdrop-blur-*` use with file, class, and whether it sits over scrolling or animated content; **7b** reduce layer count — replace many small stacked blurs with a few larger blocks, and **never nest blurs**; **7c** use cheaper effects where visually acceptable — semi-transparent solids or opacity gradients instead of blur; **7d** cap radii — nothing above `backdrop-blur-md` on full-screen or scrolling surfaces, and never animate an element that has `backdrop-filter`; **7e** low-end fallback — detect via `navigator.deviceMemory` / `hardwareConcurrency` or a native flag and swap blur for flat translucent backgrounds. **Mitigating factor to state in the report, not hide:** `MainActivity.onPause()` → `webView.onPause()` already pauses rendering in the background, so this is a **foreground-only** cost — jank while scrolling and animating. Acceptance: fewer blur layers, smoother scrolling confirmed by `gfxinfo` jank % or the Chrome Performance panel, design unchanged on a normal device · src: `POL-1`, `inefficiencies.md`
+
+- [ ] **PERF-8** — React render efficiency in the heavy screens. `NOT BUILT` — **8a** profile first with React DevTools Profiler and fix only real hot spots; **8b** memoise expensive derived data (`useMemo` for sorted/filtered lists), stabilise callbacks passed to memoised children (`useCallback`), and `React.memo` the list-row components; **8c** virtualise lists exceeding ~50 rows (`@tanstack/react-virtual` is **not** currently a dependency — evaluate before adding; note the reuse rule: existing code → stdlib → installed dep → new package last); **8d** split state/context so a change to one slice does not re-render the whole tree, colocating state near its use; **8e** never do work during render — no `JSON.parse`, no `localStorage` reads, no date-heavy computation in render bodies; move to memoised selectors or effects; **8f** stable `key`s everywhere, never array-index keys on reorderable lists. Acceptance: fewer and cheaper commits on the heavy screens; interactions feel instant on a low-end device · src: planner, day-schedule, habits, journey
+
+- [ ] **PERF-9** — Animation and compositing hygiene. `NOT BUILT` — **9a** animate only `transform` and `opacity`, never `width`/`height`/`top`/`left`/`box-shadow`/`filter`; **9b** pause infinite CSS animations when off-screen or when the page is hidden (`IntersectionObserver` / `visibilitychange`); **9c** honour `prefers-reduced-motion` — note the existing house pattern of putting keyframes inside a `prefers-reduced-motion: no-preference` query in `globals.css`; **9d** use `will-change` sparingly, only on elements that actually animate; **9e** avoid layout thrashing — no read-write-read of layout properties in loops. Acceptance: no continuously running animation on invisible elements; steady 60 fps in common interactions · src: `app/globals.css`
+
+- [ ] **PERF-10** — Fonts, images and static assets. `NOT BUILT` — **10a** self-host fonts via `next/font`, subset them, `font-display: swap`, load only the weights actually used (two display faces are in use on the landing/onboarding flow — verify whether both are needed on every step); **10b** convert raster images to WebP/AVIF at sensible dimensions, inline tiny SVGs, remove unused assets from the web bundle and APK; **10c** lazy-load below-the-fold images with explicit width/height to prevent layout shift; **10d** preload only the truly critical font/asset. Acceptance: smaller asset payload with before/after, no layout shift on load · src: `app/layout.tsx`
+
+- [ ] **PERF-11** — Bitmap handling for custom wallpapers. `NOT BUILT` — **11a** `.recycle()` bitmaps that are replaced or discarded, **never** one still being drawn or cached; **11b** decode smartly with `inJustDecodeBounds` + `inSampleSize` at screen size, never full resolution, `RGB_565` when no alpha is needed, decode off the draw thread; **11c** cache the decoded custom image keyed by URI + modified time so it is not re-decoded on every rebuild; **11d** handle `OutOfMemoryError`/decode failure with a fallback. Acceptance: lower peak memory in the Memory Profiler, no repeated decodes, no crashes on large images · src: `renderWallpaper`
+
+- [ ] **PERF-12** — `SharedPreferences.commit()` → `apply()`. `NOT BUILT` — **9 instances** today (the master prompt says 8; re-count). Replace with `apply()` (async) and batch per transaction (see PERF-6c). **Check each call site:** `apply()` is safe for in-process readers because in-memory state updates immediately, but **keep `commit()`** where another process reads the value or durability before process death is required — and document why at that site. Acceptance: no blocking disk I/O on the bridge thread, behaviour unchanged · src: `OdysseyWallpaperBridge.kt`
+
+- [ ] **PERF-13** — Release build optimisation. `NOT BUILT` — `android/app/build.gradle` has **`minifyEnabled false`** today. **13a** enable R8 `minifyEnabled true` and `shrinkResources true` for release, and fix any keep-rules needed for `@JavascriptInterface` classes and reflection; **13b** add a **Baseline Profile** and a Macrobenchmark module for cold start; **13c** ship an **AAB** so ABI/density splits reduce install size; **13d** remove unused Gradle dependencies and resources (Android Lint "unused resources"). Acceptance: smaller APK/AAB, faster cold start, and **the release build still works end to end — test the bridge and the wallpaper**, since R8 can strip exactly the reflection-dependent code this app depends on · src: `android/app/build.gradle`
+
+- [ ] **PERF-14** — Logging, leaks and lifecycle hygiene. `NOT BUILT` — **14a** strip or gate `Log.*` in hot paths and release builds, and remove `console.log` from production web code (the ESLint config already warns on `no-console`); **14b** ensure every `Handler` callback, `BroadcastReceiver`, listener and coroutine is cancelled/unregistered in the matching lifecycle callback (`onDestroy`, `onVisibilityChanged`, `onPause`) — **debt D4 in this repo was exactly a listener without cleanup**; **14c** destroy the WebView correctly in `onDestroy` (remove from parent, `stopLoading`, `destroy`) to avoid leaks; **14d** add LeakCanary to **debug builds only** and fix what it reports. Acceptance: no leaks in a normal usage session, no logging in hot loops · src: `DEVELOPMENT_PLAN.md` §5.6, debt register D4
+
+- [x] **PERF-15** — Remove the unused `WAKE_LOCK` permission. `BUILT` — **already delivered**; the permission is gone and only an explanatory comment remains in `AndroidManifest.xml`. **Needs verification:** confirm via the **merged** manifest that nothing (including a dependency) re-adds it; if a dependency does need it, document that instead of removing the line silently. Acceptance: build passes, app works, merged manifest no longer requests `WAKE_LOCK` · src: `android/app/src/main/AndroidManifest.xml`
+
+- [ ] **PERF-16** — Dependency and dead-code audit. `NOT BUILT` — **16a** run `depcheck`/`knip` for the web side and the Gradle dependency report for Android, then remove what is unused; **16b** update dependencies with known performance fixes (Next.js, React, AndroidX WebKit) **after reading the changelogs**, and test thoroughly — the app is pinned to **Next.js 16.3.5** and the upgrade path is not casual; **16c** delete unused components, routes and assets left from earlier iterations. Note: `seedInitialData()` is currently an **empty function** and is tracked as debt **D8** — a known dead-code candidate · src: `DEBT` D8
+
+- [ ] **PERF-17** — Storage layer modernisation. `NOT BUILT` — ⚪ **optional; skip unless measurement shows benefit.** If preferences are growing large or are accessed from multiple threads, migrate `SharedPreferences` to Jetpack **DataStore** (async, transactional). On the web side, confirm `localStorage` reads/writes are not in render paths and that large JSON is not re-serialised on every change — note the `odyssey/storage-boundary` ESLint rule already funnels all of it through `lib/utils/logger.ts`. Also note the deliberate counter-example: **reward settlement records must stay in IndexedDB, not `localStorage`** (ADR 0002) — do not migrate those. · src: `docs/adr/0002-reward-vault.md`
+
+- [ ] **PERF-18** — Performance regression guardrails. `NOT BUILT` — **there is no `PERFORMANCE.md` and no `.github/workflows` in the repo today.** **18a** add a bundle-size budget to CI that fails the build if a route's JS grows past an agreed threshold; **18b** add Lighthouse CI (or equivalent) on the production web build; **18c** add the Macrobenchmark startup test from PERF-13 to CI if feasible; **18d** write `PERFORMANCE.md` documenting the baselines, the final numbers, the rules (no allocations in draw loops, one shared clock, no wake-up alarms unless essential, a blur budget) and **how to re-measure**. Acceptance: a regression in bundle size or cold start fails CI rather than being discovered later · src: `tracker-performance-master-prompt.md`
+
+### 6.5.4 Honest measurement boundary — read before promising anything
+
+**The native items (PERF-1 verification, 2, 3, 11, 13, 14) cannot be fully signed off on this
+machine, and this phase must not pretend otherwise.**
+
+- There is **no `gradlew`** in the repo. The Android build runs through the documented
+  manual Gradle path with Android Studio's bundled JBR, and the Kotlin daemon cannot
+  start on JDK 25 with this project's Kotlin 1.9.22 pin (`IllegalArgumentException: 25.0.3`,
+  risk **R14**).
+- There is **no physical device attached**, and the master prompt requires measurements
+  on a **real mid/low-end device, release build** — not the emulator, not debug.
+- Therefore: `tsc`, `lint`, `build`, `vitest`, Lighthouse, bundle analyzer, React
+  Profiler and the browser suite **can** all be run here. `adb`/`dumpsys`/`gfxinfo`/
+  `batterystats` and R8/Baseline-Profile/AAB outcomes **cannot**.
+
+**Rule:** a native item may be implemented and reported, but it stays `BUILT` with
+"unverified — needs a device" until someone measures it. **Never** write `SHIPPED` for a
+native item on the strength of a green web test suite — `tsc` does not read Kotlin, and a
+real syntax error once shipped through a fully green web suite (risk **R12**).
+
+### 6.5.5 `POL-1` absorbed here — nothing lost
+
+`POL-1` previously lived in Phase 6 §8.3 and read:
+
+> *"Battery/render hardening: default-off background features, render cost. `PARTIAL` —
+> wallpaper master switch shipped (`P8-E1`); 29 `backdrop-blur` surfaces remain on the
+> planner · src: `inefficiencies.md`, `DEVELOPMENT_PLAN.md §4 P8`*
+
+Both halves are preserved: the **default-off master switch** is delivered (`P8-E1`, and
+is covered by the battery rule in `AGENTS.md` and `DEVELOPMENT_PLAN.md` §6.6), and the
+**render-cost** half is **this phase** — `PERF-7` for blur and `PERF-1`/`PERF-9` for
+draw cost. The **29** figure was stale and is corrected to the measured **41 across 21
+files**. The Phase 6 line now points here so the original location still says where the
+work went. Recorded as **C12**.
+
+### 6.5.6 Phase exit gate
+
+- `PERF-0` baselines recorded, and every §6.5.2 figure either confirmed or corrected in
+  writing — **no item implemented on a stale premise**
+- All web-side items measurable on this machine either `SHIPPED` with before/after
+  numbers, or explicitly `DEFERRED` **with a reason**
+- Every native item implemented, compiled, and reported as `BUILT` + "unverified — needs a
+  device" until measured on hardware
+- `PERFORMANCE.md` written with baselines, final numbers, the four rules and how to
+  re-measure
+- No visual or behavioural regression: reference screenshots taken first, and any visible
+  difference called out in the report
+- `POL-1` fully accounted for; no item duplicated across two phases
+- Working tree clean, `main_plan.md` and `context.md` updated before the commit
+
+---
+
 ## 7. PHASE 5 — Wallpaper and widgets
 
 Odyssey's **core differentiator** — the product is defined by it
@@ -692,7 +849,7 @@ src: `MASTER_TODO_REVISED.md §19 Tier 4 L1046–1065`
 - [ ] **FD13** — Memento Mori / Life Weeks dot grid. `NOT BUILT` · also: `G9`
 - [ ] **FD14** — Decision Fatigue Triage mode (collapse to one active task). `NOT BUILT` · src: `§12 L631`
 - [x] **XL14** — Interactive landing & onboarding. `BUILT` — landed with **A1** in Phase 1 (§10 C11). `/` is a five-step flow with working state and navigation: Next/Back with Back hidden on step 1 and Next hidden on step 5, a step indicator, an animated circadian preview, and a **theme choice (System/Light/Dark) available on every step that becomes the app's setting** — `setTheme` writes the same `odyssey_theme_mode` key the anti-FOUC script in `layout.tsx` reads, so no extra plumbing. System stays the default because the toggle writes **only on an explicit tap**; writing the resolved value on mount would persist a mode the user never chose. One way in: the old page had four separate controls (a header "Launch App", a hero "Explore Habit Studio", and five footer links) that each marked onboarding complete, so the whole introduction was skippable — verified zero bypass links remain · also: `A1`
-- [ ] **POL-1** — Battery/render hardening: default-off background features, render cost. `PARTIAL` — wallpaper master switch shipped (`P8-E1`); 29 `backdrop-blur` surfaces remain on the planner · src: `inefficiencies.md`, `DEVELOPMENT_PLAN.md §4 P8`
+- [x] **POL-1** — Battery/render hardening: default-off background features, render cost. `BUILT` — **moved to §6.5 (Performance phase) as `PERF-0`…`PERF-18`**, see **C12**. Both halves are accounted for and nothing was dropped: the **default-off master switch** shipped with `P8-E1` and remains enforced by the battery rule in `AGENTS.md` and `DEVELOPMENT_PLAN.md` §6.6; the **render-cost** half is now `PERF-1`, `PERF-7` and `PERF-9`. **Needs verification:** the original line claimed *"29 `backdrop-blur` surfaces remain on the planner"* — the measured figure is **41 occurrences across 21 files**, so that number was stale and is corrected in §6.5 · src: `inefficiencies.md`, `DEVELOPMENT_PLAN.md §4 P8`, §6.5
 
 ### 8.4 Habit-science extras — `§12 L637–644`
 
@@ -884,6 +1041,51 @@ That is a deliberate gap, not an oversight: the goal picker wants the habit
 template library to suggest against, and adding one without suggestions would be
 a picker that promises tailoring it cannot yet deliver.
 
+### C12 — A performance phase was added, unnumbered, and `POL-1` moved into it · **RESOLVED (owner decision)**
+
+A new phase was added for the 18-item performance overhaul in
+`tracker-performance-master-prompt.md`, and `POL-1` was dissolved into it.
+
+**Three structural decisions, all made deliberately rather than by accident:**
+
+1. **It is `§6.5` and it is unnumbered as a phase.** It sits between Phase 4 (Social) and
+   Phase 5 (Wallpaper). It is titled "PERFORMANCE PHASE" rather than "Phase 4.5" because
+   `§6` is already *PHASE 4 – Social tab*; a second block numbered "Phase 4" would create
+   a duplicate phase name that breaks the §0.4 order table and every "Phase 4" reference
+   in the repo. **Renumbering the later sections was rejected**: §7–§12 carry **33
+   cross-references inside this file alone**, plus more in `DEVELOPMENT_PLAN.md`,
+   `FEATURES.md` and `context.md`, and each is a chance to break a citation silently.
+
+2. **`POL-1` was absorbed, and nothing was lost.** Its full original wording is preserved
+   verbatim in §6.5.5 so the text survives the move. Both halves survive it: the
+   default-off master switch (delivered, `P8-E1`) and the render-cost work (now `PERF-1`,
+   `PERF-7`, `PERF-9`). The Phase 6 line was rewritten as a pointer rather than deleted,
+   so the original location still records where the work went. **Its "29
+   `backdrop-blur` surfaces" figure was stale — measured at 41 across 21 files.**
+
+3. **The master prompt is the authority; §6.5 is a self-contained restatement.** The
+   owner required that an agent working the phase not have to reopen
+   `tracker-performance-master-prompt.md` for routine work. That creates a drift risk, so
+   §6.5 carries two binding rules: on conflict the **master prompt wins** and §6.5 is the
+   stale side; and **editing one requires editing the other**.
+
+**The reconciliation finding is the point of this entry.** Applying the master prompt's
+own "verify before you change" rule before writing the phase found that **5 of its 18
+items are already delivered** (#1 core, #2c, #4a, #15, plus the wallpaper half of `POL-1`)
+and **4 of its figures are wrong** (blur 22 → 41, `commit()` 8 → 9, the 1,710/sec
+allocation estimate, and its bundled-asset assumption for #3 — the app serves a **remote**
+URL). Implementing the list as written would have meant optimising a 30 FPS loop that was
+removed by `P8-E2` months earlier. Hence `PERF-0` is a mandatory baselines-and-reconcile
+step, and every already-delivered item is recorded `BUILT` **with what still needs
+verifying** rather than quietly closed.
+
+**Also added by this change:** `BUILT` as a distinct status in §0.2. It was already used
+on a dozen lines (M1–M6, A1, XL14) but was **absent from the legend**, so nothing defined
+what it meant. It now means *code exists, not yet verified in this phase* — deliberately
+weaker than `SHIPPED`, which means someone measured it. Native items in this phase stay
+`BUILT` until measured on hardware, because there is no `gradlew` in the repo and no
+device attached (see §6.5.4).
+
 ---
 ## 11. SOURCE DOCUMENT INDEX
 
@@ -892,6 +1094,8 @@ a picker that promises tailoring it cannot yet deliver.
 | **`Market Research/context.md`** | Agent entry point: product, stack, schema, environment, durable learnings, live task state. Written back every session (Step 9b) | **CANONICAL for orientation** — never for status |
 | **`main_plan.md`** (this file) | Order, priority, status | **CANONICAL for status** |
 | `DEVELOPMENT_PLAN.md` | Engineering conventions §5, workflow §6, risks §7 | **CANONICAL for HOW** |
+| **`tracker-performance-master-prompt.md`** | 18-item performance overhaul, priorities and acceptance criteria | **CANONICAL for the performance phase (§6.5)** — on conflict, it wins and §6.5 is the stale side |
+| `PERFORMANCE.md` | Perf baselines, final numbers, the rules, how to re-measure | **Not yet written** — `PERF-18d` |
 | `Market Research/MASTER_TODO_REVISED.md` | 140-item catalogue §5, matrix §19, schemas §20 | Reference — full specs |
 | `Market Research/PRODUCTION_PLAN.md` | Phase 0–7 framing, exit gates | Reference — superseded on conflict |
 | `Market Research/PHASE_0_AUDIT_REPORT.md` | Verified-vs-assumed audit | Reference — **factual error: says Next.js 14; app is 16.3.5** |
@@ -926,6 +1130,7 @@ superseded archives contribute no features that are absent above.
 
 | Date | Change |
 |---|---|
+| 2026-10-08 | **Added the performance phase (§6.5) and dissolved `POL-1` into it.** Owner instruction. §6.5 carries all 18 items of `tracker-performance-master-prompt.md` **in full, inline**, so an agent working the phase does not have to reopen the master prompt; two binding rules prevent drift (on conflict the master prompt wins, and editing one requires editing the other). **Unnumbered on purpose:** `§6` is already *PHASE 4 – Social tab*, and renumbering §7–§12 would touch **33 cross-references in this file alone** plus four more documents. `POL-1`'s wording is preserved verbatim in §6.5.5 and its Phase 6 line became a pointer, so nothing is lost — its stale "29 `backdrop-blur` surfaces" is corrected to the measured **41 across 21 files**. Recorded as **C12**. **Reconciling before writing changed the work:** 5 of 18 items are already delivered (`#1` core via `P8-E2`, `#2c`, `#4a`, `#15`, and `POL-1`'s master switch) and 4 figures are wrong (blur 22→41, `commit()` 8→9, the 1,710/sec allocation estimate, and `#3`'s bundled-asset assumption — the app serves a **remote** URL via `loadUrl(targetUrl)`). So `PERF-0` is a mandatory baselines-and-reconcile step, and delivered items are recorded `BUILT` **with what still needs verifying**. Added `BUILT` to the §0.2 legend, where it was already used on a dozen lines but never defined; it means *code exists, not yet verified*, deliberately weaker than `SHIPPED`. §6.5.4 states the measurement boundary plainly — no `gradlew`, no device, so native items stay `BUILT` + "unverified — needs a device" and must never be promoted on a green web suite alone (R12). |
 | 2026-10-07 | **Process rules hardened, on owner instruction.** Two failures this session, both costing real time, are now enforced rather than merely noted. (1) **The commit sequence is mandatory and ordered**: `implement → verify → main_plan.md → context.md → commit`, all three in one commit — a commit with code but no status update is the same defect as uncommitted work, only harder to spot because `git status` is clean. Added to §1, to `AGENTS.md` non-negotiables 11 and to `FEATURE_WORKFLOW.md` Stage 3, with the rule extended to cover features that did *not* ship as planned (dropped, deferred, renamed) so silence never stands in for a decision. (2) **Background servers must never be left running**: `Start-Process` returns as soon as the process spawns and then leaves it alive forever, holding its port; the next start fails with `EADDRINUSE` while silently serving the **previous** build, so a clean page load is not evidence that the change under test is the change being tested. `AGENTS.md` gained a worked start/assert/kill chain and the rule to kill by the **port's owning PID** (not a remembered PID — `next start` spawns a child). Also recorded in `FEATURE_WORKFLOW.md` §Process traps: headless Chrome defaults to dark, the OTA update modal's fixed overlay swallows `page.click`, never edit markdown with PowerShell `Set-Content` (it re-encoded all of `context.md` once), and a failing assertion on the headline requirement needs a control before a fix. |
 | 2026-10-07 | **M3 shipped.** Planner zero-block state (`PlannerEmptyState`). Researched copy changed with owner approval because it promised a + button and a template import, neither of which exists — template import is `B1`/`HD29`, Phase 2. Added a `blocksLoading` flag so the state cannot fire on the pre-read `[]` that the planner holds on first paint for every day (D5: it bypasses the schedule store, so there was no loading flag to borrow). Logic extracted to `shouldShowPlannerEmptyState()` with 6 regression tests → 116 green. |
 | 2026-10-07 | **Adopted `Market Research/context.md` as the agent entry point.** It existed but was structurally corrupted — text severed mid-sentence and re-appended at the end — so every fact was re-verified against source and the file rewritten whole (product, stack, routes, schema, stores, reward economy, pure-logic modules, 7 phases, environment/toolchain/tests/design system, people/memory/research, session log, git + live task state, binding rules). New **§0** defines the mechanism: read `context.md` → `main_plan.md` → cited spec at session start; write back at session end. Propagated here — §0 header + authority order now put `context.md` first **for orientation only**; **Step 1** requires reading it and forbids asking the owner for context already written down; new **Step 9b** requires the write-back in the same commit; **Definition of Done** gained a checkbox; §11 source index and `AGENTS.md` non-negotiables point at it. Status remains exclusive to this file (C10). `.gitignore` no longer ignores `context.md`, so a fresh clone gets it. |

@@ -340,7 +340,7 @@ to v2.0 (ECON-2, contradiction C3).
 - **`inefficiencies.md`** (repo `odyssey/`): the audit whose findings became the
   P8 guard rails.
 
-### The 7 phases (`main_plan.md` order — overrides all other phase numbering, C1)
+### The phases (`main_plan.md` order — overrides all other phase numbering, C1)
 
 1. **Small things, polish, micro-interactions, stabilise** — M1–M18 micro,
    S1–S25 tier-2, CONS-1–3 cross-surface, P0-T2/T3/T6/T7 stabilise. Exit gate:
@@ -354,6 +354,14 @@ to v2.0 (ECON-2, contradiction C3).
    local-first**: needs backend + accounts + UGC moderation + Play Families
    compliance **before any user publishes** (GATE-1..4). Social-before-AI is
    owner-chosen but an OPEN dispute (**C1**) — confirm before starting Phase 4.
+4.5. **Performance** — `PERF-0`…`PERF-18` in `main_plan.md` **§6.5**, spec in
+    `MASTER_TODO_REVISED.md` §23, origin `tracker-performance-master-prompt.md`.
+    **Unnumbered on purpose** (§6 is already Phase 4; a second "Phase 4" would
+    duplicate it) and **no phase renumbering** — §7–§12 carry 33 cross-references in
+    `main_plan.md` alone. Adds no features. Absorbs **`POL-1`** from Phase 6 (C12).
+    **Starts with `PERF-0`, a mandatory reconcile**: 5 of the 18 items are already
+    delivered and 4 of the audit's figures are wrong, so implementing the list as
+    written would optimise a 30 FPS loop that `P8-E2` removed.
 5. **Wallpaper + widgets** — G1–G12+, BUG-1/BUG-2 live here (§7.2). The core
    differentiator; the engine ships, this phase deepens it.
 6. **Polish, non-AI Pro features, third-party integrations** — SC7/SC9/SC10/F9.
@@ -585,6 +593,51 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-08 — Performance phase added (§6.5), `POL-1` dissolved into it
+
+**Owner instruction.** The 18-item overhaul in `tracker-performance-master-prompt.md`
+became a phase, and the owner required its content be **written into the docs** so an
+agent never has to reopen the master prompt for routine work.
+
+**Where it lives:** `main_plan.md` **§6.5** (all 18 items inline, `PERF-0`…`PERF-18`) and
+`MASTER_TODO_REVISED.md` **§23** (the specification). The master prompt stays the
+**authority**: §6.5 carries two binding anti-drift rules — on conflict the master prompt
+wins and §6.5 is the stale side, and editing one requires editing the other.
+
+**Unnumbered, deliberately.** `§6` is already *PHASE 4 – Social tab*. Naming a second
+block "Phase 4" would create a duplicate phase name that breaks the §0.4 order table and
+every "Phase 4" reference in the repo. Renumbering §7–§12 was rejected: **33
+cross-references inside `main_plan.md` alone**, plus more in `DEVELOPMENT_PLAN.md`,
+`FEATURES.md` and this file. One line is the whole cost of avoiding that.
+
+**Reconciling first changed what the phase is.** Applying the master prompt's own
+"verify before you change" rule against source found **5 of 18 items already delivered**
+(`#1` core via `P8-E2`, `#2c`, `#4a`, `#15`, and `POL-1`'s master switch) and **4 figures
+wrong** — blur "~22" is really **41 across 21 files**, `.commit()` "8" is **9**, the
+1,710-allocations-per-second estimate died with the 30 FPS loop, and `#3` assumes bundled
+assets when `MainActivity` does `loadUrl(targetUrl)`, i.e. **remote**. So `PERF-0` is a
+mandatory baselines-and-reconcile step, and delivered items are recorded `BUILT` **with
+what still needs verifying** rather than quietly closed. Implementing the list as written
+would have meant "optimising" a loop removed months earlier.
+
+**`POL-1` dissolved, nothing lost.** Its wording is preserved verbatim in §6.5.5, both
+halves survive (default-off master switch = delivered `P8-E1`; render cost = `PERF-1`/
+`PERF-7`/`PERF-9`), and the Phase 6 line became a pointer rather than a deletion so the
+old location still says where it went. Its stale **29** blur figure is corrected to 41.
+Recorded as **C12**.
+
+**`BUILT` added to the §0.2 status legend.** It was already used on a dozen lines (M1–M6,
+A1, XL14) but was **never defined**, so nothing said what it meant. It now means *code
+exists, not yet verified in this phase* — deliberately weaker than `SHIPPED`, which means
+someone measured it.
+
+**The measurement boundary is stated, not hidden** (§6.5.4). Six items are native Kotlin
+and the master prompt demands `adb`/`dupsys`/`gfxinfo` on a **physical mid/low-end device,
+release build**. This repo has **no `gradlew`**, JBR 25 cannot start the Kotlin 1.9.22
+daemon (R14), and no device is attached. Those items stay `BUILT` + "unverified — needs a
+device" and must never be promoted on a green web suite alone — `tsc` does not read
+Kotlin, and a real Kotlin error once shipped through a fully green suite (R12).
 
 ### 2026-10-07 — Status sweep: three lines in `main_plan.md` were lying
 
@@ -998,9 +1051,9 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `3663906` (**A1/XL14** first-run flow), on top of `f4fa8c0`
-  (M6 welcome card) and `673cf30` (M5). The **process-rule hardening** commit lands on
-  top of `3663906`.
+- HEAD at last update: `0ccf426` (status sweep + ADR 0002), on top of `be5e44a`
+  (process rules), `3663906` (**A1/XL14** flow), `f4fa8c0` (M6), `673cf30` (M5). The
+  **performance phase (§6.5)** commit lands on top of `0ccf426`.
 - Working tree: clean after commit. The root `package.json` launcher (see §2, "Where to
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
@@ -1051,6 +1104,7 @@ above the vault banner. The follow-up task is closed.
 | Next feature | **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15` |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
+| **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |
 | Phase 1 exit gate | Gates clean · no uncommitted work |
 | Next after Phase 1 | Phase 2 — **`A1`/`XL14` are done** (moved into Phase 1). Largest remaining gaps are **A2** animated walkthrough and **M16** goal tags |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |

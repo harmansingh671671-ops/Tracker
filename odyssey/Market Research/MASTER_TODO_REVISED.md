@@ -1317,4 +1317,129 @@ Do not begin with app blocking, cloud AI, social accounts, subscriptions, or the
 
 ---
 
+## 23. Performance overhaul specification (Phase 6.5)
+
+> **Authority:** this section restates `tracker-performance-master-prompt.md` so the
+> specification is readable without opening that file. **On any conflict, the master
+> prompt is correct and this section is stale** — fix it in the same commit. Editing one
+> requires editing the other. This section adds **no** features; it makes what already
+> exists faster to load, smoother to render and cheaper to run.
+>
+> **Status of record is `main_plan.md` §6.5** (`PERF-0`…`PERF-18`). This is the
+> specification; that file is the status. Never update status here.
+
+### 23.1 Ground rules (apply to every item)
+
+1. **Verify before you change.** The figures in the master prompt came from a code review, not measurement. Open the real code, confirm the problem exists as described, and record actual numbers. If something is already fixed or misdescribed, say so and move on.
+2. **Measure before and after.** Baselines before item 1; re-measure and record the delta after each item. Android: `adb shell am start -W` (cold start), `dumpsys gfxinfo` (jank), `dumpsys batterystats`, `dumpsys alarm | grep <package>` (wakeups), Android Studio CPU/Memory profilers, Perfetto. Web: `chrome://inspect` against the WebView, React DevTools Profiler, bundle analyzer, Lighthouse on a production build. Always release builds on a real mid/low-end device.
+3. **No behaviour or visual regressions.** The wallpaper must stay pixel-identical (take reference screenshots first). UI unchanged unless an item explicitly says otherwise.
+4. **One item = one commit**, message like `perf(#1): cache static wallpaper scene`. Keep diffs focused.
+5. **Prefer the smallest correct change.** Do not rewrite architecture when a targeted fix works.
+6. **Report format after each item:** what you found, what changed (files), before/after numbers, risks, how you tested it.
+7. **If a step is risky or ambiguous, stop and ask** rather than guessing — e.g. an alarm that genuinely must be exact.
+
+### 23.2 Reconciliation against the live codebase (verified 2026-10-08)
+
+The master prompt's audit predates several delivered optimisations. Measured against source:
+
+| # | Master prompt says | Verified reality | Effect on the work |
+|---|---|---|---|
+| #1 | 30 FPS redraw, ~1,710 `Paint` allocs/sec | **Delivered** via `P8-E2` — `REFRESH_INTERVAL_MS = 60_000L`, minute-boundary re-arm, cached schedule JSON | The headline motivation is gone; `P8-E4` already ruled the residual allocations not worth fixing at 1 render/min |
+| #2c | Replace the wallpaper alarm | **Delivered** — wallpaper uses `Handler.postDelayed` | But `RTC_WAKEUP` remains at 2 sites in `OdysseyCadenceNotificationWorker.kt` |
+| #4a | `wallpaper-preview.tsx` ticks every 1 s | **Delivered** — `msToNextMinute` re-arm | 7 `setInterval` calls remain app-wide; no shared clock module |
+| #7 | "~22 stacked blur layers" | **41 occurrences across 21 files** | Underestimated |
+| #12 | "8 instances" of `.commit()` | **9** | Re-count before acting |
+| #15 | Remove `WAKE_LOCK` | **Already removed** | Verify against the merged manifest, then close |
+| #3 | Bundled vs remote delivery open | **Remote** — `MainActivity` calls `loadUrl(targetUrl)` | The bundled-asset branch does not apply |
+
+Net: **~4 delivered, ~3 partial, ~11 open.** The phase therefore begins with a mandatory
+baselines-and-reconcile step (`PERF-0`), and delivered items are recorded `BUILT` **with
+what still needs verifying** rather than silently closed.
+
+### 23.3 The priority list
+
+#### #1 — 🔴 CRITICAL · stop re-rendering the wallpaper 30×/s `[AUDIT]` · **DELIVERED (`P8-E2`)**
+
+`OdysseyLiveWallpaperService.kt`. The scene used to redraw fully just to animate one alpha. Now it renders once, re-renders on the minute boundary, caches the parsed schedule, freezes the beacon glow, and draws nothing at all when the user has applied their own wallpaper. **Remaining verification:** zero drawing while invisible, no allocation in the draw path, re-measured CPU. Sub-steps 1c (hoist `Paint`/`Path` allocations) and 1h (dirty-rect / hardware canvas) must **not** be implemented on the 30 FPS reasoning — `P8-E4` classified that as not worth doing at 1 render/minute. If measurement contradicts `P8-E4`, report it rather than quietly re-opening them.
+
+#### #2 — 🟡 HIGH · eliminate wasted device wake-ups `[AUDIT]`
+
+The alarm scheduling code. Open work: **2a** move the "is the live wallpaper active?" early-return **before** scheduling, and cancel any existing alarm when the wallpaper is deactivated; **2b** prefer inexact/non-waking scheduling (`WorkManager` periodic, `setInexactRepeating`, `setAndAllowWhileIdle` without a `WAKEUP` type) and keep a waking alarm only for user-visible notifications that truly need precision, with the correct exact-alarm API and permission for the target SDK; **2d** re-schedule after reboot/time change only if still needed. **2c** is delivered. The prompt quotes both "~24/day" and "48/day" — verify with `dumpsys alarm` and report the true number. Acceptance: no wake-up alarms for an inactive wallpaper; early return precedes any alarm set; notification timing unaffected.
+
+#### #3 — 🟡 HIGH · cold-start and WebView load path `[ADDED]`
+
+`MainActivity`, WebView setup, Next.js config. The app is served **remotely**, so: **3a** caching headers and/or a service worker for the shell and static assets, early preconnect; **3b** warm the WebView early and reuse a single instance; **3c** never block the main thread at startup — defer analytics, non-first-screen bridges and alarm setup until after first frame (AndroidX App Startup or `Looper.myQueue().addIdleHandler`); **3d** `SplashScreen` API with a bridge `onAppReady()` after first paint so no white WebView is visible; **3e** `domStorageEnabled`, `cacheMode = LOAD_DEFAULT`, hardware acceleration on, `setWebContentsDebuggingEnabled(false)` in release; **3f** prefetch other routes on idle, not at startup. Acceptance: measurably lower cold-start-to-first-paint, no white flash, no startup jank.
+
+#### #4 — 🟡 HIGH · redundant JS timers and clock re-renders `[AUDIT]`
+
+`wallpaper-preview.tsx`, `journey-day-schedule.tsx`, `planner/page.tsx`. **4a** delivered. **4b** build one shared `useNow()` hook on `useSyncExternalStore` with **one timer total**, started on first subscriber and stopped on last, replacing all scattered timers; finer granularity must be an explicit opt-in, not a private timer. `journey-day-schedule.tsx` at 5 s is the worst offender; the 3 s day-change detectors are boundary polls, not clocks — decide deliberately which is which. **4c** pause while `document.hidden`, refresh on `visibilitychange`. **4d** isolate clock display so a tick does not re-render a page. **4e** test minute rollover, midnight rollover, DST, timezone change. Acceptance: one active clock app-wide; minute-boundary ticks; ~60× fewer preview renders; no timers while backgrounded.
+
+#### #5 — 🟠 MEDIUM-HIGH · route-level code splitting and bundle diet `[AUDIT]`+`[ADDED]`
+
+Measured today: `planner/page.tsx` 48.3 KB, `habits/page.tsx` 45.4 KB, `journey-day-schedule.tsx` 44.9 KB, `day-schedule/page.tsx` 39.5 KB, `stats/page.tsx` 35.8 KB. **5a** add the bundle analyzer, record per-route baseline; **5b** confirm route splitting works — heavy, below-the-fold or modal-only components use `next/dynamic` (`ssr: false` where appropriate for a WebView app) or `React.lazy`; **5c** extract hooks and sub-components into `hooks/` and `components/`. The A1 onboarding flow is the working proof of this pattern — `app/page.tsx` went from 710 lines to **8.2 KB** by extracting steps; **5d** trim dependencies (`date-fns` already present; import icons individually via `optimizePackageImports`; remove unused packages); **5e** production hygiene — minify on, source maps off in the shipped build, `compiler.removeConsole` for production, Tailwind purging unused CSS; **5f** enable the React Compiler only if the profiler shows benefit. Acceptance: smaller per-route JS with KB before/after, on-demand route components, **no file over ~15–20 KB without good reason**.
+
+#### #6 — 🟠 MEDIUM-HIGH · JS ↔ Kotlin bridge and wallpaper sync `[ADDED]`
+
+**6a** debounce wallpaper-sync calls 300–500 ms trailing; never per keystroke or per render; **6b** send only on actual change — compare a payload hash/version, skip no-ops; **6c** batch preference writes into one `Editor` transaction; **6d** keep `@JavascriptInterface` methods fast — real work off the bridge thread. Acceptance: at most one bridge call and one cache rebuild per burst of edits.
+
+#### #7 — 🟠 MEDIUM · reduce heavy `backdrop-filter` `[AUDIT]`
+
+**41 occurrences across 21 files.** **7a** audit every `backdrop-blur-*` use with file, class, and whether it overlays scrolling/animated content; **7b** fewer, larger blur blocks, never nested; **7c** semi-transparent solids or opacity gradients where visually acceptable; **7d** cap at `backdrop-blur-md` on full-screen/scrolling surfaces, never animate an element with `backdrop-filter`; **7e** low-end fallback via `navigator.deviceMemory` / `hardwareConcurrency` or a native flag. **State the mitigating factor rather than hide it:** `MainActivity.onPause()` → `webView.onPause()` already pauses background rendering, so this is a **foreground-only** cost. Acceptance: fewer layers, smoother scrolling per `gfxinfo`/Performance panel, design unchanged on a normal device.
+
+#### #8 — 🟠 MEDIUM · React render efficiency `[ADDED]`
+
+**8a** profile first, fix only real hot spots; **8b** memoise derived data, stabilise callbacks, `React.memo` list rows; **8c** virtualise lists over ~50 rows (`@tanstack/react-virtual` is **not** a dependency — evaluate before adding; reuse order: existing code → stdlib → installed dep → new package); **8d** split state/context so one slice change does not re-render the tree; **8e** no `JSON.parse`, `localStorage` reads or date-heavy computation in render bodies; **8f** stable `key`s, never index keys on reorderable lists. Acceptance: fewer, cheaper commits; instant-feeling interaction on a low-end device.
+
+#### #9 — 🟠 MEDIUM · animation and compositing hygiene `[ADDED]`
+
+**9a** animate only `transform`/`opacity`; **9b** pause infinite animations off-screen or when hidden (`IntersectionObserver` / `visibilitychange`); **9c** honour `prefers-reduced-motion` — the house pattern puts keyframes inside a `prefers-reduced-motion: no-preference` query; **9d** `will-change` sparingly; **9e** no layout thrashing. Acceptance: no continuously running animation on invisible elements; steady 60 fps.
+
+#### #10 — 🟢 MEDIUM-LOW · fonts, images, static assets `[ADDED]`
+
+**10a** self-host and subset via `next/font`, `font-display: swap`, only the weights used; **10b** WebP/AVIF at sensible dimensions, inline tiny SVGs, drop unused assets; **10c** lazy-load below-the-fold images with explicit width/height; **10d** preload only what is critical. Acceptance: smaller payload with before/after, no layout shift.
+
+#### #11 — 🟢 MEDIUM-LOW · bitmap handling for custom wallpapers `[AUDIT]`+`[ADDED]`
+
+**11a** `.recycle()` discarded bitmaps, never one being drawn or cached; **11b** `inJustDecodeBounds` + `inSampleSize` at screen size, `RGB_565` when no alpha, decode off the draw thread; **11c** cache the decoded image by URI + modified time; **11d** handle `OutOfMemoryError`/decode failure with a fallback. Acceptance: lower peak memory, no repeated decodes, no crashes on large images.
+
+#### #12 — 🟢 LOW · `SharedPreferences.commit()` → `apply()` `[AUDIT]`
+
+**9 instances** today (prompt says 8; re-count). Use `apply()` and batch per transaction. **Check each call site:** `apply()` is safe for in-process readers, but **keep `commit()`** where another process reads the value or durability before process death matters — and document why at that site. Acceptance: no blocking disk I/O on the bridge thread; behaviour unchanged.
+
+#### #13 — 🟢 LOW · release build optimisation `[ADDED]`
+
+`android/app/build.gradle` currently has **`minifyEnabled false`**. **13a** R8 `minifyEnabled true` + `shrinkResources true`, with keep-rules for `@JavascriptInterface` and reflection; **13b** Baseline Profile and a Macrobenchmark module; **13c** ship an **AAB** for ABI/density splits; **13d** drop unused Gradle dependencies and resources. Acceptance: smaller APK/AAB, faster cold start, **release build still works end to end — test the bridge and wallpaper**, since R8 can strip reflection-dependent code this app depends on.
+
+#### #14 — 🟢 LOW · logging, leaks, lifecycle hygiene `[ADDED]`
+
+**14a** gate `Log.*` in hot paths and release; remove production `console.log` (ESLint already warns via `no-console`); **14b** cancel/unregister every `Handler` callback, receiver, listener and coroutine in the matching lifecycle callback — **debt D4 was exactly a listener without cleanup**; **14c** destroy the WebView properly (`removeView`, `stopLoading`, `destroy`); **14d** LeakCanary in **debug only**. Acceptance: no leaks in a normal session, no logging in hot loops.
+
+#### #15 — 🟢 LOW · remove unused `WAKE_LOCK` `[AUDIT]` · **DELIVERED**
+
+Already removed; only an explanatory comment remains. **Verify against the merged manifest** that no dependency re-adds it; if one does, document that instead of silently removing the line. Acceptance: build passes, merged manifest does not request it.
+
+#### #16 — 🟢 LOW · dependency and dead-code audit `[ADDED]`
+
+**16a** `depcheck`/`knip` + Gradle dependency report, remove unused; **16b** update dependencies with performance fixes **after reading changelogs** — the app is pinned to **Next.js 16.3.5** and the upgrade path is not casual; **16c** delete unused components/routes/assets. Known dead-code candidate: `seedInitialData()` is an empty function (debt **D8**).
+
+#### #17 — ⚪ LOW · storage layer modernisation `[ADDED]`
+
+**Optional — skip unless measurement shows benefit.** Migrate `SharedPreferences` to **DataStore** if preferences are large or multi-threaded. On the web side confirm `localStorage` is not read/written in render paths (the `odyssey/storage-boundary` rule already funnels it through `lib/utils/logger.ts`). **Counter-example: reward settlement records must stay in IndexedDB, not `localStorage`** (ADR 0002) — do not migrate those.
+
+#### #18 — ⚪ LOW · regression guardrails `[ADDED]`
+
+No `PERFORMANCE.md` and no CI exist today. **18a** bundle-size budget that fails the build on growth past a threshold; **18b** Lighthouse CI on the production build; **18c** Macrobenchmark in CI if feasible; **18d** write `PERFORMANCE.md` with baselines, final numbers, the rules (no allocations in draw loops, one shared clock, no wake-up alarms unless essential, a blur budget) and how to re-measure. Acceptance: bundle or cold-start regressions fail CI.
+
+### 23.4 Measurement boundary
+
+Six items (#1 verification, #2, #3, #11, #13, #14) are native Kotlin and require `adb`/`dumpsys`/`gfxinfo`/`batterystats` on a **physical mid/low-end device running a release build**. The repo has **no `gradlew`**, and Android Studio's bundled JBR 25 cannot start the Kotlin 1.9.22 compile daemon (`IllegalArgumentException: 25.0.3`, risk **R14**). No device is attached in this environment.
+
+`tsc`, `lint`, `build`, `vitest`, Lighthouse, the bundle analyzer and the React Profiler **can** run here. The `adb`/R8/Baseline-Profile outcomes **cannot**. Those items stay `BUILT` and reported as unverified until measured on hardware — `tsc` does not read Kotlin, and a real Kotlin error once shipped through a fully green web suite (risk **R12**).
+
+### 23.5 Final deliverable
+
+When all 18 items are done or explicitly deferred with a reason, produce the summary table: item, status, before, after, notes/risks — plus cold-start time, wallpaper CPU %, wake-ups/day, JS bundle size per route, jank %, battery drain over a fixed period, and APK size. Then list anything skipped, anything disagreed with, and follow-up recommendations.
+
+---
+
 *End of Odyssey Master Production Guide — ready for the application audit and launch-scope definition.*
