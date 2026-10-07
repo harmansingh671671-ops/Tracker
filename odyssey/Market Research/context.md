@@ -595,6 +595,48 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M8 daily capacity badge, and a label that argued with itself
+
+**Shipped:** a badge in the planner header — *"Light Day · N habits"* / *"Balanced · N habits"* /
+*"Heavy Day · …"*. Implemented as **a third `HeaderSlot`**, which is exactly the extension point
+M9 was built for: no other part of `CompletionFractionHeader` changed. Keyed on the **level**
+rather than the label, so it cross-fades when a day's load changes category and stays put while
+a habit is merely ticked.
+
+**The source material has a gap, and it is resolved rather than hidden.** §19 labels heavy as
+"8+ habits"; §21 says "8+ habits **or** six planned hours". So **6 and 7 habits are neither
+light nor heavy by count alone** — they fall in Balanced, and a day is heavy on *either* signal.
+Both are used because §21 L811 is explicit that a warning must compare planned hours to the
+available window, and **eight 5-minute habits is not a heavy day**. Thresholds are named
+constants because §22.3 calls them *"starting hypotheses, not validated limits"* — the same
+treatment ADR 0001 §7 gives the XP rates.
+
+**The label caught by browser verification, not by the pure tests.** A first pass always quoted
+the hours, so nine habits and an empty schedule rendered **"Heavy Day · 0h planned"** — heavy,
+but naming the signal that was *not* the reason. It reads as a contradiction and sends the
+reader hunting for a bug that does not exist. The label now quotes whichever signal decided it
+(`Heavy Day · 9 habits`, `Heavy Day · 6h planned`, `Heavy Day · 9 habits · 6h`), with a
+regression test. **Every pure test passed while this was wrong** — the arithmetic was right and
+the sentence was not.
+
+**Read-only by construction, and that is tested rather than asserted in a comment.** Nothing in
+the returned shape can block, hide, or refuse; the heavy state says *"Consider doing less"*,
+and `MASTER_TODO_REVISED.md` I2 requires "never block". One test pins the exact set of returned
+keys as an anti-action guarantee, so adding a `blocked` field later breaks it.
+
+**Two "say nothing" decisions**, both following the M7 precedent — a rest day renders **no
+badge** rather than "Light Day · 0 habits", and the badge is suppressed while the habit store
+loads, because `habits` is empty before the read resolves and a habitless user would otherwise
+be labelled light on every visit and see the label vanish.
+
+**The planner's own `categoryStats.plannedTotal` is passed in**, not recomputed, so the badge and
+the Daily Schedule Rail balance bar cannot disagree about the same day. Verified side by side: a
+6-hour day shows the same 25% fill on both.
+
+19 new tests; **199 green overall**. Verified at 360/390/430 in light and dark across all four
+classifications, **0 console errors**. `C5` moves to `PARTIAL` — capacity shipped, the buffer
+half is `S17` and still unbuilt.
+
 ### 2026-10-08 — M7 "last done", and a fabricated timestamp that would have shipped a lie
 
 **Shipped:** a line under the habit name on every list card — *"Last done: Today at 8:15 AM"* /
@@ -1134,7 +1176,7 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `8e1c0b1` (performance spec consolidated into
+- HEAD at last update: `3085c7f` (M7 last-done), on top of `8e1c0b1` (performance spec consolidated into
   `inefficiencies.md` §11), on top of `2f8db6c`, `f820ed0` (§6.5 phase), `0ccf426`
   (status sweep + ADR 0002), `be5e44a` (process rules), `3663906` (A1/XL14 flow). The
   **M7 "last done"** commit lands on top of `8e1c0b1`.
@@ -1142,7 +1184,7 @@ to know where things stand.
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **12 suites, 181 tests, all green** (M7 adds `last-done.test.ts` with 13).
+- Tests: **14 suites, 199 tests, all green** (M8 adds `day-capacity.test.ts` with 19; M7 adds `last-done.test.ts` with 13).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1183,7 +1225,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M16** — onboarding goal category tags. `NOT BUILT` · also: `A1` |
+| Next feature | **M11** — time-period colour accents. `NOT BUILT` · also: `C1`. Queue agreed with owner: M8 (done) → M11 → M12 → M13 → M14 → M16 |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |

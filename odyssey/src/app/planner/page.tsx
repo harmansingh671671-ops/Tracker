@@ -960,6 +960,10 @@ function PlannerContent() {
         todayLogs={todayLogs}
         historyLogs={historyLogs}
         loading={habitsLoading || !user?.id}
+        // M8: reuse the planner's own hours total rather than recomputing it, so
+        // the capacity badge and the Daily Schedule Rail balance bar can never
+        // disagree about the same day.
+        plannedHours={categoryStats.plannedTotal}
       />
 
       {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings */}
