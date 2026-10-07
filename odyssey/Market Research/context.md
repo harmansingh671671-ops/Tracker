@@ -595,6 +595,60 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M13 warm microcopy, whose real finding was a fabricated "1d"
+
+**Shipped:** warmer XP toasts and a warmer streak counter, with every string in a tested
+module (`warm-copy.ts`) instead of inline in JSX.
+
+**Two rules shaped all of it, and both come from the failure this repo keeps auditing for
+— a confident line of copy that is not true.**
+
+**Warmth never outruns the event.** Completing a habit that was **not scheduled today** used
+to say *"Rest-day completion registered!"*, which reads like a scheduled routine was ticked
+off. It now says **"Not scheduled today, done anyway"** — warmer *and* more accurate than
+before. Undoing a completion is not an achievement, so *"Completion undone."* carries no XP
+figure and no praise.
+
+**"Pending" survives.** An earlier pass at warm copy would have turned these into "XP
+earned" — a nicer sentence about money the user does not have until the day's rewards settle
+at midnight. The word stays, and a test asserts it on all three XP toasts so a later
+"warmer" edit cannot quietly regress it.
+
+**The real finding was a number, not a word.** The streak counter rendered
+`{h.currentStreak || 1}d`, which printed **`1d` on a habit with no streak at all** — on the
+habit card, right beside a completion count. `edit-habit-modal.tsx` and
+`wallpaper-preview.tsx` already read the same value honestly with `|| 0`, so **both idioms
+were live in one codebase and the warm one was the liar.** A real zero now reads **"No
+streak yet"** and drops out of the achievement amber into the muted colour, because a zero
+streak is not a failure state and should not be painted like a trophy.
+
+**This closes `B15`, and it is worth being explicit that it is not scope creep.** The `B15`
+line previously recorded that false value and **deliberately deferred it** rather than
+bundling a number fix into `M7` (a copy feature). `M13` is the copy feature that owns the
+streak counter's *label*, and a label function that takes the true value is the honest
+implementation — routing `currentStreak || 1` into new copy would have re-blessed the lie.
+The fix appears in M13 because that is where it belongs, and `B15` moves to `SHIPPED` with
+the reasoning written down rather than quietly absorbed.
+
+**The empty states were audited and left alone — on purpose.** `M13`'s brief also names
+them. The Habits keystone ("Your journey begins with one keystone habit"), the Planner clean
+slate, the template library and the vault **already read like a person wrote them**.
+Rewriting copy that is already warm would be churn performed to look busy, which is the same
+instinct that produces generic copy in the first place. Recorded on the M13 line as a
+finding, not a gap.
+
+18 new tests, **255 green** across 17 suites. Verified in-browser with two genuine zero
+streaks and two real ones across **all three habit views** (list, grid, compact) at 360/390
+in light and dark: zeros read "No streak yet" in the muted colour, real streaks read `1d`/`7d`
+in amber, the toast read *"That's one in the bank. +15 XP pending"*, and **"No streak yet"**
+fits the compact grid tile without clipping. **0 console errors.**
+
+**A harness bug worth recording:** the first view-toggle selector guessed at `title`
+attributes, silently stayed on the list view, and printed three identical passes that looked
+like coverage. It only became obvious when the click step reported zero cards found. The
+fix locates the toggle row from the "Today: N/M" label and asserts how many buttons it
+found — a green run that never left the starting state is worse than a red one.
+
 ### 2026-10-08 — M12 "Up next in 35 min", and a clock that had three ways to lie
 
 **Shipped:** a line under the planner header — *"Up next in 35 min · Deep Work Session
@@ -1278,7 +1332,7 @@ to know where things stand.
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **16 suites, 237 tests, all green** (M12 adds `up-next.test.ts` with 26; M11 adds `time-period.test.ts` with 11).
+- Tests: **17 suites, 255 tests, all green** (M13 adds `warm-copy.test.ts` with 18; M12 adds `up-next.test.ts` with 26).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1319,7 +1373,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M13** — warm microcopy across toasts/counters/empty states. `NOT BUILT` · also: `B14`. Queue agreed with owner: M8 → M11 → M12 → M13 → M14 → M16 (M8/M11/M12 done) |
+| Next feature | **M14** — unique rank level-up dialogs for the 9 ranks (Beginner → Legend). `NOT BUILT` · also: `A1`. Queue agreed with owner: M8 → M11 → M12 → M13 → M14 → M16 (M8–M13 done) |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |

@@ -18,6 +18,7 @@ import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/u
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
+import { getCompletionToast, getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
 import {
   XP_CREATION_DIAMONDS,
   XP_CREATION_XP,
@@ -287,16 +288,20 @@ export default function HabitsPage() {
         live.historyLogs
       ).isAllCompleted;
 
+      // M13 -- the toast copy lives in a tested module so the rules (never claim
+      // more than happened, never call pending XP earned) are enforced once.
       showToast(
-        justCompletedTheDay
-          ? `Perfect day! +${XP_PERFECT_DAY_BONUS} bonus pending • pays at midnight`
-          : isScheduled
-            ? `Habit completed! +${XP_PER_COMPLETION} XP pending`
-            : `Rest-day completion registered! +${XP_PER_COMPLETION} XP pending`
+        getCompletionToast(
+          justCompletedTheDay ? "perfect-day" : isScheduled ? "scheduled" : "rest-day",
+          { xpPerCompletion: XP_PER_COMPLETION, perfectDayBonus: XP_PERFECT_DAY_BONUS }
+        )
       );
     } else {
       await fetchTemporaryWallet(user.id);
-      showToast("Habit reverted.");
+      showToast(getCompletionToast("reverted", {
+        xpPerCompletion: XP_PER_COMPLETION,
+        perfectDayBonus: XP_PERFECT_DAY_BONUS,
+      }));
     }
   };
 
@@ -665,9 +670,9 @@ export default function HabitsPage() {
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
                           <span className="font-semibold" style={{ color: habitColor }}>{h.category || "Routine"}</span>
                           <span>•</span>
-                          <span className="text-amber-400 flex items-center gap-0.5">
+                          <span className={`flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                             <Flame className="w-3 h-3" />
-                            {h.currentStreak || 1}d
+                            {getStreakLabel(h.currentStreak)}
                           </span>
                         </div>
 
@@ -942,9 +947,9 @@ export default function HabitsPage() {
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
                       <span className="truncate font-semibold" style={{ color: habitColor }}>{h.category || "General"}</span>
-                      <span className="text-amber-400 font-bold shrink-0 flex items-center gap-0.5">
+                      <span className={`font-bold shrink-0 flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                         <Flame className="w-3 h-3" />
-                        {h.currentStreak || 1}d
+                        {getStreakLabel(h.currentStreak)}
                       </span>
                     </div>
                   </div>
@@ -1020,9 +1025,9 @@ export default function HabitsPage() {
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
-                      <span className="text-amber-400 font-bold text-[10px] font-mono flex items-center gap-0.5">
+                      <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                         <Flame className="w-3 h-3" />
-                        {h.currentStreak || 1}d
+                        {getStreakLabel(h.currentStreak)}
                       </span>
                       {!isScheduled && (
                         <span className="px-1 py-0.2 rounded bg-surface-container-highest text-on-surface-variant text-[8px] font-mono font-bold">

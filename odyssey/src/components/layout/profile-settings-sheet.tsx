@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
+import { getStreakLabel } from "@/lib/utils/warm-copy";
 import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette, Image as ImageIcon } from "lucide-react";
@@ -183,7 +184,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
                 <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
               </div>
               <p className="text-xs text-on-surface-variant font-mono mt-0.5">
-                Scholar • Division II • {user?.streak ?? 1}d Streak
+                Scholar · Division II · {getStreakLabel(user?.streak ?? 0, "long")}
               </p>
             </div>
           </div>
