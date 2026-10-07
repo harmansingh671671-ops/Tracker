@@ -306,7 +306,7 @@ export default function HabitsPage() {
     await fetchUser();
     await fetchTemporaryWallet(user.id);
     await fetchHabits(user.id, selectedDate, { force: true });
-    showToast(`New habit created! +${XP_PER_COMPLETION} XP per completion pending • ${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
+    showToast(`Your journey with "${data.name}" begins now. First milestone: 3-day streak. +${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
   };
 
   const handleUpdateHabit = async (
