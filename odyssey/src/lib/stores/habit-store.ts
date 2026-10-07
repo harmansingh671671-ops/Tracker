@@ -55,6 +55,20 @@ interface HabitState {
   habits: Habit[];
   todayLogs: Record<string, HabitLog>; // habitId -> HabitLog
   historyLogs: Record<string, Record<string, boolean>>; // habitId -> date -> completed boolean
+  /**
+   * `habitId` -> ISO timestamp of that habit's most recent COMPLETED log.
+   *
+   * Built from the database rows, never from `todayLogs`. The store's `todayLogs`
+   * cannot be trusted for a time: when that slice is rebuilt from `historyLogs`
+   * after a date rollover, `loggedAt` is fabricated as `new Date().toISOString()`,
+   * so reading a clock time from it would report "Today at 2:04 AM" for something
+   * completed at 8:15 that morning.
+   *
+   * User-scoped and date-independent -- it describes the habit, not the selected
+   * day -- so the early-return paths in `fetchHabits` deliberately leave it alone
+   * rather than recomputing it on every date change.
+   */
+  lastCompletedAt: Record<string, string>;
   /** Date that `todayLogs` was captured for; '' when unknown. */
   todayLogsDate: string;
   /** User whose data the store currently holds; '' until first successful load. */
@@ -96,6 +110,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
   todayLogs: {},
   historyLogs: {},
+  lastCompletedAt: {},
   todayLogsDate: "",
   loadedUserId: "",
   // Starts LOADING, not idle. Before the first fetch resolves there are no
@@ -203,6 +218,23 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const logsMap: Record<string, HabitLog> = {};
     const historyMap: Record<string, Record<string, boolean>> = {};
 
+    // M7: the most recent real completion per habit, folded in here because
+    // `allUserLogs` is already in hand -- this costs no extra query.
+    //
+    // String comparison is safe here because `loggedAt` is an ISO-8601 UTC
+    // timestamp from `toISOString()`, and that format sorts lexicographically in
+    // chronological order. Comparing as Date objects 500 rows at a time would be
+    // correct too, but strictly more work for an identical result.
+    const lastCompleted: Record<string, string> = {};
+
+    allUserLogs.forEach(l => {
+      if (!l.completed) return;
+      const previous = lastCompleted[l.habitId];
+      if (previous === undefined || l.loggedAt > previous) {
+        lastCompleted[l.habitId] = l.loggedAt;
+      }
+    });
+
     allUserLogs.forEach(l => {
       if (l.date === date) {
         logsMap[l.habitId] = l;
@@ -213,7 +245,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       historyMap[l.habitId][l.date] = l.completed;
     });
 
-    set({ habits, todayLogs: logsMap, historyLogs: historyMap, todayLogsDate: date, loadedUserId: userId, loading: false });
+    set({ habits, todayLogs: logsMap, historyLogs: historyMap, lastCompletedAt: lastCompleted, todayLogsDate: date, loadedUserId: userId, loading: false });
 
     // Mirror the authoritative read so the next cold load can paint instantly.
     // `logsMap` is by construction the logs for `date`, and it is stored under

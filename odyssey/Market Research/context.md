@@ -595,6 +595,48 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M7 "last done", and a fabricated timestamp that would have shipped a lie
+
+**Shipped:** a line under the habit name on every list card — *"Last done: Today at 8:15 AM"* /
+*"Yesterday"* / *"N days ago"*, collapsing to *"Last week"* at 7–13 days and *"N weeks ago"*
+beyond. A habit never completed renders **no line at all**; `formatLastDone` returns `null`
+rather than printing "never", because the honest answer is that we do not know.
+
+**The finding that shaped it.** The obvious source for the clock time is `todayLogs`, and it
+**cannot be trusted**. When the store rebuilds that slice from `historyLogs` after a date
+rollover it fabricates `loggedAt: new Date().toISOString()` — *now*. So a clock time read from
+the store reports **"Today at 2:04 AM"** for a habit completed at 8:15 that morning, and it
+does so *only* after a reload, so it looks fine in a casual test. `lastCompletedAt` is
+therefore folded out of `allUserLogs` inside `fetchHabits` — the row set is already in hand, so
+**no extra query** — and it is user-scoped and date-independent, so the date-change
+early-returns deliberately leave it alone rather than recomputing per date change.
+
+**Only the "today" variant needs a time,** and that is not a shortcut — `historyLogs` stores
+booleans, not timestamps, so for any other day only the *date* is genuinely known. Inventing a
+time would have been a guess presented as data.
+
+**Anchored to today, not the selected date.** It describes the habit, so browsing to a past
+date still answers "when did I last do this" truthfully rather than implying you stopped
+existing. A future timestamp (device clock moved backwards) yields **no line**, not
+"yesterday" — a lie in the other direction is just as wrong as a false zero.
+
+**Three of my own tests were wrong before the code was,** which keeps happening and keeps being
+worth catching: Sep 30 → Oct 8 is **8** days (lands in "Last week", not "1 week ago"); Sep 8 →
+Oct 8 is **30** days (`4 weeks ago`, not "Last week"); and Feb 28 → Mar 1 2028 is **2** days,
+because 2028 is a leap year — exactly what a naive "one month boundary = one day" assumption
+gets wrong. I also had a sanity assertion that pinned the **UTC** date of a local 23:30
+completion; that depends on the machine's timezone (this box is UTC+5:30, so it is the same
+UTC day), so it would have passed here and failed elsewhere. Replaced with a behavioural
+assertion.
+
+**Found, reported, NOT fixed (recorded on `B15`):** the card renders `{h.currentStreak || 1}d`,
+so a habit with a genuine **zero**-day streak displays **`1d`** — confirmed in the verification
+screenshot. Same family as the `0/0` readout and the fake vault balance, but a *different*
+fix, and folding it into M7 would be the silent scope-creep this repo keeps auditing for.
+
+Verified against a production build at 360/390/430 in light **and** dark with all four cases
+seeded into IndexedDB — today, yesterday, three days ago, never — **0 console errors**.
+
 ### 2026-10-08 — Performance spec consolidated into `inefficiencies.md` §11, master prompt deleted
 
 The performance phase had **two** authoritative documents — `main_plan.md` §6.5 and the
@@ -1092,16 +1134,15 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `0ccf426` (status sweep + ADR 0002), on top of `be5e44a`
-  (process rules), `3663906` (**A1/XL14** flow), `f4fa8c0` (M6), `673cf30` (M5). The
-  **performance phase (§6.5)** commit lands on top of `0ccf426`.
+- HEAD at last update: `8e1c0b1` (performance spec consolidated into
+  `inefficiencies.md` §11), on top of `2f8db6c`, `f820ed0` (§6.5 phase), `0ccf426`
+  (status sweep + ADR 0002), `be5e44a` (process rules), `3663906` (A1/XL14 flow). The
+  **M7 "last done"** commit lands on top of `8e1c0b1`.
 - Working tree: clean after commit. The root `package.json` launcher (see §2, "Where to
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **12 suites, 168 tests, all green** (A1 adds
-  `onboarding-flow.test.ts` with 30; M6's `welcome-card.test.ts` and 9
-  `onboarding.test.ts` cases were deleted along with the card).
+- Tests: **12 suites, 181 tests, all green** (M7 adds `last-done.test.ts` with 13).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1142,8 +1183,8 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15` |
-| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep |
+| Next feature | **M16** — onboarding goal category tags. `NOT BUILT` · also: `A1` |
+| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |
 | Phase 1 exit gate | Gates clean · no uncommitted work |

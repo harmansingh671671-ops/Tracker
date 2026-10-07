@@ -16,6 +16,7 @@ import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
+import { formatLastDone } from "@/lib/utils/last-done";
 import {
   XP_CREATION_DIAMONDS,
   XP_CREATION_XP,
@@ -43,6 +44,7 @@ export default function HabitsPage() {
     habits,
     todayLogs,
     historyLogs,
+    lastCompletedAt,
     temporaryWallet,
     fetchHabits,
     fetchTemporaryWallet,
@@ -204,6 +206,25 @@ export default function HabitsPage() {
     !isFutureSelectedDate &&
     !habitsLoading &&
     habits.length > 0;
+
+  /**
+   * M7 -- the "last done" line for a habit, or null when there is nothing true to
+   * say.
+   *
+   * Memoised on the two inputs that actually change it. Memoising per habit inside
+   * the loop would allocate a cache entry per card per render, which is worse than
+   * recomputing: `formatLastDone` is a date subtraction and a string build.
+   *
+   * Returns null while the list is still loading, because `lastCompletedAt` is
+   * empty until the authoritative read lands -- the same rule as everywhere else
+   * in this screen, and the reason a returning user never sees the line flicker
+   * out on arrival.
+   */
+  const lastDoneLabel = useCallback(
+    (habitId: string): string | null =>
+      formatLastDone(lastCompletedAt[habitId], todayStr),
+    [lastCompletedAt, todayStr]
+  );
 
   const formattedSelectedDate = useMemo(() => {
     if (selectedDate === todayStr) return "Today";
@@ -541,6 +562,9 @@ export default function HabitsPage() {
                 ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
                 : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
               const habitColor = getHabitColor(h);
+              // M7 -- computed once per card rather than twice in the JSX. Null for
+              // a habit never completed, and then no line renders at all.
+              const lastDone = lastDoneLabel(h.id);
 
               return (
                 <motion.div
@@ -630,6 +654,22 @@ export default function HabitsPage() {
                             {h.currentStreak || 1}d
                           </span>
                         </div>
+
+                        {/* M7 -- "Last done: Today at 8:15 AM". Renders nothing at
+                            all for a habit never completed: `formatLastDone`
+                            returns null rather than a placeholder, because
+                            printing "never" puts a word where the honest answer is
+                            that we do not know.
+
+                            Anchored to `todayStr`, not the selected date. This is
+                            a property of the habit, so browsing to a past date
+                            still answers "when did I last do this" truthfully
+                            rather than pretending you stopped existing. */}
+                        {lastDone && (
+                          <p className="mt-0.5 text-[11px] font-mono text-on-surface-variant/80 truncate">
+                            {lastDone}
+                          </p>
+                        )}
                       </div>
                     </div>
 
