@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   ONBOARDING_STORAGE_KEY,
-  WELCOME_CARD_DISMISSED_KEY,
-  dismissWelcomeCard,
   hasCompletedOnboarding,
-  hasDismissedWelcomeCard,
   markOnboardingComplete,
 } from "./onboarding";
 
@@ -92,81 +89,5 @@ describe("onboarding first-run gate", () => {
     });
     expect(hasCompletedOnboarding()).toBe(false);
     expect(() => markOnboardingComplete()).not.toThrow();
-  });
-});
-
-describe("welcome card dismissal flag (M6)", () => {
-  it("is not dismissed on a fresh install", () => {
-    expect(hasDismissedWelcomeCard()).toBe(false);
-  });
-
-  it("records dismissal under its own key", () => {
-    dismissWelcomeCard();
-    expect(store[WELCOME_CARD_DISMISSED_KEY]).toBe("true");
-  });
-
-  it("reports dismissed after the flag is written", () => {
-    dismissWelcomeCard();
-    expect(hasDismissedWelcomeCard()).toBe(true);
-  });
-
-  it("survives a reload", () => {
-    dismissWelcomeCard();
-    const persisted = store[WELCOME_CARD_DISMISSED_KEY];
-    store = {};
-    store[WELCOME_CARD_DISMISSED_KEY] = persisted;
-    expect(hasDismissedWelcomeCard()).toBe(true);
-  });
-
-  it("ignores values written by anything other than this module", () => {
-    store[WELCOME_CARD_DISMISSED_KEY] = "false";
-    expect(hasDismissedWelcomeCard()).toBe(false);
-    store[WELCOME_CARD_DISMISSED_KEY] = "1";
-    expect(hasDismissedWelcomeCard()).toBe(false);
-  });
-
-  // The two flags gate different surfaces: one decides whether the landing page's
-  // pitch shows, the other whether the welcome card shows. Sharing a key would
-  // mean dismissing the card let the landing page reappear.
-  it("is independent of the onboarding flag", () => {
-    // Finishing the landing pitch must NOT dismiss the welcome card.
-    markOnboardingComplete();
-    expect(hasCompletedOnboarding()).toBe(true);
-    expect(hasDismissedWelcomeCard()).toBe(false);
-
-    // And dismissing the card must NOT re-arm the landing page.
-    store = {};
-    dismissWelcomeCard();
-    expect(hasDismissedWelcomeCard()).toBe(true);
-    expect(hasCompletedOnboarding()).toBe(false);
-  });
-
-  it("uses a different key from the onboarding flag", () => {
-    expect(WELCOME_CARD_DISMISSED_KEY).not.toBe(ONBOARDING_STORAGE_KEY);
-  });
-
-  // Fail toward SHOWING. An unreadable flag must not permanently hide the card
-  // for a user who never dismissed it. (The reward ledger deliberately fails the
-  // other way -- see ADR 0002.)
-  it("fails open when storage throws", () => {
-    vi.stubGlobal("window", {
-      localStorage: {
-        getItem: () => {
-          throw new Error("SecurityError");
-        },
-        setItem: () => {
-          throw new Error("QuotaExceededError");
-        },
-      },
-    });
-    expect(hasDismissedWelcomeCard()).toBe(false);
-    expect(() => dismissWelcomeCard()).not.toThrow();
-  });
-
-  it("treats no browser as not dismissed", () => {
-    vi.stubGlobal("window", undefined);
-    vi.stubGlobal("localStorage", undefined);
-    expect(hasDismissedWelcomeCard()).toBe(false);
-    expect(() => dismissWelcomeCard()).not.toThrow();
   });
 });

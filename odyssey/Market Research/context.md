@@ -134,7 +134,7 @@ workspace hoisting, and declaring one would move dependency resolution out of
 
 | Route | Purpose |
 |---|---|
-| `/` | Circadian landing page (marketing dial, **not** a first-run flow — onboarding gap is XL14/A1) |
+| `/` | **The first-run flow** (`A1`/`XL14`): intro → circadian preview → welcome + add habit → your habits → Day 1 commitment hold. One way in; hands off to `/planner` |
 | `/habits` | Habit CRUD, categories, streaks, per-habit flame, completion toggle; create/edit modals; date strip, month calendar, heatmaps |
 | `/planner` | 24h visual timeline, duration distribution, drag/reschedule, edit-hour modal, live hour marker, infinite date strip, completion-fraction header, clean-slate empty state |
 | `/journey` | Scrollable day map, SVG bézier curves, dynamic past/future counts, today-in-view, 9 ranks |
@@ -144,9 +144,23 @@ workspace hoisting, and declaring one would move dependency resolution out of
 | `/day-schedule` | Day schedule detail page |
 | `/profile` | Profile, rank info, theme switcher, wallpaper toggle, settings sheet, local-data trust badge |
 
-**No `/onboarding` route exists.** `src/lib/utils/onboarding.ts` holds only a
-storage flag (`ONBOARDING_STORAGE_KEY`, `hasCompletedOnboarding()`,
-`markOnboardingComplete()`) — the flow itself is unbuilt (XL14/A1).
+**There is no separate `/onboarding` route, and there does not need to be one.**
+The flow IS `/`. `src/lib/utils/onboarding.ts` holds the first-run storage flag
+(`ONBOARDING_STORAGE_KEY`, `hasCompletedOnboarding()`,
+`markOnboardingComplete()`); the step machine and commitment maths are pure
+functions in `src/lib/utils/onboarding-flow.ts` (30 unit tests), and the steps
+live in `src/components/onboarding/`.
+
+Two rules worth not re-deriving:
+
+- **Step index is in-memory only.** Reloading mid-flow restarts at step 1, but
+  habits already added are in IndexedDB and survive. A returning user who cleared
+  the flag is re-onboarded and would meet their own habits again on step 3 —
+  which is why that step tracks the ids *this flow* created instead of reading
+  the store.
+- **`addHabit` needs a `userId`.** The flow awaits `getOrCreateUser()` on mount.
+  Without it the first habit fails to write silently and step 3 looks empty for
+  no visible reason.
 
 `/profile` is correctly excluded from bottom-nav as a dead route (CONS-3
 SHIPPED).
@@ -546,6 +560,82 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-07 — A1/XL14 first-run flow, and M6 moved into it
+
+**Shipped:** `/` is no longer a 710-line scrolling pitch. It is a five-step flow —
+`intro → circadian → welcome → habits → protocol` — with Next/Back, a step
+indicator, a theme choice on every step, and a commitment hold that ends in a
+spreading circle. `app/page.tsx` is now the flow host, the steps are in
+`src/components/onboarding/`, and the step machine plus commitment maths are pure
+functions in `lib/utils/onboarding-flow.ts` (30 unit tests).
+
+**Habits created during the flow are real habits.** Step 2 reuses
+`CreateHabitModal` and writes through the same store action the Habits tab uses,
+so there is nothing to copy or sync — verified end to end: a habit added in step 2
+is present on `/habits` after the commit, and the empty state is gone.
+
+**The profile must exist before any habit saves.** `addHabit` requires a
+`userId`, so the flow awaits `getOrCreateUser()` on mount. Without it the first
+habit silently fails to write and the "your habits" step is empty for no visible
+reason. `handleCreateHabit` guards on `profileId` rather than trusting it.
+
+**Step 3 tracks the ids it created, never "all habits".** A returning user who
+cleared the onboarding flag already has habits, and presenting those as the ones
+they just added would be a lie. Same species of bug as the confident false zero: a
+claim about data state made without checking whose data it is.
+
+**One way in.** The old page had four controls that each called `enterApp()`: a
+header "Launch App", a hero "Explore Habit Studio", and five footer links. Any of
+them skipped the entire introduction. All removed — verified `bypassLinks: []` on
+every step. Back is hidden on step 1 and Next hidden on step 5 rather than
+rendered disabled, because a permanently dead button reads as a broken app.
+
+**The commitment hold, per owner instruction: no progress bar.** While held, a
+circle grows from the button until it covers the screen; at coverage it locks,
+then 1s later the app opens. Details that are not obvious:
+
+- The radius target is the viewport **half-diagonal**, not half-height. A circle
+  sized to the shorter side leaves the corners uncovered.
+- It is driven by **wall-clock elapsed time** through rAF, not a frame counter, so
+  a dropped frame or a backgrounded tab cannot shorten the commitment.
+- `hasCoveredViewport` demands **exactly 1** — no "close enough". A partly covered
+  screen must not commit to a route change the user cannot take back.
+- Release early cancels and shrinks back (320ms) rather than snapping to zero.
+- 2500ms, up from the old 1400ms ring, eased in-out. Linear would make the first
+  and last few percent feel like nothing was happening, which reads as "snappy"
+  and invites an early release.
+- Keyboard parity: hold Space or Enter. A single-gesture step with no non-gesture
+  equivalent would be unreachable by keyboard.
+- Reduced motion commits immediately instead of animating.
+
+**Theme is a real three-way choice (System/Light/Dark) on every step, and it IS
+the app setting** — `setTheme` writes the same `odyssey_theme_mode` key the
+anti-FOUC script in `layout.tsx` reads before paint, so no plumbing was needed.
+The control deliberately **does not write on mount**: persisting the resolved
+value unprompted would override a user who never chose, which is exactly the
+"system by default" behaviour that was asked for.
+
+**M6 was moved, not duplicated.** Its pillars and the M1 trust badge are step 2;
+`WelcomeCard`, `shouldShowWelcomeCard`, the dismissal flag and both test sets were
+**deleted** (18 tests) rather than left in two places. A dismissible banner makes
+no sense inside a guided flow, and its copy described itself in terms of a screen
+it no longer lived on. Zero-habit users on `/habits` fall back to the M2 keystone
+state.
+
+**A UX flaw the first verification pass surfaced.** The welcome step ended up with
+both "Add your first habit" and a neutral shell "Next" that silently skipped the
+step's entire purpose — two controls reading as equal alternatives when one is a
+skip. Next now reads **"Skip for now"** with nothing added and **"Continue"** once
+something is. Same duplicate-control lesson as M3's two (+) marks and M6's stacked
+cards.
+
+**My own test was wrong before the app was.** The first persistence run reported
+the habit missing from `/habits`, which looked like the headline requirement
+failing. It was the script: it clicked `Next` twice and skipped straight past the
+step that adds the habit, so nothing was ever created. Traced by logging the step
+indicator after every click. **A failing assertion that says the most important
+requirement is broken deserves a control before a fix.**
+
 ### 2026-10-07 — M6 welcome card, and two verification traps that faked a failure
 
 **Shipped:** `src/components/habits/welcome-card.tsx` — heading, warm
@@ -797,15 +887,15 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `673cf30` (M5 creation toast docs), on top of `5d4edc2`
-  (M5), `1feae91` (M4 docs), `5a40a2b` (**M4** reward unification), `2481609`
-  (M3). The **M6** welcome card is committed on top of `673cf30`.
+- HEAD at last update: `f4fa8c0` (M6 welcome card), on top of `673cf30`. The
+  **A1/XL14** first-run flow is committed on top of `f4fa8c0`.
 - Working tree: clean. The root `package.json` launcher (see §2, "Where to run
   commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
-  `no-unused-vars` for `Coffee` in `habits/page.tsx`. The M6 files add none.
-- Tests: **12 suites, 156 tests, all green** (M6 adds `welcome-card.test.ts` and 9
-  cases in `onboarding.test.ts`).
+  `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
+- Tests: **12 suites, 168 tests, all green** (A1 adds
+  `onboarding-flow.test.ts` with 30; M6's `welcome-card.test.ts` and 9
+  `onboarding.test.ts` cases were deleted along with the card).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -848,9 +938,10 @@ above the vault banner. The follow-up task is closed.
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
 | Next feature | **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15` |
-| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep, not to any single feature |
+| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep |
+| Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | Phase 1 exit gate | Gates clean · no uncommitted work |
-| Next after Phase 1 | Phase 2 — onboarding `A1`/`XL14` is the largest gap between the app and its own research |
+| Next after Phase 1 | Phase 2 — **`A1`/`XL14` are done** (moved into Phase 1). Largest remaining gaps are **A2** animated walkthrough and **M16** goal tags |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
 ---

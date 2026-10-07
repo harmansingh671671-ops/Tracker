@@ -261,7 +261,7 @@ src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 - [x] **M3** — Planner empty state "clean slate". `BUILT` — `PlannerEmptyState` sits above the rail and points at the gesture that already works (tap any hour), so it adds no new button and no new path. Illustration is the planner's own rail spine with one highlighted hour, drawn with CSS-var tokens and animated by `slateSweep` + `slateTapPulse`, both gated on `prefers-reduced-motion` in `globals.css` the way `keystonePulse` is. **Spec copy changed with owner approval:** the researched line *"Tap + or import a routine template"* promised two things that do not exist — there is no + button and no template import (`B1`/`HD29`, still Phase 2) — so it now reads *"Tap any empty hour to schedule your first block."* A day in the past that was left blank was not a choice, so it gets different copy (*"Nothing was scheduled on this day"*) rather than being called a clean slate. Visibility is gated on a new `blocksLoading` flag, because the planner reads `db` directly (D5) and `blocks` is `[]` on first paint for **every** day — without it, a full day would flash "clean slate" before the read resolved · also: `A8`
 - [x] **M4** — All-habits-done celebration card (+50 XP). `PARTIAL` — `PerfectDayCard` component built with CSS glow animation; reward calculations in `reward-rules.ts`; habit-store imports but no page mounts the component yet · also: `FD1`
 - [x] **M5** — Creation confirmation toast naming first milestone. `BUILT` — habit creation toast reads *"Your journey with {Habit Name} begins now. First milestone: 3-day streak."* · also: `B15`
-- [x] **M6** — First-open welcome banner (3 pillars). `BUILT` — `WelcomeCard` on the **Habits** screen: heading, warm one-liner, three pillar rows (Habits / Schedule / Wallpaper) and the **M1** trust badge inline, which fills the onboarding surface the M1 comment had recorded as deliberately absent. **Shares one slot with the M2 empty state rather than stacking above it** — two full-size cards each carrying a "do this" button is the duplicate-control mistake M3 made, so `shouldShowWelcomeCard` picks a winner and the loser is not rendered. It retires permanently once a habit exists, and dismissing hands the slot to M2 so dismissal is never a dead end. Visibility is gated on `habitsLoading` **first** (pure fn `lib/utils/welcome-card.ts`): the habit store starts `loading: true`, so testing `habits.length === 0` alone would flash the card at every returning user on every visit. Dismissal is a **separate** localStorage flag from the landing page's `odyssey_onboarding_complete` — sharing one would let dismissing the card re-arm the landing pitch. **Wallpaper copy says "if you want it there", not that it is running**: P8-E1 made the wallpaper default-OFF, so promising a live lock screen would overclaim. No animation, so reduced motion is honoured with no handling · also: `A8`
+- [x] **M6** — First-open welcome banner (3 pillars). `BUILT`, then **relocated into the onboarding flow** when **A1** shipped (§10 C11) — the three pillars and the **M1** trust badge are now step 2 of `/`, not a card on the Habits tab. `WelcomeCard` and its `shouldShowWelcomeCard` visibility rule were **deleted** rather than left in two places: a dismissible banner makes no sense inside a guided flow, and its copy described itself in terms of a screen it no longer lived on. The rule it was built for survives as `lib/utils/onboarding-flow.ts`: any state that asserts "this is empty" must check loading first, because a store that loads starts empty for *every* user. Zero-habit users on `/habits` fall back to the **M2** keystone empty state. Wallpaper copy stays hedged — "if you want it there" — because P8-E1 made the wallpaper default-OFF · also: `A8`
 - [ ] **M7** — "Last done: Today at 8:15 AM" subtitle. `NOT BUILT` · also: `B15`
 - [ ] **M8** — Daily capacity indicator. `NOT BUILT` · also: `C5`
 - [x] **M9** — Completion fraction header. `BUILT` — `CompletionFractionHeader` sits above the date strip (in-flow, not pinned); animated, built from swappable slots so further readouts can be added later; arithmetic lives in `lib/utils/habit-progress.ts` (unit-tested, no NaN on empty days). Slot keys are namespaced by slot id (`getHeaderSlotKeys`, regression-tested) — bare keys made the icon and label both `"rest"` on an empty day and threw React's duplicate-key error · also: `C4`
@@ -322,13 +322,13 @@ catalogue lands here.
 
 ### 4.1 Onboarding & first run — `MASTER_TODO_REVISED.md §5 A L184–200`
 
-- [ ] **A1** — Short goal-based first run (goal picker → 3–4 editable habits → usable plan <60s). `NOT BUILT` — `/` is a circadian landing page, **no `/onboarding` route** · also: `XL14`, `M16`
+- [x] **A1** — Short goal-based first run. `BUILT` — **shipped in Phase 1 as a phase-order exception, see §10 C11.** `/` is now a five-step flow (`intro → circadian → welcome → habits → protocol`) rather than a scrolling pitch. **Habits created during the flow are real**: step 2 reuses `CreateHabitModal` and writes through the habit store, so they are already on the Habits tab when the flow ends (verified end to end — created in step 2, present on `/habits` after commit). The flow tracks the ids *it* created, so step 3 can never present a returning user's pre-existing habits as "the ones you added". Profile bootstrap is awaited before any save, because `addHabit` needs a `userId` and would otherwise fail silently. Step 3 is **removable** (A1's "editable final preview") and **allows zero habits** — blocking there turns an introduction into a gate · also: `XL14`, `M16`
 - [ ] **A2** — Animated walkthrough, one concept per scene, contextual not exhaustive. `NOT BUILT`
 - [ ] **A3** — Optional interests/profession, skip-able, never used to obscure price. `NOT BUILT` · also: `HD25`
 - [ ] **A5** — Commitment moment (identity line + hold-to-commit). `NOT BUILT` · also: `S14`
 - [ ] **A6** — Loading/processing animation instead of blank screens. `NOT BUILT` · also: `M17`
 - [ ] **A7** — Just-in-time permission education with animated preview. `NOT BUILT` · also: `D6`
-- [ ] **A8** — Welcome / empty states / local-data trust. `PARTIAL` — both empty states ship (**M2** habits, **M3** planner); the welcome banner ships (**M6**) and it carries the trust message inline, so all three named surfaces of the M1 badge now exist. **Goal labels are the remaining gap** and belong to `A1` (`NOT BUILT`, no `/onboarding` route) · also: `M1`, `M6`
+- [ ] **A8** — Welcome / empty states / local-data trust. `PARTIAL` — both empty states ship (**M2** habits, **M3** planner); the welcome content ships as step 2 of the onboarding flow (**A1**, carrying **M6**'s pillars), so all three named surfaces of the M1 badge now exist. **Goal labels are the remaining gap** — the flow does not ask for a goal yet, which is **M16**'s job, not A8's · also: `M1`, `M6`
 - [ ] **A4** — Optional AI assessment/coach. `NOT BUILT` · → **Phase 7**
 
 ### 4.2 Habits — `§5 B L202–232`
@@ -644,7 +644,7 @@ src: `MASTER_TODO_REVISED.md §19 Tier 4 L1046–1065`
 - [ ] **FD12** — Habit debt clearing system. `NOT BUILT` · src: `§12 L622` — **keep optional, capped, non-compounding; consider excluding from v1**
 - [ ] **FD13** — Memento Mori / Life Weeks dot grid. `NOT BUILT` · also: `G9`
 - [ ] **FD14** — Decision Fatigue Triage mode (collapse to one active task). `NOT BUILT` · src: `§12 L631`
-- [ ] **XL14** — Interactive landing & onboarding. `NOT BUILT` — → **Phase 2** as `A1`
+- [x] **XL14** — Interactive landing & onboarding. `BUILT` — landed with **A1** in Phase 1 (§10 C11). `/` is a five-step flow with working state and navigation: Next/Back with Back hidden on step 1 and Next hidden on step 5, a step indicator, an animated circadian preview, and a **theme choice (System/Light/Dark) available on every step that becomes the app's setting** — `setTheme` writes the same `odyssey_theme_mode` key the anti-FOUC script in `layout.tsx` reads, so no extra plumbing. System stays the default because the toggle writes **only on an explicit tap**; writing the resolved value on mount would persist a mode the user never chose. One way in: the old page had four separate controls (a header "Launch App", a hero "Explore Habit Studio", and five footer links) that each marked onboarding complete, so the whole introduction was skippable — verified zero bypass links remain · also: `A1`
 - [ ] **POL-1** — Battery/render hardening: default-off background features, render cost. `PARTIAL` — wallpaper master switch shipped (`P8-E1`); 29 `backdrop-blur` surfaces remain on the planner · src: `inefficiencies.md`, `DEVELOPMENT_PLAN.md §4 P8`
 
 ### 8.4 Habit-science extras — `§12 L637–644`
@@ -808,6 +808,34 @@ migration**; never adopt §20.1 wholesale. Any deviation needs an ADR in
 Every research checkbox is `- [ ]` (452 total, **zero ticked**), yet Phase 1 shipped
 via git without ticking any. **Status lives only in this file.**
 src: `DEVELOPMENT_PLAN.md §2.8 L167`
+
+### C11 — Onboarding shipped in Phase 1, not Phase 2 · **RESOLVED (owner decision)**
+
+`A1` and `XL14` were listed in **Phase 2**. They shipped in **Phase 1** on
+2026-10-07. Recording it here so the plan does not quietly contradict itself.
+
+**Owner decision, not an implementation detail.** Phase gates are normally hard,
+and `AGENTS.md` rule 9 says skipping one is the plan owner's call rather than
+something an agent does on its own. It was escalated and approved.
+
+**Why it was defensible rather than merely convenient:**
+
+- Phase 1's own work made it necessary. **M2**, **M3** and **M6** all landed
+  first-run surfaces (empty states, a welcome card) and each needed the question
+  *"when does a new user first see this?"* answered. Leaving the answer as a
+  Phase 2 item meant shipping three screens that assumed a first-run experience
+  that did not exist yet.
+- **M6 was moved, not duplicated.** Its content became step 2 of the flow and the
+  card was deleted from `/habits`. One implementation, one place.
+- Phase 2 loses its single largest item. What remains there is substantive but
+  none of it blocks the daily-use loop.
+
+**What Phase 2 gave up:** `A2` (animated walkthrough), `A3` (interests),
+**M16** (onboarding goal category tags). `M16` is the notable one — **A1 shipped
+without asking for a goal**, so "goal labels" remain the open half of **A8**.
+That is a deliberate gap, not an oversight: the goal picker wants the habit
+template library to suggest against, and adding one without suggestions would be
+a picker that promises tailoring it cannot yet deliver.
 
 ---
 ## 11. SOURCE DOCUMENT INDEX
