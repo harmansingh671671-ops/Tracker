@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Shield, Flame } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { ProfileSettingsSheet } from "./profile-settings-sheet";
+import { RankUpDialog } from "@/components/gamification/rank-up-dialog";
 
 export function Header() {
   const { user, fetchUser } = useUserStore();
@@ -16,6 +17,10 @@ export function Header() {
 
   return (
     <>
+      {/* M14 -- mounted here because the header is the one component present on
+          every screen, so a promotion earned while completing a habit is shown
+          wherever the user happens to be. */}
+      <RankUpDialog streak={user?.streak} militaryRank={user?.militaryRank} />
       <header className="fixed top-0 w-full z-40 pt-safe bg-surface/85 backdrop-blur-xl border-b border-outline/10">
         <div className="h-14 px-3 sm:px-4 max-w-xl sm:max-w-2xl mx-auto flex items-center justify-between gap-2">
           {/* Logo Title */}

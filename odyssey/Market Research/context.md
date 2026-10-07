@@ -595,6 +595,65 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-08 — M14 rank level-up dialogs, whose hard part is refusing to fire
+
+**Shipped:** a dialog carrying the newly earned rank's badge, division, milestone line and a
+**unique piece of lore**, shown once per promotion.
+
+**The feature is 10% rendering and 90% refusing to fire.** `getRankUpCelebration` returns
+`null` — not a degraded object — in the three cases where a level-up dialog would be lying:
+
+1. **First launch.** A new user opening the app holds the rank they were always going to
+   have. Nothing was earned, so the rank is recorded silently and no dialog appears.
+2. **The same rank again.** A refresh, a re-render, a second device. Strict inequality, so
+   one promotion cannot be celebrated twice.
+3. **A demotion.** Losing days moves a user *down* the ladder. Congratulating someone for
+   *"reaching Master"* when they have just fallen to Novice is the worst lie available in
+   this app, and it is the easy case to get wrong because the rank genuinely changed.
+
+**The previous rank has to be remembered, and that is where case 3 gets subtle.** The rank
+is derived from the streak inside a store the component never sees, so the previous value
+lives in `localStorage`. A demotion updates that stored value **silently** — otherwise a
+broken streak leaves a stale high-water mark that fires a false promotion days later, which
+is the same lie arriving late instead of immediately.
+
+**A test caught a real instance of the exact bug this design is about.**
+`getRankLore` originally resolved names through `getRankInfo`, which **silently falls back
+to Beginner** for anything unrecognised. So `" legend "` (leading space) and `"Warlord"` were
+both handed **the Beginner's story** — a confident, wrong line of lore, from the one function
+whose whole job is to not say that. It now resolves against the ladder directly and returns
+`null` for anything off it. Had the test only checked the nine valid names, this would have
+shipped.
+
+**Lore is keyed by rank name, not index,** so reordering `RANKS` cannot silently attach the
+wrong story to a rank. `RankInfo.description` already states the milestone (*"1 week
+completed"*), so the lore says what the rank *means* instead of repeating it — and a test
+asserts no lore restates its description.
+
+**The Legend line deliberately honours the missed days:** *"Not one perfect year — a real
+one, with the missed days included and the showing up anyway."* The app counts real
+adherence with gaps, so a perfectionist claim at the top of the ladder would be false for
+nearly every user who reaches it.
+
+16 new tests, **271 green** across 18 suites. Verified in-browser across all four cases at
+360/390 in light and dark: promotion fires with the right `Novice → Consistent` header and
+the right lore; **demotion, repeat and no-change all render no dialog** while still updating
+the stored rank. **0 console errors.**
+
+**A harness bug worth recording, because it nearly inverted the result.** The first run
+reported a dialog for *every* case, all headed `Beginner → Consistent`. The app was right and
+the harness was wrong: it wrote the "rank you had last time" to `localStorage` immediately
+after `goto`, and the app's own first-load write of its starting rank landed *afterwards* and
+clobbered it — so all four cases silently became Beginner→X promotions. The fix lets the app
+settle **before** seeding the preseed. **A verification script that overwrites the state
+under test between setup and assertion will agree with the code no matter what the code
+does**, and the tell was that four supposedly different cases returned identical text.
+
+One lint error surfaced and was fixed rather than suppressed: calling `setState` synchronously
+inside the effect cascades a second render pass, so the promotion is applied via
+`queueMicrotask` — the promotion is still *recorded* immediately, so a deferred render can
+never show it twice. `F1` stays `PARTIAL` (avatar scenes still missing).
+
 ### 2026-10-08 — M13 warm microcopy, whose real finding was a fabricated "1d"
 
 **Shipped:** warmer XP toasts and a warmer streak counter, with every string in a tested
@@ -1332,7 +1391,7 @@ to know where things stand.
   run commands") is the only file outside `odyssey/` and holds no dependencies.
 - Lint on the touched files: **0 errors, 1 warning** — pre-existing
   `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **17 suites, 255 tests, all green** (M13 adds `warm-copy.test.ts` with 18; M12 adds `up-next.test.ts` with 26).
+- Tests: **18 suites, 271 tests, all green** (M14 adds `rank-lore.test.ts` with 16; M13 adds `warm-copy.test.ts` with 18).
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1373,7 +1432,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M14** — unique rank level-up dialogs for the 9 ranks (Beginner → Legend). `NOT BUILT` · also: `A1`. Queue agreed with owner: M8 → M11 → M12 → M13 → M14 → M16 (M8–M13 done) |
+| Next feature | **M16** — onboarding goal category tags. `NOT BUILT` · also: `A1`. Queue agreed with owner: M8 → M11 → M12 → M13 → M14 → M16 (M8–M14 done; **M16 is last**) |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
 | Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
 | **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |
