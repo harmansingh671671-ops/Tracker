@@ -713,14 +713,20 @@ to know where things stand.
 
 **Graph freshness note:** `graphify update .` executed at start of session, but the CLI is not available in this environment (missing from `PATH` and no local bin). The graph at `graphify-out/GRAPH_REPORT.md` is built from `dda4383d` and should be regenerated when graphify is accessible, before using it for impact analysis.
 
+### 2026-10-07 — M5 Creation feedback toast, and M4 integration status
+
+**Shipped:** M5 creation confirmation toast now names the first milestone. Habit creation dialog shows: "Your journey with {Habit Name} begins now. First milestone: 3-day streak." This matches the spec in `MASTER_TODO_REVISED.md` §19.
+
+**M4 integration status:** the `PerfectDayCard` component remains unmounted. The reward engine (`reward-rules.ts`) is fully tested and working; finding the right consumer location (likely `habits/page.tsx` or `day-schedule`) is a follow-up task.
+
 ### Where the work is right now
 
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **M5** — Creation confirmation toast naming first milestone. `NOT BUILT` · also: `B15` |
+| Next feature | **M6** — First-open welcome banner (3 pillars). `NOT BUILT` · also: `A8` |
 | Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead), CONS-1, CONS-2 |
-| Phase 1 exit gate | Gates clean · no uncommitted work (M4 was committed as partial) |
+| Phase 1 exit gate | Gates clean · no uncommitted work |
 | Next after Phase 1 | Phase 2 — onboarding `A1`/`XL14` is the largest gap between the app and its own research |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
