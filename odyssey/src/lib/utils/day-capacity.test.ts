@@ -16,7 +16,7 @@ function habit(id: string, targetDays?: number[]): Habit {
     userId: "u1",
     name: id,
     icon: "🧘",
-    category: "Health",
+    category: "Vitality & Fitness",
     frequency: "daily",
     targetDays: targetDays ?? [1, 2, 3, 4, 5, 6, 7],
     currentStreak: 0,

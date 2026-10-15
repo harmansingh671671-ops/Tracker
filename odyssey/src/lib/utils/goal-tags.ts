@@ -1,3 +1,5 @@
+import { type HabitCategory } from "@/lib/db";
+
 /**
  * M16 -- onboarding goal category tags.
  *
@@ -44,7 +46,7 @@ export interface GoalTag {
     name: string;
     icon: string;
     /** One of `CreateHabitModal`'s four DOMAINS. */
-    category: string;
+    category: HabitCategory;
   };
 }
 

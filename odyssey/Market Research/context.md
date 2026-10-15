@@ -606,6 +606,64 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — P0-T3, where the escape hatch turned out to be load-bearing
+
+**Shipped:** habits now have **one** category vocabulary, and `Habit.category` is a closed union.
+
+**The type was not sloppy — it was holding up a disagreement.** `Habit.category` was
+`HabitCategory | (string & {})`, a union that accepts any string and therefore constrains nothing.
+The reason it existed: **three competing vocabularies.**
+
+1. the schema declared **6** categories — Health, Mindfulness, Learning, Productivity, Social, Growth
+2. the create/edit form offers **4 DOMAINS** — Mindful Focus, Vitality & Fitness, Renewal & Health, Craft & Skill
+3. the colour lookup had a **third set of 7** groups
+
+So every habit the app actually created carried a category the schema did not declare. **Owner
+decision: the form's 4 are canonical**, because they are the only values a user can pick.
+
+**Narrowing the type immediately paid for itself — it caught 8 real violations** the moment it was
+closed, across `app/page.tsx`, `habits/page.tsx`, both habit modals, `goal-tags`,
+`habit-template-library`, `wallpaper-generator` and two test fixtures. Each was a string that had
+been quietly assignable since the union was widened. `DOMAINS` in both modals and `domainLabel`
+in the template library are now typed `HabitCategory`, so a rename breaks **at the source** rather
+than producing a category nobody can write.
+
+**The most important finding was a collision the single normaliser was silently resolving in the
+wrong direction.** `normalizeCategory` checked the **schedule** list before the habit list, and
+`'health'` and `'sleep'` exist in **both** vocabularies — so a *habit* saved as `"sleep"` resolved
+to the schedule's `"Sleep"` and never reached a domain at all. It is now split:
+`normalizeCategory` is schedule-only (existing contract and its nine tests untouched) and
+`normalizeHabitCategory` handles habits. **One function serving two vocabularies that share words
+is not deduplication, it is a coin flip.**
+
+**The colour map went from 70 keys to 4, and 26 of the 70 were unreachable.** `getHabitColor`
+compared `key.toLowerCase() === category.toLowerCase()`, so every lowercase duplicate sitting
+behind a Title Case twin could never match. They read as coverage and provided none. The seven
+keyword-heuristic branches went too — they matched substrings like `cat.includes("zen")` in
+categories no write path can produce, and a substring match on a user's own label is how a habit
+ends up green for reasons nobody can explain. **All four domain colours are asserted as literal
+hexes so no habit is repainted by this change.**
+
+**The migration is a safety net, not a conversion — and that was worth proving rather than
+assuming.** `LEGACY_HABIT_CATEGORY_MAP` plus a `version(2).upgrade()` rewrites existing rows, but
+`create-habit-modal` writes `tpl.domainLabel` and **never** `tpl.category`, and the habit store
+never touches `category` — so **no live write path can produce a legacy value**. That is why
+`Social` and `Growth`, which have no fourth-domain equivalent, could be mapped to the nearest
+instead of raising a product question: there is no data to lose. Both facts are recorded on the
+line rather than assumed, because "we have no legacy data" is exactly the claim that is wrong
+when someone finds a `put()` I missed.
+
+**The upgrade is declared on `version(2)`, not a new version.** Only row *values* change — the
+`category` index already exists and no field is added, removed or retyped — so bumping the schema
+version would make a data-only migration look like a schema change.
+
+**Verification:** 14 new tests. `tsc` exit 0, eslint 0 errors, **21 suites / 314 tests green**,
+build clean. Browser: a v1 database seeded with `Health`, `Mindfulness`, `Learning`, `sleep` and an
+unrecognised label comes back as `Vitality & Fitness`, `Mindful Focus`, `Craft & Skill`,
+`Renewal & Health`, and **`Gardening` preserved verbatim** — unknown user data survives the
+migration, which is the property that matters most. No mojibake and no layout regressions across
+all 42 probe combinations.
+
 ### 2026-10-15 — BUG-5 the streak that was 1 when it was 0, in nine places
 
 **Shipped:** every falsified streak in the app now reports its **true** value.

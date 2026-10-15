@@ -8,13 +8,21 @@ import {
   Check,
   ArrowRight,
 } from "lucide-react";
+import { type HabitCategory } from "@/lib/db";
 
 export interface HabitTemplate {
   id: string;
   name: string;
   icon: string;
-  category: "Health" | "Mindfulness" | "Learning" | "Productivity" | "Social" | "growth" | "work";
-  domainLabel: string;
+  // P0-T3: `category` is dead metadata -- `create-habit-modal.tsx` writes
+  // `domainLabel`, never this, and nothing reads it. It kept a hand-written
+  // union with lowercase "growth" and "work" in it, which is a third category
+  // vocabulary in the codebase. Kept (removing it is dead-code work under
+  // PERF-16c) but it can no longer be confused with a writable category.
+  category: string;
+  /** The value actually written to `Habit.category`. P0-T3: typed, so a rename
+   *  of a DOMAIN breaks here rather than producing an unwriteable category. */
+  domainLabel: HabitCategory;
   period: "morning" | "afternoon" | "evening" | "anytime";
   targetDaysPerWeek: number;
   targetDays: number[];

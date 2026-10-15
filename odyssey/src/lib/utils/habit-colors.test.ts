@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getHabitScheduledDays, isHabitScheduledOnDate } from "./habit-colors";
+import {
+  getHabitScheduledDays,
+  isHabitScheduledOnDate,
+  getHabitColor,
+  BOLD_CATEGORY_COLORS,
+  BOLD_HABIT_PALETTE,
+} from "./habit-colors";
+import { HABIT_CATEGORIES, LEGACY_HABIT_CATEGORY_MAP } from "@/lib/db";
 
 describe("getHabitScheduledDays", () => {
   it("prefers explicit targetDays over targetDaysPerWeek", () => {
@@ -83,5 +90,64 @@ describe("isHabitScheduledOnDate", () => {
     const week = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11"];
     const workweek = { targetDaysPerWeek: 5 };
     expect(week.filter((d) => isHabitScheduledOnDate(workweek, d))).toHaveLength(5);
+  });
+});
+
+
+describe("getHabitColor (P0-T3)", () => {
+  // The guarantee that matters: moving a habit onto the canonical vocabulary
+  // must not repaint it. These are the exact hexes the pre-P0-T3 map assigned
+  // to each domain, so a change here is a visible regression for every user.
+  const CANONICAL_COLOURS: Record<string, string> = {
+    "Vitality & Fitness": "#10B981",
+    "Craft & Skill": "#2563EB",
+    "Mindful Focus": "#8B5CF6",
+    "Renewal & Health": "#F59E0B",
+  };
+
+  it("gives each canonical domain its established colour", () => {
+    for (const [domain, hex] of Object.entries(CANONICAL_COLOURS)) {
+      expect(getHabitColor({ category: domain, name: "Anything" })).toBe(hex);
+    }
+  });
+
+  it("exposes exactly the four domains, and no more", () => {
+    expect(Object.keys(BOLD_CATEGORY_COLORS).sort()).toEqual([...HABIT_CATEGORIES].sort());
+  });
+
+  it("keeps a retired category on the colour its domain will become", () => {
+    // A habit saved before the migration is repainted only if the old lookup
+    // and the new one disagree. They must not.
+    for (const [alias, domain] of Object.entries(LEGACY_HABIT_CATEGORY_MAP)) {
+      expect(getHabitColor({ category: alias, name: "x" })).toBe(
+        BOLD_CATEGORY_COLORS[domain]
+      );
+    }
+  });
+
+  it("ignores casing and padding on a category", () => {
+    const expected = BOLD_CATEGORY_COLORS["Mindful Focus"];
+    for (const spelling of ["mindful focus", "MINDFUL FOCUS", "  Mindful Focus  "]) {
+      expect(getHabitColor({ category: spelling, name: "x" })).toBe(expected);
+    }
+  });
+
+  it("returns a stable colour for a habit with no recognisable category", () => {
+    const a = getHabitColor({ name: "Read" });
+    const b = getHabitColor({ name: "Read" });
+    expect(a).toBe(b);
+    expect(BOLD_HABIT_PALETTE).toContain(a);
+  });
+
+  it("falls back rather than throwing on empty or absent input", () => {
+    expect(BOLD_HABIT_PALETTE).toContain(getHabitColor({}));
+    expect(BOLD_HABIT_PALETTE).toContain(getHabitColor({ category: "", name: "" }));
+    expect(BOLD_HABIT_PALETTE).toContain(getHabitColor({ category: "Gardening" }));
+  });
+
+  it("does not depend on the discarded legacy index argument", () => {
+    const withIndex = getHabitColor({ category: "Craft & Skill", name: "x" }, 7);
+    const without = getHabitColor({ category: "Craft & Skill", name: "x" });
+    expect(withIndex).toBe(without);
   });
 });

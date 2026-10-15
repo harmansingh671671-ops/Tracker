@@ -43,7 +43,11 @@ const sampleHabit: Habit = {
   userId: "u1",
   name: "Read",
   icon: "book",
-  category: "Learning",
+  // P0-T3: was the pre-migration "Learning". Both fixtures deliberately use a
+  // canonical domain now, and the legacy mapping is covered directly in
+  // `categories.test.ts` — a fixture that quietly keeps testing a legacy value
+  // stops testing the thing users actually have.
+  category: "Craft & Skill",
   frequency: "daily",
   currentStreak: 3,
   longestStreak: 9,

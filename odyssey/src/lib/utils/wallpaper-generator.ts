@@ -143,7 +143,11 @@ export function placeholderHabits(): Habit[] {
       id: "def-1",
       name: "Mindful Focus",
       icon: "🧘",
-      category: "Habit Track",
+      // P0-T3: was the invented string "Habit Track", which was not a
+      // category at all -- so these placeholders resolved their colour through
+      // the deterministic name hash rather than a real mapping. They now use
+      // the real domain, so the wallpaper colours them as their category.
+      category: "Mindful Focus" as const,
       period: "morning" as const,
       timeOfDay: "08:00 AM",
       currentStreak: 0,
@@ -153,7 +157,7 @@ export function placeholderHabits(): Habit[] {
       id: "def-2",
       name: "Daily Hydration",
       icon: "💧",
-      category: "Vitality Track",
+      category: "Vitality & Fitness" as const,
       period: "afternoon" as const,
       timeOfDay: "01:00 PM",
       currentStreak: 0,

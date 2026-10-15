@@ -34,6 +34,7 @@ import { StepYourHabits, type OnboardingHabit } from "@/components/onboarding/st
 import { StepProtocol } from "@/components/onboarding/step-protocol";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { hasCompletedOnboarding, markOnboardingComplete } from "@/lib/utils/onboarding";
+import { type HabitCategory } from "@/lib/db";
 import {
   FIRST_STEP,
   canAdvance,
@@ -70,7 +71,7 @@ export default function OnboardingPage() {
   // M16 -- the goal tag tapped on the habits step, if any. Held as the modal's
   // `defaults` shape so an unknown category from a tag can never be injected.
   const [createDefaults, setCreateDefaults] = useState<
-    { name?: string; icon?: string; category?: string } | null
+    { name?: string; icon?: string; category?: HabitCategory } | null
   >(null);
 
   /**
@@ -128,7 +129,7 @@ export default function OnboardingPage() {
     async (data: {
       name: string;
       icon: string;
-      category: string;
+      category: HabitCategory;
       frequency: number;
       targetDays: number[];
       timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";

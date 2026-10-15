@@ -308,7 +308,7 @@ export default function HabitsPage() {
   const handleCreateHabit = async (data: {
     name: string;
     icon: string;
-    category: string;
+    category: HabitCategory;
     frequency: number;
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
@@ -341,7 +341,7 @@ export default function HabitsPage() {
     updates: {
       name: string;
       icon: string;
-      category: HabitCategory | (string & {});
+      category: HabitCategory;
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
       targetDays?: number[];

@@ -32,7 +32,7 @@ interface EditHabitModalProps {
     updates: {
       name: string;
       icon: string;
-      category: HabitCategory | (string & {});
+      category: HabitCategory;
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
       targetDays?: number[];
@@ -65,7 +65,7 @@ const EMOJIS = [
   { emoji: "🧹", label: "Organize" },
 ];
 
-const DOMAINS = [
+const DOMAINS: { id: HabitCategory; label: string; color: string; bg: string }[] = [
   { id: "Mindful Focus", label: "Mindful Focus", color: "text-secondary border-secondary/30", bg: "bg-secondary-container text-on-secondary-container" },
   { id: "Vitality & Fitness", label: "Vitality & Fitness", color: "text-primary border-primary/30", bg: "bg-primary text-on-primary" },
   { id: "Renewal & Health", label: "Renewal & Health", color: "text-tertiary border-tertiary/30", bg: "bg-tertiary-container text-on-tertiary-container" },
@@ -93,7 +93,7 @@ export function EditHabitModal({
   // Form states for Edit Tab
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🧘");
-  const [domain, setDomain] = useState("Vitality & Fitness");
+  const [domain, setDomain] = useState<HabitCategory>("Vitality & Fitness");
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);

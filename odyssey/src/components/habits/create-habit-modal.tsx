@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { type Habit } from "@/lib/db";
+import { type Habit, type HabitCategory } from "@/lib/db";
 import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/habit-template-library";
 import { X, Check, Sparkles, Plus, ArrowLeft } from "lucide-react";
 
@@ -11,7 +11,7 @@ interface CreateHabitModalProps {
   onSave: (habitData: {
     name: string;
     icon: string;
-    category: string;
+    category: HabitCategory;
     frequency: number;
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
@@ -31,7 +31,7 @@ interface CreateHabitModalProps {
     name?: string;
     icon?: string;
     /** Must be one of `DOMAINS`. An unknown value is ignored, not injected. */
-    category?: string;
+    category?: HabitCategory;
   };
 }
 
@@ -58,7 +58,10 @@ const EMOJIS = [
   { emoji: "🧹", label: "Organize" },
 ];
 
-const DOMAINS = [
+// P0-T3: typed as HabitCategory so the form and the schema cannot drift apart
+// again. These four ARE the canonical list — the previous divergence is exactly
+// what forced the `| (string & {})` escape hatch off `Habit.category`.
+const DOMAINS: { id: HabitCategory; label: string; color: string; bg: string }[] = [
   { id: "Mindful Focus", label: "Mindful Focus", color: "text-secondary border-secondary/30", bg: "bg-secondary-container text-on-secondary-container" },
   { id: "Vitality & Fitness", label: "Vitality & Fitness", color: "text-primary border-primary/30", bg: "bg-primary text-on-primary" },
   { id: "Renewal & Health", label: "Renewal & Health", color: "text-tertiary border-tertiary/30", bg: "bg-tertiary-container text-on-tertiary-container" },
