@@ -2,11 +2,6 @@ import { db, type Profile } from './db';
 import { remove } from "@/lib/utils/logger";
 import { v4 as uuidv4 } from 'uuid';
 
-export async function seedInitialData(userId: string): Promise<void> {
-  // No hardcoded starter hobbies.
-  // Users create and write their own custom hobbies from start.
-}
-
 export async function resetAllDataToZero(): Promise<Profile> {
   await db.transaction('rw', [db.profiles, db.habits, db.habitLogs, db.scheduleBlocks, db.weeklyReports, db.rewardSettlements], async () => {
     await db.profiles.clear();
@@ -49,6 +44,5 @@ export async function resetAllDataToZero(): Promise<Profile> {
   };
 
   await db.profiles.add(newUser);
-  await seedInitialData(newUser.id);
   return newUser;
 }

@@ -1,7 +1,7 @@
 import { db, type Profile } from './db';
 import { v4 as uuidv4 } from 'uuid';
 import { RANKS, calculateRank } from './utils/gamification';
-import { seedInitialData, resetAllDataToZero } from './seed';
+import { resetAllDataToZero } from './seed';
 
 export type { Profile };
 export { RANKS, calculateRank, resetAllDataToZero };
@@ -21,7 +21,6 @@ export async function getOrCreateUser(): Promise<Profile> {
       user.militaryRank = modernRank;
       await db.profiles.update(user.id, { militaryRank: modernRank });
     }
-    await seedInitialData(user.id);
     return user;
   }
   
@@ -51,7 +50,6 @@ export async function getOrCreateUser(): Promise<Profile> {
   };
   
   await db.profiles.add(newUser);
-  await seedInitialData(newUser.id);
   return newUser;
 }
 

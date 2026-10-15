@@ -289,8 +289,7 @@ to v2.0 (ECON-2, contradiction C3).
 - `src/lib/utils/wallpaper-generator.ts` — canvas render + `build24HourlyBlocks()`.
 - `src/lib/utils/confetti.ts` — `triggerStreaksConfetti()`.
 - `src/lib/habit-cache.ts` — localStorage mirror (read/write/clear per user).
-- `src/lib/seed.ts` — `seedInitialData()` is an **empty function** (dead code,
-  debt **D8**), `resetAllDataToZero()`.
+- `src/lib/seed.ts` — `resetAllDataToZero()` only. **`seedInitialData()` was removed 2026-10-15** (`P0-T7`, debt **D8** closed): it was an empty function awaited from 3 call sites, so removing it changed nothing observable but took the codebase off a file that exported a no-op as if it did work.
 - Category helpers live in `db.ts` itself (`normalizeCategory`, `SCHEDULE_CATEGORIES`,
   `HABIT_CATEGORIES`) and are tested by `src/lib/categories.test.ts`. **There is no
   `src/lib/categories.ts`** — an earlier version of this file listed one; the test imports

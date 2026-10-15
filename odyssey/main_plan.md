@@ -286,7 +286,7 @@ Reconciled against source at `6b42b74`. **This is the status seed — everything
 | **D5** | Planner/journey/stats bypass Zustand, read `db` directly | Two data-access styles | Medium |
 | **D6** | Knowledge graph stale — built from `efa7dc9a` | Run `graphify update .` before impact analysis | Medium |
 | **D7** | No test suite | **Fixed** — **19 suites / 283 tests** now exist | ~~High~~ |
-| **D8** | `seedInitialData()` empty function, 2 call sites | Dead code | Low |
+| **D8** | `seedInitialData()` empty function, 3 call sites | Dead code — **CLOSED** by P0-T7 (2026-10-15) | Low |
 | **D9** | Dual XP accounting: profile XP vs Temporary Wallet XP | Double-claim risk — specified in `docs/adr/0001-reward-economy.md` | High |
 
 ---
@@ -303,7 +303,7 @@ first: cheap, de-risks later phases, and several are correctness bugs.
 - [x] **P0-T4** — Specify reward economy (closes D9). `SHIPPED` · src: `docs/adr/0001-reward-economy.md`
 - [x] **P0-T5** — First tests. `SHIPPED` — **19 suites / 283 tests** (this line read "8 suites"; it was never updated after the P8 and M-series work) · src: `DEVELOPMENT_PLAN.md §4 L276`
 - [ ] **P0-T6** — Native bridge adapter pattern (closes D1). `PARTIAL` — the alias-resolution adapter **has landed**: `nativeBridge()` / `hasNative()` / `callNative()` / `callNativeBool()` in `src/lib/utils/android-bridge.ts`, with `odyssey/bridge-boundary` in ESLint making direct `window.OdysseyAndroid` access a lint error (59 duplicated blocks removed). **What remains:** the module is still one 829-line file holding all 34 methods, so D1's "god-node" half is unclosed — it needs splitting by concern, behaviour-preserving · src: `DEVELOPMENT_PLAN.md §4 L277`
-- [ ] **P0-T7** — Remove dead code `seedInitialData()` (D8). `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §4 L278`
+- [x] **P0-T7** — Remove dead code `seedInitialData()` (D8). `SHIPPED` — the function's body was **two comments and nothing else**, and it was `await`ed from **3** call sites (`user.ts` x2, `seed.ts` x1). All five references gone; `resetAllDataToZero()` — which does real work — is untouched. `FEATURES.md` had recorded D8 `CLOSED` while this line said `NOT BUILT`; the two now agree. Closes **D8** · src: `DEVELOPMENT_PLAN.md §4 L278`
 - [ ] **DEBT** — D2 split `useUserStore`; D5 unify data access; D6 refresh graph. `NOT BUILT` · src: `DEVELOPMENT_PLAN.md §3.3 L217`
 
 ### 3.2 Known defects found by audit

@@ -169,7 +169,7 @@ Verified by building, compiling, and (where possible) running it.
 | D5 | Planner/journey/stats bypass Zustand, read `db` directly | **OPEN** — two data-access styles |
 | D6 | Knowledge graph stale | **CLOSED** (P0-T2) — rebuilt from `dda4383d`; report now tracked in git |
 | D7 | No test suite | **CLOSED** — 8 suites (P0-T5) |
-| D8 | `seedInitialData()` empty with 2 call sites | **OPEN** — `P0-T7` is `NOT BUILT` in `main_plan.md`, which is the status record (C10). This table previously said `CLOSED`, which contradicted it. |
+| D8 | `seedInitialData()` empty with 3 call sites | **CLOSED** (P0-T7, 2026-10-15) |
 | D9 | Dual XP accounting | **OPEN — HIGH**, blocks P3 |
 
 ## ACTIVE RISKS
