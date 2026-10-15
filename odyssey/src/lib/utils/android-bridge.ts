@@ -272,8 +272,8 @@ export function buildNativeSchedulePayload(data: WallpaperData): string {
         timeOfDay: h.timeOfDay || "",
       }))
     : [
-        { name: "Mindful Focus", icon: "ðŸ§˜", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
-        { name: "Daily Hydration", icon: "ðŸ’§", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
+        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
+        { name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
       ];
 
   // Merge full 24 blocks with raw user blocks to ensure exact title and hour matching
@@ -807,7 +807,7 @@ export function sendTestNotificationToAndroid(
 
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
-      new Notification(`Odyssey â€¢ XX:57 Heads-Up`, {
+      new Notification(`Odyssey • XX:57 Heads-Up`, {
         body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
         icon: "/logo.png",
       });
@@ -815,7 +815,7 @@ export function sendTestNotificationToAndroid(
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission().then((perm) => {
         if (perm === "granted") {
-          new Notification(`Odyssey â€¢ XX:57 Heads-Up`, {
+          new Notification(`Odyssey • XX:57 Heads-Up`, {
             body: `Upcoming at ${timeStr}: ${taskTitle} (${category})`,
             icon: "/logo.png",
           });

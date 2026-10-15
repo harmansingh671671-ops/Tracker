@@ -606,6 +606,37 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — BUG-4 mojibake, and a guard that caught itself
+
+**Shipped:** 5 mojibake sequences across 2 files, all in text the user sees, all the
+signature of the documented PowerShell `Set-Content` incident (§7).
+
+- the **notification title** rendered `Odyssey â€¢ XX:57 Heads-Up` instead of `•`
+- the **habits date strip** rendered `Completed âœ“` instead of `✓`
+- the two **fallback habit icons** sent to the wallpaper were `ðŸ§˜` / `ðŸ'§`
+  instead of 🧘 / 💧
+
+**Found while reading `android-bridge.ts` for P0-T6, not by any gate.** That is the lesson:
+`tsc`, lint and 283 tests were all green the whole time these were shipping. Nothing asserted
+on any of those strings, so the only detection path was a human reading them — and
+`git ls-files` / a codepoint scan is now part of the routine.
+
+**Repaired by codepoint, not by search-and-replace.** The byte sequences were confirmed first
+(`U+00E2 20AC 00A2` → `U+2022`, and so on) and replaced with an explicit UTF-8 **no-BOM** write.
+The repo already records that `Set-Content` corrupted `context.md` once; using a tool that can
+corrupt files, to fix a corruption, would have been the same mistake twice.
+
+**A guard, not a one-off fix.** `src/lib/utils/encoding.test.ts` walks every `.ts`/`.tsx`/`.css`
+under `src/` on every suite and fails on any mojibake marker or a BOM. **It caught itself
+twice while being written** — its own explanatory comments reproduced the bad bytes. That is the
+cheapest possible proof a guard can fail, and it is the same lesson as the `#__next` probe that
+reported `false` on a working page. A guard that cannot fail is not a guard.
+
+The guard also asserts it is looking at more than 100 files, for the same reason: a scanner that
+silently matches nothing reads as passing while covering nothing.
+
+`Market Research/` and the Kotlin sources are **not** covered yet — the obvious next extension.
+
 ### 2026-10-15 — CONS-2 narrow-screen sweep, where the recorded bug was not the bug
 
 **Shipped:** the Phase 1 exit-gate criterion `CONS-2`, plus `P0-T2` (knowledge-graph refresh)

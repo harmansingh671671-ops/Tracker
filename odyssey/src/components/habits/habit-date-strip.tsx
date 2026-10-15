@@ -516,7 +516,7 @@ export function HabitDateStrip({
                           title={`${h.name}: ${
                             isDone
                               ? isScheduled
-                                ? "Completed âœ“"
+                                ? "Completed ✓"
                                 : "Unscheduled Completed (!)"
                               : "Pending"
                           }`}
