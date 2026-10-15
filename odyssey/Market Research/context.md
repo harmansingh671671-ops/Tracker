@@ -606,6 +606,61 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — BUG-5 the streak that was 1 when it was 0, in nine places
+
+**Shipped:** every falsified streak in the app now reports its **true** value.
+
+**The finding.** `currentStreak || 1` turns a genuine zero into 1, and the native wallpaper
+renders that number inside an **amber achievement pill**. So a habit with no streak arrived on
+the lock screen wearing a trophy while the app said *"No streak yet"* on screen. **M13 fixed
+exactly this on the web side in 2026-10-08 and the native side was never touched.**
+
+**The idiom was not one site, it was nine, across three files** — and two of them are
+user-visible text the user reads without opening anything:
+
+| Where | Was | Now |
+|---|---|---|
+| `/journey` header | `"{user?.streak \|\| 1}d Streak"` next to an amber flame | reuses M13's `getStreakLabel`/`isStreakActive` — **"No streak yet"**, muted |
+| wallpaper header | fell back to `data.activeDay` (**journey day**, not a streak) beside the label "DAYS STREAK" | `data.userStreak ?? 0` |
+| placeholder habits | inherited `data.userStreak` — shown to a user with **no habits at all** | always `0`; a placeholder habit has never been completed |
+| bridge payload ×4, canvas generator, sync result | `\|\| 1` / `?? 1` | `trueStreak()` |
+
+**Why it survived: `buildNativeSchedulePayload` had no tests at all.** Not one. `tsc`, lint
+and 283 tests were green the entire time, because none of them ever constructed the payload.
+It now has 14, including the specific case that would reintroduce the defect.
+
+**The Journey header was the worst of them** — the most prominent position on that screen, with
+a flame icon and amber text, and it was still live **a week after** M13 shipped the helper
+designed to fix exactly this. Three separate screens now read a streak three different ways.
+
+**My own test was wrong before the code was, again.** I asserted a numeric string `"7"` should
+coerce to `0`. It should not: a habit whose streak round-tripped through storage as `"7"`
+really does have a 7-day streak, and flattening it to 0 discards the user's history — trading
+one false number for another. It coerces to `7`. The repo has now recorded this class four
+times; the reason it keeps recurring is that "make it safe" and "make it true" are different
+goals and only one of them is the job.
+
+**Browser verification caught a defect I introduced, and then four defects in the harness.**
+The first fix rendered **"No streak yet Streak"** — grammatical nonsense, because I appended
+`" Streak"` to a label that already carries the phrase. The `long` variant of `getStreakLabel`
+already says *"5-day streak"*, so the suffix was never needed. The harness then failed three
+times in a row for reasons that were **all mine, none the app's**: `put({id, streak})` replaces
+the whole IndexedDB record and wipes every field; the write was not awaited before `reload`;
+and the assertion still looked for the short form after the label changed.
+
+**And the harness's first real failure was a genuine finding.** With three profiles in the
+database, `/journey` rendered a *different* profile's streak than the one seeded — because
+`getOrCreateUser()` returns `users[0]` from an **unordered** `toArray()`. Recorded as **BUG-6**
+as a **hypothesis, not a finding**: I cannot show the app created those rows rather than my own
+seeding, and it needs a control run before anything gets built. A single-profile invariant is a
+schema decision and needs an ADR, not a patch.
+
+**Deliberately not done, and recorded rather than half-done:** the Kotlin side reads
+`optInt("currentStreak", 1)`, so an absent key still becomes 1. Fixing it is a native change
+and **this machine cannot compile Kotlin** — no `gradlew`, and JBR 25 cannot start the Kotlin
+1.9.22 daemon. Shipping it blind is forbidden (R12). Hiding the amber pill at zero needs canvas
+**and** native layout work, because both derive the card's text width from the pill's position.
+
 ### 2026-10-15 — BUG-4 mojibake, and a guard that caught itself
 
 **Shipped:** 5 mojibake sequences across 2 files, all in text the user sees, all the

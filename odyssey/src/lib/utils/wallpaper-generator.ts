@@ -226,7 +226,10 @@ function getDisplayHobbies(habits: Habit[], currentHour: number = 12): DisplayHo
     results.push({
       icon: resolveHobbyEmoji(h.icon, h.name),
       title: h.name,
-      streak: h.currentStreak || 1,
+      // Was `h.currentStreak || 1`. NOTE: getDisplayHobbies is currently unreferenced
+      // (lint flags it), so this never executes today -- but leaving a falsifying
+      // idiom in place means wiring it up later reintroduces the lie silently.
+      streak: Number.isFinite(h.currentStreak) ? Math.max(0, Math.floor(h.currentStreak)) : 0,
       sub: h.category ? `${h.category} • Target active` : "Habit track",
     });
   }
@@ -371,7 +374,11 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   ctx.fillText(`Level ${String(data.userLevel).padStart(2, "0")} Explorer`, cardPad + 36, headerY + 162);
 
   // Minimal Streak Count on right
-  const streakNum = data.userStreak !== undefined ? data.userStreak : data.activeDay;
+  // Was: `data.userStreak !== undefined ? data.userStreak : data.activeDay`.
+  // `activeDay` is the journey day number, not a streak, so a user who had
+  // never kept a streak saw their journey day rendered next to the label
+  // "DAYS STREAK". A missing streak is 0, never a different number.
+  const streakNum = data.userStreak ?? 0;
   const streakX = cardPad + cardW - 36;
   ctx.textAlign = "right";
   ctx.font = "700 44px 'JetBrains Mono', monospace";

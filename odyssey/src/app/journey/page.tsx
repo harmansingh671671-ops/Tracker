@@ -7,6 +7,7 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
+import { getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
 import { evaluateDayCompletion, type DayCompletionStats } from "@/lib/utils/day-status";
 import {
   Check,
@@ -257,9 +258,9 @@ export default function JourneyPage() {
             <span className="text-xs font-mono font-bold text-primary px-3 py-1 rounded-full bg-primary/15 border border-primary/30">
               Day {activeDay} Active
             </span>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high text-amber-400 text-xs font-mono font-bold">
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold ${isStreakActive(user?.streak ?? 0) ? "bg-surface-container-high text-amber-400" : "bg-surface-container text-on-surface-variant/70"}`}>
               <Flame className="w-3.5 h-3.5" />
-              <span>{user?.streak || 1}d Streak</span>
+              <span>{getStreakLabel(user?.streak ?? 0, "long")}</span>
             </div>
           </div>
 

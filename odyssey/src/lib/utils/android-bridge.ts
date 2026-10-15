@@ -255,6 +255,25 @@ export function isNativeBridgeAvailable(): boolean {
 }
 
 /**
+ * A streak is a count, and 0 is a real count.
+ *
+ * This used to read `h.currentStreak || 1`, which turned every genuine zero
+ * into 1 -- and the native wallpaper renders that number in an amber
+ * achievement pill ("1d" with a fire), so a habit with no streak at all
+ * arrived on the lock screen wearing a trophy. M13 fixed exactly this on the
+ * web side; the native side was never touched, so the app could read "No
+ * streak yet" on screen and "1d" on the wallpaper at the same moment.
+ *
+ * Coerce rather than trust the type: the value round-trips through
+ * IndexedDB, which is not type-checked, and a habit written by an older build
+ * can hold anything. A non-number becomes 0, never 1.
+ */
+function trueStreak(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
  * Generates the standardized 24-hour and habit payload for native wallpaper sync.
  */
 export function buildNativeSchedulePayload(data: WallpaperData): string {
@@ -266,14 +285,17 @@ export function buildNativeSchedulePayload(data: WallpaperData): string {
         id: h.id,
         name: h.name,
         icon: h.icon,
-        currentStreak: h.currentStreak || 1,
+        currentStreak: trueStreak(h.currentStreak),
         category: h.category || "Habit Track",
         period: h.period || "",
         timeOfDay: h.timeOfDay || "",
       }))
     : [
-        { name: "Mindful Focus", icon: "🧘", currentStreak: data.userStreak || 1, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
-        { name: "Daily Hydration", icon: "💧", currentStreak: data.userStreak || 1, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
+        // Placeholders for a user who has not created a habit yet. They
+        // deliberately report 0: these habits do not exist, so any streak
+        // shown against them is invented.
+        { name: "Mindful Focus", icon: "🧘", currentStreak: 0, category: "Habit Track", period: "morning", timeOfDay: "08:00 AM" },
+        { name: "Daily Hydration", icon: "💧", currentStreak: 0, category: "Vitality Track", period: "afternoon", timeOfDay: "01:00 PM" },
       ];
 
   // Merge full 24 blocks with raw user blocks to ensure exact title and hour matching
@@ -292,7 +314,11 @@ export function buildNativeSchedulePayload(data: WallpaperData): string {
     rankName: data.rankName,
     rankBadge: data.rankBadge,
     userLevel: data.userLevel,
-    userStreak: data.userStreak || data.activeDay || 1,
+    // Was `data.userStreak || data.activeDay || 1`, which meant a brand-new
+    // user with a real streak of 0 was shown the journey day number, and a
+    // day-1 user was shown 1. Neither is a streak. The native header renders
+    // this unconditionally next to the label "DAYS STREAK".
+    userStreak: trueStreak(data.userStreak),
     plannedHours: data.plannedHours,
     blocks: blocksList,
     habits: habitsList,
@@ -358,7 +384,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
               habitCount: resObj.habitCount ?? habitNames.length,
               taskNames,
               habitNames,
-              streak: resObj.streak ?? data.userStreak ?? 1,
+              streak: trueStreak(resObj.streak ?? data.userStreak),
               message: `Verified: ${resObj.blockCount ?? taskNames.length} tasks and ${resObj.habitCount ?? habitNames.length} hobbies confirmed in Android Native Storage!`,
               timestamp: timeFormatted,
             };
@@ -378,7 +404,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
         habitCount: habitNames.length,
         taskNames,
         habitNames,
-        streak: data.userStreak || 1,
+        streak: trueStreak(data.userStreak),
         message: isOk
           ? `Verified: ${taskNames.length} tasks and ${habitNames.length} hobbies synced to Android preferences.`
           : `Synced to native Android engine (${taskNames.length} tasks, ${habitNames.length} hobbies).`,
@@ -392,7 +418,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
         habitCount: habitNames.length,
         taskNames,
         habitNames,
-        streak: data.userStreak || 1,
+        streak: trueStreak(data.userStreak),
         message: `Native bridge error during sync: ${errText(e)}`,
         error: String(e),
         timestamp: timeFormatted,
@@ -408,7 +434,7 @@ export async function syncAndVerifySchedule(data: WallpaperData): Promise<SyncVe
     habitCount: habitNames.length,
     taskNames,
     habitNames,
-    streak: data.userStreak || 1,
+    streak: trueStreak(data.userStreak),
     message: "Running in web browser (Chrome). The 24-hour schedule and hobbies are verified in web cache, but modifying your physical phone's lockscreen requires the Native APK build.",
     timestamp: timeFormatted,
   };
@@ -755,7 +781,7 @@ export async function syncCurrentScheduleToNative(targetDateStr?: string): Promi
           rankBadge: rankInfo.badge,
           rankName: rankInfo.name,
           userLevel: user.level ?? 1,
-          userStreak: user.streak ?? 1,
+          userStreak: trueStreak(user.streak),
           plannedHours,
           dateStr: activeDateStr,
           formattedDate: dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
