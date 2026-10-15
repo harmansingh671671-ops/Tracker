@@ -211,7 +211,7 @@ export function FloatingFeedbackButton() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-3.5 sm:bottom-24 sm:right-6 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high/95 hover:bg-surface-bright text-on-surface border border-emerald-500/30 shadow-lg backdrop-blur-md text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 hover:border-emerald-500/60 hover:shadow-emerald-500/10 group"
+        className="fixed bottom-[var(--app-fab-offset)] right-3.5 sm:right-6 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high/95 hover:bg-surface-bright text-on-surface border border-emerald-500/30 shadow-lg backdrop-blur-md text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 hover:border-emerald-500/60 hover:shadow-emerald-500/10 group"
         title="Give Feedback or Reviews on WhatsApp"
         aria-label="Feedback"
       >

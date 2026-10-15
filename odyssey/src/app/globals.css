@@ -55,6 +55,38 @@
   --journey-node-completed-text: #FFFFFF;
   --journey-node-completed-border: #9B4DFF;
 
+  /* CONS-2 -- reserved space for the two fixed chrome layers.
+     The bottom nav and the floating feedback button are both position:fixed,
+     so scrolling content has to END above them or the button sits on top of a
+     control the user is trying to press.
+
+     These are the single source of truth. The nav takes its height from
+     --app-nav-h, the feedback button takes its offset from --app-fab-offset,
+     and <main> reserves exactly --app-content-bottom, which is derived from
+     both. Before this, <main> reserved a flat 96px (pb-24) while the button
+     occupied 80px-114px, so its top 18px sat over content: measured at 21.8%
+     of a month-calendar day button at 360px, plus a shop purchase button and a
+     profile text input at EVERY width. Two magic numbers in two files that
+     disagreed; a derived value cannot. Do not reintroduce a literal here. */
+  --app-nav-h: 4rem;
+  --app-fab-h: 2.25rem;
+  --app-fab-offset: 5rem;
+  --app-content-gap: 0.5rem;
+  --app-content-bottom: calc(
+    var(--app-fab-offset) + var(--app-fab-h) + var(--app-content-gap) +
+    env(safe-area-inset-bottom, 0px)
+  );
+
+  /* CONS-2 -- a SECOND floating button stacks directly above the feedback
+     button, not on top of it. /journey shows a "Go to Today" quick-return pill
+     in the same corner whenever today is scrolled out of view, and the two
+     were both at bottom-20 right-*, so they covered each other: 27.1% of the
+     button, at every width, in both themes. Expressed as an offset from the
+     first so moving one moves the other. */
+  --app-stack-offset: calc(
+    var(--app-fab-offset) + var(--app-fab-h) + var(--app-content-gap)
+  );
+
   /* M11 -- time-period accents. The research specifies Morning #F59E0B,
      Afternoon #3B82F6, Evening #8B5CF6, Night #4F46E5. Those exact values are
      NOT used: they were chosen without checking contrast against this app's
@@ -141,6 +173,19 @@
   --journey-node-completed-text: #002f18;
   --journey-node-completed-border: #69f0ae;
   color-scheme: dark;
+}
+
+/* The feedback button moves up a step at sm (it used to be bottom-20 -> sm:bottom-24).
+   Defining it here instead of as a Tailwind sm: variant means the reservation in
+   <main> follows it automatically -- the two cannot drift apart at this breakpoint.
+   This is deliberately outside :root/.light/.dark: it is a breakpoint change, not a
+   colour, so it must not be duplicated per theme. */
+@media (min-width: 640px) {
+  :root,
+  .light,
+  .dark {
+    --app-fab-offset: 6rem;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -281,6 +326,13 @@
 
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  /* CONS-2 -- reserve exactly the height of the fixed nav + floating feedback
+     button, derived from the tokens above. Replaces a flat pb-24 that left the
+     button's top 18px sitting over content. */
+  .pb-app-content {
+    padding-bottom: var(--app-content-bottom);
   }
   
   .pt-safe {

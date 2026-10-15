@@ -32,10 +32,14 @@ against the research corpus when it is available, but the register never *requir
 
 ## NEXT UP
 
+> **This table is stale. Status lives in `main_plan.md` (C10).** `XL14` shipped on
+> 2026-10-07 as `A1`, and `M1`–`M3` / `M6` / `M16` are all `BUILT`. Read
+> `main_plan.md` → Phase 1 → first unchecked line for what is actually next.
+
 | # | ID | What | Why it is next |
 |---|---|---|---|
-| 1 | **XL14** | Interactive onboarding (P1) | **Next feature.** No `/onboarding` route exists; `/` is a marketing dial, not a first-run flow. Largest gap between the app and its own research. |
-| 2 | M1–M3, M6 | Empty states, trust badge, welcome banner (P1) | Highest-ROI polish after onboarding. |
+| 1 | **XL14** | Interactive onboarding (P1) | ~~Next feature.~~ **SHIPPED as `A1`** — `/` is the five-step first-run flow; there is still no separate `/onboarding` route and does not need one. |
+| 2 | M1–M3, M6 | Empty states, trust badge, welcome banner (P1) | **All `BUILT`.** M6 was relocated into the onboarding flow. |
 | 3 | HD13–HD15 | Pomodoro, soundscapes, breathing pacer (P2) | There is no focus timer at all. |
 
 ---
@@ -51,7 +55,7 @@ record; this section is the only place that needs updating per feature.
 | `any` casts | 31 | **0** |
 | Direct `localStorage` call sites | 85 | **0** |
 | Direct bridge-namespace references | 59 | **1** (the resolver itself) |
-| `android-bridge.ts` | 1027 lines | **813 lines** |
+| `android-bridge.ts` | 1027 lines | **829 lines** |
 | Divergent category unions | 2 | **1** + normalizer |
 | Lint guard rules | **0** | **6**, all passing |
 
@@ -165,7 +169,7 @@ Verified by building, compiling, and (where possible) running it.
 | D5 | Planner/journey/stats bypass Zustand, read `db` directly | **OPEN** — two data-access styles |
 | D6 | Knowledge graph stale | **CLOSED** (P0-T2) — rebuilt from `dda4383d`; report now tracked in git |
 | D7 | No test suite | **CLOSED** — 8 suites (P0-T5) |
-| D8 | `seedInitialData()` empty with 2 call sites | **CLOSED** (P0-T7) |
+| D8 | `seedInitialData()` empty with 2 call sites | **OPEN** — `P0-T7` is `NOT BUILT` in `main_plan.md`, which is the status record (C10). This table previously said `CLOSED`, which contradicted it. |
 | D9 | Dual XP accounting | **OPEN — HIGH**, blocks P3 |
 
 ## ACTIVE RISKS

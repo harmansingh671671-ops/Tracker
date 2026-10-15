@@ -100,8 +100,8 @@ there). Live on Vercel, APK at `/downloads/odyssey-latest.apk`.
 |---|---|
 | Framework | Next.js **16.3.5** (NOT 14 — `PHASE_0_AUDIT_REPORT.md` says 14; that is a documented factual error), App Router, React 19.2.8 |
 | UI | Tailwind CSS v4 via `@tailwindcss/postcss`; `lucide-react`, `framer-motion` 13.2.0, `tw-animate-css`, `@base-ui/react`, `shadcn` 4.21 |
-| State | Zustand 5 — 7 stores, see §5 |
-| Data | Dexie 4 (`dexie-react-hooks`) `OdysseyDB`, 6 tables, compound indexes, UTC timestamps; `fake-indexeddb` in tests |
+| State | Zustand 5 — **6** stores, see §5 |
+| Data | Dexie 4 (`dexie-react-hooks`) `OdysseyDB`, **7 tables** (Dexie `version(2)`), compound indexes, UTC timestamps; `fake-indexeddb` in tests |
 | Dates | `date-fns` 4; `react-day-picker` 10. Habit dates are `YYYY-MM-DD` **local** strings |
 | Charts | recharts 3 |
 | IDs | `uuid` 14 |
@@ -175,7 +175,7 @@ vs `name`, `streakCurrent` vs `currentStreak`) — an **unapproved** proposal.
 Never adopt it wholesale. New fields are additive migrations; deviations need
 an ADR in `docs/adr/`.
 
-Dexie `OdysseyDB`, `version(1)`, 6 tables:
+Dexie `OdysseyDB`, **`version(2)`**, **7 tables** — `profiles`, `scheduleBlocks`, `habits`, `habitLogs`, `weeklyReports`, `inboxItems`, and `rewardSettlements`:
 
 | Table | Fields |
 |---|---|
@@ -186,12 +186,12 @@ Dexie `OdysseyDB`, `version(1)`, 6 tables:
 | `weeklyReports` | `weekStart`/`weekEnd`, `totalScheduledHours`/`totalCompletedHours`, `completionRate`, `topCategory`, `mostProductiveHour`, `streakAtWeekEnd`, `diamondsEarned`, `xpEarned`, `categoryBreakdown` |
 | `inboxItems` | `title`, `timeHorizon` (`today`/`this_week`/`someday`), `estimatedMinutes?`, `priority?`, `category?` |
 
-Indexes are declared in the same `.stores({...})` block (`db.ts:179`) — several are
+Indexes are declared in the same `.stores({...})` block (`db.ts:206`) — several are
 compound, e.g. `profiles: 'id, userId, …'`, `habitLogs: 'habitId, date, [habitId+date]'`,
 `weeklyReports: 'id, userId, weekStart, [userId+weekStart]'`.
 
 Canonical categories are **Title Case** (`SCHEDULE_CATEGORIES`, `HABIT_CATEGORIES`
-const arrays in `db.ts:59`/`db.ts:76`):
+const arrays in `db.ts:48`/`db.ts:67`):
 
 - Schedule: Work / Study / Health / Sleep / Leisure / Admin / Habits / Buffer
 - Habits: Health / Mindfulness / Learning / Productivity / Social / Growth
@@ -206,7 +206,7 @@ dual-case — `ScheduleBlock.category:102` and `Habit.category:117` are both
 `Category | (string & {})`, which accepts any string and so defeats the point of
 the union — and `habit-colors.ts` still carries ~50 colour aliases.
 
-**The `.stores({...})` map is at `db.ts:179`, `this.version(1)`.**
+**The `version(1)` `.stores({...})` map is at `db.ts:206`, and `version(2)` adds `rewardSettlements` at `db.ts:220`** (ADR 0002 — a new table only, no existing table modified, so `up()` has nothing to do).
 
 ---
 
@@ -218,7 +218,7 @@ db.ts (Dexie/IndexedDB) ──► stores (Zustand) ──► components ──�
                 └──── habit-cache.ts ─────┘ (localStorage mirror, last-known-good)
 ```
 
-Stores live in `src/lib/stores/` (7 files):
+Stores live in `src/lib/stores/` (**6** stores — the 7th file there is `wallpaper-toggle-store.test.ts`):
 
 | Store | Role |
 |---|---|
@@ -291,7 +291,10 @@ to v2.0 (ECON-2, contradiction C3).
 - `src/lib/habit-cache.ts` — localStorage mirror (read/write/clear per user).
 - `src/lib/seed.ts` — `seedInitialData()` is an **empty function** (dead code,
   debt **D8**), `resetAllDataToZero()`.
-- `src/lib/categories.ts` — category helpers (tested).
+- Category helpers live in `db.ts` itself (`normalizeCategory`, `SCHEDULE_CATEGORIES`,
+  `HABIT_CATEGORIES`) and are tested by `src/lib/categories.test.ts`. **There is no
+  `src/lib/categories.ts`** — an earlier version of this file listed one; the test imports
+  from `./db`.
 
 ---
 
@@ -442,6 +445,15 @@ through that media query (`theme-store.ts` + the anti-FOUC script in
 loaded. Force both: `page.emulateMediaFeatures([{name:"prefers-color-scheme",
 value:"light"}])` **and** set `odyssey_theme_mode` in `evaluateOnNewDocument`.
 Assert the rendered background rather than trusting the run name.
+
+**Assert the theme by reading `--background`, not `backgroundColor`.** Light mode
+paints a *gradient* (`--body-bg: linear-gradient(...)`), so
+`getComputedStyle(document.body).backgroundColor` returns `rgba(0, 0, 0, 0)` for
+light — which reads as "no background", not "light", and a pass built on it cannot
+distinguish a working light pass from a silently-dark one. Read
+`getComputedStyle(document.documentElement).getPropertyValue('--background')`:
+`#f8f5fb` light, `#0b1326` dark. The same class of bug as the `#__next` probe — a
+check that cannot fail is not a check.
 
 **A fixed `z-50` overlay swallows real mouse clicks.** `AppShell` renders
 `<AppUpdateModal />` on every route, and it appears on a fresh profile. Use
@@ -594,6 +606,72 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-15 — CONS-2 narrow-screen sweep, where the recorded bug was not the bug
+
+**Shipped:** the Phase 1 exit-gate criterion `CONS-2`, plus `P0-T2` (knowledge-graph refresh)
+which was run first as a tool step because the graph was 11 days stale and `.clinerules` §1
+makes it the first search tool.
+
+**The defect was not the narrow screen, and the defect on the line was not the real one.**
+`CONS-2` recorded "the Feedback button overlaps a screen's primary CTA at 360px, 2.4%". Swept
+all 5 main surfaces plus Profile and Wallpaper at **360 / 390 / 430** in **light and dark** —
+42 combinations — with a geometric probe rather than by eye. Two things came out of that:
+
+1. **The recorded 2.4% was a mid-scroll artifact.** A `fixed` floating button overlays whatever
+   sits at its screen position, so at `scrollTop=0` it floats over mid-page content. Measured at
+   full scroll, it never appeared on any route. The extra clearance `CONS-2` added is real
+   insurance, but it is not the fix and the original figure did not mean what the line said.
+2. **The real defect was two buttons in one corner, and it was not width-specific.**
+   `/journey` renders a *"Go to Today"* quick-return pill at `fixed bottom-20 right-4 sm:right-6`
+   whenever today is scrolled out of view — **the exact corner the Feedback button occupies**.
+   The two covered each other by **27.1%, at every width, in both themes**. Fixed by stacking:
+   the journey pill sits one button-height above the Feedback button.
+
+**A fixed button overlapping content mid-scroll is not a defect, and that distinction is the
+whole measurement.** The first probe reported 14 findings and the fix appeared to do nothing
+because 14 was still the number. The probe was wrong, not the fix — and the tell was that the
+count could not distinguish a stuck control from a transient. Re-measuring at full scroll
+separated them: **6 genuine findings → 0**, while the 14 transients stayed 14 and are expected
+for any FAB.
+
+**The magic numbers are gone, which is the durable half.** Nav height, feedback offset, feedback
+height and the reserved content space are now **four tokens in `globals.css`**, and `<main>`'s
+padding is *derived* from them, so the layout and the floating button cannot drift apart again.
+The `sm:` shift became a **token override inside a `min-width: 640px` media query** rather than a
+Tailwind variant, so the reservation follows the button automatically — at 700px the button moves
+to 96px and the reservation moves to 140px with no second number to update. Verified by reading
+the computed values back: 360px → padding 124px vs button top 114px; 700px → 140px vs 130px;
+**10px clearance at both**. `--app-content-bottom` also now includes
+`env(safe-area-inset-bottom)`, which the old flat `pb-24` ignored — on a device with a home
+indicator the nav is taller than 64px and the reservation was short by exactly that much.
+
+**Two claims on the `CONS-2` line did not reproduce, and no fix was invented for them.**
+Document horizontal scroll is **0** and off-screen elements are **0** at every width, so the
+*"4 fixed pixel widths remain"* cause no defect — the arbitrary values still present are
+`w-full max-w-[Npx]` caps, which adapt, or genuinely fixed decorative controls (the toggle
+switch, the onboarding step dots). And *"no `md:`"* is stylistic with no measured consequence.
+Both are recorded as findings rather than gaps, on the M13 precedent: manufacturing a change to
+look busy is the same instinct that produces the defects.
+
+**Verification:** 42 combinations probed before and after, **6 → 0** genuine findings;
+`tsc` clean (exit 0); full lint **0 errors** (85 pre-existing warnings, none from these files);
+**19 suites / 283 tests green**; production build clean; 42 screenshots at 360/390/430 in both
+themes. **The theme assertion had to be rebuilt.** Reading `backgroundColor` reported
+`rgba(0,0,0,0)` for light — light mode paints a *gradient*, so the check cannot see it — and the
+first "light" pass was **silently rendering dark**, the exact trap §7 warns about. Reading
+`--background` is the check that cannot lie: `#f8f5fb` light, `#0b1326` dark. The evening-reminder
+modal also fired on a wall-clock schedule and covered every screenshot in a dim backdrop until
+the harness learned to dismiss dialogs.
+
+**Doc drift corrected in the same commit** (rule 8 — a known-wrong line is never left):
+`context.md` said Dexie `version(1)` / 6 tables (it is `version(2)` / **7**, `rewardSettlements`
+added by ADR 0002), cited a **non-existent `src/lib/categories.ts`**, said **7** stores (there
+are 6 — the 7th file in that folder is a test), and pointed at stale `db.ts` line numbers
+(`179`→`206`, `59`→`48`, `76`→`67`; `85` for `normalizeCategory` was correct). `main_plan.md` said
+**8** test suites in four places (there are 19 / 283). `FEATURES.md` claimed `D8` **CLOSED** while
+`P0-T7` is `NOT BUILT`, listed `XL14` as "next feature" though it shipped as `A1`, and quoted
+`android-bridge.ts` at 813 lines (it is 829).
 
 ### 2026-10-08 — M16 goal category tags, and the tag that opened an empty form
 
@@ -1434,15 +1512,21 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: `efb3b55` (M11 time-period accents), on top of `258f70f` (M8 capacity badge) and `8e1c0b1` (performance spec consolidated into
-  `inefficiencies.md` §11), on top of `2f8db6c`, `f820ed0` (§6.5 phase), `0ccf426`
-  (status sweep + ADR 0002), `be5e44a` (process rules), `3663906` (A1/XL14 flow). The
-  **M7 "last done"** commit lands on top of `8e1c0b1`.
-- Working tree: clean after commit. The root `package.json` launcher (see §2, "Where to
-  run commands") is the only file outside `odyssey/` and holds no dependencies.
-- Lint on the touched files: **0 errors, 1 warning** — pre-existing
-  `no-unused-vars` for `Coffee` in `habits/page.tsx`. The A1 files add none.
-- Tests: **19 suites, 283 tests, all green** (M16 adds `goal-tags.test.ts` with 12; M14 adds `rank-lore.test.ts` with 16).
+- HEAD at last update: **`0030b69` + this commit** — `CONS-2` narrow-screen sweep and
+  `P0-T2` graph refresh, on top of `0030b69` (M16 goal tags), `83a1703` (M14), `023797f`
+  (M13), `3f080cb` (M12), `efb3b55` (M11), `258f70f` (M8), `3085c7f` (M7), `8e1c0b1`.
+  **The line above previously said `efb3b55`, which was four commits behind.**
+- Working tree: clean after commit.
+- Lint: **0 errors, 85 warnings** repo-wide (all pre-existing `no-unused-vars`); none from the
+  four files this commit touched.
+- Tests: **19 suites, 283 tests, all green.** `tsc --noEmit` exit 0. Production build clean.
+- **`P0-T2` — `graphify` IS on PATH**, at
+  `%APPDATA%\..\Python\Python311\Scripts\graphify.exe`. The 2026-10-07 session-log entry
+  recording the CLI as unavailable is **wrong** and is superseded by this. `graphify update .`
+  now completes: 2164 nodes / 3164 edges / 208 communities. It reports the installed *skill*
+  (0.9.67) is newer than the *package* (0.9.51) — harmless — and that the two `build.gradle`
+  files have syntax errors and extract no symbols, which is a Groovy parser limitation, not a
+  build defect.
 - **Verify interaction against `next start`, not `next dev`** — see §9, 2026-10-07.
   On this machine a `next dev` page renders but never hydrates, so every click
   silently no-ops.
@@ -1483,12 +1567,11 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **None from the owner's queue** — **M8, M11, M12, M13, M14 and M16 are all shipped and committed**, in that order. Next feature is now the owner's call; candidates still open in Phase 1/2 include `A2`, `A3`, `A5`, `A6`, `A7`, `M9`, `M10`, `M15`, `M17` |
-| Also open in Phase 1 | P0-T3 (category type still dual-case), P0-T6 (829-line file split), P0-T7 (`seedInitialData()` dead — named by `PERF-16c`), CONS-1, CONS-2. **Found during M6:** at 360px the fixed Feedback FAB overlaps a screen's primary CTA by ~2.4% — belongs to the CONS-2 narrow-screen sweep. **Found during M7:** habit cards render `{h.currentStreak || 1}d`, so a genuine zero-day streak displays **`1d`** — a false value on the `B15` row, left unfixed deliberately and recorded there |
-| Newly available | **M16** — onboarding goal category tags. `A1` shipped **without** asking for a goal, which leaves "goal labels" the open half of **A8**. The template library now exists to suggest against, so a goal picker can promise tailoring it can actually deliver. Recorded as `main_plan.md` §10 **C11** |
-| **New phase available** | **Performance** — `main_plan.md` **§6.5**, `PERF-0`…`PERF-18`. Starts with **`PERF-0`**, a mandatory reconcile against the master prompt, because 5 of 18 items are already delivered and 4 of its figures are wrong. `POL-1` moved here from Phase 6 (C12). Native items need a physical device + release build, which this machine cannot do (§6.5.4) |
-| Phase 1 exit gate | Gates clean · no uncommitted work |
-| Next after Phase 1 | Phase 2 — **`A1`/`XL14` are done** (moved into Phase 1). Largest remaining gaps are **A2** animated walkthrough and **M16** goal tags |
+| Next feature | **None staged.** `CONS-2` and `P0-T2` shipped 2026-10-15. Candidates still open in Phase 1: **`P0-T6`** (the last named exit-gate criterion), `P0-T3`, `P0-T7`, `CONS-1` |
+| **Exit gate status** | **2 of 4 met.** `CONS-2` ✓ · gates clean ✓ · no uncommitted work ✓ · **`P0-T6` adapter landed ✗** — the adapter exists but is still one 829-line file holding all 34 methods, so D1's god-node half needs a behaviour-preserving split |
+| Also open in Phase 1 | `P0-T3` (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain), `P0-T7` (`seedInitialData()` is an **empty function** at `src/lib/seed.ts:5` with 3 call sites — `user.ts:24`, `user.ts:54`, `seed.ts:52`), `CONS-1` (colour mapping still defined 4×), `DEBT` (D2 `useUserStore` 33 edges, D5 two data-access styles). ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
+| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-18`, starts with **`PERF-0`**, a mandatory reconcile (5 of 18 already delivered, 4 figures wrong). Native items need a physical device + release build this machine cannot do (§6.5.4) |
+| Next after Phase 1 | Phase 2 — `A1`/`XL14` and `M16` are done. Largest remaining gaps are **A2** animated walkthrough and the `A3`–`A7` onboarding items |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
 ---
@@ -1519,6 +1602,23 @@ above the vault banner. The follow-up task is closed.
   `Start-Process → assert Ready → use → kill by the port's owning PID` into one
   command. `Start-Process` returns while the server keeps running forever, and a
   stale server answers with the **previous** build — a plausible wrong answer.
+  **In practice use the wrapper and do not type `Start-Process` at all:**
+  `%TEMP%\opencode\verify\with-server.ps1 -Port 3100 -Command node -CommandArgs
+  @('script.js')` refuses to start if the port is already held, asserts `Ready`,
+  runs the command, and kills **in a `finally` block**, so the port is released even
+  if the command throws or the harness crashes. It exits with the command's exit
+  code and prints `PORT STILL OPEN - HARD FAILURE` if anything survived. This rule
+  was **violated on 2026-10-15** by issuing a bare `Start-Process` whose only
+  visible result was `server ready` — the call looked finished, which is the entire
+  trap. The wrapper exists so the trap has nowhere left to happen.
+- **Measure fixed-overlay interference at full scroll, not at the top.** A
+  `position: fixed` button overlays whatever sits at its screen position, so
+  measuring at `scrollTop=0` reports mid-page content it merely floats over — true of
+  every FAB in every app, and not a defect. The real question is whether a control
+  can be scrolled *out* from under it, which means measuring at `scrollHeight`. A
+  probe that cannot distinguish a stuck control from a transient reports "no change"
+  after a correct fix and costs a whole debug cycle. This exact misreading happened
+  on 2026-10-15 and hid a 27.1% button-on-button overlap for one cycle.
 - Visually verify at 360/390/430px, in light **and** dark, with reduced motion
   checked — and screenshot rather than assert. Force light mode explicitly;
   headless Chrome defaults to dark.
