@@ -122,6 +122,11 @@ export const LEGACY_HABIT_CATEGORY_MAP: Readonly<Record<string, HabitCategory>> 
   // No equivalent; nearest is Mindful Focus. See the note above.
   social: "Mindful Focus",
   growth: "Craft & Skill",
+  // "Routine" was displayed by three surfaces as a fallback for a habit with no
+  // category, and is still in the retired vocabulary. Mapping it means a legacy
+  // row labelled Routine resolves to a real domain instead of falling through
+  // to the name hash and being coloured as though it belonged to none.
+  routine: "Craft & Skill",
   productivity: "Mindful Focus",
   work: "Mindful Focus",
   focus: "Mindful Focus",

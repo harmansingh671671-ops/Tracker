@@ -606,6 +606,43 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — CONS-1, where the recorded defect was stale and the real one was a label
+
+**Shipped:** the last open Phase 1 item. Habit colour and category text now agree across every
+surface.
+
+**The recorded claim was stale.** CONS-1 said *"colour mapping still defined 4×"*. `P0-T3` had
+already left exactly **one** map, and all seven colour-bearing sites — `habits/page`,
+`edit-habit-modal`, `habit-date-strip`, `habit-heatmap`, `habit-github-heatmap`,
+`habit-month-calendar` and the planner's `infinite-date-strip` — already call the same
+`getHabitColor` and pass it through `style={{ color: habitColor }}`. Grep confirms **no surface
+holds a raw hex or a second map.**
+
+**The real defect was in the labels.** Three sites each invented their own fallback — `"Routine"`
+twice, `"General"` once — and **neither is a canonical domain**; both are retired vocabulary.
+Because they are strings rather than typed values they never failed to compile, so the app could
+display a category that exists nowhere in the schema without anything going red.
+
+**And the same missing category produced two different colours on two screens.** `"General"` was
+in the legacy map, so it painted Craft & Skill blue; `"Routine"` was not, so it fell through to
+the name hash. One habit, two colours, depending on which screen you looked at — which is the
+whole of CONS-1, stated precisely.
+
+One shared `habitCategoryLabel()` replaces all three, and it **normalises as well as falling
+back**. My first version only handled the empty case, and the test I wrote for it caught the gap:
+an un-migrated row still holding `"health"` would be labelled `health` while being painted
+Vitality & Fitness emerald. **The label and the colour cannot disagree** — that is now the rule,
+and it is asserted rather than hoped for.
+
+An uncategorised habit reads **"Uncategorised"** rather than being handed a category name it does
+not have, and a user's own unrecognised label is preserved verbatim, because it is their data.
+
+**Period accents were already consistent** — `getTimePeriodAccent` has a single consumer and no
+competing fallback — so that half of the line needed nothing.
+
+**Phase 1 is complete.** All five planned items done, plus three defects found along the way
+(`BUG-4` mojibake, `BUG-5` false streaks, and the boost that paid out XP).
+
 ### 2026-10-15 — D2 closed WITHOUT splitting it, and the split would have made it worse
 
 **Shipped:** debt **D2** closed by *not* doing the thing it asked for, after reading the store.

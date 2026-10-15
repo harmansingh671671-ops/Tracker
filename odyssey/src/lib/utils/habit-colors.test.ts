@@ -5,6 +5,7 @@ import {
   getHabitColor,
   BOLD_CATEGORY_COLORS,
   BOLD_HABIT_PALETTE,
+  habitCategoryLabel,
 } from "./habit-colors";
 import { HABIT_CATEGORIES, LEGACY_HABIT_CATEGORY_MAP } from "@/lib/db";
 
@@ -149,5 +150,42 @@ describe("getHabitColor (P0-T3)", () => {
     const withIndex = getHabitColor({ category: "Craft & Skill", name: "x" }, 7);
     const without = getHabitColor({ category: "Craft & Skill", name: "x" });
     expect(withIndex).toBe(without);
+  });
+});
+
+
+describe("habitCategoryLabel (CONS-1)", () => {
+  it("shows the category when there is one", () => {
+    expect(habitCategoryLabel({ category: "Mindful Focus" })).toBe("Mindful Focus");
+  });
+
+  it("says so plainly when there is not", () => {
+    // The three surfaces previously each invented a fallback -- "Routine" twice
+    // and "General" once -- and neither is a canonical domain. One shared
+    // answer removes the third opinion.
+    expect(habitCategoryLabel({})).toBe("Uncategorised");
+    expect(habitCategoryLabel({ category: "" })).toBe("Uncategorised");
+    expect(habitCategoryLabel({ category: "   " })).toBe("Uncategorised");
+  });
+
+  it("never returns a label from the retired vocabulary", () => {
+    // Health / Mindfulness / Learning / Productivity / Social / Growth were the
+    // old schema list. A fallback must not reintroduce one of them.
+    const retired = ["Health", "Mindfulness", "Learning", "Productivity", "Social", "Growth", "Routine", "General"];
+    for (const category of ["", "  ", "Mindful Focus", ...HABIT_CATEGORIES]) {
+      expect(retired).not.toContain(habitCategoryLabel({ category }));
+    }
+  });
+
+  it("agrees with getHabitColor for every legacy alias", () => {
+    // The defect this closes: "General" is in the legacy map (so it painted
+    // Craft & Skill blue) while "Routine" was not (so it fell to the name
+    // hash). The same missing category therefore produced two different
+    // colours on two screens.
+    for (const alias of Object.keys(LEGACY_HABIT_CATEGORY_MAP)) {
+      const label = habitCategoryLabel({ category: alias });
+      expect(HABIT_CATEGORIES).toContain(label);
+      expect(getHabitColor({ category: label, name: "x" })).toBe(getHabitColor({ category: alias, name: "x" }));
+    }
   });
 });

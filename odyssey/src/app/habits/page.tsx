@@ -14,7 +14,7 @@ import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { PerfectDayCard } from "@/components/habits/perfect-day-card";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
-import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
+import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
@@ -668,7 +668,7 @@ export default function HabitsPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
-                          <span className="font-semibold" style={{ color: habitColor }}>{h.category || "Routine"}</span>
+                          <span className="font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
                           <span>•</span>
                           <span className={`flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                             <Flame className="w-3 h-3" />
@@ -946,7 +946,7 @@ export default function HabitsPage() {
                       )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
-                      <span className="truncate font-semibold" style={{ color: habitColor }}>{h.category || "General"}</span>
+                      <span className="truncate font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
                       <span className={`font-bold shrink-0 flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                         <Flame className="w-3 h-3" />
                         {getStreakLabel(h.currentStreak)}
@@ -1018,7 +1018,7 @@ export default function HabitsPage() {
                         </h4>
                         <div className="flex items-center gap-1 text-[10px] font-mono text-on-surface-variant">
                           <span className="truncate font-semibold" style={{ color: habitColor }}>
-                            {h.category || "Routine"}
+                            {habitCategoryLabel(h)}
                           </span>
                         </div>
                       </div>

@@ -72,6 +72,40 @@ export function getHabitColor(
 }
 
 /**
+ * The category text to show for a habit.
+ *
+ * CONS-1. Three surfaces each had their own fallback — `"Routine"` twice and
+ * `"General"` once — and **none of those are canonical domains**. They are
+ * leftovers from the retired six-category vocabulary, and because they are
+ * *labels* rather than values they did not fail to typecheck: the app could
+ * display a category that exists nowhere in the schema while painting the
+ * habit with a colour derived from a completely different rule (a legacy
+ * `"General"` resolves to Craft & Skill's blue, while `"Routine"` is not in the
+ * map at all and falls to the name hash, so the same missing category produced
+ * two different colours on two screens).
+ *
+ * One shared helper removes the third opinion. An uncategorised habit says so
+ * plainly rather than being given a category name it does not have.
+ */
+export const UNCATEGORISED_LABEL = "Uncategorised";
+
+export function habitCategoryLabel(habit: { category?: string }): string {
+  const raw = String(habit.category ?? "").trim();
+  if (!raw) return UNCATEGORISED_LABEL;
+
+  // Normalise, so the LABEL and the COLOUR cannot disagree. An un-migrated row
+  // still holding "health" would otherwise be labelled "health" while being
+  // painted in Vitality & Fitness emerald -- the exact mismatch CONS-1 is
+  // about, just relocated from the label to the pair.
+  const normalised = normalizeHabitCategory(raw);
+  // normalizeHabitCategory deliberately preserves a value it does not
+  // recognise, because a user's own category text is their data. So only adopt
+  // the result when it actually resolved to a canonical domain; otherwise show
+  // what the user wrote.
+  return (HABIT_CATEGORIES as readonly string[]).includes(normalised) ? normalised : raw;
+}
+
+/**
  * Resolves the effective scheduled days of the week (1=Mon, ..., 7=Sun) for a habit.
  */
 export function getHabitScheduledDays(habit: {
