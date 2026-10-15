@@ -606,6 +606,46 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — D2 closed WITHOUT splitting it, and the split would have made it worse
+
+**Shipped:** debt **D2** closed by *not* doing the thing it asked for, after reading the store.
+
+`useUserStore` is 76 lines, and the "33 edges" that motivated D2 turned out to be **"many screens
+read the profile"** — which is not god-node-ness. Every member operates on the **same single
+`profiles` row**: `buyItem` reads `diamonds`, `equippedItems` and `streakFreezeCount` and then
+writes `diamonds`, `equippedItems`, `streakFreeze*`, `xp` and `level`; `addXp` reads and writes
+`xp`/`level`; `resetToZero` rewrites the whole row. Splitting "profile / wallet / shop" would
+create **two sources of truth for one row** and widen an already-present `await` race on a
+read-modify-write — on a store with exactly one concern. **D1 deserved splitting because it mixed
+five unrelated concerns. This mixes none.**
+
+This changed my recommendation *after* the owner had approved a Phase 1 split, so I went back and
+asked rather than building it. The briefing had said "contained", which was true about effort and
+wrong about the thing that mattered.
+
+**The real gap was where the tests weren't.** `buyItem` had **zero tests**: the insufficient-funds,
+streak-freeze and instant-XP branches only ever ran during a real purchase, so a diamond-balance
+bug would have shipped silently and been found by a user with a balance. Those rules are now pure
+functions in `src/lib/utils/economy.ts` with **26 tests**, and `XP_PER_LEVEL` is a named constant
+per ADR 0001 §7 rather than `Math.floor(xp / 500) + 1` written out in **5** places.
+
+**Extracting them surfaced a live economy bug.** `buyItem` is called with the item **`id`**, and the
+2x XP Chrono Boost's id is `"xp-boost"` — which the original `includes("xp")` test matched. So
+**every boost purchase also silently paid out 100 instant XP**, on top of the 24h multiplier the
+user paid for. Confirmed in-browser (600 XP went to 700), then fixed by testing `instant` before any
+bare `xp` and giving the boost its own explicit branch. A test now pins each of the four real shop
+ids to its own branch, so a rename fails loudly instead of silently re-granting something.
+
+**The fragility was documented before it was found.** The extraction note said substring matching on
+a hand-written id was "a real fragility... stated here rather than hidden", and the very next
+browser run showed it was not hypothetical.
+
+**D5 is deferred, and the plan understated it by roughly 10×.** It records "planner/journey/stats
+bypass the store"; **29 files** actually import `db` directly — 10 screens, every planner modal,
+the wallpaper page, several utilities. That is a multi-day architectural change, not a stabilise
+task, and `context.md` already says "not to be fixed opportunistically". Deferred to Phase 3 with
+the measured number attached so the estimate stops being wrong.
+
 ### 2026-10-15 — P0-T6, and a lint guard that had been half-dead since it was written
 
 **Shipped:** one 855-line native-bridge module became six, split by concern. `core` (the only

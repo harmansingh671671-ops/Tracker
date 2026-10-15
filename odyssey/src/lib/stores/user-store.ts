@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getOrCreateUser, updateUserProfile, resetAllDataToZero, type Profile } from '../user';
+import { levelFromXp, quotePurchase, snapshotOf } from '../utils/economy';
 
 interface UserState {
   user: Profile | null;
@@ -34,8 +35,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     const current = get().user || (await getOrCreateUser());
     const currentXp = typeof current.xp === 'number' ? current.xp : 0;
     const newXp = Math.max(0, currentXp + amount);
-    const newLevel = Math.floor(newXp / 500) + 1;
-    await get().updateUser({ xp: newXp, level: newLevel });
+    await get().updateUser({ xp: newXp, level: levelFromXp(newXp) });
   },
   addDiamonds: async (amount) => {
     const current = get().user || (await getOrCreateUser());
@@ -45,29 +45,15 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
   buyItem: async (itemIdOrName, cost) => {
     const current = get().user || (await getOrCreateUser());
-    const currentDiamonds = current.diamonds || 0;
-    if (currentDiamonds < cost) {
-      return { success: false, message: `Insufficient diamonds! Need ${cost}, have ${currentDiamonds}` };
-    }
+    // The purchase rules themselves -- insufficient funds, the streak-freeze
+    // branch, the instant-XP branch -- live in lib/utils/economy.ts and are
+    // unit-tested there. They had no tests at all while they lived here, which
+    // is the only reason this moved.
+    const quote = quotePurchase(snapshotOf(current), itemIdOrName, cost);
+    if (!quote.ok) return { success: false, message: quote.message };
 
-    const equipped = current.equippedItems || [];
-    const lower = itemIdOrName.toLowerCase();
-    const updates: Partial<Profile> = {
-      diamonds: Math.max(0, currentDiamonds - cost),
-      equippedItems: Array.from(new Set([...equipped, itemIdOrName])),
-    };
-
-    if (lower.includes('freeze') || lower.includes('shield')) {
-      updates.streakFreezeActive = true;
-      updates.streakFreezeCount = (current.streakFreezeCount || 0) + 1;
-    } else if (lower.includes('xp') || lower.includes('instant')) {
-      const newXp = (current.xp || 0) + 100;
-      updates.xp = newXp;
-      updates.level = Math.floor(newXp / 500) + 1;
-    }
-
-    await get().updateUser(updates);
-    return { success: true, message: `Acquired ${itemIdOrName}!` };
+    await get().updateUser(quote.updates);
+    return { success: true, message: quote.message };
   },
   resetToZero: async () => {
     const user = await resetAllDataToZero();
