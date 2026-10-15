@@ -606,6 +606,55 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — P0-T6, and a lint guard that had been half-dead since it was written
+
+**Shipped:** one 855-line native-bridge module became six, split by concern. `core` (the only
+module permitted to touch `window.*`), `schedule`, `wallpaper`, `notifications`, `app-update`,
+and an `index` barrel.
+
+**The barrel is the design decision, not the split.** `index` re-exports everything, so **not one
+of the 8 consumers was edited**. A refactor that needs 8 files changed in step is a refactor that
+can be half-applied. Export sets were diffed mechanically against the old file: **41 → 43,
+nothing lost**, the two additions being `errText` and `trueStreak`, previously module-private.
+
+`BRIDGE_OWNER` moved with the code, to `android-bridge/core.ts`, so the lint exemption points at a
+file that exists.
+
+**The split exposed that `odyssey/bridge-boundary` had been half-dead since it was written.** Its
+selector was `MemberExpression[object.object.name='window'][...]`, which matches only the
+**two-level** form `window.OdysseyAndroid?.syncSchedule(x)`. The common form `window.OdysseyAndroid`
+is **one level** and sailed through. Proven by probe before changing anything — one-level exited 0,
+two-level errored — then fixed to match both, and verified against all four violation shapes plus
+the legitimate `nativeBridge()` call.
+
+**The fixed rule immediately caught 2 real violations in `wallpaper-toggle-store.ts`** that had been
+shipping the entire time. This is the third time in this repo's recent history that a guard was
+found not to guard (`#__next`, the light-mode `backgroundColor` probe, now this). **A guard that
+cannot fail is not a guard, and a config that reads as enforcement is worse than one that does not,
+because it is trusted.**
+
+**Rerouting those two then exposed a battery bug I was about to introduce myself.** The obvious
+rewrite uses `callNativeBool`, which collapses *"the bridge said no"* and *"the bridge could not be
+reached"* into a single `false`. The existing code then does `enabled: !enabled` — so a user who
+switched the wallpaper **off** and hit a throwing bridge would have had it switched **back on**.
+That is precisely the battery question this repo insists on answering before anything persistent
+ships. Now `callNative`'s `undefined` is handled explicitly: **unreachable settles off in both
+directions**, refusal still flips. Two tests cover it, and one of them is a **control** — the same
+call must still succeed against a working bridge, or the failure test could pass simply by
+breaking the feature.
+
+**Three of my own errors in this item, all caught by gates rather than by reading:** I removed
+`callNativeBool` from the imports while `readNativeFlag` still used it, so a *pre-existing* test
+broke and `tsc` had not yet been re-run; one new test asserted a bridge refusal the mock cannot
+simulate; another set the stored flag without the native one and so failed for its own reasons.
+The first is the one worth remembering: **`tsc` run before the edit is not `tsc` run after it.**
+
+**Verification:** `tsc` exit 0, eslint **0 errors** (84 pre-existing warnings), **21 suites / 316
+tests green**, build clean. In-browser: no mojibake, no layout regressions across 42 combinations,
+category migration intact, streak labels intact.
+
+**Phase 1 now has no outstanding gate criterion.**
+
 ### 2026-10-15 — P0-T3, where the escape hatch turned out to be load-bearing
 
 **Shipped:** habits now have **one** category vocabulary, and `Habit.category` is a closed union.

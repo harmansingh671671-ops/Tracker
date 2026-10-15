@@ -107,6 +107,37 @@ describe("wallpaper master toggle", () => {
     expect(useWallpaperToggle.getState().enabled).toBe(false);
   });
 
+  it("does not switch the wallpaper ON when turning it off and the bridge throws", async () => {
+    // The regression this guards: routing through callNativeBool() collapses
+    // "bridge threw" and "bridge said no" into the same `false`, after which
+    // the old `enabled: !enabled` flip turned a wallpaper the user was
+    // switching OFF back ON. A failed call must never grant battery-hungry
+    // behaviour the user did not ask for.
+    store[WALLPAPER_ENABLED_KEY] = "true";
+    nativeEnabled = true;
+    nativeThrows = false;
+    await useWallpaperToggle.getState().refresh();
+    expect(useWallpaperToggle.getState().enabled).toBe(true);
+
+    nativeThrows = true;
+    const ok = await useWallpaperToggle.getState().setEnabled(false);
+
+    expect(ok).toBe(false);
+    expect(useWallpaperToggle.getState().enabled).toBe(false);
+    expect(store[WALLPAPER_ENABLED_KEY]).toBe("false");
+  });
+
+  it("still enables normally when the bridge is reachable", async () => {
+    // The control for the test above: the same call with a working bridge must
+    // succeed, or the previous test could pass simply by breaking the feature.
+    store[WALLPAPER_ENABLED_KEY] = "false";
+    nativeThrows = false;
+    const ok = await useWallpaperToggle.getState().setEnabled(true);
+    expect(ok).toBe(true);
+    expect(nativeEnabled).toBe(true);
+    expect(useWallpaperToggle.getState().enabled).toBe(true);
+  });
+
   it("never claims loaded before the first read", () => {
     expect(useWallpaperToggle.getState().loaded).toBe(false);
   });

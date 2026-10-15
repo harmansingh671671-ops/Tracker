@@ -19,6 +19,7 @@
 
 import { create } from "zustand";
 import { logWarn, readBool, writeString } from "@/lib/utils/logger";
+import { callNative, hasNative, nativeBridge } from "@/lib/utils/android-bridge";
 
 /** Mirrors the native `odyssey_prefs:wallpaper_enabled` preference. */
 export const WALLPAPER_ENABLED_KEY = "odyssey_wallpaper_enabled";
@@ -38,15 +39,16 @@ interface WallpaperToggleState {
 
 function readNativeFlag(): boolean | null {
   if (typeof window === "undefined") return null;
-  const bridge = window.OdysseyAndroid;
-  if (!bridge?.isWallpaperEnabled) return null; // no native side (web preview)
-  try {
-    return bridge.isWallpaperEnabled() === true;
-  } catch {
-    // The bridge exists but failed. We do NOT know the native state, and a
-    // wrong "on" means background battery burn the user never asked for.
-    return false;
-  }
+  // Was `const bridge = window.OdysseyAndroid; if (!bridge?.isWallpaperEnabled)`.
+  // Reaching for the global here is exactly what `odyssey/bridge-boundary`
+  // forbids -- and the rule's selector only matched the two-level form, so
+  // this line passed lint for as long as the rule existed. Fixing the selector
+  // found it immediately.
+  if (!nativeBridge() || !hasNative("isWallpaperEnabled")) return null; // no native side (web preview)
+  // A throwing bridge is reported by callNative as `undefined`, which compares
+  // false here -- the same outcome the original `catch` produced, but now it is
+  // also logged rather than swallowed.
+  return callNative<unknown>("isWallpaperEnabled") === true;
 }
 
 export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
@@ -81,9 +83,23 @@ export const useWallpaperToggle = create<WallpaperToggleState>((set, get) => ({
     if (typeof window === "undefined") return enabled;
 
     try {
-      const bridge = window.OdysseyAndroid;
-      if (bridge?.setWallpaperMasterEnabled) {
-        const ok = bridge.setWallpaperMasterEnabled(enabled) !== false;
+      if (nativeBridge() && hasNative("setWallpaperMasterEnabled")) {
+        // NOT callNativeBool. `callNative` reports three different situations
+        // as `undefined` -- bridge absent, method missing, or the bridge
+        // throwing -- and this code must tell "the phone said no" apart from
+        // "we could not ask the phone".
+        //
+        // "Said no" (returned false) flips to the opposite of what was asked.
+        // "Could not ask" settles OFF in both directions: a bridge we could not
+        // reach must never leave the wallpaper running, and above all must not
+        // turn a wallpaper the user just switched OFF back on.
+        const raw = callNative<unknown>("setWallpaperMasterEnabled", enabled);
+        if (raw === undefined) {
+          set({ enabled: false });
+          writeString(WALLPAPER_ENABLED_KEY, "false");
+          return false;
+        }
+        const ok = raw !== false;
         // Native is authoritative -- it may refuse (e.g. restore failed).
         set({ enabled: ok ? enabled : !enabled });
         if (!ok) {
