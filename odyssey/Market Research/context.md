@@ -134,7 +134,7 @@ workspace hoisting, and declaring one would move dependency resolution out of
 
 | Route | Purpose |
 |---|---|
-| `/` | **The first-run flow** (`A1`/`XL14`): intro → circadian preview → welcome + add habit → your habits → Day 1 commitment hold. One way in; hands off to `/planner` |
+| `/` | **The first-run flow** (`A1`/`XL14`/`A2`): intro → circadian preview → welcome + add habit → your habits → **basics (`A2`: plan an hour / tick the habit)** → Day 1 commitment hold. **Six** steps. One way in; hands off to `/planner` |
 | `/habits` | Habit CRUD, categories, streaks, per-habit flame, completion toggle; create/edit modals; date strip, month calendar, heatmaps |
 | `/planner` | 24h visual timeline, duration distribution, drag/reschedule, edit-hour modal, live hour marker, infinite date strip, completion-fraction header, clean-slate empty state |
 | `/journey` | Scrollable day map, SVG bézier curves, dynamic past/future counts, today-in-view, 9 ranks |
@@ -149,7 +149,10 @@ The flow IS `/`. `src/lib/utils/onboarding.ts` holds the first-run storage flag
 (`ONBOARDING_STORAGE_KEY`, `hasCompletedOnboarding()`,
 `markOnboardingComplete()`); the step machine and commitment maths are pure
 functions in `src/lib/utils/onboarding-flow.ts` (30 unit tests), and the steps
-live in `src/components/onboarding/`.
+live in `src/components/onboarding/` (including `step-basics.tsx`, the `A2` scene).
+**The step count is read, never typed:** the shell's `n/total` and the intro's
+*"N short steps"* both derive from `ONBOARDING_STEPS`, so adding a step cannot
+make the copy false the way the literal *"Five short steps"* did.
 
 Two rules worth not re-deriving:
 
@@ -613,6 +616,72 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+
+### 2026-10-16 — `A2` the basics scene, and a literal that rotted the moment the feature landed
+
+**Owner instruction, twice, and the second one is the one that shaped it.** I briefed `A2` as the
+researched four-scene walkthrough (wallpaper, habits, schedule, rewards) and flagged that the spec's
+own second sentence — *"make optional features contextual instead of dumping all navigation into
+onboarding"* — contradicts the first. The owner settled it: *"only explain the things that is
+required to use the app for basic tasks, don't explain everything, just keep the basic and limited
+things in the onboarding."*
+
+**Reading the existing flow changed the size of the job, not just its scope.** Steps 2 and 3 already
+**create a real habit and review it**, so a "habits" scene would have been a third telling of what two
+working screens already showed. What remained was the two actions nobody can guess: **tap an empty
+hour to plan your day**, and **tap the habit to mark it done**. One scene, both actions, inserted
+between `habits` and `protocol` — so by the time it runs the user has a real habit and "mark it done"
+is concrete rather than hypothetical.
+
+**Every exclusion carries a reason, because "we left it out" is not a scope note.** Rewards and XP
+need no action and a scene selling them describes something the user never operates. The **wallpaper
+is off by default and costs battery** (`P8-E1`) — walking a first-time user through an opt-in they
+have not taken is the wrong first impression, and the differentiator is still perfectly findable in
+the app. Journey and stats are reflection, not a basic task.
+
+**The screenshot caught what every assertion passed.** The tick card shipped with an **empty icon
+circle** — it reads as a broken image, not as an illustration. It also displayed an **invented "Drink
+water"**, which is the confident-display-of-a-fact-the-user-lacks failure this repo keeps auditing
+for, committed in the very step meant to teach trust in local data. It now shows **the habit this
+flow created**, passed down from the habit step, with a neutral `Target` placeholder when the user
+skipped habits — which the flow explicitly allows, so that path is a real state and not an edge case.
+**No streak number is shown** for the same reason. Lesson worth keeping: *the illustration is still a
+display, and an illustration that invents a fact is the same defect as a real one.*
+
+**A literal rotted on the way in.** The intro screen said **"Five short steps"** — adding a sixth step
+made it false on arrival. It is now `{totalSteps()}` read from the step machine, so the step counter,
+the dots and that sentence cannot disagree again. **Found by grepping for the phrase, not by reading
+the diff** — the same drift class this file exists to catch, and the reason the sweep procedure in
+§1 exists.
+
+**Two harness bugs were mine and neither was the app.** (a) `waitForFunction` was handed the
+**clicking** expression and then `evaluate` clicked *again*, so every step advanced **twice** and the
+run timed out waiting for a button two steps ahead. **A wait that also acts is a wait that lies** —
+the same lesson as the `#__next` probe. (b) The fallback assertion matched `/your habit/i` against
+the **whole card**, which includes the caption *"Tap your habit each day"* — a false failure on a
+correct render. Both were fixed by scoping the assertion to the row and making waits predicate-only.
+
+**The create-habit modal opens on the TEMPLATE LIBRARY, not the name form.** The name input only
+exists after tapping "Create Custom Habit". A harness that waits for the input directly waits 15s for
+something the app has correctly not rendered. Recorded because it will cost the same15s to anyone
+driving that flow.
+
+**`HabitIcon` deliberately infers an icon from the habit NAME when none is stored** — so a row's
+`innerText` is not a stable exact string and asserting `rowText === name` passes or fails depending
+on which resolution won. Both behaviours are pre-existing and correct; only my assertion was wrong.
+
+**No interval.** The illustration plays **once** on mount, gated on `useReducedMotion()`. A looping
+decorative timer on a screen a user sees for seconds is timer sprawl (rule 16).
+
+Gates: `tsc` exit 0; eslint **0 errors**; **22 suites / 331 tests** green; production build clean.
+In-browser at **360/390/430 in light and dark**: counter `5/6`, both cards present, **no
+wallpaper/reward/rank/shop/xp string anywhere in the scene**, 0 horizontal overflow, 0 console
+errors. **Reduced motion read on the first frame** — 0 nodes mid-fade, 0 running animations — rather
+than after a settle wait, because a settle wait cannot distinguish "honoured" from "finished".
+Real-habit path proven separately by creating a habit through the real modal and asserting the exact
+name reaches the card. **Ports 3000/3001/3100 verified clear:** 3000 was holding a stale `next start`
+from **18:03**, hours before this session, serving the **previous build** — the exact trap §7
+warns about, found on a port this session never used.
 
 ### 2026-10-16 — M12 retracted: the "Now / Up next" ticker is gone, and it took a 15-second timer write with it
 
@@ -2418,26 +2487,21 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit (M21 XP bar) + `c034b9a` (M20) + `808a959` (Shop) + `60485f4`** —
-  M21 reverses the Journey XP bar (solid fill, recessive track); M20 removes the `SAVED` / `LIVE` /
-  capacity chips; `60485f4` (Quick schedule header: day count + dot removed, title editable in place,
-  no focus ring); `022eff1` (BUG-8 category-picker stacking), `a09d66e` (M19 allocation bar),
-  `7dd58eb` (review toggle and Focus & Title removed), `2f9cf5f` (BUG-7).
-  **⚠️ CORRECTION, kept from the previous entry.** The Day Schedule half of M20 rode along inside
-  `60485f4` because a concurrent session ran `git add -A`; `git apply --cached` protects only your own
-  commit, never the other direction. Verified via `git show HEAD:…`. History is not being rewritten.
-- **⚠️ TWO sessions share this working tree, and one of them has left finished, UNCOMMITTED
-  work here.** That is the **M12 retraction** (below): the planner's "Now / Up next in 35 min"
-  line, `lib/utils/up-next.ts` + its 26 tests, the dead `nowMinutes` 15s-timer write, and the
-  `M12`/`C4`/`DEVELOPMENT_PLAN.md`/`FEATURES.md` lines that documented it — **all complete,
-  all gates green, and deliberately NOT committed at the owner's instruction.**
-  **The two file deletions are on disk but UNSTAGED** (they were staged briefly; unstaging was
-  deliberate, because a bare `git commit` on either side sweeps the whole index and would have
-  taken them into someone else's commit). **Check `git status` before committing here, never
-  `git add -A`, and commit by explicit paths.**
-  The *other* session's `M21` work was left exactly as found throughout, and the edits to
-  `main_plan.md` and `context.md` were made as surgical single-line replacements for exactly
-  that reason. **Supersedes the previous note here**, which recorded those deletions as staged.
+- HEAD at last update: **`A2` (this commit)** — the `basics` step, five→six steps · before it
+  `eb3700a` "Fixxes" (**BUG-9**: planner cold-load hydration fix, `planner/page.tsx` 1052→20 lines
+  behind `dynamic(..., { ssr: false })`) · `3970e90` "Essential Fixes" (**M12 retraction**, now
+  committed — the deletions are no longer sitting unstaged, which §10 previously recorded as the
+  case) · `c034b9a` (**M20**) · `808a959` (Shop badge) · `60485f4` (Quick schedule header) ·
+  `022eff1` (**BUG-8**) · `a09d66e` (**M19**) · `7dd58eb` (review toggle / Focus & Title removed) ·
+  `2f9cf5f` (**BUG-7**). **⚠️ CORRECTION, kept from the previous entry.** The Day Schedule half of M20 rode
+  along inside `60485f4` because a concurrent session ran `git add -A`; `git apply --cached` protects
+  only your own commit, never the other direction. Verified via `git show HEAD:…`. History is not being
+  rewritten.
+- **`⚠️ CORRECTED — this section previously claimed the M12 retraction was uncommitted with
+  `up-next.ts` "deleted on disk but UNSTAGED". That is false.** The file is gone from disk *and* absent
+  from `git status`, which means it was committed — in `3970e90`, not in the HEAD list the previous
+  version of this section gave. Any exit-gate claim built on "M12 is uncommitted" was therefore
+  reasoning from a false premise.
 - Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing** (`db`,
   `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`, `handleClearBlock`).
   `allocation-bar.ts` and its test are **clean**.
@@ -2493,15 +2557,17 @@ to know where things stand.
   Count `Object.keys(n).filter(k => k.startsWith("__reactFiber"))` per element;
   a probe built on `for…in` reports 1 on a page with 676 and looks like a real
   hydration failure.
-- Puppeteer is **not** a project dependency, and — **corrected 2026-10-16** — `puppeteer-core`
-  is **no longer reachable at all**: absent from `odyssey/node_modules`, from global `npm ls`, and
-  from the npx cache, so the earlier note that it is "installed outside the repo" is now **wrong**.
-  Verify visually with the **system Chrome** (`C:\Program Files\Google\Chrome\Application\chrome.exe`,
-  155.0.8059.80) driven directly, **without adding a dependency**: `--headless=old` (not `=new`),
-  and write its output through `cmd /c "... > file 2>&1"` because PowerShell captures nothing from it.
-  `--window-size` is **ignored** (viewport pinned near 504px), and **IndexedDB never completes under
-  `--virtual-time-budget`**, so no data-driven state can be exercised in-browser here. Full detail and
-  the self-measuring-fixture method in §9, 2026-10-16.
+- Puppeteer is **not** a project dependency, and `puppeteer-core` is **not** in `odyssey/node_modules`.
+  **⚠️ CORRECTED — this section previously said it was "no longer reachable at all" and that the
+  earlier "installed outside the repo" note was wrong. That correction was itself wrong.**
+  `puppeteer-core` **is** installed at **`%TEMP%\opencode\verify\node_modules`**, verified by
+  `Test-Path` this session, and every browser check above ran through it. It was missed twice by
+  looking only in `odyssey/node_modules`. **`page.setViewport()` works** (CDP
+  `Emulation.setDeviceMetricsOverride`), `headless: 'new'` works, and **IndexedDB works** — the real
+  habit path above was created through the real modal and read back after navigation. The genuine
+  raw-Chrome-CLI limits still stand for *that* route: `--window-size` is ignored, and IndexedDB never
+  completes under `--virtual-time-budget`. **Verify visually with puppeteer from the temp verify dir,
+  and do not conclude "this cannot be measured here" from a failed raw-CLI attempt.**
 - `.clinerules` lives at the workspace **parent** (`C:\PROJECTS`), with paths
   prefixed `odyssey/`. It is itself git-ignored.
 - `Market Research/` **is** tracked (deliberate; decision recorded in the
@@ -2528,12 +2594,12 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **None staged, and the previous version of this row was WRONG — corrected 2026-10-16.** It listed `P0-T6`, `P0-T3`, `P0-T7` and `CONS-1` as open; **all four shipped earlier that day** (`837cf7f`, `96881f2`, `d50e112`, `e058567`). **`main_plan.md` §3 was always right and `context.md` was the stale side**: `P0-T1`–`P0-T7` and `CONS-1`/`2`/`3` are all `SHIPPED`, and the Phase 1 exit gate reads *"All four criteria are now met… **Phase 1 has no named gate criterion outstanding.**"* **The one caveat that gate still carries: "no uncommitted work" is currently FALSE** — the M12 retraction is finished and green but uncommitted at the owner's instruction. **What is genuinely next, in plan order:** **Phase 2** (first unchecked line is `A2` animated walkthrough; then `A3`–`A7`) · **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects**, which now holds `BUG-1`, `BUG-2` and **`BUG-7`** — the last **relocated here from Phase 1 §3.2 on owner instruction 2026-10-16**, because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce. **Not yet decided: is `BUG-1`'s "colour defined 4×" claim still true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2` has shipped** (2026-10-16), cut down on owner instruction to one scene covering the two basic-task actions — plan an hour, tick the habit. **Phase 2's first unchecked line is now `A3`** (optional interests/profession, skip-able), then `A5`, `A6`, `A7`. `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
-| **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓), **but the fourth criterion — "no uncommitted work" — is currently FALSE**: the finished, gate-green **M12 retraction** is sitting uncommitted at the owner's instruction. Treat Phase 1 as *feature-complete, one commit short*. (The earlier "2 of 4 met / `P0-T6` adapter landed ✗" reading of this row was stale: `P0-T6` shipped as `837cf7f`, splitting the 855-line bridge into six modules.) |
-| Also open in Phase 1 | `P0-T3` (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain), `P0-T7` (`seedInitialData()` is an **empty function** at `src/lib/seed.ts:5` with 3 call sites — `user.ts:24`, `user.ts:54`, `seed.ts:52`), `CONS-1` (colour mapping still defined 4×), `DEBT` (D2 `useUserStore` 33 edges, D5 two data-access styles). ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
+| **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
+| Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
 | Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-18`, starts with **`PERF-0`**, a mandatory reconcile (5 of 18 already delivered, 4 figures wrong). Native items need a physical device + release build this machine cannot do (§6.5.4) |
-| Next after Phase 1 | Phase 2 — `A1`/`XL14` and `M16` are done. Largest remaining gaps are **A2** animated walkthrough and the `A3`–`A7` onboarding items |
+| Next after Phase 1 | Phase 2 — `A1`/`XL14`, `M16` and now **`A2`** are done. **`A2` landed as ONE scene, not four**: the researched walkthrough asked for wallpaper + habits + schedule + rewards, and was cut on owner instruction to *"only explain the things required to use the app for basic tasks"* — so it teaches **plan an hour** and **tick the habit**, and deliberately does not mention the wallpaper (off by default, costs battery), rewards (need no action), journey or the shop. Remaining gaps are `A3`, `A5`, `A6`, `A7` |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
 ---

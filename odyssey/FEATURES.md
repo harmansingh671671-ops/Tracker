@@ -38,7 +38,7 @@ against the research corpus when it is available, but the register never *requir
 
 | # | ID | What | Why it is next |
 |---|---|---|---|
-| 1 | **XL14** | Interactive onboarding (P1) | ~~Next feature.~~ **SHIPPED as `A1`** — `/` is the five-step first-run flow; there is still no separate `/onboarding` route and does not need one. |
+| 1 | **XL14** | Interactive onboarding (P1) | ~~Next feature.~~ **SHIPPED as `A1`** — `/` is the first-run flow (**six** steps after `A2` added `basics`); there is still no separate `/onboarding` route and does not need one. |
 | 2 | M1–M3, M6 | Empty states, trust badge, welcome banner (P1) | **All `BUILT`.** M6 was relocated into the onboarding flow. |
 | 3 | HD13–HD15 | Pomodoro, soundscapes, breathing pacer (P2) | There is no focus timer at all. |
 

@@ -14,6 +14,7 @@ export const ONBOARDING_STEPS = [
   "circadian",
   "welcome",
   "habits",
+  "basics",
   "protocol",
 ] as const;
 

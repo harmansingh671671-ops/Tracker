@@ -25,8 +25,15 @@ import {
 } from "./onboarding-flow";
 
 describe("step machine", () => {
-  it("has the agreed five steps in order", () => {
-    expect(ONBOARDING_STEPS).toEqual(["intro", "circadian", "welcome", "habits", "protocol"]);
+  it("has the agreed six steps in order", () => {
+    expect(ONBOARDING_STEPS).toEqual([
+      "intro",
+      "circadian",
+      "welcome",
+      "habits",
+      "basics",
+      "protocol",
+    ]);
   });
 
   it("walks forward through every step and stops at the end", () => {

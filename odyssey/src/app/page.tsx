@@ -3,7 +3,7 @@
 /**
  * The first-run flow (A1 / XL14).
  *
- * This replaces a 710-line single-page marketing pitch with a five-step flow.
+ * This replaces a 710-line single-page marketing pitch with a step flow.
  * Three things changed beyond structure, and all three matter:
  *
  *   1. **One way in.** The old page had a "Launch App" header button, an
@@ -31,6 +31,7 @@ import { StepIntro } from "@/components/onboarding/step-intro";
 import { StepCircadian } from "@/components/onboarding/step-circadian";
 import { StepWelcomeHabits } from "@/components/onboarding/step-welcome-habits";
 import { StepYourHabits, type OnboardingHabit } from "@/components/onboarding/step-your-habits";
+import { StepBasics } from "@/components/onboarding/step-basics";
 import { StepProtocol } from "@/components/onboarding/step-protocol";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { hasCompletedOnboarding, markOnboardingComplete } from "@/lib/utils/onboarding";
@@ -224,6 +225,14 @@ export default function OnboardingPage() {
           setIsCreateOpen(true);
         }}
           />
+        )}
+
+        {/* The habit this flow created, so the "mark it done" card shows their
+            own habit rather than an invented one. `created` can legitimately be
+            empty -- the habits step allows zero -- and the card falls back to a
+            neutral placeholder rather than inventing a habit to display. */}
+        {step === "basics" && (
+          <StepBasics habit={created[0] ? { name: created[0].name, icon: created[0].icon } : undefined} />
         )}
 
         {step === "protocol" && <StepProtocol onCommit={handleCommit} />}

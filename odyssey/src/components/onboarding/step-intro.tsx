@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight, Compass, Sparkles } from "lucide-react";
+import { totalSteps } from "@/lib/utils/onboarding-flow";
 
 interface StepIntroProps {
   onBegin: () => void;
@@ -38,7 +39,11 @@ export function StepIntro({ onBegin, addedCount }: StepIntroProps) {
         transition={{ duration: 0.6, delay: 0.2 }}
         className="text-sm sm:text-base text-on-surface-variant max-w-md mx-auto leading-relaxed"
       >
-        Five short steps. You&apos;ll see your day as a shape, add one habit, and
+        {/* Counted from the step machine, never typed. This line used to say
+            "Five short steps" as a literal, which `A2` made false the moment a
+            sixth step was added -- the kind of copy drift that ships because
+            nothing asserts on it. */}
+        {totalSteps()} short steps. You&apos;ll see your day as a shape, add one habit, and
         be in.
       </motion.p>
 
