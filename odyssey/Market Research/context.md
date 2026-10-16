@@ -606,6 +606,74 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — Quick schedule: two controls removed, and an `<input>` that could never wrap
+
+**Owner instruction (two parts, from screenshots).** Removed from `/day-schedule` only:
+the **3-state review toggle** (Tick / Cross / Unreviewed) on every hour row, and the
+**"Day N Focus & Title" card**. Scope confirmed with the owner first: `/planner` and
+`/journey` keep the identical toggle, and completed blocks keep the struck-through
+styling the owner asked to preserve.
+
+**The tick/cross was not decoration, and saying so is the point of this entry.** Tapping it
+wrote the block's status, fired confetti and haptic, and paid `XP_PER_BLOCK_COMPLETED`
+(and its negation). `/day-schedule` therefore no longer offers **any** way to complete or
+miss a block — the XP path for blocks is now planner/journey-only. `handleToggleComplete`
+was deleted rather than left unreachable, taking `CheckCircle2`/`XCircle`/`Circle`,
+`triggerStreaksConfetti`, `XP_PER_BLOCK_COMPLETED` and `addXp` with it. The **read** side is
+deliberately intact: `isCompleted` still styles completed rows struck through, because that
+status is written elsewhere and would otherwise be invisible here.
+
+**The Focus & Title card was the app's only writer of `odyssey_day_name_*`.** `/journey`
+*reads* that key; nothing else sets it. So removing the card retires the ability to name a
+day app-wide — **a new user can now never set a title**, and `/journey`'s read can only ever
+find a title written before this change. The two **reads** were kept: a title the user
+already typed is their data, and deleting it from the UI would be destroying it. The write
+path (`handleUpdateDayName`, `writeString`) is gone.
+
+**Long task text could not wrap, and no CSS could have fixed it.** The field was an
+`<input>` with `truncate`. An input cannot wrap — it scrolls horizontally and `truncate`
+merely clips at whatever width the row happened to be. Replaced with a **`<textarea rows={1}>`**
+plus `break-words` (so a single 57-char token breaks instead of scrolling) and an
+**autosize** that sets `height` to `scrollHeight`. The row then grows to fit. The hour block
+resizes because it is a flex row and the textarea is its tallest child.
+
+**The autosize is called from two places on purpose.** `onChange` covers typing, but the
+value is also written from *outside* the field by the block-sync effect, so it is also called
+from the ref callback — which React re-invokes on every render. Measured: the height after a
+reload (value from IndexedDB) equals the height while typing, at all 8 width/theme
+combinations. **Setting `height:auto` first is not redundant** — a textarea's natural height
+is one row, so measuring `scrollHeight` without collapsing it first reports its current
+height and a *shrinking* edit leaves the box too tall.
+
+**Enter is a genuine regression risk of the input→textarea swap**, because Enter normally
+inserts a newline. The page's Enter = save + advance to the next hour. Verified in-browser:
+the title arrives intact with no `\n`, and focus still lands on the next hour's field.
+
+**A verification harness of mine passed with meaningless numbers, and only the numbers gave
+it away.** First run reported 360px → 5 lines, 360px dark → 10, 390 → 13/17, 430 → 18/21,
+768 → 15/17. Theme changed the line count, and 430px "wrapped" into *more* lines than 360px —
+both impossible. Cause: seeded rows live in **IndexedDB**, and a reused browser context made
+each run type into a field already holding the previous run's value, so the text doubled
+every iteration (2×, 3×, 4×… matched the reported counts exactly). Every assertion still
+passed, because the text genuinely did wrap. Fixed with `createBrowserContext()` per
+combination, and **a guard added that asserts the field holds exactly what was typed** — the
+check that would have caught it. Corrected figures: lines now *fall* with width
+(360→5, 390→5, 430→4, 768→3) and light/dark match exactly, which is what wrapping should do.
+This is the same failure class as the reused-page probe in §9 2026-10-15: **a green run that
+never left the starting state is worse than a red one**, and here the tell was that the
+numbers moved when nothing about the layout had.
+
+**Verification:** `tsc` exit 0; eslint **0 errors**, 7 warnings all pre-existing at HEAD
+(`db`, 3 unused chevrons, `Trash2`, `addDiamonds`, `handleClearBlock`) — none introduced, and
+5 newly-dead imports removed; **22 suites / 346 tests green**; production build clean.
+In-browser at **360/390/430/768 in light and dark**: 0 review controls, 0 "Saved" chips, no
+Focus & Title card; text wraps to 2–5 lines, **no internal vertical scroll**
+(`scrollHeight ≤ clientHeight`) and **no horizontal scroll** (`scrollWidth ≤ clientWidth`) on
+any field; the long row is 141px against a 64px short row; document horizontal overflow 0.
+Separately proven end to end: a block completed on `/planner` still renders
+`text-decoration-line: line-through` here with zero controls. 8 screenshots reviewed.
+**No background server left running** — 3000/3001/3100 verified closed.
+
 ### 2026-10-15 — BUG-7 the wallpaper switch that would not stay off, and a native fix that is NOT verified
 
 **Reported by the owner:** turn the Odyssey wallpaper off, close the app, reopen it — the
@@ -1894,14 +1962,27 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **`0030b69` + this commit** — `CONS-2` narrow-screen sweep and
-  `P0-T2` graph refresh, on top of `0030b69` (M16 goal tags), `83a1703` (M14), `023797f`
-  (M13), `3f080cb` (M12), `efb3b55` (M11), `258f70f` (M8), `3085c7f` (M7), `8e1c0b1`.
-  **The line above previously said `efb3b55`, which was four commits behind.**
+- HEAD at last update: **`2f9cf5f` + this commit** — Quick schedule: review toggle and
+  Focus & Title card removed, hour-row task text now wraps, on top of `2f9cf5f`
+  (BUG-7), `80b10a7` (chest hydration + freeze chip), `d2ee8e9` (Bonus Tier bar),
+  `e058567` (CONS-1), `c4f052d` (D2), `837cf7f` (P0-T6), `96881f2` (P0-T3),
+  `9cf731f` (BUG-5), `4f41b08` (BUG-4), `d50e112` (P0-T7), `811fea0` (CONS-2/P0-T2).
 - Working tree: clean after commit.
-- Lint: **0 errors, 85 warnings** repo-wide (all pre-existing `no-unused-vars`); none from the
-  four files this commit touched.
-- Tests: **19 suites, 283 tests, all green.** `tsc --noEmit` exit 0. Production build clean.
+- Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing at HEAD**
+  (`db`, `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`,
+  `handleClearBlock`). Repo-wide figure unchanged from the 85 recorded below.
+- Tests: **22 suites, 346 tests, all green.** `tsc --noEmit` exit 0. Production build clean.
+- **Two harness traps confirmed in this environment, both worth keeping:**
+  - **Seeded IndexedDB persists across runs inside a browser context.** Reuse the context
+    and each run appends to the previous one. Use `browser.createBrowserContext()` per
+    combination, and assert the field holds exactly the seeded string — otherwise a
+    wrapping assertion passes while measuring multiplied text. Details in §9, 2026-10-16.
+  - `%TEMP%\opencode\verify\with-server.ps1` killed port 3100 correctly on both runs,
+    including when the script exited non-zero. Prefer it over a bare `Start-Process`.
+- **The verification scripts for this work** are `check-quicksched.js` (removals + wrapping
+  at 360/390/430/768 in both themes) and `check-strikethrough.js` (Enter saves+advances
+  without inserting a newline; a block completed on `/planner` still shows struck through
+  with no controls). Screenshots in `%TEMP%\opencode\verify\shots-quicksched\`.
 - **`P0-T2` — `graphify` IS on PATH**, at
   `%APPDATA%\..\Python\Python311\Scripts\graphify.exe`. The 2026-10-07 session-log entry
   recording the CLI as unavailable is **wrong** and is superseded by this. `graphify update .`
@@ -1950,6 +2031,7 @@ above the vault banner. The follow-up task is closed.
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
 | Next feature | **None staged.** `CONS-2` and `P0-T2` shipped 2026-10-15. Candidates still open in Phase 1: **`P0-T6`** (the last named exit-gate criterion), `P0-T3`, `P0-T7`, `CONS-1` |
+| **Owner-instruction UI removals 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** `/day-schedule` lost the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card; the hour-row task field became a wrapping auto-growing `<textarea>`. **Two consequences to carry forward:** that card was the app's only writer of `odyssey_day_name_*`, so **day titles can no longer be set by anyone** (existing titles still display; `/journey`'s read of the key is now only satisfiable by pre-existing data), and `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is now reachable from `/planner` and `/journey` only. |
 | **Exit gate status** | **2 of 4 met.** `CONS-2` ✓ · gates clean ✓ · no uncommitted work ✓ · **`P0-T6` adapter landed ✗** — the adapter exists but is still one 829-line file holding all 34 methods, so D1's god-node half needs a behaviour-preserving split |
 | Also open in Phase 1 | `P0-T3` (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain), `P0-T7` (`seedInitialData()` is an **empty function** at `src/lib/seed.ts:5` with 3 call sites — `user.ts:24`, `user.ts:54`, `seed.ts:52`), `CONS-1` (colour mapping still defined 4×), `DEBT` (D2 `useUserStore` 33 edges, D5 two data-access styles). ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
 | Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-18`, starts with **`PERF-0`**, a mandatory reconcile (5 of 18 already delivered, 4 figures wrong). Native items need a physical device + release build this machine cannot do (§6.5.4) |

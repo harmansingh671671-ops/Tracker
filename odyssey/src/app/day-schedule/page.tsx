@@ -1,6 +1,6 @@
 "use client";
 
-import { logWarn, readString, writeString } from "@/lib/utils/logger";
+import { logWarn, readString } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -8,8 +8,6 @@ import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
-import { triggerStreaksConfetti } from "@/lib/utils/confetti";
-import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import {
   ChevronLeft,
   ChevronDown,
@@ -21,13 +19,9 @@ import {
   Heart,
   MessageSquare,
   Check,
-  CheckCircle2,
-  XCircle,
-  Circle,
   Clock,
   Trash2,
   Loader2,
-  Sparkles,
 } from "lucide-react";
 
 export default function DaySchedulePage() {
@@ -237,7 +231,7 @@ const getTodayStr = () => {
 function DayScheduleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, fetchUser, addXp, addDiamonds } = useUserStore();
+  const { user, fetchUser, addDiamonds } = useUserStore();
   const userId = user?.id;
   const {
     blocks,
@@ -270,18 +264,6 @@ function DayScheduleContent() {
     setDayName(saved);
   }
 
-  const handleUpdateDayName = (newName: string) => {
-    setDayName(newName);
-    if (typeof window !== "undefined") {
-      try {
-        writeString(`odyssey_day_name_day_${displayDay}`, newName);
-        if (dateStr) {
-          writeString(`odyssey_day_name_${dateStr}`, newName);
-        }
-      } catch (e) { logWarn("storage call failed: localStorage.setItem", "storage call failed: localStorage.setItem", e); }
-    }
-  };
-
   const [loading, setLoading] = useState(true);
 
   // Reloading shows the spinner again; done during render so React Compiler
@@ -312,11 +294,29 @@ function DayScheduleContent() {
   // Recently saved hour for pulsing feedback
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
 
-  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const inputRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const focusedHourRef = useRef<number | null>(null);
   const currentHour = new Date().getHours();
   const todayStr = getTodayStr();
   const isSelectedToday = dateStr === todayStr;
+
+  /**
+   * Grow a task textarea to exactly fit its wrapped content.
+   *
+   * `height: auto` first is not redundant: a textarea's natural height only
+   * accounts for one row, so measuring `scrollHeight` without collapsing the
+   * box first reports the height it already has, and a shrinking edit leaves
+   * the box too tall instead of getting shorter.
+   *
+   * Called from the ref callback as well as on change, because the value is
+   * also written from outside the textarea (the block-sync effect above), and
+   * a ref callback re-runs on every render for exactly that reason.
+   */
+  const autosizeTextarea = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
 
   // Fetch user profile on mount
   useEffect(() => {
@@ -513,7 +513,7 @@ function DayScheduleContent() {
 
   // Handle Enter / Line-break key on mobile/desktop
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>, hour: number) => {
+    (e: React.KeyboardEvent<HTMLTextAreaElement>, hour: number) => {
       if (e.key === "Enter") {
         e.preventDefault();
         const value = e.currentTarget.value;
@@ -551,51 +551,6 @@ function DayScheduleContent() {
     syncCurrentScheduleToNative(dateStr);
   }, [userId, dateStr, autoFillSleep]);
 
-  // Toggle completion status (3-state cycle: unreviewed -> completed -> missed -> unreviewed)
-  const handleToggleComplete = useCallback(
-    async (block: ScheduleBlock | null, hour: number) => {
-      if (!block) return;
-      const isFuture =
-        dateStr > todayStr ||
-        (dateStr === todayStr && hour > currentHour);
-
-      if (isFuture) {
-        return;
-      }
-
-      const current = (block.status || "pending") as "pending" | "completed" | "missed";
-      let newStatus: "pending" | "completed" | "missed" = "completed";
-      if (current === "completed") {
-        newStatus = "missed";
-      } else if (current === "missed") {
-        newStatus = "pending";
-      } else {
-        newStatus = "completed";
-      }
-
-      await updateBlock(block.id, {
-        status: newStatus,
-        completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
-        missReason: newStatus === "missed" ? "Did not follow" : undefined,
-      });
-
-      if (newStatus === "completed") {
-        triggerStreaksConfetti();
-        try {
-          if (typeof window !== "undefined" && navigator?.vibrate) {
-            navigator.vibrate(40);
-          }
-        } catch (e) { logWarn("page", "haptic feedback failed", e); }
-        await addXp(XP_PER_BLOCK_COMPLETED);
-      } else if (current === "completed") {
-        await addXp(-XP_PER_BLOCK_COMPLETED);
-      }
-      await fetchUser();
-      syncCurrentScheduleToNative(dateStr);
-    },
-    [updateBlock, addXp, fetchUser, dateStr, todayStr, currentHour]
-  );
-
   // Clear / delete block
   const handleClearBlock = useCallback(
     async (hour: number) => {
@@ -613,7 +568,6 @@ function DayScheduleContent() {
   const renderHourSlot = (slot: (typeof full24Hours)[0]) => {
     const isPastHour = isSelectedToday && slot.hour < currentHour;
     const isCurrent = isSelectedToday && currentHour === slot.hour;
-    const isFutureHour = dateStr > todayStr || (dateStr === todayStr && slot.hour > currentHour);
     const isRecentlySaved = recentlySavedHour === slot.hour;
     const cat = getCatStyle(slot.category, slot.isCustom);
     const CatIcon = cat.Icon;
@@ -722,13 +676,17 @@ function DayScheduleContent() {
           )}
         </div>
 
-        {/* Input & Details */}
+        {/* Task text & category label. A TEXTAREA, not an input: an <input>
+            cannot wrap — it scrolls sideways and `truncate` just clipped long
+            task names at whatever the row happened to be wide. Here the text
+            wraps and the row grows to fit it, at any screen width. */}
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <input
+          <textarea
             ref={(el) => {
               inputRefs.current[slot.hour] = el;
+              autosizeTextarea(el);
             }}
-            type="text"
+            rows={1}
             placeholder={
               isCurrent
                 ? "What are you conquering now?"
@@ -743,6 +701,7 @@ function DayScheduleContent() {
             onChange={(e) => {
               const val = e.target.value;
               focusedHourRef.current = slot.hour;
+              autosizeTextarea(e.target);
               setEditingValues((prev) => ({
                 ...prev,
                 [slot.hour]: val,
@@ -750,7 +709,7 @@ function DayScheduleContent() {
             }}
             onKeyDown={(e) => handleKeyDown(e, slot.hour)}
             onBlur={(e) => handleBlur(slot.hour, e.target.value)}
-            className={`w-full bg-transparent border-0 p-0 text-sm font-semibold focus:ring-0 focus:outline-none truncate placeholder:text-on-surface-variant/35 placeholder:font-normal transition-colors ${
+            className={`w-full max-w-full bg-transparent border-0 p-0 text-sm font-semibold leading-snug resize-none overflow-hidden break-words focus:ring-0 focus:outline-none placeholder:text-on-surface-variant/35 placeholder:font-normal transition-colors ${
               isCompleted
                 ? "line-through text-on-surface-variant/50"
                 : hasContent
@@ -763,50 +722,18 @@ function DayScheduleContent() {
           </div>
         </div>
 
-        {/* Right Status: 3-state toggle (Tick, Cross, Unreviewed) */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {slot.block ? (
-            slot.status === "completed" ? (
-              <button
-                type="button"
-                onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title="Completed ✓ (tap to mark missed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 hover:bg-emerald-500/10 transition-colors cursor-pointer dark:text-emerald-400"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-              </button>
-            ) : slot.status === "missed" ? (
-              <button
-                type="button"
-                onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title="Missed ✕ (tap to reset to unreviewed)"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer dark:text-rose-400"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            ) : isFutureHour ? (
-              <button
-                type="button"
-                onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title={dateStr > todayStr ? "Future day (cannot review yet)" : "Future hour (cannot review yet)"}
-                className="w-7 h-7 rounded-full border border-outline/10 text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
-              >
-                <Circle className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleToggleComplete(slot.block, slot.hour)}
-                title="Unreviewed (tap to mark completed)"
-                className="w-7 h-7 rounded-full border border-outline/25 hover:border-emerald-500 hover:text-emerald-600 text-on-surface-variant/50 flex items-center justify-center transition-colors cursor-pointer dark:border-outline/30 dark:hover:border-emerald-400 dark:hover:text-emerald-400 dark:text-on-surface-variant/40"
-              >
-                <Circle className="w-3.5 h-3.5" />
-              </button>
-            )
-          ) : (
-            <div className="w-7 h-7" />
-          )}
-        </div>
+        {/* The 3-state review toggle (Tick / Cross / Unreviewed) was removed
+            here on owner instruction. It was NOT decorative: tapping it wrote
+            the block's status and paid XP_PER_BLOCK_COMPLETED plus confetti, so
+            this page no longer offers a way to complete or miss a block at all.
+
+            `/planner` and `/journey` still carry the identical control, and a
+            status set there still renders here as struck-through text — the
+            `isCompleted` styling above is deliberately kept.
+
+            Reinstate it as a deliberate decision to make this screen able to
+            review a day again, not by restoring these buttons; the handler it
+            called was deleted rather than left unreachable. */}
       </div>
     );
   };
@@ -929,25 +856,13 @@ function DayScheduleContent() {
           </div>
         </section>
 
-        {/* Quick Day Naming / Focus Input */}
-        <section className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 space-y-1.5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Day {displayDay} Focus &amp; Title
-            </span>
-            {dayName && (
-              <span className="text-[10px] text-emerald-600 font-semibold dark:text-emerald-400">Saved</span>
-            )}
-          </div>
-          <input
-            type="text"
-            value={dayName}
-            onChange={(e) => handleUpdateDayName(e.target.value)}
-            placeholder="e.g. Improve English, Be Happy, Enjoy Holidays..."
-            className="w-full py-1.5 px-3 rounded-xl bg-surface-container-lowest border border-outline/15 text-xs text-on-surface font-semibold focus:border-primary/50 focus:ring-1 focus:ring-primary/40 focus:outline-none placeholder:text-on-surface-variant/40 transition-all"
-          />
-        </section>
+        {/* The "Day N Focus & Title" card was removed here on owner instruction.
+            It was the app's ONLY writer of `odyssey_day_name_*` — `/journey` reads
+            that key but nothing else sets it — so removing the card retires the
+            ability to name a day. The READ above is deliberately kept: titles a
+            user already typed are their data, so the header still shows them.
+            Do not reinstate this card as a plain input without also restoring a
+            reason for it; and note a new user can no longer ever set a title. */}
 
         {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks (Structured Vertical Rail) */}
         {loading ? (
