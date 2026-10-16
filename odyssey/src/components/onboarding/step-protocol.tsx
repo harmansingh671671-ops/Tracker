@@ -9,13 +9,19 @@
  * the transition, so there is nothing to draw a bar about.
  *
  * Behaviour, all of it deliberate:
- *   - The circle starts at exactly the button's radius, so it does not pop.
+ *   - **The circle is centred on the BUTTON, not on the viewport.** It used to be
+ *     pinned to `50% 50%`, which is only the button's centre on a layout that
+ *     happens to put it there. It does not: measured in-browser the button's
+ *     centre sits 103px (360x780) to 180px (430x932) ABOVE the middle of the
+ *     screen, so the spread began up to 180px away from the finger pressing it --
+ *     while the comments here claimed it "starts exactly on the button".
+ *   - Coverage is therefore computed FROM that origin. A half-diagonal is only
+ *     correct from the centre; from an off-centre origin it leaves the bottom
+ *     corners bare and the flow would commit on a half-filled screen.
  *   - It is driven by wall-clock elapsed time through a rAF loop, not by a
  *     frame counter, so a dropped frame or a backgrounded tab cannot shorten the
  *     commitment.
  *   - Releasing early cancels and shrinks it back.
- *   - The radius target is the viewport's HALF-DIAGONAL, not its half-height.
- *     A circle sized to the shorter side leaves the corners showing.
  *   - Coverage is binary. `hasCoveredViewport` demands exactly 1, because a
  *     partly covered screen must not commit to a route change.
  *   - Reduced motion skips the animation and commits immediately.
@@ -30,6 +36,10 @@ import {
   spreadRadiusPx,
 } from "@/lib/utils/onboarding-flow";
 
+/** How far the rim glow reaches inside and outside the clip boundary. */
+const RIM_INNER_PX = 16;
+const RIM_OUTER_PX = 6;
+
 interface StepProtocolProps {
   /** Called once the settle pause has elapsed. */
   onCommit: () => void;
@@ -41,6 +51,14 @@ export function StepProtocol({ onCommit }: StepProtocolProps) {
   const [isCommitted, setIsCommitted] = useState(false);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
 
+  /**
+   * The button's centre in viewport coordinates -- the circle's true origin.
+   * Starts at the viewport centre so the very first frame is sane; nothing is
+   * drawn until a hold begins anyway.
+   */
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
+
+  const btnRef = useRef<HTMLButtonElement>(null);
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,11 +71,21 @@ export function StepProtocol({ onCommit }: StepProtocolProps) {
     commitRef.current = onCommit;
   }, [onCommit]);
 
-  // Measured rather than hardcoded, because the coverage radius depends on the
-  // device's real dimensions and it is measured in CSS pixels.
+  // Measured rather than hardcoded, because both the coverage radius and the
+  // circle's origin depend on the device's real dimensions and on where the
+  // button actually landed. Measured in an effect, never during render, so the
+  // server pass and the first client render agree (AGENTS.md rule 15).
+  //
+  // One effect for both: they are the same resize event, and two listeners that
+  // both write layout-derived state are two chances to disagree.
   useEffect(() => {
-    const measure = () =>
+    const measure = () => {
+      const el = btnRef.current;
       setViewport({ w: window.innerWidth, h: window.innerHeight });
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setOrigin({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    };
     measure();
     window.addEventListener("resize", measure);
     window.addEventListener("orientationchange", measure);
@@ -142,8 +170,9 @@ export function StepProtocol({ onCommit }: StepProtocolProps) {
     cancelHold();
   };
 
-  const radius = spreadRadiusPx(progress, viewport.w, viewport.h);
+  const radius = spreadRadiusPx(progress, viewport.w, viewport.h, origin.x, origin.y);
   const covered = progress > 0;
+  const clip = `circle(${radius}px at ${origin.x}px ${origin.y}px)`;
 
   return (
     <section className="space-y-6">
@@ -161,6 +190,7 @@ export function StepProtocol({ onCommit }: StepProtocolProps) {
 
       <div className="relative flex items-center justify-center pt-6">
         <button
+          ref={btnRef}
           type="button"
           onPointerDown={beginHold}
           onPointerUp={cancelHold}
@@ -186,14 +216,33 @@ export function StepProtocol({ onCommit }: StepProtocolProps) {
 
         {/* The spreading circle. `clip-path` on a full-viewport layer rather than
             a scaled element: no layout, no reflow, and the radius is expressible
-            directly in the same pixels the maths produced. */}
+            directly in the same pixels the maths produced. The centre is the
+            measured button position, so it starts under the finger. */}
         {covered && !isCommitted && (
           <div
             aria-hidden="true"
             className="fixed inset-0 z-50 pointer-events-none bg-primary"
             style={{
-              clipPath: `circle(${radius}px at 50% 50%)`,
+              clipPath: clip,
               transition: isHolding ? "none" : "clip-path 320ms ease-out",
+            }}
+          />
+        )}
+
+        {/* The boundary itself. A radial-gradient ring sharing the circle's exact
+            centre and radius, so it rides the clip edge instead of being a
+            separate element that could drift from it. Painted ABOVE the fill, so
+            the half of the band that falls inside the spread is not swallowed by
+            it -- the edge reads as the source rather than as an edge. */}
+        {covered && !isCommitted && (
+          <div
+            aria-hidden="true"
+            className="fixed inset-0 z-[51] pointer-events-none odyssey-hold-rim"
+            style={{
+              background: `radial-gradient(circle at ${origin.x}px ${origin.y}px, transparent ${Math.max(
+                0,
+                radius - RIM_INNER_PX
+              )}px, var(--primary) ${Math.max(0, radius - 2)}px, transparent ${radius + RIM_OUTER_PX}px)`,
             }}
           />
         )}

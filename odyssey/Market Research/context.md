@@ -617,6 +617,60 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — The hold's circle started in the wrong place, and 33 green tests never noticed
+
+**Owner instruction:** *"when the tap and hold thing work make sure that the circle center is at the center of the hold button and make the boundry of the circle little animated."*
+
+**It was a real defect, not polish, and the numbers are the whole story.** The circle was clipped to
+`circle(Rpx at 50% 50%)` — the **viewport** centre — while the button sits below the heading. Measured
+in-browser before touching anything: offset **103px** on 360×780, **135px** on 390×844, **179px** on
+430×932, **growing with screen height**. Two comments in that file claimed the opposite — *"the
+overlay starts exactly on the button the user is holding — no pop, no jump"* — and **33 tests were
+green throughout**. The **radius** was always right (`COMMIT_RADIUS_PX` 56 = the `w-28` button's
+radius); only the **centre** was wrong, and **nothing asserted on the centre**. This is the
+`#__next` probe shape again: the test suite was green about the radius and silent about the thing
+the owner could see.
+
+**The part that was easy to miss: moving the origin breaks coverage unless coverage moves with it.**
+A half-diagonal is only correct *from the centre*. Repointing the circle at the button while keeping
+`viewportCoverRadiusPx` would have left the **bottom corners uncovered** and committed the route
+change on a half-filled screen — precisely what `hasCoveredViewport` exists to prevent. So
+`coverRadiusFromPx(originX, originY, w, h)` replaces it, taking the max of the four axis distances to
+an edge, and **`spreadRadiusPx` takes the origin as a required argument rather than defaulting it** —
+defaulting to the viewport centre *is* the bug, and a default is how it comes back.
+
+**Two of my own new tests failed on the first run, and both premises were mine, not the code's.**
+One asserted `coverRadiusFromPx(-100,-100,-100,-100) === 0`, which was really the **old**
+centre-only function's artefact: it clamped the viewport to 0 and had no origin to consider, so `0`
+was an accident of the old signature. The other assumed a **corner** origin yields a *small* radius —
+a corner is the **farthest** point: 927px against a 465px minimum, so the button-radius floor is
+unreachable on any real viewport. Kept anyway for ~one line, with that honestly recorded in the test.
+
+**The rim rides the clip edge rather than being a separate element beside it** — a radial-gradient
+band sharing the circle's exact centre and radius, so it cannot drift from the spread. Painted
+**above** the fill so the half of the band that falls inside is not swallowed, which is what makes the
+edge read as the *source* of the spread. It breathes opacity 0.55↔1 on a 1.5s cycle, so one full
+pulse lands per 2.5s hold. **Opacity only, deliberately:** the gradient stops carry the live radius in
+px, so animating them would need a registered custom property and a full-viewport repaint every
+frame. Keyframes sit inside `prefers-reduced-motion: no-preference` with `animation: none` under
+`reduce`, per the `keystonePulse` / `slateSweep` / `perfectDayGlow` convention. **It is purely visual
+and cannot affect when the hold completes** — worth stating, because "an animated boundary" on a
+commitment ritual is exactly where a decoration could quietly become a gate.
+
+**Verification:** `tsc` exit 0; eslint **0 errors**; **22 suites / 336 tests** green; build clean.
+In-browser at **360/390/430 in light and dark**, with a real `page.mouse.down()` held mid-press:
+**circle-to-button offset 0.00px in every combination**, radius growing toward the origin-aware
+target, release still cancels with the rim removed, a full hold still reaches "Day 1 initiated" and
+navigates to `/planner`, and reduced motion commits immediately with **no rim animation**. Screenshots
+reviewed in both themes.
+
+**Two plan lines had to be swept, and both had been wrong for a long time.** `S14` (tap-and-hold
+commitment ritual) and `A5` (commitment moment) both read **`NOT BUILT`** while the ritual had been
+live since `A1`. `S14` is now `SHIPPED`. **`A5` is `PARTIAL`, not `SHIPPED`** — its **identity line**
+half is genuinely absent and the step is **not skippable** while the spec asks for *"short, skippable
+and celebratory"*. Those two gaps are recorded rather than quietly accepted, because the alternative is
+a line that says the work is done when the interesting half is missing.
+
 ### 2026-10-16 — `A2` the basics scene, and a literal that rotted the moment the feature landed
 
 **Owner instruction, twice, and the second one is the one that shaped it.** I briefed `A2` as the
@@ -2532,6 +2586,19 @@ to know where things stand.
   each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
   and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
   while measuring multiplied text. Details in §9, 2026-10-16.
+- **Verification scripts added 2026-10-16** (all in `%TEMP%\opencode\verify`, driven through
+  `with-server.ps1`): `check-a2.js` (the basics scene at 360/390/430 in both themes — step counter,
+  excluded-content check, overflow, console errors, and **reduced motion read on the first frame**,
+  because a settle wait cannot distinguish "honoured" from "finished") · `check-a2b.js` (creates a
+  habit through the **real** modal and asserts the exact name reaches the card) · `check-hold.js`
+  (the commitment spread: **circle-to-button offset read from the live computed `clip-path` mid-hold**,
+  origin-aware coverage, rim present + animating, release cancels, full hold navigates, reduced motion
+  commits) · `diag-hold.js` (the diagnostic that produced the 103/135/179px offsets) · `diag-a2.js`,
+  `diag-a2b.js`. **Two harness lessons worth keeping:** a `waitForFunction` given a **clicking**
+  expression will click again when you follow it with `evaluate` — every step advanced twice and the
+  run timed out on a button two steps ahead, so waits are predicate-only now; and **`CreateHabitModal`
+  opens on the TEMPLATE LIBRARY, not the name form**, so a harness must click "Create Custom Habit"
+  first or it waits 15s for an input the app correctly has not rendered.
 - **Verification scripts** for `/day-schedule`: `check-quicksched.js` (removals + wrapping at
   360/390/430/768 both themes), `check-strikethrough.js` (Enter saves + advances; a block
   completed on `/planner` still shows struck through), `check-title.js` (no dot, no day count,

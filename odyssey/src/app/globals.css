@@ -702,6 +702,42 @@ button, a, input, select {
   animation: spin 20s linear infinite;
 }
 
+/* The commitment hold's circle boundary. A gentle opacity breath so the edge
+   reads as the source of the spread instead of a hard cut between "screen" and
+   "not screen".
+
+   Opacity only, and deliberately not the band's width: the gradient stops are
+   inline (they carry the live radius in px), so animating them would need a
+   registered custom property and a repaint of a full-viewport layer every frame.
+   The breath is also on a 1.5s cycle against a 2.5s hold, so it completes one
+   full pulse per press rather than stopping mid-cycle.
+
+   Keyframes inside `no-preference` for the same reason as `keystonePulse` (M2),
+   `slateSweep` (M3) and `perfectDayGlow` (M4): honouring reduced motion then
+   costs no JS and no hydration-time flash. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes holdRimPulse {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+.odyssey-hold-rim {
+  animation: holdRimPulse 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odyssey-hold-rim {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 .shimmer-text {
   background: linear-gradient(90deg, #6c00ff 0%, #b78aff 50%, #6c00ff 100%);
   background-size: 200% auto;

@@ -8,6 +8,7 @@ import {
   SPREAD_SETTLE_MS,
   THEME_CHOICES,
   canAdvance,
+  coverRadiusFromPx,
   hasCoveredViewport,
   isFirstStep,
   isLastStep,
@@ -19,7 +20,6 @@ import {
   stepIndex,
   stepNumber,
   totalSteps,
-  viewportCoverRadiusPx,
   type OnboardingThemeChoice,
   type OnboardingStep,
 } from "./onboarding-flow";
@@ -111,20 +111,55 @@ describe("canAdvance", () => {
   });
 });
 
-describe("viewportCoverRadiusPx", () => {
-  it("is the half-diagonal, so a shorter-side circle cannot cover it", () => {
-    // 390 x 844: half-diagonal is much larger than half the height.
-    const r = viewportCoverRadiusPx(390, 844);
-    expect(r).toBeCloseTo(Math.sqrt(195 ** 2 + 422 ** 2), 5);
-    expect(r).toBeGreaterThan(844 / 2);
+describe("coverRadiusFromPx", () => {
+  it("reduces to the half-diagonal when the origin IS the viewport centre", () => {
+    expect(coverRadiusFromPx(195, 422, 390, 844)).toBeCloseTo(
+      Math.sqrt(195 ** 2 + 422 ** 2),
+      5
+    );
   });
 
-  it("handles a square viewport", () => {
-    expect(viewportCoverRadiusPx(800, 800)).toBeCloseTo(Math.sqrt(400 ** 2 + 400 ** 2), 5);
+  it("handles a square viewport centred", () => {
+    expect(coverRadiusFromPx(400, 400, 800, 800)).toBeCloseTo(Math.sqrt(400 ** 2 + 400 ** 2), 5);
   });
 
-  it("never returns a negative radius", () => {
-    expect(viewportCoverRadiusPx(-100, -100)).toBe(0);
+  // The regression this function exists for: the hold button sits well ABOVE the
+  // viewport centre, and a centre-sized radius leaves the bottom corners bare.
+  it("covers the FAR corner when the origin is off-centre", () => {
+    const originX = 195;
+    const originY = 286.5;
+    const radius = coverRadiusFromPx(originX, originY, 390, 844);
+    const farCorner = Math.hypot(195, 844 - originY);
+    expect(radius).toBeCloseTo(farCorner, 5);
+    // And it MUST exceed the centred radius, or corners would show.
+    expect(radius).toBeGreaterThan(coverRadiusFromPx(195, 422, 390, 844));
+  });
+
+  it("reaches every corner from an off-centre origin", () => {
+    const ox = 100;
+    const oy = 150;
+    const r = coverRadiusFromPx(ox, oy, 390, 844);
+    for (const [cx, cy] of [[0, 0], [390, 0], [0, 844], [390, 844]]) {
+      expect(Math.hypot(cx - ox, cy - oy)).toBeLessThanOrEqual(r + 1e-9);
+    }
+  });
+
+  it("never returns a negative or non-finite radius", () => {
+    // Note this is NOT 0, which is what the old centre-only function returned for
+    // negative input: it clamped the viewport to 0 and ignored the origin, so the
+    // answer was an artefact of there being no origin to consider. Measured, the
+    // honest result is a positive finite distance.
+    const r = coverRadiusFromPx(-100, -100, -100, -100);
+    expect(r).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(r)).toBe(true);
+    expect(coverRadiusFromPx(0, 0, 0, 0)).toBe(0);
+  });
+
+  it("treats a non-finite origin as zero rather than propagating NaN", () => {
+    expect(coverRadiusFromPx(NaN, Infinity, 390, 844)).toBeCloseTo(
+      coverRadiusFromPx(0, 0, 390, 844),
+      5
+    );
   });
 });
 
@@ -180,18 +215,47 @@ describe("spreadProgress", () => {
 });
 
 describe("spreadRadiusPx", () => {
+  // The real button centre on a 390x844 phone, measured in-browser.
+  const OX = 195;
+  const OY = 286.5;
+
   it("starts exactly on the commitment button", () => {
     // No pop: at progress 0 the overlay is the button the user is holding.
-    expect(spreadRadiusPx(0, 390, 844)).toBe(COMMIT_RADIUS_PX);
+    expect(spreadRadiusPx(0, 390, 844, OX, OY)).toBe(COMMIT_RADIUS_PX);
   });
 
   it("reaches full coverage at progress 1", () => {
-    expect(spreadRadiusPx(1, 390, 844)).toBeCloseTo(viewportCoverRadiusPx(390, 844), 5);
+    expect(spreadRadiusPx(1, 390, 844, OX, OY)).toBeCloseTo(
+      coverRadiusFromPx(OX, OY, 390, 844),
+      5
+    );
   });
 
   it("clamps out-of-range progress", () => {
-    expect(spreadRadiusPx(-5, 390, 844)).toBe(COMMIT_RADIUS_PX);
-    expect(spreadRadiusPx(9, 390, 844)).toBeCloseTo(viewportCoverRadiusPx(390, 844), 5);
+    expect(spreadRadiusPx(-5, 390, 844, OX, OY)).toBe(COMMIT_RADIUS_PX);
+    expect(spreadRadiusPx(9, 390, 844, OX, OY)).toBeCloseTo(
+      coverRadiusFromPx(OX, OY, 390, 844),
+      5
+    );
+  });
+
+  it("never shrinks below the button", () => {
+    // A corner origin is the FARTHEST point, not the nearest -- the minimum for a
+    // 390x844 viewport is ~465, so this floor is only reachable on a degenerate
+    // viewport. It is kept anyway: it makes the invariant explicit for ~one line,
+    // rather than leaving the inversion reachable through a future refactor.
+    const tiny = coverRadiusFromPx(30, 30, 60, 60);
+    expect(tiny).toBeLessThan(COMMIT_RADIUS_PX);
+    expect(spreadRadiusPx(0.5, 60, 60, 30, 30)).toBeGreaterThanOrEqual(COMMIT_RADIUS_PX);
+  });
+
+  it("grows monotonically through the hold", () => {
+    let prev = 0;
+    for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+      const r = spreadRadiusPx(p, 390, 844, OX, OY);
+      expect(r).toBeGreaterThanOrEqual(prev);
+      prev = r;
+    }
   });
 });
 

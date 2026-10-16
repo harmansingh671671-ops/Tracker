@@ -96,13 +96,32 @@ export function canAdvance(step: OnboardingStep): boolean {
 /* ------------------------------------------------------------------ */
 
 /**
- * The radius needed to cover the whole viewport from the centre: half the
- * diagonal. A circle sized to the shorter side leaves the corners showing.
+ * The radius needed to cover the whole viewport from an ARBITRARY centre.
+ *
+ * Not the half-diagonal. That is only correct when the centre *is* the centre,
+ * and the hold button never is: it sits below the heading, and measured on real
+ * phones its centre is 103px (360x780) to 180px (430x932) above the middle. A
+ * radius sized from the viewport centre therefore leaves the bottom corners
+ * uncovered and the flow would commit on a half-filled screen -- which is the one
+ * outcome `hasCoveredViewport` exists to prevent.
+ *
+ * The corners are the only candidates that matter, so this is the largest of the
+ * four axis distances from the origin to an edge.
  */
-export function viewportCoverRadiusPx(viewportWidth: number, viewportHeight: number): number {
+export function coverRadiusFromPx(
+  originX: number,
+  originY: number,
+  viewportWidth: number,
+  viewportHeight: number
+): number {
   const w = Math.max(0, viewportWidth);
   const h = Math.max(0, viewportHeight);
-  return Math.sqrt((w / 2) ** 2 + (h / 2) ** 2);
+  const x = Number.isFinite(originX) ? originX : 0;
+  const y = Number.isFinite(originY) ? originY : 0;
+
+  const farX = Math.max(Math.abs(x), Math.abs(w - x));
+  const farY = Math.max(Math.abs(y), Math.abs(h - y));
+  return Math.hypot(farX, farY);
 }
 
 /**
@@ -122,18 +141,29 @@ export function spreadProgress(elapsedMs: number, holdMs: number = SPREAD_HOLD_M
 }
 
 /**
- * The radius to draw, in pixels.
+ * The radius to draw, in pixels, spreading from the hold button's centre.
  *
  * Returns the button radius at progress 0, so the overlay starts exactly on the
- * button the user is holding -- no pop, no jump.
+ * button the user is holding -- no pop, no jump. The origin is a required
+ * parameter rather than a defaulting one on purpose: defaulting it to the
+ * viewport centre is precisely the bug this replaced, and a default would let it
+ * come back silently.
+ *
+ * Clamped up from the button radius, because a centre near a corner can compute a
+ * target smaller than the button, which would make the circle *shrink* on hold.
  */
 export function spreadRadiusPx(
   progress: number,
   viewportWidth: number,
-  viewportHeight: number
+  viewportHeight: number,
+  originX: number,
+  originY: number
 ): number {
   const clamped = Math.min(Math.max(progress, 0), 1);
-  const target = viewportCoverRadiusPx(viewportWidth, viewportHeight);
+  const target = Math.max(
+    COMMIT_RADIUS_PX,
+    coverRadiusFromPx(originX, originY, viewportWidth, viewportHeight)
+  );
   return COMMIT_RADIUS_PX + (target - COMMIT_RADIUS_PX) * clamped;
 }
 
