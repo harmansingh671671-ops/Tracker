@@ -606,6 +606,49 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — Two console errors on the Armory screen, and a fix I had to throw away
+
+**Fixed (1) — hydration mismatch on the chest card.** `chestClaimed` was initialised with a **lazy
+`useState` that read `localStorage`**. There is no `localStorage` on the server, so the server
+rendered `false` while the client rendered the stored value, and the card's `className` differed on
+each side — React threw, discarded the server HTML and re-rendered. Now initialised to the server's
+answer and corrected after mount, the same shape as `planner-empty-state.ts`. The correction is
+wrapped in `queueMicrotask` because the `react-hooks` rule (correctly) rejects a synchronous
+`setState` in an effect — **the same fix M14 used for the rank dialog.**
+
+**Found alongside it: the chest key was UTC.** Both the read and the write used
+`new Date().toISOString()`, so for anyone whose local date differs from the UTC date the chest was
+written under one key and looked for under another, and "today" rolled over at the wrong hour. Both
+now use `getLocalTodayStr()`, the local-date helper the rest of the app already uses. **Fixing only
+the hydration would have left the read and the write disagreeing**, which is a quieter bug than the
+one reported.
+
+**Fixed (2) — the "0 Freeze Active" chip** is removed from the vault reserves card, on owner
+instruction. The genuinely useful part of the feature is unaffected: the Streak Freeze item still
+carries its own `N Active` badge when you own one (`shop/page.tsx:57`).
+
+**NOT fixed (3) — the anti-FOUC script warning, because the fix broke something better.**
+React warns that a `<script>` rendered inside a component is never executed client-side, which is
+true of *client* renders and not of the server HTML this app relies on. The supported replacement is
+`next/script` with `strategy="beforeInteractive"`, so I swapped it — **and measured a regression.**
+With `next/script`, the light theme's `class="light"` was **not** set at `domcontentloaded`; with the
+original raw `<script>` it always is. I confirmed this by stashing my change, rebuilding, and running
+the same probe against the original, which passed both themes where mine failed one. **Reverted.**
+
+**A console warning is cheaper than a white flash on every page load for light-mode users**, and that
+is the trade the measurement settled. `layout.tsx` is unchanged; the warning remains. The rule now
+worth writing down: **do not silence a framework warning by adopting a "more correct" API without
+measuring the behaviour the warning was merely noise in front of.**
+
+**Two of my own harness mistakes again.** A regex checked for `id="odyssey-theme-init"` in the tag
+*attributes* while the script lives in the tag *body*, so it reported a correct script as missing.
+And an earlier check read the theme class only once, at a moment where a race could masquerade as a
+product bug. Reading early *and* settled made the difference visible instead of guessed at.
+
+Verified: **zero console errors or warnings across all 7 routes in both themes**, 346 tests green,
+build clean, anti-FOUC confirmed intact on both themes, and the Armory screenshot confirms the chip
+is gone with the vault balance untouched.
+
 ### 2026-10-15 — Owner instruction: remove the Shop "Bonus Tier" bar
 
 **Removed** the bar at the top of `/shop` reading *"Bonus Tier Active • Week 2 Streak"* with

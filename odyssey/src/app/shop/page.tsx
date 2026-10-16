@@ -1,11 +1,11 @@
 "use client";
 
 import { readString, writeString } from "@/lib/utils/logger";
+import { getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { useEffect, useState, useMemo } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { RewardCelebrationModal } from "@/components/shop/reward-celebration-modal";
 import {
-  Shield,
   Zap,
   Sparkles,
   Award,
@@ -31,10 +31,25 @@ export default function ShopPage() {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [toastMsg, setToastMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
-  const [chestClaimed, setChestClaimed] = useState(() => {
-    const savedChest = readString(`odyssey_chest_${new Date().toISOString().split("T")[0]}`);
-    return !!savedChest;
-  });
+  // P0: the initial value MUST be identical on the server and the client, or
+  // React throws a hydration mismatch and silently re-renders the tree.
+  // A lazy initialiser that reads localStorage cannot do that -- there is no
+  // localStorage on the server, so it returned `false` there and the stored
+  // value in the browser, and the chest card rendered a different className on
+  // each side.
+  //
+  // So: start at the server's answer, then correct it after mount. The same
+  // shape as `planner-empty-state.ts` and the wallpaper toggle store.
+  const [chestClaimed, setChestClaimed] = useState(false);
+
+  useEffect(() => {
+    // Deferred rather than set synchronously: the react-hooks rule is right
+    // that a synchronous setState in an effect cascades a second render pass.
+    // This is the same fix M14 used for the rank dialog. The read still
+    // happens immediately and the value is still recorded on the next tick, so
+    // a deferred render can never show the chest in the wrong state twice.
+    queueMicrotask(() => setChestClaimed(!!readString(`odyssey_chest_${getLocalTodayStr()}`)));
+  }, []);
 
   useEffect(() => {
     fetchUser();
@@ -113,7 +128,12 @@ export default function ShopPage() {
     await addXp(50);
     await fetchUser();
     setChestClaimed(true);
-    writeString(`odyssey_chest_${new Date().toISOString().split("T")[0]}`, "true");
+    // Same key the read uses. This was `new Date().toISOString()`, which is
+    // UTC -- so for anyone whose local date differs from the UTC date the chest
+    // was written under one key and looked for under another, and "today"
+    // rolled over at the wrong hour. `getLocalTodayStr()` is the local-date
+    // helper the rest of the app already uses.
+    writeString(`odyssey_chest_${getLocalTodayStr()}`, "true");
     setIsCelebrationOpen(true);
   };
 
@@ -143,14 +163,6 @@ export default function ShopPage() {
                 </span>
                 <span className="text-base font-bold text-secondary">Diamonds 💎</span>
               </div>
-            </div>
-
-            {/* Active Protections */}
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high border border-outline/10 text-xs font-mono">
-              <Shield className="w-3.5 h-3.5 text-primary" />
-              <span className="text-primary font-bold">
-                {user?.streakFreezeCount ?? 0} Freeze Active
-              </span>
             </div>
           </div>
 
