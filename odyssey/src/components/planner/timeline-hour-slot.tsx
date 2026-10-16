@@ -1,0 +1,340 @@
+"use client";
+
+import React, { useRef } from "react";
+import { logWarn } from "@/lib/utils/logger";
+import { type ScheduleBlock } from "@/lib/db";
+import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
+import {
+  CheckCircle2,
+  XCircle,
+  Circle,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+
+export interface TimelineSlotData {
+  hour: number;
+  startTime: string;
+  endTime: string;
+  category: string;
+  title: string;
+  isCustom: boolean;
+  status: string;
+  block: ScheduleBlock | null;
+}
+
+interface TimelineHourSlotProps {
+  slot: TimelineSlotData;
+  isPastHour: boolean;
+  isCurrent: boolean;
+  isFutureHour: boolean;
+  isRecentlySaved: boolean;
+  selectedDate: string;
+  todayStr: string;
+  options?: {
+    isInsideGroup?: boolean;
+    groupType?: string;
+    expandToggle?: { isExpanded: boolean; onToggle: () => void };
+  };
+  onOpenHour: (hour: number, block: ScheduleBlock | null, endHour: number) => void;
+  onToggleStatus: (
+    e: React.MouseEvent,
+    hour: number,
+    block: ScheduleBlock | null,
+    status?: string
+  ) => void;
+  onShowHint: (msg: string) => void;
+}
+
+export function TimelineHourSlot({
+  slot,
+  isPastHour,
+  isCurrent,
+  isFutureHour,
+  isRecentlySaved,
+  selectedDate,
+  todayStr,
+  options,
+  onOpenHour,
+  onToggleStatus,
+  onShowHint,
+}: TimelineHourSlotProps) {
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+
+  const cat = getPlannerCatStyle(slot.category, slot.isCustom);
+  const CatIcon = cat.Icon;
+
+  const handleSlotClick = (e: React.MouseEvent) => {
+    if (isPastHour) {
+      if (isLongPressTriggeredRef.current) {
+        isLongPressTriggeredRef.current = false;
+        return;
+      }
+      onShowHint("Tap & hold to edit past hours");
+      return;
+    }
+    onOpenHour(slot.hour, slot.block, slot.hour + 1);
+  };
+
+  const handleTouchStart = () => {
+    if (!isPastHour) return;
+    isLongPressTriggeredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      if (typeof window !== "undefined" && window.getSelection) {
+        try {
+          window.getSelection()?.removeAllRanges();
+        } catch (e) {
+          logWarn("page", "could not clear text selection", e);
+        }
+      }
+      try {
+        if (typeof window !== "undefined" && navigator?.vibrate) {
+          navigator.vibrate(40);
+        }
+      } catch (e) {
+        logWarn("page", "browser call failed: window.getSelection", e);
+      }
+      onOpenHour(slot.hour, slot.block, slot.hour + 1);
+    }, 450);
+  };
+
+  const handleTouchMove = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleMouseDown = () => {
+    if (!isPastHour) return;
+    isLongPressTriggeredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      if (typeof window !== "undefined" && window.getSelection) {
+        try {
+          window.getSelection()?.removeAllRanges();
+        } catch (e) {
+          logWarn("page", "could not clear text selection", e);
+        }
+      }
+      onOpenHour(slot.hour, slot.block, slot.hour + 1);
+    }, 450);
+  };
+
+  const handleMouseUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  if (slot.isCustom) {
+    return (
+      <div
+        key={`slot-${slot.hour}`}
+        onClick={handleSlotClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onContextMenu={(e) => e.preventDefault()}
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${
+          options?.isInsideGroup
+            ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
+            : cat.cardBg
+        } backdrop-blur-xl my-1 shadow-sm ${
+          isRecentlySaved
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
+            : isCurrent
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.22)] bg-surface-container-low relative z-20"
+            : ""
+        }`}
+      >
+        {/* Structured Left Spine Time Stamp */}
+        <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
+          <span
+            className={`text-xs font-mono font-bold leading-tight ${
+              isCurrent ? "text-primary font-extrabold" : "text-on-surface"
+            }`}
+          >
+            {String(slot.hour).padStart(2, "0")}:00
+          </span>
+          <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
+            {String((slot.hour + 1) % 24 === 0 ? 24 : slot.hour + 1).padStart(2, "0")}:00
+          </span>
+        </div>
+
+        {/* Structured Node Glyph on Rail */}
+        <div className="relative shrink-0">
+          {isCurrent && (
+            <span className="absolute -inset-1 rounded-2xl bg-primary/20 animate-pulse pointer-events-none" />
+          )}
+          <div
+            className={`relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} shadow-inner`}
+          >
+            <CatIcon className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Title & Details */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h4
+              className={`text-sm font-semibold truncate ${
+                isCurrent ? "text-on-surface font-bold" : "text-on-surface"
+              }`}
+            >
+              {slot.title || cat.label}
+            </h4>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
+            <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
+            {slot.block?.description && (
+              <>
+                <span className="text-on-surface-variant/30">•</span>
+                <span className="text-on-surface-variant truncate">
+                  {slot.block.description}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right Status: 3-State Toggle & Expand Chevron */}
+        <div className="flex items-center gap-1 shrink-0">
+          {options?.expandToggle && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                options.expandToggle!.onToggle();
+              }}
+              aria-label={
+                options.expandToggle.isExpanded
+                  ? "Collapse sleep hours"
+                  : "Expand sleep hours"
+              }
+              title={
+                options.expandToggle.isExpanded
+                  ? "Collapse sleep hours"
+                  : "Expand sleep hours"
+              }
+              className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/30 flex items-center justify-center text-indigo-600 hover:text-on-surface dark:border-indigo-500/25 dark:text-indigo-300 transition-all cursor-pointer"
+            >
+              {options.expandToggle.isExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+          )}
+          {slot.status === "completed" ? (
+            <button
+              type="button"
+              onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
+              title="Completed ✓ (tap to mark missed)"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer dark:text-emerald-400"
+            >
+              <CheckCircle2 className="w-5 h-5 shadow-[0_0_12px_rgba(52,211,153,0.4)]" />
+            </button>
+          ) : slot.status === "missed" ? (
+            <button
+              type="button"
+              onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
+              title="Missed ✕ (tap to reset to unreviewed)"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer dark:text-rose-400"
+            >
+              <XCircle className="w-5 h-5 shadow-[0_0_12px_rgba(244,63,94,0.4)]" />
+            </button>
+          ) : isFutureHour ? (
+            <button
+              type="button"
+              onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
+              title={
+                selectedDate > todayStr
+                  ? "Future day (cannot review yet)"
+                  : "Future hour (cannot review yet)"
+              }
+              className="w-7 h-7 rounded-full border border-outline/[0.08] text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
+            >
+              <Circle className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
+              title="Unreviewed (tap to mark completed)"
+              className="w-7 h-7 rounded-full border border-outline/25 hover:border-emerald-500 hover:text-emerald-600 text-on-surface-variant/50 flex items-center justify-center transition-colors cursor-pointer dark:border-outline/20 dark:hover:border-emerald-400 dark:hover:text-emerald-400 dark:text-on-surface-variant/40"
+            >
+              <Circle className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Open / Unscheduled Slot
+  return (
+    <div
+      key={`slot-${slot.hour}`}
+      onClick={handleSlotClick}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-md my-0.5 ${
+        isRecentlySaved
+          ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
+          : isCurrent
+          ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.22)] bg-surface-container-low relative z-20"
+          : ""
+      }`}
+    >
+      <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
+        <span
+          className={`text-xs font-mono font-bold leading-tight ${
+            isCurrent ? "text-primary font-bold" : "text-on-surface-variant/50"
+          }`}
+        >
+          {String(slot.hour).padStart(2, "0")}:00
+        </span>
+      </div>
+
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}
+      >
+        <CatIcon className="w-4 h-4" />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <h4 className="text-xs font-mono text-on-surface-variant/40 italic">
+          {isPastHour ? "Passed Slot" : "Empty Slot"}
+        </h4>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="text-[10px] font-mono text-on-surface-variant/35">
+            {isPastHour ? "Hold to schedule past" : "Tap to schedule focus"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}

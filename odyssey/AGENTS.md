@@ -70,6 +70,16 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
     below.
 12. **Never leave a background server running.** `Start-Process` returns immediately and
     leaves the process alive forever, holding its port. See "Background servers" below.
+13. **Max component file size: 200–250 lines.** Never write monolithic components. If a file
+    approaches 250 lines, subcomponents (rows, cards, modals, toolbars) MUST be extracted
+    into `src/components/<feature>/`.
+14. **No inline sub-render functions (`renderItem`).** FORBIDDEN to define helper functions
+    returning JSX inside parent components. Extract standalone components with typed props.
+15. **Next.js SSR & Hydration Safety.** Never call `localStorage`, `window`, or device time
+    inside initial `useState` calls without SSR guards. Client-only screens reading local cache
+    on frame-0 MUST use `next/dynamic` with `{ ssr: false }`.
+16. **No timer sprawl.** Never spawn uncoordinated `setInterval` loops in React components.
+    Use shared hooks, minute-boundary triggers, or `visibilitychange` events.
 
 ### The commit sequence — order matters
 
