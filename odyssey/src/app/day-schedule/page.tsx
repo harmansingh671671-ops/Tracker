@@ -599,6 +599,25 @@ function DayScheduleContent() {
     const inputValue = editingValues[slot.hour] ?? slot.title ?? "";
     const hasContent = inputValue.trim().length > 0 || !!slot.block;
 
+    /**
+     * How high this card stacks.
+     *
+     * The category dropdown lives INSIDE this card, and `backdrop-blur-xl` makes
+     * a card both a stacking context and a containing block for fixed children.
+     * So the dropdown's own `z-50` resolves only inside this card and cannot
+     * lift it past the hour rows below - measured before this fix: the topmost
+     * element over the middle of an open dropdown was the *08:00 card*, not the
+     * dropdown. Raising the card is the only thing that can.
+     *
+     * A picker therefore outranks the "current hour"/"saved" highlight, which is
+     * what you want: the thing you just opened must never be the thing hidden.
+     */
+    const stackClass = isCategoryPickerOpen
+      ? "z-50"
+      : isCurrent || isRecentlySaved
+      ? "z-20"
+      : "";
+
     return (
       <div
         key={`slot-${slot.hour}`}
@@ -606,11 +625,11 @@ function DayScheduleContent() {
         onContextMenu={(e) => e.preventDefault()}
         className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border border-l-4 ${cat.leftBorder} select-none ${
           cat.cardBg
-        } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${
+        } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${stackClass} ${
           isRecentlySaved
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low"
             : isCurrent
-            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.25)] bg-surface-container-low relative z-20"
+            ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.25)] bg-surface-container-low"
             : ""
         }`}
       >
@@ -655,47 +674,46 @@ function DayScheduleContent() {
             <CatIcon className="w-4 h-4" />
           </button>
 
-          {/* Category Selection Dropdown Popup */}
+          {/* Category Selection Dropdown Popup.
+              The dim "tap outside to close" scrim that used to sit here has
+              MOVED to the list wrapper below. `backdrop-blur-xl` on this card
+              makes the card a containing block for fixed-position children, so
+              a `fixed inset-0` scrim rendered in here collapsed onto the card's
+              own bounds instead of the screen - measured: the overlay was
+              725x62px, the card, inside a 762x484 viewport. It dimmed the row
+              you tapped and nothing else. Outside the cards it covers the
+              screen, as it always was meant to. */}
           {isCategoryPickerOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenCategoryHour(null);
-                }}
-              />
-              <div
-                className="absolute left-0 top-full mt-1.5 z-50 w-52 p-1.5 rounded-2xl bg-surface-container border border-outline/25 shadow-2xl space-y-1 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="px-2.5 py-1 text-[10px] font-mono text-on-surface-variant font-bold uppercase tracking-wider">
-                  Select Block Type
-                </div>
-                {CATEGORY_OPTIONS.map((opt) => {
-                  const isSelected = normalizeCategory(slot.category, slot.hour) === opt.id;
-                  const OptIcon = opt.Icon;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => handleCategoryChange(slot.hour, opt.id)}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isSelected
-                          ? `${opt.badgeBg} font-bold shadow-sm ring-1 ring-current/30`
-                          : "text-on-surface hover:bg-surface-container-high"
-                      }`}
-                    >
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${opt.badgeBg}`}>
-                        <OptIcon className="w-3.5 h-3.5" />
-                      </div>
-                      <span className="flex-1 text-left truncate">{opt.label}</span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
-                    </button>
-                  );
-                })}
+            <div
+              className="absolute left-0 top-full mt-1.5 z-50 w-52 p-1.5 rounded-2xl bg-surface-container border border-outline/25 shadow-2xl space-y-1 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-2.5 py-1 text-[10px] font-mono text-on-surface-variant font-bold uppercase tracking-wider">
+                Select Block Type
               </div>
-            </>
+              {CATEGORY_OPTIONS.map((opt) => {
+                const isSelected = normalizeCategory(slot.category, slot.hour) === opt.id;
+                const OptIcon = opt.Icon;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleCategoryChange(slot.hour, opt.id)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? `${opt.badgeBg} font-bold shadow-sm ring-1 ring-current/30`
+                        : "text-on-surface hover:bg-surface-container-high"
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${opt.badgeBg}`}>
+                      <OptIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="flex-1 text-left truncate">{opt.label}</span>
+                    {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -908,6 +926,23 @@ function DayScheduleContent() {
         ) : (
           <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
             {full24Hours.map((slot) => renderHourSlot(slot))}
+
+            {/* "Tap outside to close" scrim for the category picker. Rendered ONCE,
+                here, OUTSIDE every card. Inside a card it could not work: each card
+                carries `backdrop-blur-xl`, which makes the card a containing block
+                for fixed-position children, so `fixed inset-0` collapsed onto the
+                card's own box instead of the screen. This wrapper has no
+                backdrop-filter, so the scrim covers the viewport - and it sits
+                below the open card's `z-50`, so the dropdown is still clickable. */}
+            {openCategoryHour !== null && (
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenCategoryHour(null);
+                }}
+              />
+            )}
           </div>
         )}
 

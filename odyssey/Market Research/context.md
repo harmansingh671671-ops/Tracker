@@ -682,6 +682,80 @@ Separately proven end to end: a block completed on `/planner` still renders
 `text-decoration-line: line-through` here with zero controls. 8 screenshots reviewed.
 **No background server left running** — 3000/3001/3100 verified closed.
 
+### 2026-10-16 — BUG-8, one CSS property caused two bugs that looked unrelated: the picker opened behind the cards, and the dim overlay covered one row instead of the screen
+
+**Reported from a screenshot:** tapping the category icon on an hour row opened the "Select Block
+Type" list *behind* the rows below it, so only slivers of it were visible.
+
+**There was no `z-index` bug.** Both symptoms came from one line: **every hour card carries
+`backdrop-blur-xl`**, and `backdrop-filter` makes an element **both a stacking context and a
+containing block for `position: fixed` descendants**. That single fact produced two failures:
+
+1. The dropdown's own `z-50` resolved **inside its own card** and could not lift it past the next
+   card. Measured with `document.elementFromPoint` over the middle of an open dropdown: the topmost
+   element was the **08:00 card**, not the dropdown.
+2. The `fixed inset-0` "tap outside to close" scrim **collapsed onto the tapped card's own box**.
+   Measured: **725x62px — the card — inside a 762x484 viewport.** That is why the screenshot shows
+   only the tapped row dimmed; everything below it was simply painted over the scrim too.
+
+**Neither is fixable by raising the dropdown.** The fix is structural: the card that owns an open
+picker is raised (`stackClass`, `z-50`), and the scrim moved **out of the cards** to the list
+wrapper, which has no `backdrop-filter`, so `fixed inset-0` covers the viewport again. Re-measured
+after: topmost element over the dropdown **is** the dropdown, scrim **is** viewport-sized.
+
+**A picker now deliberately outranks the "current hour" / "just saved" highlight** (`z-50` beats
+`z-20`). Those were two hardcoded `relative z-20` strings; folding them into one `stackClass` was
+also the only way to avoid a Tailwind conflict between two z-index utilities in one class list,
+whose resolution depends on stylesheet order rather than attribute order.
+
+**Two things I got wrong and corrected, both by measuring rather than reasoning:**
+
+- **I assumed the dropdown was simply under-stacked** and nearly "fixed" it by raising `z-50`. That
+  would have changed nothing: it was already `z-50`. Measuring `elementFromPoint` first is what
+  showed the real problem was the *containing block*, not the z-index.
+- **My verification fixture silently went stale and I nearly trusted it.** It hardcoded two
+  stylesheet chunk filenames; those names are content-hashed, so after one `npm run build` the
+  links 404'd, the page rendered **unstyled**, and the measurement came back
+  `dropdown: 746x0` — obviously wrong, and I had already printed it as a result. The fixture now
+  discovers `.next/static/chunks/*.css` at write time. **A fixture that links build output must
+  resolve it at run time, and its own measurement should sanity-check the numbers it expects.**
+
+**Left alone, deliberately:** the picker still opens *downward*, so on the last hours of the day it
+runs off the bottom of the screen. That is a real latent bug but a different one from the reported
+symptom, and fixing it means measuring available space per row.
+
+### 2026-10-16 — Two sessions are editing `day-schedule/page.tsx` at the same time; here is how this change was committed without touching the other's work
+
+**A concurrent session is working in this repo.** Twice now it has moved underneath this one: it
+finished and committed `7dd58eb` (the half-finished edit that was breaking `tsc`) mid-task, and
+during BUG-8 it began adding an inline day-title editor (`refocusTitleRef`, `beginTitleEdit`,
+`commitTitle`, `cancelTitleEdit`, ~65 lines) to the **same file this task was editing**. A `npm run
+build` in the middle of its write failed with `Cannot find name 'refocusTitleRef'` — a race, not a
+real defect, and `tsc --noEmit` passed seconds later.
+
+**Committing with `git add -A` here would have swept ~130 lines of someone else's unfinished work
+into this commit** — the exact failure this repo's status rules exist to prevent.
+
+**The fix was to never touch the working tree at all**, rather than to stash, reset, or restore it:
+
+```
+git show HEAD:odyssey/src/app/day-schedule/page.tsx > head.tsx   # clean base
+# apply ONLY this task's edits to head.tsx, producing mine.tsx
+git diff --no-index --no-prefix head.tsx mine.tsx > mine.patch  # path headers rewritten
+git apply --cached mine.patch                                   # stages; working tree untouched
+git commit                                                      # commits HEAD + these hunks only
+```
+
+The other session's edits then remained in the working tree as an ordinary unstaged diff against the
+new HEAD. **`git checkout --` on a file another agent is actively writing is the dangerous version of
+this**, and so is any save-and-restore: both have a window in which the other session's write is lost.
+
+**Two PowerShell traps hit on the way.** `Set-Content -Encoding UTF8` **adds a BOM** (PS 5.1), which
+corrupts a patch file — `[System.IO.File]::WriteAllText($p, $text, (New-Object
+System.Text.UTF8Encoding($false)))` is the safe form, and asserting the first three bytes are not
+`239,187,191` is the check that proves it. And **heredocs (`<<EOF`) do not work in PS 5.1** at all,
+so commit messages must be written to a file and passed with `git commit -F`.
+
 ### 2026-10-16 — M19, the Daily Allocation bar now reads left-to-right in time, and why 24 flex children were already wrong
 
 **Owner instruction, from a screenshot of the Day Schedule screen:** *"Rewrite the logic of this
@@ -2041,24 +2115,22 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **`7dd58eb` + this commit** — M19, the Daily Allocation bar rewritten as 24
-  per-hour slices on `/day-schedule` **and** `/planner`, on top of `7dd58eb` (Quick schedule: review
-  toggle and Focus & Title card removed, hour-row task text wraps), `2f9cf5f`
+- HEAD at last update: **this commit (BUG-8 category picker stacking) + `a09d66e`** — M19 allocation
+  bar, `7dd58eb` (Quick schedule: review toggle and Focus & Title removed, task text wraps),
+  `2f9cf5f`
   (BUG-7), `80b10a7` (chest hydration + freeze chip), `d2ee8e9` (Bonus Tier bar),
   `e058567` (CONS-1), `c4f052d` (D2), `837cf7f` (P0-T6), `96881f2` (P0-T3),
   `9cf731f` (BUG-5), `4f41b08` (BUG-4), `d50e112` (P0-T7), `811fea0` (CONS-2/P0-T2).
-  **A concurrent session committed `7dd58eb` while this one was still reading the files** — the
-  half-finished edit that was breaking `tsc` at the start of this task was finished and committed
-  underneath me, which is why this file's HEAD line moved without anyone asking.
-- Working tree: clean after commit.
-- Lint: **0 errors**, 16 warnings across `day-schedule/page.tsx` and `planner/page.tsx` — **all
-  pre-existing** (`db`, `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`,
-  `handleClearBlock`, `useScheduleStore`, `getJourneyDayNumber`, `ChevronLeft`, `Flame`, `Check`,
-  `Radio`, `Zap`, two catch bindings, `CatIcon`). `allocation-bar.ts` and its test are **clean**.
-  The warning count rose 7 → 16 because the other session added two more unused imports in
-  `planner/page.tsx`; none of them are this task's.
-- Tests: **23 suites, 357 tests, all green** (11 of them new, in `allocation-bar.test.ts`).
-  `tsc --noEmit` exit 0. Production build clean.
+  **⚠️ A concurrent session is editing `day-schedule/page.tsx` right now** (an inline day-title
+  editor: `refocusTitleRef` / `beginTitleEdit` / `commitTitle` / `cancelTitleEdit`). **It is
+  deliberately left uncommitted in the working tree.** BUG-8 was committed with `git apply --cached`
+  from a patch built against HEAD so that not one byte of that work was staged — see §9 2026-10-16.
+  **Do not `git checkout --`, reset, stash or re-save that file while the other session is running.**
+- Working tree: **not clean** — the concurrent session's day-title editor, unstaged, on purpose.
+- Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing** (`db`,
+  `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`, `handleClearBlock`).
+  `allocation-bar.ts` and its test are **clean**.
+- Tests: **23 suites, 357 tests, all green.** `tsc --noEmit` exit 0. Production build clean.
 - **Server hygiene this session:** a `next start` on **port 3000**, started at 16:10:49 by the
   *other* session, was still holding the port when this task finished and **was killed** along with
   this session's own 3100 server. **No listener remains on 3000 / 3001 / 3100.**
