@@ -614,6 +614,97 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — Quick schedule header: day count and dot out, title editable in place, no ring
+
+**Owner instruction, three parts.** From the Quick schedule header: remove the **day
+count** ("Day 28 •") and the **pulsing dot** left of the title, and make the **title
+editable in place**. Then, from screenshots: **no box around the title**, in the saved
+state *or* while typing.
+
+**This reverses a consequence recorded earlier the same day.** Removing the "Day N Focus &
+Title" card had removed the app's only WRITER of `odyssey_day_name_*`, and the session log
+stated flatly that "a new user can now never set a title". **That line was true when
+written and is false now**, so it is corrected in place here and in the §10 table rather
+than left to contradict the code. The header title is now click-to-edit, **both** storage
+keys are written again (`..._day_${displayDay}` and `..._${dateStr}`), and a new user can
+name a day. Verified: a title set on `/day-schedule` **appears on `/journey`**, which reads
+those keys — that cross-screen hop is the whole reason both are written, and it is the
+thing that silently rotted when the card went.
+
+**`displayDay` is still load-bearing and was nearly deleted with the day count.** It is not
+only decoration: it is the storage key the title is filed under. Removing it from the header
+did not remove it from the code.
+
+**Committed value and in-progress draft are SEPARATE states.** Escape must be able to
+abandon an edit; with one state that is impossible without re-reading storage to find out
+what was committed, and it would have written a half-typed title on every keystroke. Enter
+and blur commit; Escape discards.
+
+**The `<h1>` wraps the button, not the reverse.** `<button><h1/></button>` is invalid HTML —
+`h1` is not phrasing content — even though every browser renders it. The button is inside
+the heading.
+
+**Two real bugs the browser found, both invisible to `tsc` and lint.**
+
+1. **`el.select()` in a ref callback destroys typing.** React 19 re-invokes a ref callback
+   with the node on *every render*, so select-all re-ran after each keystroke and the next
+   character replaced everything typed so far. The symptom was a title of **`"e"`** — the
+   last character of "Rest and recharge" — while every assertion about saving and reloading
+   still passed. Select-on-open now lives in an effect keyed on `isEditingTitle`. **This is
+   the same class as the `#__next` probe: a check that cannot fail is not a check, and here
+   the failing value looked like a passing one.**
+2. **`titleButtonRef` is `null` while editing**, because the button is unmounted in edit
+   mode — so "return focus to the title button" was a silent no-op. Focus is now restored
+   by an effect, gated on a ref flag so it happens for keyboard users and never steals
+   focus from wherever someone clicked.
+
+**The ring was replaced, not deleted.** The owner asked twice for no box, which is fair —
+it was a visible box around the title in both states. Removing every focus indicator would
+have broken the repo's own "visible focus ring" rule and made the title unreachable for
+keyboard users. `focus-visible:ring-2` is now `focus-visible:underline`, so **tap and mouse
+show nothing at all** and keyboard navigation still has a visible indicator. Measured, not
+eyeballed: a Tailwind ring is a `box-shadow`, so `check-noring.js` asserts
+`box-shadow: none`, `outline-width: 0` and `border-width: 0` on both elements in both
+states, and asserts the underline is present. **A screenshot of the editing state suggested
+only part of the title was selected; measuring `selectionStart/End` gave `[0,13]` and
+proved the whole value was selected and typing replaced it — the highlight was a headless
+paint artifact.** Measure, then believe the paint never.
+
+**A keyboard-reachability harness flaked across identical runs.** "Press Tab twice" was
+wrong (the back button comes first) and "Tab up to 25 times" was also wrong and
+*inconsistent* — one combination reached the title on exactly tab 25 while five others never
+did, which should have been the clue that the starting focus after a reload is not knowable.
+Replaced with the property that actually matters and is deterministic: **focus the back
+button, press Tab once, assert the title button receives it.** A separate diagnostic printed
+the real tab order rather than guessing at it.
+
+**The verification wrapper was lying, twice.** `with-server.ps1` printed
+`server killed, port 3100 closed` and left a live listener, and the next run aborted on
+EADDRINUSE. Cause: **`next start` is supervised by its `npx` parent, which re-binds the
+port about a second later**, so killing the port's owner is not enough and a single sweep
+cannot prove the port is released. Fixed to kill the launcher **tree** first (`-PassThru` +
+`taskkill /T`) and then sweep the port repeatedly until it stays clear. Three consecutive
+runs now clean up with no abort. **A tool that reports success while leaving the thing it
+claims to have cleaned up is worse than no tool**, and this one was trusted because it
+printed the reassuring line.
+
+**Two commits landed on `day-schedule/page.tsx` while this work was in progress**
+(`M19` allocation bar at 16:32, `BUG-8` category-picker z-order at 17:05 — mid-edit). HEAD
+was checked for each before committing: **neither swept this uncommitted work in** (0 matches
+for `beginTitleEdit` in HEAD), and this change was confirmed to sit **on top of** both. Three
+hunks of **incidental comment churn** — em dashes replacing hyphens in BUG-8's own comments,
+introduced by a read→edit round-trip — were reverted so the diff stays surgical. **A diff is
+part of the feature: unrelated reformatting in someone else's commit is noise that hides
+the real change.**
+
+Gates: `tsc` exit 0; eslint **0 errors** (7 warnings, all pre-existing at HEAD); **23 suites /
+357 tests green**; production build clean. In-browser at 360/390/430 in light and dark: no
+dot, no day count, `h1` has a single BUTTON child, empty-day title reads "Schedule", Escape
+discards, blur and Enter both commit, title survives reload, both storage keys written,
+Tab-from-back-button reaches the title, header does not overflow. Re-ran
+`check-quicksched.js` and `check-strikethrough.js` against the new build to confirm no
+regression. **No background server left running.**
+
 ### 2026-10-16 — Quick schedule: two controls removed, and an `<input>` that could never wrap
 
 **Owner instruction (two parts, from screenshots).** Removed from `/day-schedule` only:
@@ -2115,18 +2206,22 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit (BUG-8 category picker stacking) + `a09d66e`** — M19 allocation
-  bar, `7dd58eb` (Quick schedule: review toggle and Focus & Title removed, task text wraps),
-  `2f9cf5f`
-  (BUG-7), `80b10a7` (chest hydration + freeze chip), `d2ee8e9` (Bonus Tier bar),
-  `e058567` (CONS-1), `c4f052d` (D2), `837cf7f` (P0-T6), `96881f2` (P0-T3),
-  `9cf731f` (BUG-5), `4f41b08` (BUG-4), `d50e112` (P0-T7), `811fea0` (CONS-2/P0-T2).
-  **⚠️ A concurrent session is editing `day-schedule/page.tsx` right now** (an inline day-title
-  editor: `refocusTitleRef` / `beginTitleEdit` / `commitTitle` / `cancelTitleEdit`). **It is
-  deliberately left uncommitted in the working tree.** BUG-8 was committed with `git apply --cached`
-  from a patch built against HEAD so that not one byte of that work was staged — see §9 2026-10-16.
-  **Do not `git checkout --`, reset, stash or re-save that file while the other session is running.**
-- Working tree: **not clean** — the concurrent session's day-title editor, unstaged, on purpose.
+- HEAD at last update: **this commit (Quick schedule header: day count + dot removed, title
+  editable in place, no focus ring) + `022eff1`** — BUG-8 category-picker stacking,
+  `a09d66e` (M19 allocation bar), `7dd58eb` (Quick schedule: review toggle and Focus & Title
+  removed, task text wraps), `2f9cf5f` (BUG-7), `80b10a7` (chest hydration + freeze chip),
+  `d2ee8e9` (Bonus Tier bar), `e058567` (CONS-1), `c4f052d` (D2), `837cf7f` (P0-T6),
+  `96881f2` (P0-T3), `9cf731f` (BUG-5), `4f41b08` (BUG-4), `d50e112` (P0-T7),
+  `811fea0` (CONS-2/P0-T2).
+  **The concurrent-session coordination described in §9 2026-10-16 worked in both
+  directions.** The other session saw the day-title editor in the working tree, committed
+  `BUG-8` from a patch staged with `git apply --cached` so not one byte of it was swept in,
+  and left a do-not-clobber warning; this session then committed that work on top of
+  `022eff1` and `a09d66e`, confirming via `git show HEAD:…` that **neither commit had
+  absorbed the other's uncommitted bytes**. Three hunks of incidental em-dash churn in
+  BUG-8's own comments were reverted so this diff stays surgical. **The do-not-touch note
+  is now resolved and may be deleted** — that session is finished.
+- Working tree: clean after commit.
 - Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing** (`db`,
   `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`, `handleClearBlock`).
   `allocation-bar.ts` and its test are **clean**.
@@ -2134,17 +2229,34 @@ to know where things stand.
 - **Server hygiene this session:** a `next start` on **port 3000**, started at 16:10:49 by the
   *other* session, was still holding the port when this task finished and **was killed** along with
   this session's own 3100 server. **No listener remains on 3000 / 3001 / 3100.**
-- **Two harness traps confirmed in this environment, both worth keeping:**
-  - **Seeded IndexedDB persists across runs inside a browser context.** Reuse the context
-    and each run appends to the previous one. Use `browser.createBrowserContext()` per
-    combination, and assert the field holds exactly the seeded string — otherwise a
-    wrapping assertion passes while measuring multiplied text. Details in §9, 2026-10-16.
-  - `%TEMP%\opencode\verify\with-server.ps1` killed port 3100 correctly on both runs,
-    including when the script exited non-zero. Prefer it over a bare `Start-Process`.
-- **The verification scripts for this work** are `check-quicksched.js` (removals + wrapping
-  at 360/390/430/768 in both themes) and `check-strikethrough.js` (Enter saves+advances
-  without inserting a newline; a block completed on `/planner` still shows struck through
-  with no controls). Screenshots in `%TEMP%\opencode\verify\shots-quicksched\`.
+- **⚠️ `with-server.ps1` used to REPORT SUCCESS WHILE LEAVING THE SERVER RUNNING.** An
+  earlier line here claimed it "killed port 3100 correctly on both runs". **That was false.**
+  It printed `server killed, port 3100 closed` and left a live listener; the next run then
+  aborted on `EADDRINUSE`. Cause: **`next start` is supervised by its `npx` parent, which
+  re-binds the port about a second after the child is killed**, so killing the port's owner is
+  not enough and a single sweep cannot prove the port is released. **Fixed**: it now kills
+  the launcher **tree** (`-PassThru` + `taskkill /T`) and then sweeps the port repeatedly until
+  it stays clear; three consecutive runs clean up with no abort. **Still check the port
+  yourself rather than trusting its success line.**
+- **A read→edit round-trip can silently rewrite hyphens as em dashes** in comment text that was
+  never targeted, adding unrelated churn to another agent's commit. Seen in BUG-8's comments;
+  reverted. **Read the diff before committing** — three comment hunks had nothing to do with
+  the feature.
+- **A React 19 ref callback re-runs on every render**, so `el.select()` inside one re-selects
+  the field after each keystroke and the next character replaces everything typed. Cost a real
+  bug (a title of `"e"`, the last character of "Rest and recharge"). Put select/focus in an
+  effect keyed on the state that opens the editor, never in a ref callback.
+- **Seeded IndexedDB persists across runs inside a browser context.** Reuse the context and
+  each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
+  and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
+  while measuring multiplied text. Details in §9, 2026-10-16.
+- **Verification scripts** for `/day-schedule`: `check-quicksched.js` (removals + wrapping at
+  360/390/430/768 both themes), `check-strikethrough.js` (Enter saves + advances; a block
+  completed on `/planner` still shows struck through), `check-title.js` (no dot, no day count,
+  editing, persistence, both storage keys, `/journey` sees the title, keyboard order),
+  `check-noring.js` (no ring/outline/border on the title in any state), and `diag-tab.js`,
+  which printed the real tab order instead of guessing it. Screenshots in
+  `%TEMP%\opencode\verify\shots-*\`.
 - **`P0-T2` — `graphify` IS on PATH**, at
   `%APPDATA%\..\Python\Python311\Scripts\graphify.exe`. The 2026-10-07 session-log entry
   recording the CLI as unavailable is **wrong** and is superseded by this. `graphify update .`
@@ -2199,7 +2311,7 @@ above the vault banner. The follow-up task is closed.
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
 | Next feature | **None staged.** `CONS-2` and `P0-T2` shipped 2026-10-15. Candidates still open in Phase 1: **`P0-T6`** (the last named exit-gate criterion), `P0-T3`, `P0-T7`, `CONS-1` |
-| **Owner-instruction UI removals 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** `/day-schedule` lost the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card; the hour-row task field became a wrapping auto-growing `<textarea>`. **Two consequences to carry forward:** that card was the app's only writer of `odyssey_day_name_*`, so **day titles can no longer be set by anyone** (existing titles still display; `/journey`'s read of the key is now only satisfiable by pre-existing data), and `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is now reachable from `/planner` and `/journey` only. |
+| **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **2 of 4 met.** `CONS-2` ✓ · gates clean ✓ · no uncommitted work ✓ · **`P0-T6` adapter landed ✗** — the adapter exists but is still one 829-line file holding all 34 methods, so D1's god-node half needs a behaviour-preserving split |
 | Also open in Phase 1 | `P0-T3` (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain), `P0-T7` (`seedInitialData()` is an **empty function** at `src/lib/seed.ts:5` with 3 call sites — `user.ts:24`, `user.ts:54`, `seed.ts:52`), `CONS-1` (colour mapping still defined 4×), `DEBT` (D2 `useUserStore` 33 edges, D5 two data-access styles). ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
 | Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-18`, starts with **`PERF-0`**, a mandatory reconcile (5 of 18 already delivered, 4 figures wrong). Native items need a physical device + release build this machine cannot do (§6.5.4) |

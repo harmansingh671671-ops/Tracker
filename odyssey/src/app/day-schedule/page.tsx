@@ -1,6 +1,6 @@
 "use client";
 
-import { logWarn, readString } from "@/lib/utils/logger";
+import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -264,6 +264,71 @@ function DayScheduleContent() {
     }
     setDayName(saved);
   }
+
+  // Day title: committed value vs. in-progress draft.
+  //
+  // These are deliberately SEPARATE states rather than writing on every
+  // keystroke. Escape has to be able to abandon an edit, and a single state
+  // makes that impossible without re-reading storage to find out what was
+  // committed before the user started typing — and it would have written a
+  // half-typed title to storage on every character.
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const titleButtonRef = useRef<HTMLButtonElement | null>(null);
+  const refocusTitleRef = useRef(false);
+
+  const beginTitleEdit = useCallback(() => {
+    setTitleDraft(dayName);
+    setIsEditingTitle(true);
+  }, [dayName]);
+
+  /** Persist the draft. Also used as the blur handler, so clicking away saves. */
+  const commitTitle = useCallback(() => {
+    const next = titleDraft.trim();
+    setDayName(next);
+    if (typeof window !== "undefined") {
+      try {
+        writeString(`odyssey_day_name_day_${displayDay}`, next);
+        if (dateStr) {
+          writeString(`odyssey_day_name_${dateStr}`, next);
+        }
+      } catch (e) { logWarn("storage call failed: localStorage.setItem", "storage call failed: localStorage.setItem", e); }
+    }
+    refocusTitleRef.current = true;
+    setIsEditingTitle(false);
+  }, [titleDraft, displayDay, dateStr]);
+
+  /** Abandon the edit. Focus is restored by the effect below, not here —
+   *  `titleButtonRef` is null while editing, because the button is unmounted. */
+  const cancelTitleEdit = useCallback(() => {
+    refocusTitleRef.current = true;
+    setIsEditingTitle(false);
+  }, []);
+
+  // Focus handling for the title editor.
+  //
+  // Select-on-open must live HERE, not in the ref callback. A ref callback is
+  // re-invoked with the node on every render (React 19 calls it null-then-node),
+  // so an `el.select()` inside it re-selects the whole field after every
+  // keystroke — and the next character typed then REPLACES everything, leaving
+  // a one-character title. Keying on `isEditingTitle` runs it exactly once.
+  useEffect(() => {
+    if (isEditingTitle) {
+      const el = titleInputRef.current;
+      if (el) {
+        el.focus();
+        el.select();
+      }
+      return;
+    }
+    // Only pull focus back for keyboard users. Doing it after a blur would
+    // steal focus from wherever the user clicked to.
+    if (refocusTitleRef.current) {
+      refocusTitleRef.current = false;
+      titleButtonRef.current?.focus();
+    }
+  }, [isEditingTitle]);
 
   const [loading, setLoading] = useState(true);
 
@@ -645,16 +710,12 @@ function DayScheduleContent() {
           <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
             {formatHour((slot.hour + 1) % 24)}
           </span>
-          {isRecentlySaved ? (
-            <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-on-primary font-black mt-1 shadow-sm animate-pulse">
-              SAVED
-            </span>
-          ) : isCurrent ? (
-            <div className="flex items-center gap-1 mt-1 px-1.5 py-0.2 rounded-full bg-primary/20 border border-primary/40 text-primary">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-              <span className="text-[8px] font-mono font-extrabold tracking-wider">LIVE</span>
-            </div>
-          ) : null}
+          {/* The "SAVED" flash and the "LIVE" pill were removed here on owner
+              instruction. Both were status chips under the time; the row's own
+              highlight (the ring/glow, the violet clock, the LIVE pulsing ring
+              around the icon) already says which hour is current and which was
+              just edited, so the third signal repeated it. Do not reinstate one
+              without the other — they were a pair. */}
         </div>
 
         {/* Category Icon & Interactive Type Switcher Pill */}
@@ -793,16 +854,60 @@ function DayScheduleContent() {
             <ChevronLeft size={22} />
           </button>
 
-          {/* Title Stack */}
+          {/* Title Stack — click the title to rename the day.
+
+              The pulsing dot and the "Day N •" count were removed on owner
+              instruction. `displayDay` is still load-bearing: it is the storage
+              key the day title is filed under, and /journey reads that same key.
+
+              No focus RING on the title or its editor, on owner instruction: the
+              ring was a visible box around the title in both the saved and the
+              editing state. Keyboard focus still shows an UNDERLINE
+              (`focus-visible:underline`), which keeps a visible focus indicator
+              without drawing a box — the ring was removed, not the affordance. */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_rgba(108,0,255,0.6)]" />
+            {isEditingTitle ? (
+              <input
+                ref={(el) => {
+                  titleInputRef.current = el;
+                }}
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitTitle();
+                  } else if (e.key === "Escape") {
+                    // Not commitTitle: Escape must DISCARD the draft.
+                    e.preventDefault();
+                    cancelTitleEdit();
+                  }
+                }}
+                onBlur={commitTitle}
+                aria-label="Day title"
+                placeholder="Name this day"
+                maxLength={80}
+                className="w-full bg-transparent border-0 p-0 text-base sm:text-lg font-bold tracking-tight text-on-surface placeholder:font-normal placeholder:text-on-surface-variant/40 focus:outline-none focus-visible:underline focus-visible:decoration-2 focus-visible:underline-offset-4"
+              />
+            ) : (
               <h1 className="text-base sm:text-lg font-bold text-on-surface tracking-tight truncate">
-                {dayName ? dayName : `Day ${displayDay} Schedule`}
+                {/* The <h1> WRAPS the button, not the reverse: <h1> is not
+                    phrasing content, so <button><h1/></button> is invalid HTML
+                    even though browsers render it. */}
+                <button
+                  ref={titleButtonRef}
+                  type="button"
+                  onClick={beginTitleEdit}
+                  aria-label={dayName ? `Day title: ${dayName}. Change it` : "Set a title for this day"}
+                  title="Tap to change the day title"
+                  className="text-left max-w-full truncate hover:text-primary focus-visible:outline-none focus-visible:underline focus-visible:decoration-2 focus-visible:underline-offset-4 transition-colors cursor-text"
+                >
+                  {dayName || "Schedule"}
+                </button>
               </h1>
-            </div>
-            <p className="text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5 font-mono">
-              {dayName && <span className="text-primary font-semibold">Day {displayDay} • </span>}
+            )}
+            <p className="text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5 font-mono truncate">
               <span>{dateStr ? formatDateDisplay(dateStr) : ""}</span>
             </p>
           </div>
@@ -910,12 +1015,19 @@ function DayScheduleContent() {
         </section>
 
         {/* The "Day N Focus & Title" card was removed here on owner instruction.
-            It was the app's ONLY writer of `odyssey_day_name_*` — `/journey` reads
-            that key but nothing else sets it — so removing the card retires the
-            ability to name a day. The READ above is deliberately kept: titles a
-            user already typed are their data, so the header still shows them.
-            Do not reinstate this card as a plain input without also restoring a
-            reason for it; and note a new user can no longer ever set a title. */}
+            It had been the app's only WRITER of `odyssey_day_name_*` — `/journey`
+            reads that key — so removing it appeared to retire the ability to name
+            a day entirely.
+
+            That was reversed the same session, also on owner instruction: the day
+            count and the pulsing dot came out of the header and the title became
+            click-to-edit in place, so the write path above is alive again and the
+            ability to name a day is NOT retired. The card itself stays gone — the
+            editing now happens in the header rather than in a panel below it.
+
+            Both storage keys are still written (`..._day_${displayDay}` and
+            `..._${dateStr}`) because `/journey` reads them and a title written
+            under only one of them would not appear there. */}
 
         {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks (Structured Vertical Rail) */}
         {loading ? (
