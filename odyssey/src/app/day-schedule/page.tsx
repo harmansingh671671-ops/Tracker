@@ -8,6 +8,7 @@ import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
+import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import {
   ChevronLeft,
   ChevronDown,
@@ -418,6 +419,19 @@ function DayScheduleContent() {
     });
   }, [blocks, editingValues, hourCategories]);
 
+  /**
+   * Whether an hour counts as PLANNED for this day. Named rather than inlined
+   * because the allocation bar below and the legend under it are the same fact
+   * about the same day, and M8's lesson applies: two derivations of "how much of
+   * this day is planned" is how a bar and its own caption start disagreeing.
+   * A typed-but-unsaved title counts here; the planner deliberately does not
+   * (it reads only saved blocks), and that difference is intentional per screen.
+   */
+  const isPlannedHour = useCallback(
+    (h: (typeof full24Hours)[number]) => !!h.block || (h.title || "").trim().length > 0,
+    []
+  );
+
   // Compute 24h category allocation statistics
   const categoryStats = useMemo(() => {
     let focusH = 0;
@@ -427,8 +441,7 @@ function DayScheduleContent() {
     let restH = 0;
 
     full24Hours.forEach((h) => {
-      const hasContent = !!h.block || (h.title || "").trim().length > 0;
-      if (!hasContent) return;
+      if (!isPlannedHour(h)) return;
       const c = (h.category || "").toLowerCase();
       if (c.includes("sleep") || c.includes("rest")) restH++;
       else if (c.includes("vitality") || c.includes("habit") || c.includes("health")) vitalityH++;
@@ -440,7 +453,17 @@ function DayScheduleContent() {
     const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
     const remaining = Math.max(0, 24 - plannedTotal);
     return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal, remaining };
-  }, [full24Hours]);
+  }, [full24Hours, isPlannedHour]);
+
+  /**
+   * The bar's 24 one-hour slices, left to right = 00:00 → 23:00, so it reads as
+   * the day rather than as five buckets with the order discarded. Same planned
+   * test as `categoryStats` above, by construction.
+   */
+  const allocationSlices = useMemo(
+    () => buildAllocationSlices(full24Hours.map(isPlannedHour)),
+    [full24Hours, isPlannedHour]
+  );
 
   const progressPct = Math.round((categoryStats.plannedTotal / 24) * 100);
 
@@ -830,19 +853,31 @@ function DayScheduleContent() {
             </div>
           </div>
 
-          {/* Proportional Balance Bar */}
-          <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
-            {categoryStats.plannedTotal > 0 ? (
-              <>
-                <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
-                <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
-                <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
-                <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
-                <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
-              </>
-            ) : (
-              <div className="w-full h-full bg-surface-container-highest/60" />
-            )}
+          {/* Daily Allocation bar — 24 one-hour slices, left to right = 00:00 →
+              23:00, so the strip reads as the day instead of five buckets with
+              the order thrown away. `rounded-full overflow-hidden` is what makes
+              the bar a capsule and, because slice 0 starts at 0% and slice 23
+              ends at 100%, what makes both rounded ends fully covered rather
+              than notched. Slices are absolutely positioned (not flex children)
+              so they tile the width exactly — a flex row of 24 would also need
+              gaps, and those gaps eat into every slice. `aria-hidden` because
+              the legend directly below says the same thing in words. */}
+          <div
+            aria-hidden="true"
+            className="relative h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden"
+          >
+            {allocationSlices.map((slice) => {
+              if (!slice.filled) return null;
+              const cat = allocationCategory(full24Hours[slice.hour].category);
+              return (
+                <div
+                  key={slice.hour}
+                  style={slice.style}
+                  title={`${slice.label} · ${cat.label}`}
+                  className={`absolute inset-y-0 ${cat.fill}`}
+                />
+              );
+            })}
           </div>
 
           {/* Category Hours Legend */}

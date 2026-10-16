@@ -17,6 +17,7 @@ import { PlannerEmptyState } from "@/components/planner/planner-empty-state";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
+import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import { getUpNextBlock, formatCountdown } from "@/lib/utils/up-next";
 import {
   Clock,
@@ -392,6 +393,13 @@ function PlannerContent() {
   }, [blocks, nowMinutes, selectedDate, todayStr]);
 
   // Category summary counts - strictly from user scheduled blocks!
+  // `isCustom` (a saved block) is the test, and it is named because the
+  // allocation bar below is the SAME fact about the SAME day: two derivations
+  // of "how much of this day is planned" is how a bar and its own caption
+  // start disagreeing. A typed-but-unsaved title deliberately does NOT count
+  // here, unlike the Day Schedule screen.
+  const isPlannedHour = useCallback((h: (typeof full24Hours)[number]) => !!h.isCustom, []);
+
   const categoryStats = useMemo(() => {
     let focusH = 0;
     let vitalityH = 0;
@@ -400,7 +408,7 @@ function PlannerContent() {
     let restH = 0;
 
     full24Hours.forEach((h) => {
-      if (!h.isCustom) return; // Do NOT count unwritten hours!
+      if (!isPlannedHour(h)) return; // Do NOT count unwritten hours!
       const c = (h.category || "").toLowerCase();
       if (c.includes("sleep") || c.includes("rest")) restH++;
       else if (c.includes("vitality") || c.includes("habit")) vitalityH++;
@@ -412,7 +420,15 @@ function PlannerContent() {
     const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
 
     return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
-  }, [full24Hours]);
+  }, [full24Hours, isPlannedHour]);
+
+  // The bar's 24 one-hour slices, left to right = 00:00 → 23:00, so it reads as
+  // the day rather than as five buckets with the order discarded. Same planned
+  // test as `categoryStats` above, by construction.
+  const allocationSlices = useMemo(
+    () => buildAllocationSlices(full24Hours.map(isPlannedHour)),
+    [full24Hours, isPlannedHour]
+  );
 
   // Helper to determine canonical category type for adjacent grouping
   const getCategoryType = useCallback((category?: string, isCustom?: boolean): string => {
@@ -1058,19 +1074,37 @@ function PlannerContent() {
             </div>
           </div>
 
-          {/* Proportional Balance Bar */}
-          <div suppressHydrationWarning className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
-            {categoryStats.plannedTotal > 0 ? (
-              <>
-                <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full" title="Focus" />
-                <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full" title="Vitality" />
-                <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full" title="Sync" />
-                <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full" title="Renewal" />
-                <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full" title="Rest" />
-              </>
-            ) : (
-              <div className="w-full h-full bg-surface-container-highest/60" />
-            )}
+          {/* Daily Allocation bar — 24 one-hour slices, left to right = 00:00 →
+              23:00, so the strip reads as the day instead of five buckets with
+              the order thrown away. `rounded-full overflow-hidden` is what makes
+              the bar a capsule and, because slice 0 starts at 0% and slice 23
+              ends at 100%, what makes both rounded ends fully covered rather
+              than notched. Slices are absolutely positioned (not flex children)
+              so they tile the width exactly — a flex row of 24 would also need
+              gaps, and those gaps eat into every slice. `aria-hidden` because
+              the hour rail below it carries the same information in words. */}
+          <div
+            aria-hidden="true"
+            suppressHydrationWarning
+            className="relative h-2 w-full bg-surface-container-highest rounded-full overflow-hidden"
+          >
+            {allocationSlices.map((slice) => {
+              if (!slice.filled) return null;
+              // The planner's hours hold the raw stored category, so it goes
+              // through this page's own resolver first. Same answer either way:
+              // `isCustom` is true for every filled slice by definition.
+              const cat = allocationCategory(
+                getCategoryType(full24Hours[slice.hour].category, true)
+              );
+              return (
+                <div
+                  key={slice.hour}
+                  style={slice.style}
+                  title={`${slice.label} · ${cat.label}`}
+                  className={`absolute inset-y-0 ${cat.fill}`}
+                />
+              );
+            })}
           </div>
         </div>
 

@@ -546,11 +546,19 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 - Every interactive element needs explicit hover/focus/active/loading/disabled
   states, must be keyboard reachable with a visible focus ring, and must honour
   reduced motion.
-- **Visual verification:** `puppeteer-core` + system Chrome at phone width
-  (390px — also 360 and 430), before/after screenshots, light **and** dark.
+- **Visual verification:** system Chrome at phone width (390px — also 360 and 430),
+  before/after screenshots, light **and** dark.
   *Do not assert a visual change works — screenshot it or measure it.*
   Screenshots catch things assertions miss: the M3 pulse rendered two (+)
   marks side by side while every scripted assertion passed.
+  **Prefer a page that measures itself** (it writes its own
+  `getBoundingClientRect()` results into the DOM and `--dump-dom` reads them
+  out) over a pixel scan. A scan measured the wrong viewport and reported two
+  defects that did not exist; a self-measuring page settles the same question in
+  one run. `puppeteer-core` is **not currently available** — see §10 and §9
+  2026-10-16 for how to drive Chrome without it, and for the two Chrome
+  behaviours (`--window-size` ignored, IndexedDB stalled under virtual time) that
+  will otherwise be rediscovered the hard way.
 
 ---
 
@@ -673,6 +681,77 @@ any field; the long row is 141px against a 64px short row; document horizontal o
 Separately proven end to end: a block completed on `/planner` still renders
 `text-decoration-line: line-through` here with zero controls. 8 screenshots reviewed.
 **No background server left running** — 3000/3001/3100 verified closed.
+
+### 2026-10-16 — M19, the Daily Allocation bar now reads left-to-right in time, and why 24 flex children were already wrong
+
+**Owner instruction, from a screenshot of the Day Schedule screen:** *"Rewrite the logic of this
+bar, make it like the 1st hour on the left then 2nd hour to its right 3rd hour to right of 2nd like
+that, and make sure that it also cover the semicircle on both ends."*
+
+**The old bar grouped by category, not by time.** It was five children sized as a share of 24 —
+all Focus, then all Vitality, then Sync, then Renewal, then Rest. A day running
+Sleep → Vitality → Sleep → Work → Sleep therefore rendered as **one indigo block beside one violet
+block with the order of the day discarded**: the strip could not be read as a day at all, only as
+five totals. It is now **24 one-hour slices, left to right = 00:00 → 23:00**, each coloured by that
+hour's own category. Adjacent same-category hours merge into one band — which is what the shape of a
+day actually looks like — and category changes show a crisp one-hour boundary.
+
+**The old layout was also quietly broken, which is worth writing down because it was invisible.**
+A flex row of 24 children whose widths already summed to **100%**, plus a 2px `gap` between each
+one, over-constrains the row: flexbox shrinks all 24 to make room, and the 23 gaps ate roughly **15%
+of every slice**. Nothing looked wrong, because the result was still a plausible bar. Slices are now
+**absolutely positioned** (slice *h* starts at *h*/24 and is exactly 1/24 wide) inside the
+`rounded-full overflow-hidden` track, which tiles the capsule with no seam and no over-constraint.
+
+**"Cover the semicircle on both ends" is a geometry claim, so it was measured rather than eyeballed.**
+At a 328px track: the first slice's left edge sits **0.00px** inside the track's left edge and the
+last slice's right edge **0.01px** inside its right edge (sub-pixel rounding). `border-radius`
+computes to `9999px` with `overflow: hidden`, so both caps are clipped out of a slice that reaches
+them — there is no notch.
+
+**The category colours moved into the shared module rather than being reused from the pages.** The two
+screens keep their own `getCatStyle` maps and **the planner's has no `dotClass` at all** (only an
+`accentGlow`), so "just reuse the page's colour map" would have meant adding a second and third
+spelling of the same five colours. `lib/utils/allocation-bar.ts` now owns the geometry *and* the five
+category colours, and **11 tests** pin the tiling, the equal widths, both caps, the midnight label and
+the empty-input case. A short or missing input yields 24 open slices, **never a collapsed bar** — the
+bar is a fixed frame of reference for the day, so a data glitch must not shrink it.
+
+**`isPlannedHour` is now named on both screens, because a bar and its own caption must not be two
+derivations of the same fact** (M8's lesson). The two screens still count differently **on purpose** —
+Day Schedule counts a typed-but-unsaved title, Planner counts only saved blocks — and that difference
+is now written in a comment instead of being something a reader has to rediscover. Nothing about the
+legend's numbers changed.
+
+### 2026-10-16 — Visual verification on this machine: IndexedDB never completes under headless Chrome, so the geometry was verified with a self-measuring fixture
+
+**Worth knowing before anyone repeats a browser pass here.** There is **no `puppeteer-core`
+installed** (not in `node_modules`, not global, no npx cache) even though §7 describes it as the
+visual-verification tool, and Chrome **155.0.8059.80** is the system browser. Three things cost real
+time and each would cost it again:
+
+1. **`--headless=new` does not work; `--headless=old` does**, and PowerShell's capture of its stdout
+   produced nothing. `cmd /c "... > file 2>&1"` is what actually writes the output. The same pattern
+   already used for `git diff --output` is the reliable one here.
+2. **`--window-size` is ignored** — the layout viewport came back **504px** for every width asked for,
+   which is how a first pixel-scan concluded the bar was wider than its card and that hour 23 was
+   missing. **Both were artefacts of measuring the wrong thing.** A page that reports its own
+   `getBoundingClientRect()` settles this in one run where a pixel scan cannot; pinning the fixture's
+   container to an explicit `width:390px` gave the real 328px track.
+3. **IndexedDB never completes under `--virtual-time-budget`.** Every page stayed at
+   *"Loading schedule blocks…"* and the seed page never left `running`, at 8s, 20s, 30s and 45s alike.
+   So **no data-driven state of this app can be exercised in-browser in this environment** — that is
+   an environment limit, not a product one, and it should not be reported as a product failure.
+
+**What was verified, and how.** The real pages' **prerendered DOM** confirms both `/day-schedule` and
+`/planner` emit the new `<div aria-hidden="true" class="relative h-2(.5) w-full
+bg-surface-container-highest rounded-full overflow-hidden">` track, and that the old `flex gap-0.5`
+bar is gone from both. The **filled-slices render** was then verified with a temporary fixture served
+from the app's own origin, generated by the **real** `buildAllocationSlices` through a throwaway vitest
+file, screenshotting the app's **real compiled CSS** at 390px in **both themes** (light and dark both
+correct: Focus is violet in light, mint in dark) and having the page **report its own measurements**.
+The fixture, its generator and the seed page were **deleted in the same commit** — `git status` shows
+only the four real files.
 
 ### 2026-10-15 — BUG-7 the wallpaper switch that would not stay off, and a native fix that is NOT verified
 
@@ -1962,16 +2041,27 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **`2f9cf5f` + this commit** — Quick schedule: review toggle and
-  Focus & Title card removed, hour-row task text now wraps, on top of `2f9cf5f`
+- HEAD at last update: **`7dd58eb` + this commit** — M19, the Daily Allocation bar rewritten as 24
+  per-hour slices on `/day-schedule` **and** `/planner`, on top of `7dd58eb` (Quick schedule: review
+  toggle and Focus & Title card removed, hour-row task text wraps), `2f9cf5f`
   (BUG-7), `80b10a7` (chest hydration + freeze chip), `d2ee8e9` (Bonus Tier bar),
   `e058567` (CONS-1), `c4f052d` (D2), `837cf7f` (P0-T6), `96881f2` (P0-T3),
   `9cf731f` (BUG-5), `4f41b08` (BUG-4), `d50e112` (P0-T7), `811fea0` (CONS-2/P0-T2).
+  **A concurrent session committed `7dd58eb` while this one was still reading the files** — the
+  half-finished edit that was breaking `tsc` at the start of this task was finished and committed
+  underneath me, which is why this file's HEAD line moved without anyone asking.
 - Working tree: clean after commit.
-- Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing at HEAD**
-  (`db`, `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`,
-  `handleClearBlock`). Repo-wide figure unchanged from the 85 recorded below.
-- Tests: **22 suites, 346 tests, all green.** `tsc --noEmit` exit 0. Production build clean.
+- Lint: **0 errors**, 16 warnings across `day-schedule/page.tsx` and `planner/page.tsx` — **all
+  pre-existing** (`db`, `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`,
+  `handleClearBlock`, `useScheduleStore`, `getJourneyDayNumber`, `ChevronLeft`, `Flame`, `Check`,
+  `Radio`, `Zap`, two catch bindings, `CatIcon`). `allocation-bar.ts` and its test are **clean**.
+  The warning count rose 7 → 16 because the other session added two more unused imports in
+  `planner/page.tsx`; none of them are this task's.
+- Tests: **23 suites, 357 tests, all green** (11 of them new, in `allocation-bar.test.ts`).
+  `tsc --noEmit` exit 0. Production build clean.
+- **Server hygiene this session:** a `next start` on **port 3000**, started at 16:10:49 by the
+  *other* session, was still holding the port when this task finished and **was killed** along with
+  this session's own 3100 server. **No listener remains on 3000 / 3001 / 3100.**
 - **Two harness traps confirmed in this environment, both worth keeping:**
   - **Seeded IndexedDB persists across runs inside a browser context.** Reuse the context
     and each run appends to the previous one. Use `browser.createBrowserContext()` per
@@ -2001,9 +2091,15 @@ to know where things stand.
   Count `Object.keys(n).filter(k => k.startsWith("__reactFiber"))` per element;
   a probe built on `for…in` reports 1 on a page with 676 and looks like a real
   hydration failure.
-- Puppeteer is **not** a project dependency. Verify with `puppeteer-core` driven
-  by the system Chrome (`C:\Program Files\Google\Chrome\Application\chrome.exe`),
-  installed outside the repo, so no dependency is added to the app.
+- Puppeteer is **not** a project dependency, and — **corrected 2026-10-16** — `puppeteer-core`
+  is **no longer reachable at all**: absent from `odyssey/node_modules`, from global `npm ls`, and
+  from the npx cache, so the earlier note that it is "installed outside the repo" is now **wrong**.
+  Verify visually with the **system Chrome** (`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+  155.0.8059.80) driven directly, **without adding a dependency**: `--headless=old` (not `=new`),
+  and write its output through `cmd /c "... > file 2>&1"` because PowerShell captures nothing from it.
+  `--window-size` is **ignored** (viewport pinned near 504px), and **IndexedDB never completes under
+  `--virtual-time-budget`**, so no data-driven state can be exercised in-browser here. Full detail and
+  the self-measuring-fixture method in §9, 2026-10-16.
 - `.clinerules` lives at the workspace **parent** (`C:\PROJECTS`), with paths
   prefixed `odyssey/`. It is itself git-ignored.
 - `Market Research/` **is** tracked (deliberate; decision recorded in the
