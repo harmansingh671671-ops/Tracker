@@ -614,6 +614,75 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — Shop: the badge was eating the item name, and a note on the §9 "browser verification is impossible here" entry
+
+**Owner instruction from a screenshot of the Armory card.** "Streak Freeze Shield" rendered
+as **"Streak Freeze Sh…"**, and the "1 Active" badge was to move **below** the main text.
+
+**The cause was structural, not a long name.** The badge lived *inside* the title's flex
+row:
+
+```
+<div className="flex items-center gap-2">
+  <h3 className="… truncate">{item.name}</h3>
+  {item.badge && <span className="… rounded-full">{item.badge}</span>}
+</div>
+```
+
+so the badge took its width and `truncate` cut the name to whatever was left. **The item was
+only ever 21 characters** — nothing was too long. The badge moved below the description and
+`truncate` came off the `h3`, so the name now wraps rather than being hidden. `self-start`
+keeps the pill hugging its text instead of stretching to the column width now that it is a
+column child.
+
+**The name was deliberately NOT shortened.** "Streak Freeze Shield" is product copy, and
+`reward-celebration-modal.tsx` hardcodes it as `itemWon`. Shortening it in one place would
+have desynced the celebration dialog from the shop — **the same class of fix as the Shop
+"Bonus Tier" bar, where the right move was to remove a disconnected literal rather than
+reword a connected one.** It now fits on one line at 360px without help.
+
+**Found and deliberately NOT fixed (out of scope, recorded not half-done):** the **Daily
+Mystery Chest** card above the catalog has the **same shape of problem** — its "READY" badge
+sits beside the title inside a flex row, and at 360px "Daily Mystery Chest" wraps to two
+lines while "Open ⚡" is squeezed against it. It is a different card, not the one in the
+screenshot, and the user's instruction named the "N Active" badge specifically.
+
+**The §9 entry above claiming browser verification is impossible on this machine is WRONG,
+and it cost a detour.** It states there is "no `puppeteer-core` installed", that
+`--window-size` is ignored so "the layout viewport came back 504px for every width", and
+that "**no data-driven state of this app can be exercised in-browser in this environment**".
+All three were measured wrong, and all three come from the same cause: **those findings came
+from raw Chrome CLI flags, not from puppeteer.**
+
+- `puppeteer-core` **is** installed — at `%TEMP%\opencode\verify\node_modules`, i.e.
+  *outside the repo*, which is exactly where §7 already says it lives ("installed outside the
+  repo, so no dependency is added to the app"). It was missed by looking in
+  `odyssey/node_modules`.
+- `--window-size` **is** ignored, but puppeteer's `page.setViewport()` goes through CDP
+  `Emulation.setDeviceMetricsOverride` and is honoured precisely. Measured here: wrapped
+  line counts fell monotonically with width (360→5 lines, 390→5, 430→4, 768→3) and
+  light/dark matched exactly.
+- IndexedDB works. Data-driven state was exercised in-browser throughout: schedule blocks
+  typed and re-read after reload, a profile seeded with `streakFreezeCount` to make the shop
+  badge render, and day titles round-tripped through `localStorage` to `/journey`.
+
+The fallback of building a throwaway self-measuring fixture was a reasonable response to a
+real obstacle, but the obstacle was the tool choice. **A conclusion of "this cannot be
+measured here" needs the same scrutiny as any other measurement failure — it is the one
+claim that silently justifies skipping verification.**
+
+**A harness bug of mine, caught immediately:** the seed helper closed over `page`, which is
+declared inside the loop, so it threw `ReferenceError: page is not defined`. Passed in as a
+parameter instead.
+
+Gates: `tsc` exit 0; eslint **0 errors** (5 warnings in `shop/page.tsx`, all pre-existing
+unused icon imports); **23 suites / 357 tests green**; build clean. In-browser at
+**360/390/430/768 in light and dark**: the name renders as the full "Streak Freeze Shield",
+the badge is not inside the heading and its top is **6px below** the description's bottom,
+it is **54px wide in a 232–260px column** (not stretched), **0 of 4** item names are clipped
+or carry `text-overflow: ellipsis`, and document horizontal overflow is 0. Screenshots
+reviewed at 360 and 390 in both themes. **No background server left running.**
+
 ### 2026-10-16 — Quick schedule header: day count and dot out, title editable in place, no ring
 
 **Owner instruction, three parts.** From the Quick schedule header: remove the **day
@@ -773,6 +842,48 @@ Separately proven end to end: a block completed on `/planner` still renders
 `text-decoration-line: line-through` here with zero controls. 8 screenshots reviewed.
 **No background server left running** — 3000/3001/3100 verified closed.
 
+### 2026-10-16 — M20, three status chips removed; and my isolation trick only protects one direction
+
+**Three owner instructions in a row, all from screenshots:** *"remove the saved icon"*, *"Remove the
+live thing from the quick schedule page"*, and *"Remove the heavy tag"*. Three chips gone: the `SAVED`
+flash, the `LIVE` pill, and M8's `Heavy Day · 24h planned` tag.
+
+**Each was a third signal for something the row already said.** The ring-and-glow highlight marks the
+current hour, the violet clock and its pulsing halo mark it again, and the save flash marks a save the
+row's own glow already marks. **They were also permanently animating** — `animate-pulse` / `animate-ping`
+— so a 24-row list carried up to three always-moving elements per row, which is motion and battery cost
+for a label that says nothing new. Removed as **pairs**: the Planner had **two** row variants (a regular
+hour and a minimised sleep group) each with its own `LIVE`, and the group variant had a `LIVE` with **no**
+`SAVED` at all, so removing one and not the other would have left the two screens disagreeing.
+
+**M8's badge was the interesting one.** It was the only header slot stating a **judgement** about the day
+rather than a fact about it, and it contradicted the fraction right beside it: a fully-planned day read
+**"Heavy Day · 24h planned"** while the completion bar next to it read **full**. `getDayCapacity()` and its
+**19 tests are kept** — the rules are sound and tested, only the readout was unwanted, and restoring it is
+one object appended to the header's slots array.
+
+**⚠️ The isolation technique from the previous entry protects only ONE direction, and I got that wrong
+in my own summary.** Committing via `git apply --cached` stops *my* commit from absorbing the other
+session's work. It does **nothing** to stop *their* `git add -A` from absorbing **mine** — which is
+exactly what happened. Between writing the Day Schedule edit and committing, the other session finished
+and committed as `60485f4` (*"day count and dot out of the header, title editable in place, no ring"*),
+and **the Day Schedule half of this work went in inside that commit**. Verified afterwards rather than
+assumed: `git show HEAD:…/day-schedule/page.tsx` contains the removal comment and no `SAVED` markup.
+
+**The code is correct and the change is not lost — the *attribution* is wrong.** History cannot be
+corrected for it without rewriting a commit another session is actively building on, which is strictly
+worse than an imprecise commit subject. **So this session log is the correction**, and the lesson is worth
+more than the fix: *isolating your own commit protects your colleagues' work, not your own. When two
+agents share a repository, the honest options are to serialise the work or to state plainly in the commit
+and the log which session's change rode along.*
+
+**Also worth recording, because it nearly produced a wrong conclusion:** my first verification grep was
+`>SAVED<` and it returned **0 matches on the unedited file**. The badges put their text on its own line,
+so the `>` and `<` are on different lines and the pattern can never match. **A grep that cannot match
+anything is indistinguishable from a grep that proves something is absent** — the same lesson as the
+`#__next` probe and the half-dead lint rule. Re-checked against the actual class string
+(`font-black mt-1 shadow-sm animate-pulse`) instead.
+
 ### 2026-10-16 — BUG-8, one CSS property caused two bugs that looked unrelated: the picker opened behind the cards, and the dim overlay covered one row instead of the screen
 
 **Reported from a screenshot:** tapping the category icon on an hour row opened the "Select Block
@@ -889,6 +1000,24 @@ is now written in a comment instead of being something a reader has to rediscove
 legend's numbers changed.
 
 ### 2026-10-16 — Visual verification on this machine: IndexedDB never completes under headless Chrome, so the geometry was verified with a self-measuring fixture
+
+> **⚠️ SUPERSEDED IN PART — the conclusion below is wrong; the findings came from raw Chrome
+> CLI flags, not from puppeteer.** Verified again later the same day, in-browser, at
+> 360/390/430/768 in both themes with real seeded data:
+> **`puppeteer-core` IS installed** (at `%TEMP%\opencode\verify\node_modules` — outside the
+> repo, which §7 already records; it was missed by looking in `odyssey/node_modules`);
+> **`page.setViewport()` IS honoured** (it uses CDP `Emulation.setDeviceMetricsOverride`,
+> so it is not affected by the `--window-size` problem below — wrapped line counts fell
+> monotonically with width, 360→5 lines to 768→3); and **IndexedDB DOES work** — schedule
+> blocks, a seeded `streakFreezeCount` profile and `localStorage` day titles were all
+> exercised in-browser. **`headless: 'new'` also works fine from puppeteer.** The correct
+> version of this entry is in §9 under *"Shop: the badge was eating the item name"*. The
+> fixture approach below was a reasonable response to a real obstacle, but the obstacle was
+> the tool: **"this cannot be measured here" is the one claim that silently justifies
+> skipping verification, so it needs the same scrutiny as any other failed measurement.**
+> The findings themselves (`--headless=old`, `cmd /c … > file`, and the
+> `--virtual-time-budget` hang) are kept below because they are still true *for raw Chrome
+> CLI use*.
 
 **Worth knowing before anyone repeats a browser pass here.** There is **no `puppeteer-core`
 installed** (not in `node_modules`, not global, no npx cache) even though §7 describes it as the
@@ -2206,13 +2335,11 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit (Quick schedule header: day count + dot removed, title
-  editable in place, no focus ring) + `022eff1`** — BUG-8 category-picker stacking,
-  `a09d66e` (M19 allocation bar), `7dd58eb` (Quick schedule: review toggle and Focus & Title
-  removed, task text wraps), `2f9cf5f` (BUG-7), `80b10a7` (chest hydration + freeze chip),
-  `d2ee8e9` (Bonus Tier bar), `e058567` (CONS-1), `c4f052d` (D2), `837cf7f` (P0-T6),
-  `96881f2` (P0-T3), `9cf731f` (BUG-5), `4f41b08` (BUG-4), `d50e112` (P0-T7),
-  `811fea0` (CONS-2/P0-T2).
+- HEAD at last update: **this commit (Shop: item name un-truncated, badge moved below the
+  copy) + `60485f4`** — Quick schedule header: day count + dot removed, title editable in
+  place, no focus ring; `022eff1` (BUG-8 category-picker stacking), `a09d66e` (M19
+  allocation bar), `7dd58eb` (Quick schedule: review toggle and Focus & Title removed, task
+  text wraps), `2f9cf5f` (BUG-7).
   **The concurrent-session coordination described in §9 2026-10-16 worked in both
   directions.** The other session saw the day-title editor in the working tree, committed
   `BUG-8` from a patch staged with `git apply --cached` so not one byte of it was swept in,

@@ -237,15 +237,22 @@ export default function ShopPage() {
                 <span>{item.icon}</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-on-surface truncate">{item.name}</h3>
-                  {item.badge && (
-                    <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-mono font-bold">
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
+                {/* No `truncate`: the badge used to sit INSIDE this title row and
+                    took its width, so a 21-character name was cut to
+                    "Streak Freeze Sh...". The badge now sits below the copy
+                    (owner instruction), which gives the name the full column, and
+                    the name wraps rather than being hidden if it ever runs out of
+                    room. `min-w-0` above is what lets a flex child shrink enough
+                    for that wrap to happen at all. */}
+                <h3 className="text-sm font-bold text-on-surface break-words">{item.name}</h3>
                 <p className="text-xs text-on-surface-variant mt-1 leading-snug">{item.desc}</p>
+                {/* `self-start` so the pill hugs its text instead of stretching to
+                    the full column width now that it is a column child. */}
+                {item.badge && (
+                  <span className="self-start mt-1.5 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-mono font-bold">
+                    {item.badge}
+                  </span>
+                )}
               </div>
             </div>
 
