@@ -127,6 +127,12 @@ export default function OnboardingPage() {
     router.replace("/planner");
   }, [router]);
 
+  // A5 -- skipping the hold. Same destination and the same completion flag as
+  // committing: the user is declining the *ritual*, not the app, and the flag
+  // means "the first-run flow is finished" rather than "the ceremony happened".
+  // Deliberately the same handler, so the two exits cannot drift apart.
+  const handleSkipProtocol = handleCommit;
+
   const handleCreateHabit = useCallback(
     async (data: {
       name: string;
@@ -240,7 +246,9 @@ export default function OnboardingPage() {
           <StepBasics habit={created[0] ? { name: created[0].name, icon: created[0].icon } : undefined} />
         )}
 
-        {step === "protocol" && <StepProtocol onCommit={handleCommit} />}
+        {step === "protocol" && (
+          <StepProtocol onCommit={handleCommit} onSkip={handleSkipProtocol} />
+        )}
       </OnboardingShell>
 
       <CreateHabitModal

@@ -43,9 +43,21 @@ const RIM_OUTER_PX = 6;
 interface StepProtocolProps {
   /** Called once the settle pause has elapsed. */
   onCommit: () => void;
+  /**
+   * `A5` -- leave without doing the hold. The spec asks for a commitment moment
+   * that is *"short, skippable and celebratory"*; until this existed, `protocol`
+   * had **no exit at all**, because the shell deliberately hides Next on the last
+   * step and the hold was the only way forward. Anyone who did not discover the
+   * press-and-hold, or simply declined to, was stuck on this screen permanently.
+   *
+   * Lands in exactly the same place as the hold and records the same completion
+   * flag: skipping is *declining the ritual*, not the app. Nothing is lost --
+   * there is nothing on this step but the ritual.
+   */
+  onSkip: () => void;
 }
 
-export function StepProtocol({ onCommit }: StepProtocolProps) {
+export function StepProtocol({ onCommit, onSkip }: StepProtocolProps) {
   const [progress, setProgress] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
   const [isCommitted, setIsCommitted] = useState(false);
@@ -259,6 +271,22 @@ export function StepProtocol({ onCommit }: StepProtocolProps) {
             ? "Keep holding…"
             : "Press and hold, or hold Space"}
       </p>
+
+      {/* The skip. Hidden while a hold is in progress: a second finger landing
+          here mid-commitment would exit out from under someone who is already
+          halfway to the ritual, and a half-performed ceremony is worse than a
+          skipped one. It comes BACK when the hold is released or cancelled. */}
+      {!isHolding && !isCommitted && (
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            onClick={onSkip}
+            className="px-4 py-2 rounded-full text-[11px] font-mono font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            Skip for now
+          </button>
+        </div>
+      )}
     </section>
   );
 }

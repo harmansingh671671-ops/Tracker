@@ -617,6 +617,40 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — The commitment step had no exit at all, and a comment said so
+
+**Owner instruction:** *"approved"* to the recommendation to fix `A5`'s "skippable" half on its own, leaving
+the identity line for a separate decision.
+
+**`protocol` was a dead end.** `OnboardingShell` hides Next on the last step, and the comment explaining
+why read *"on `protocol` the hold is the only way forward"*. **That was true, and nobody had asked whether
+it should be.** A user who did not discover the press-and-hold — or who simply declined to press and hold
+a button for two and a half seconds — sat on that screen **permanently**, with `Back` the only live control
+and no route into the app. The most ceremonial screen in the flow was the one place you could get stuck.
+
+**Skipping is declining the ritual, not the app.** "Skip for now" completes the flow and enters the app,
+writing the **same completion flag** as the hold, and it is deliberately the **same handler** rather than a
+near-copy — two exits that compute the same thing independently are how they drift. The flag means *"first
+run is finished"*, not *"the ceremony happened"*. Verified as a real behaviour rather than a navigation
+trick: **skip → `/planner`, flag `"true"`, and a reload does not bounce back into onboarding.** That last
+step is the one that matters; a skip that merely navigated would strand the user back in onboarding on
+every launch.
+
+**It is hidden while a hold is in progress, and returns on release.** A second finger landing on "skip"
+mid-ceremony would exit out from under someone already halfway to committing, and **a half-performed
+commitment ritual is worse than a skipped one.** It is a real `<button>` with a visible focus ring, so
+Space/Enter reach it — the DoD's keyboard requirement applies to the escape hatch as much as the main path.
+
+**`A5` stays `PARTIAL` and the identity line is deliberately not built.** It is a **new question**, the
+same shape the owner cut from `A2` and declined in `A3`, so it needs an explicit decision rather than being
+quietly assumed in. The line now names precisely what is missing instead of leaving two gaps where one is
+already closed.
+
+Gates: `tsc` exit 0; eslint **0 errors** on touched files; **23 suites / 355 tests** green; build clean.
+In-browser at 390 in light and dark: control present and visible (98px, native `<button>`), focusable,
+hidden mid-hold, returns after release, skip reaches `/planner`, flag recorded, **reload stays out**,
+0 console errors.
+
 ### 2026-10-16 — `A3`: the decision on this line was what was **not** built, and the goal was never persisted
 
 **Owner instruction:** *"only explain the things that is required to use the app for basic tasks"* was
@@ -2641,6 +2675,12 @@ to know where things stand.
   each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
   and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
   while measuring multiplied text. Details in §9, 2026-10-16.
+- **`protocol` (the Day 1 commitment step) was a dead end until 2026-10-16.** The shell's comment —
+  *"on `protocol` the hold is the only way forward"* — was **true and wrong**: there was no exit at all
+  for anyone who declined the press-and-hold. A **"Skip for now"** control now completes the flow, writing
+  the **same flag through the same handler** as the hold, and it is **hidden while a hold is in progress** so
+  a second finger cannot exit a half-performed ceremony. Worth remembering that a comment stating an
+  intentional design decision is not evidence the decision is still correct.
 - **Verification scripts added 2026-10-16** (all in `%TEMP%\opencode\verify`, driven through
   `with-server.ps1`): `check-a2.js` (the basics scene at 360/390/430 in both themes — step counter,
   excluded-content check, overflow, console errors, and **reduced motion read on the first frame**,
@@ -2716,7 +2756,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2` and `A3` have both shipped** (2026-10-16). **Phase 2's first unchecked line is now `A5`** — commitment moment, already corrected to `PARTIAL` because its **identity line** half and its *"skippable"* requirement are genuinely missing · `A6` (loading/processing animation), then `A7` (just-in-time permission education). `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2`, `A3` and `A5`'s skippable half have shipped** (2026-10-16). **Phase 2's first unchecked line is now `A6`** — loading/processing animation instead of blank screens (no new questions; `A6` is the cleanest remaining Phase 2 item) · then **`A7`** (just-in-time permission education, which is where the battery rules live) · `A4` is explicitly routed to **Phase 7**. **One Phase 2 item is deliberately unfinished and waiting on an owner decision, not on capacity: `A5`'s identity line**, which is a *new question* and the same shape the owner cut from `A2` and declined in `A3`. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
 | Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
