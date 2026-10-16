@@ -119,21 +119,12 @@ export default function ShopPage() {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-16 pt-2 space-y-5">
-      {/* Micro Weekly Progress & Rewards Tracker Bar */}
-      <div className="w-full bg-surface-container-low rounded-2xl p-3 border border-outline/10 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
-            <span className="text-secondary text-sm">⭐</span>
-          </div>
-          <span className="text-xs font-mono font-medium text-on-surface truncate">
-            Bonus Tier Active • Week 2 Streak
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-xs font-mono font-bold text-primary">+35 💎</span>
-        </div>
-      </div>
+      {/* The "Bonus Tier Active - Week 2 Streak / +35 diamonds" bar that used to
+          sit here was removed on owner instruction 2026-10-15. It was not wired
+          to anything: "Week 2 Streak" and "+35" were both hardcoded strings, so
+          the bar claimed the same bonus to every user regardless of their actual
+          streak. Reinstating it should mean deriving both numbers, not restoring
+          the literals. */}
 
       {/* Diamond Vault Balance Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-surface-container p-5 border border-outline/10 shadow-xl space-y-4">

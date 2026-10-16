@@ -606,6 +606,32 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — Owner instruction: remove the Shop "Bonus Tier" bar
+
+**Removed** the bar at the top of `/shop` reading *"Bonus Tier Active • Week 2 Streak"* with
+*"+35 💎"*, on owner instruction from a screenshot.
+
+**It was not wired to anything.** Both "Week 2 Streak" and "+35" were hardcoded string literals —
+the bar claimed the same bonus tier to every user regardless of their actual streak, which is the
+same "confident line of copy that is not true" class this repo keeps auditing for, except static:
+it was not even computed wrongly, it was simply never connected. The vault reserves card directly
+below it *is* real (`0 Diamonds`, `Earn +15 💎 / day`), so the removal leaves the screen showing a
+true balance as its first element.
+
+A comment records why it was removed and that reinstating it should mean deriving both numbers
+rather than restoring the literals — otherwise the next person restores the fake.
+
+**Two wrong assumptions of mine while locating the other screenshots**, both worth recording:
+
+1. **`/wallpaper` redirects to `/stats`, and that is intentional, not a bug.** `wallpaper/page.tsx`
+   redirects when the wallpaper master toggle is off, and `P8-E1` made that toggle **default-off**.
+   I reported it as a discovered defect before reading the guard. The battery rule is working as
+   designed — the app's background feature stays off until the user asks for it.
+2. **A probe that reuses one browser page across routes silently keeps the previous route.** It
+   reported *identical* metrics for `/journey`, `/wallpaper` and `/stats` — three different screens —
+   and I nearly drew a conclusion from it. A fresh page per route fixed it. **Three pages agreeing
+   is not evidence; it is a sign the measurement is not moving.**
+
 ### 2026-10-15 — CONS-1, where the recorded defect was stale and the real one was a label
 
 **Shipped:** the last open Phase 1 item. Habit colour and category text now agree across every
