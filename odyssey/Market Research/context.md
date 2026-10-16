@@ -606,6 +606,50 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-15 — BUG-7 the wallpaper switch that would not stay off, and a native fix that is NOT verified
+
+**Reported by the owner:** turn the Odyssey wallpaper off, close the app, reopen it — the
+switch is ON again, but the wallpaper image itself is unchanged.
+
+**Root cause, found by reading the Kotlin rather than the JS.** `syncSchedule()` and
+`syncScheduleWithResult()` in `OdysseyWallpaperBridge.kt` both did:
+
+```kotlin
+editor.putBoolean("wallpaper_enabled", true)
+```
+
+**unconditionally**, as part of writing schedule data. `AppShell` calls
+`syncCurrentScheduleToNative()` from a `useEffect` on mount — so **every app launch** pushed a
+schedule and re-armed the master switch the user had just turned off. The flag then read back
+true, the switch showed ON, and **nothing re-applied Odyssey's wallpaper** because the user's own
+image had already been restored in the previous session. That accounts for the reported symptom
+exactly, *including* the otherwise-baffling half: the button changed but the wallpaper did not.
+
+**It was also a battery bug, which is why it matters beyond the annoyance.** Turning the switch off
+cancels the hourly alarm; the next launch re-armed the engine that alarm had just been cancelled
+for. The whole point of the master switch (`P8-E1`) is that the wallpaper stays down unless asked
+for, and a background data sync was quietly undoing the user's decision.
+
+**Both lines removed.** The flag is now written only where the user actually asks for a wallpaper:
+`setWallpaperMasterEnabled(true)`, the live-wallpaper picker, and `enableHourlyAutoUpdate()`. The
+broadcasts and the static-lockscreen refresh are untouched, so an enabled wallpaper still updates
+exactly as before.
+
+**I initially suspected my own P0-T6 change to `wallpaper-toggle-store.ts`.** I checked it, and the
+JS flip (`enabled: ok ? enabled : !enabled`) only fires when `clearLockscreenWallpaper()` throws,
+which returns `true` on the normal path — so it is not this bug. **I did not "fix" the JS to
+compensate for a native bug I had not yet found**, which would have hidden the real defect.
+
+**⚠️ THIS IS UNVERIFIED NATIVE CODE AND MUST NOT BE REPORTED AS FIXED.** `tsc` does not read Kotlin,
+and this machine **cannot compile Kotlin at all** — no `gradlew` in the repo, and no `java`, `gradle`
+or `kotlinc` anywhere on PATH. The change is two deleted lines and the file's braces balance
+(220/220), which rules out a structural mistake but proves nothing about compilation. **It needs an
+APK build and the reproduction: switch off → close → reopen → the switch must stay OFF** (R12).
+
+**One correction I made immediately:** I ticked `BUG-6`'s checkbox by reflex while editing the plan
+and reverted it — `BUG-6` is unconfirmed and unfixed. Ticking a box because you are editing that
+part of the file is exactly the status-drift this repo keeps auditing for.
+
 ### 2026-10-15 — Two console errors on the Armory screen, and a fix I had to throw away
 
 **Fixed (1) — hydration mismatch on the chest card.** `chestClaimed` was initialised with a **lazy

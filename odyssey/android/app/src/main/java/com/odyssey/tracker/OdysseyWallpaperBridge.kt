@@ -422,7 +422,24 @@ class OdysseyWallpaperBridge(
             if (dateStr.isBlank() || dateStr == todayDateStr) {
                 editor.putString("latest_schedule_json", scheduleJson)
             }
-            editor.putBoolean("wallpaper_enabled", true)
+            // REMOVED 2026-10-15: `editor.putBoolean("wallpaper_enabled", true)`
+            //
+            // A schedule sync is PURE DATA. It must never touch the master switch.
+            //
+            // This line was re-arming the wallpaper on every single app launch:
+            // AppShell calls syncCurrentScheduleToNative() from a useEffect on
+            // mount, so opening the app after the user had turned the wallpaper
+            // off set the flag straight back to true. The switch would then read
+            // ON while the wallpaper itself was untouched -- the user's own
+            // image had already been restored and nothing re-applied Odyssey's.
+            //
+            // It was also a battery bug: turning the switch off cancels the hourly
+            // alarm, and the very next launch re-armed the engine that alarm had
+            // just been cancelled for.
+            //
+            // The flag is written only where the user actually asks for a
+            // wallpaper: setWallpaperMasterEnabled(true), the live-wallpaper
+            // picker, and enableHourlyAutoUpdate().
             val success = editor.commit()
 
             if (success) {
@@ -483,7 +500,9 @@ class OdysseyWallpaperBridge(
             if (dateStr.isBlank() || dateStr == todayDateStr) {
                 editor.putString("latest_schedule_json", scheduleJson)
             }
-            editor.putBoolean("wallpaper_enabled", true)
+            // REMOVED 2026-10-15: `editor.putBoolean("wallpaper_enabled", true)`
+            // -- same defect and same reasoning as in syncSchedule() above. See
+            // that comment; a data sync must not re-arm the master switch.
             val success = editor.commit()
 
             if (success) {
