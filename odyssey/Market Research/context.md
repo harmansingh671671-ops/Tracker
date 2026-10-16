@@ -2335,20 +2335,23 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit (Shop: item name un-truncated, badge moved below the
-  copy) + `60485f4`** — Quick schedule header: day count + dot removed, title editable in
-  place, no focus ring; `022eff1` (BUG-8 category-picker stacking), `a09d66e` (M19
-  allocation bar), `7dd58eb` (Quick schedule: review toggle and Focus & Title removed, task
-  text wraps), `2f9cf5f` (BUG-7).
-  **The concurrent-session coordination described in §9 2026-10-16 worked in both
-  directions.** The other session saw the day-title editor in the working tree, committed
-  `BUG-8` from a patch staged with `git apply --cached` so not one byte of it was swept in,
-  and left a do-not-clobber warning; this session then committed that work on top of
-  `022eff1` and `a09d66e`, confirming via `git show HEAD:…` that **neither commit had
-  absorbed the other's uncommitted bytes**. Three hunks of incidental em-dash churn in
-  BUG-8's own comments were reverted so this diff stays surgical. **The do-not-touch note
-  is now resolved and may be deleted** — that session is finished.
-- Working tree: clean after commit.
+- HEAD at last update: **this commit (M20 status chips) + the Shop commit + `60485f4`** — M20 removes
+  the `SAVED` flash, the `LIVE` pill (two Planner variants) and M8's capacity badge; then the Shop item
+  name/badge change; then `60485f4` (Quick schedule header: day count + dot removed, title editable in
+  place, no focus ring); `022eff1` (BUG-8 category-picker stacking), `a09d66e` (M19 allocation bar),
+  `7dd58eb` (review toggle and Focus & Title removed), `2f9cf5f` (BUG-7).
+  **⚠️ CORRECTION to the note this section previously carried.** It said the two sessions' coordination
+  *"worked in both directions"* and that *"neither commit had absorbed the other's uncommitted bytes."*
+  **That was true when written and stopped being true minutes later.** `git apply --cached` stops *my*
+  commit from absorbing the other session's work; it does **nothing** to stop *their* `git add -A` from
+  absorbing **mine**. The other session committed `60485f4` while this session's Day Schedule chip
+  removal sat in the working tree, so **that half of M20 rode along inside `60485f4`**. Verified rather
+  than assumed — `git show HEAD:…/day-schedule/page.tsx` carries the removal comment and no `SAVED`
+  markup. **The code is correct; the attribution is not.** Correcting it in history would mean rewriting
+  a commit another session is building on, which is worse than an imprecise subject — so the correction
+  lives here. **Serialise work when two agents share a repository.**
+- Working tree: **check before committing** — the concurrent session's `shop/page.tsx` edit is unstaged
+  on purpose; never `git add -A` here.
 - Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing** (`db`,
   `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`, `handleClearBlock`).
   `allocation-bar.ts` and its test are **clean**.

@@ -9,7 +9,6 @@ import {
   getHeaderSlotKeys,
   type DayHabitProgress,
 } from "@/lib/utils/habit-progress";
-import { getDayCapacity, type DayCapacity } from "@/lib/utils/day-capacity";
 import { type Habit, type HabitLog } from "@/lib/db";
 
 interface CompletionFractionHeaderProps {
@@ -20,13 +19,6 @@ interface CompletionFractionHeaderProps {
   historyLogs?: Record<string, Record<string, boolean>>;
   /** Mirrors the date strip: render a placeholder rather than a false "0/0". */
   loading?: boolean;
-  /**
-   * Hours already planned in the schedule for `selectedDate`, for the M8 capacity
-   * readout. Passed in rather than recomputed because the planner already owns
-   * that arithmetic in `categoryStats.plannedTotal` -- deriving it twice would
-   * risk the badge and the balance bar disagreeing about the same day.
-   */
-  plannedHours?: number;
 }
 
 /**
@@ -90,7 +82,6 @@ export function CompletionFractionHeader({
   todayLogs = {},
   historyLogs = {},
   loading = false,
-  plannedHours = 0,
 }: CompletionFractionHeaderProps) {
   const progress: DayHabitProgress = getDayHabitProgress(
     habits,
@@ -101,20 +92,10 @@ export function CompletionFractionHeader({
   );
 
   /**
-   * M8 -- capacity for this day. `null` for a rest day, so the badge simply
-   * does not appear rather than asserting "Light Day · 0 habits".
-   *
-   * Suppressed while loading, for the same reason the fraction is: `habits` is
-   * empty until the read resolves, and a habitless user would otherwise be
-   * labelled a light day on every visit and see the label vanish.
+   * While the habit store is still fetching, an empty list would render a
+   * confident "0/0 Habits Done" that snaps to the truth a moment later.
+   * A same-height placeholder avoids both the lie and the layout jump.
    */
-  const capacity: DayCapacity | null = loading
-    ? null
-    : getDayCapacity(progress.scheduledCount, plannedHours);
-
-  // While the habit store is still fetching, an empty list would render a
-  // confident "0/0 Habits Done" that snaps to the truth a moment later.
-  // A same-height placeholder avoids both the lie and the layout jump.
   if (loading) {
     return (
       <motion.div
@@ -183,35 +164,14 @@ export function CompletionFractionHeader({
         </span>
       ),
     },
-    // M8 -- the capacity readout, appended as just another slot. This is the
-    // extension point doing what it exists for: no other part of this component
-    // changed to accommodate it.
-    //
-    // Keyed on the LEVEL, not the label, so the badge cross-fades when the day's
-    // load changes category and stays put while a habit is merely ticked -- the
-    // same "identity is the state, not the string" rule the other slots use.
-    ...(capacity
-      ? [
-          {
-            key: `capacity:${capacity.level}`,
-            className: "shrink-0",
-            content: (
-              <span
-                title={capacity.description}
-                className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold whitespace-nowrap ${
-                  capacity.level === "heavy"
-                    ? "border-amber-500/35 bg-amber-500/12 text-amber-600 dark:text-amber-400"
-                    : capacity.level === "light"
-                      ? "border-outline/15 bg-surface-container text-on-surface-variant"
-                      : "border-primary/30 bg-primary/10 text-primary"
-                }`}
-              >
-                {capacity.label}
-              </span>
-            ),
-          },
-        ]
-      : []),
+    // M8's capacity badge ("Heavy Day · 24h planned") was removed here on owner
+    // instruction. It was the only slot that stated a JUDGEMENT about the day
+    // rather than a fact about it, and it contradicted the bar underneath: a
+    // fully-planned 24h day reads as "Heavy" while the completion fraction right
+    // beside it reads as full. `getDayCapacity()` and its tests are deliberately
+    // KEPT in lib/utils/day-capacity.ts — the rules are sound and tested, only
+    // this readout was unwanted. Reinstating the slot means appending one object
+    // to this array, which is what the array is for.
   ];
 
   return (

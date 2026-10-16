@@ -809,18 +809,10 @@ function PlannerContent() {
             <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
               {String((slot.hour + 1) % 24 === 0 ? 24 : slot.hour + 1).padStart(2, "0")}:00
             </span>
-            
-            {/* Regain Live Focus Beacon / Radar Indicator */}
-            {isRecentlySaved ? (
-              <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-primary text-on-primary font-black mt-1 shadow-sm animate-pulse">
-                SAVED
-              </span>
-            ) : isCurrent ? (
-              <div className="flex items-center gap-1 mt-1 px-1.5 py-0.2 rounded-full bg-primary/20 border border-primary/40 text-primary">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                <span className="text-[8px] font-mono font-extrabold tracking-wider">LIVE</span>
-              </div>
-            ) : null}
+            {/* The "SAVED" flash and the "LIVE" pill were removed here on owner
+                instruction, matching the quick-schedule screen. The row's own
+                highlight already carries both signals, so these were a third,
+                redundant one. Do not reinstate one without the other. */}
           </div>
 
           {/* Structured Node Glyph on Rail */}
@@ -940,12 +932,9 @@ function PlannerContent() {
           <span className={`text-xs font-mono font-bold leading-tight ${isCurrent ? "text-primary font-bold" : "text-on-surface-variant/50"}`}>
             {String(slot.hour).padStart(2, "0")}:00
           </span>
-          {isCurrent && (
-            <div className="flex items-center gap-1 mt-1 px-1.5 py-0.2 rounded-full bg-primary/20 border border-primary/40 text-primary">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-              <span className="text-[8px] font-mono font-extrabold tracking-wider">LIVE</span>
-            </div>
-          )}
+          {/* This variant had a LIVE pill but no SAVED one; removed with the
+              others on owner instruction so no row on this screen carries a
+              status chip. */}
         </div>
 
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg}`}>
@@ -998,10 +987,6 @@ function PlannerContent() {
         todayLogs={todayLogs}
         historyLogs={historyLogs}
         loading={habitsLoading || !user?.id}
-        // M8: reuse the planner's own hours total rather than recomputing it, so
-        // the capacity badge and the Daily Schedule Rail balance bar can never
-        // disagree about the same day.
-        plannedHours={categoryStats.plannedTotal}
       />
 
       {/* M12 -- the "Up next in 35 min" line from MASTER_TODO_REVISED L984, with
@@ -1012,10 +997,9 @@ function PlannerContent() {
           appear and disappear over the day as blocks start and finish, and a
           slot is permanent chrome.
 
-          Deliberately not a pill. The header already carries the capacity badge
-          and the completion fraction; another coloured chip here would put three
-          rounded blobs in a row and read as a row of status rather than a
-          sentence about time.
+          Deliberately not a pill. The header already carries the completion
+          fraction; another coloured chip here would put two rounded blobs in a
+          row and read as a row of status rather than a sentence about time.
 
           Renders NOTHING -- no empty bar, no "Nothing scheduled" -- when the
           day has no more blocks. A countdown that has nothing to count to is not
