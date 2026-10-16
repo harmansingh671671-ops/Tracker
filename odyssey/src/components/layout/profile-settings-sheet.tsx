@@ -195,9 +195,13 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
               <span className="text-on-surface-variant">Progression to Lv. {currentLevel + 1}</span>
               <span className="text-primary font-semibold">{currentXp} / {targetXp} XP ({xpPercent}%)</span>
             </div>
-            <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">
+            <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
+              {/* Same reversal as the Journey XP bar, which this is a byte-for-byte
+                  twin of. `primary-container` (#EBDDFF light) is within a hair of
+                  the old track colour, so the fill faded out exactly where it
+                  met the empty part of its own bar. */}
               <div
-                className="h-full bg-gradient-to-r from-primary to-primary-container rounded-full transition-all duration-500 shadow-sm shadow-primary/50"
+                className="h-full bg-primary rounded-full transition-all duration-500 shadow-sm shadow-primary/30"
                 style={{ width: `${xpPercent}%` }}
               />
             </div>

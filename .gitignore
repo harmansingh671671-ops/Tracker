@@ -28,3 +28,5 @@ test_hindsight.py
 # NOTE: context.md is deliberately NOT ignored. It is the agent entry point
 # (odyssey/Market Research/context.md) and must reach every clone, or a fresh
 # checkout starts with no context at all.
+transcripts.zip
+UI_GUIDE.md

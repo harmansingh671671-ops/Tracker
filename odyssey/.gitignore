@@ -70,3 +70,5 @@ browser_use/
 !graphify-out/
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
+transcripts.zip
+UI_GUIDE.md

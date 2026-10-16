@@ -614,6 +614,52 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — M12 retracted: the "Now / Up next" ticker is gone, and it took a 15-second timer write with it
+
+**Owner instruction from a screenshot** of the planner header line reading **"Now · leebf
+(1h)"**. Removed, on an explicit decision to also delete the module and its tests rather
+than leave them dormant.
+
+**`M12` is RETRACTED, not completed.** That word matters: the behaviour was correct when
+built and is simply gone now, so `main_plan.md` reads `RETRACTED` and keeps the original
+design notes rather than being deleted. **`C4` went backwards as a result** — it read
+"the planner Up Next line shipped with `M12`", and that half is now **gone rather than
+unfinished**, so the line was restated instead of left claiming a shipped half.
+
+**Three files changed, not one.** The JSX, the `upNext` memo, the import — then
+`lib/utils/up-next.ts` and its **26 tests**, because **the planner was the module's only
+consumer**. Tests dropped 357 → 331. **A green suite over unreachable code reads as
+coverage while proving nothing**, which is the same reasoning that removed the dead
+`seedInitialData()` in `P0-T7`.
+
+**The find that would have been easy to miss: `nowMinutes` became write-only.** Removing the
+memo left `nowMinutes` with a writer and **no reader**, and it was fed by the planner's
+**15-second `setInterval`** — so the page was waking every 15 s to set state that nothing
+read. Between removing the memo and removing this, `eslint` reported **10** warnings in
+`planner/page.tsx`; deleting the state brought it to **9**, and that 10th warning *was* my
+own intermediate breakage. **The lint number is what caught it.** The **interval stays** —
+its other two writes (`currentHour`, `todayStr`) are still read by the rail's
+past/current/future-hour logic — but the dead third write is gone. This is one of the items
+`PERF-4` counts when it says the planner ticks every 15 s.
+
+**The `nowMinutes` removal was verified against the HEAD baseline, not assumed.** `git show
+HEAD:… > file` through PowerShell produced a file ESLint read as **binary**, so the
+baseline came from `cmd /c "git show … > file"` instead (the pattern already recorded in
+§9 2026-10-16). Baseline and current are the **same 9 warnings**, differing only in line
+numbers — so this change introduced **zero**.
+
+**Two more docs were made false and were fixed rather than left.** `DEVELOPMENT_PLAN.md` §5
+and `FEATURES.md` both listed "up-next ticker" among shipped glanceability features. They
+are not the status record (`main_plan.md` is), but a document naming a feature that no
+longer exists is the same defect class as a stale status line.
+
+**⚠️ STILL UNCOMMITTED — this entry describes work in the working tree only.** The owner
+asked for it not to be committed. `up-next.ts` / `up-next.test.ts` are deleted **on disk but
+deliberately left unstaged**, because a concurrent session has been committing from the
+shared index and a bare `git commit` on that side would have swept them in. Gates on this
+state: `tsc` exit 0, eslint 0 errors (9 pre-existing warnings in `planner/page.tsx`),
+**331 tests / 22 files green**.
+
 ### 2026-10-16 — Shop: the badge was eating the item name, and a note on the §9 "browser verification is impossible here" entry
 
 **Owner instruction from a screenshot of the Armory card.** "Streak Freeze Shield" rendered
@@ -841,6 +887,43 @@ any field; the long row is 141px against a 64px short row; document horizontal o
 Separately proven end to end: a block completed on `/planner` still renders
 `text-decoration-line: line-through` here with zero controls. 8 screenshots reviewed.
 **No background server left running** — 3000/3001/3100 verified closed.
+
+### 2026-10-16 — M21, the XP bar read backwards: the part you had not earned was the loudest thing on it
+
+**Owner instruction, from a screenshot of the Journey header:** *"Make the horizontal bar cover the
+white area width wise, the colors distribution in horizontal bar are opposite to what should be their."*
+This one was left open at the end of the previous entry pending a decision, then closed on *"verify
+what is required is done properly or not, if not then complete it"* — an audit of all four requests in
+this session found the first three verified in the committed code and **only this one untouched**.
+
+**Two token choices, and together they made the bar lie about its own direction.** The track was
+`surface-container-lowest`, which is **`#FFFFFF` in light mode** — a pure-white bar punched across a
+`#F5F0F8` lavender card. The fill was `from-primary to-primary-container`, i.e. **`#6C00FF` fading to
+`#EBDDFF`**, a hair away from that same white track. So **at 70% the earned 70% dissolved into the
+empty 30%**, and the strongest thing on screen was the XP the user did *not* have. That is exactly
+*"the colours are opposite to what they should be"*, and it is the same class as everything else this
+repo keeps auditing — **a confident display that contradicts the fact it reports.**
+
+**Measured rather than argued.** Before: track `rgb(255,255,255)`, fill a `linear-gradient`. After:
+track `rgb(238,232,243)`, fill **solid** `rgb(108,0,255)`. Fill is now one solid `primary` and the
+track is the recessive `surface-container-high`. The track's `p-0.5` went too — it inset the fill 2px
+and left a sliver of track colour between the fill and the track's own edge, which is a second, smaller
+version of the same "the fill does not fully cover" complaint.
+
+**The Profile page's bar was deliberately NOT changed, and the reason is a measurement, not a
+preference.** It fades `primary → secondary` = `#6C00FF → #7751A6` — two *saturated* violets. A gradient
+between two saturated colours does not dissolve into a pale track, so it is a deliberate two-brand-colour
+gradient and **not this bug**. Changing it would have been fixing something nobody reported and might
+have been intentional. The settings sheet's bar, by contrast, was byte-for-byte identical to the
+reported one, so both went together.
+
+**The audit also cleared the other three requests** against the committed code rather than against my
+memory of doing them: the allocation bar is present on **both** screens with `buildAllocationSlices`
+wired into both and **zero** survivors of the old `flex gap-0.5` bar; `stackClass` and the list-level
+scrim both survived the concurrent session's large `60485f4` rewrite of `day-schedule/page.tsx`, with
+the scrim correctly **outside** every card; and no `SAVED` / `LIVE` markup remains anywhere. **Worth
+stating plainly: that is the value of grepping `git show HEAD:…` — "I did it" and "it is in the
+committed code" are different claims, and only the second one survives another session's rewrite.**
 
 ### 2026-10-16 — M20, three status chips removed; and my isolation trick only protects one direction
 
@@ -2335,27 +2418,32 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit (M20 status chips) + the Shop commit + `60485f4`** — M20 removes
-  the `SAVED` flash, the `LIVE` pill (two Planner variants) and M8's capacity badge; then the Shop item
-  name/badge change; then `60485f4` (Quick schedule header: day count + dot removed, title editable in
-  place, no focus ring); `022eff1` (BUG-8 category-picker stacking), `a09d66e` (M19 allocation bar),
+- HEAD at last update: **this commit (M21 XP bar) + `c034b9a` (M20) + `808a959` (Shop) + `60485f4`** —
+  M21 reverses the Journey XP bar (solid fill, recessive track); M20 removes the `SAVED` / `LIVE` /
+  capacity chips; `60485f4` (Quick schedule header: day count + dot removed, title editable in place,
+  no focus ring); `022eff1` (BUG-8 category-picker stacking), `a09d66e` (M19 allocation bar),
   `7dd58eb` (review toggle and Focus & Title removed), `2f9cf5f` (BUG-7).
-  **⚠️ CORRECTION to the note this section previously carried.** It said the two sessions' coordination
-  *"worked in both directions"* and that *"neither commit had absorbed the other's uncommitted bytes."*
-  **That was true when written and stopped being true minutes later.** `git apply --cached` stops *my*
-  commit from absorbing the other session's work; it does **nothing** to stop *their* `git add -A` from
-  absorbing **mine**. The other session committed `60485f4` while this session's Day Schedule chip
-  removal sat in the working tree, so **that half of M20 rode along inside `60485f4`**. Verified rather
-  than assumed — `git show HEAD:…/day-schedule/page.tsx` carries the removal comment and no `SAVED`
-  markup. **The code is correct; the attribution is not.** Correcting it in history would mean rewriting
-  a commit another session is building on, which is worse than an imprecise subject — so the correction
-  lives here. **Serialise work when two agents share a repository.**
-- Working tree: **check before committing** — the concurrent session's `shop/page.tsx` edit is unstaged
-  on purpose; never `git add -A` here.
+  **⚠️ CORRECTION, kept from the previous entry.** The Day Schedule half of M20 rode along inside
+  `60485f4` because a concurrent session ran `git add -A`; `git apply --cached` protects only your own
+  commit, never the other direction. Verified via `git show HEAD:…`. History is not being rewritten.
+- **⚠️ TWO sessions share this working tree, and one of them has left finished, UNCOMMITTED
+  work here.** That is the **M12 retraction** (below): the planner's "Now / Up next in 35 min"
+  line, `lib/utils/up-next.ts` + its 26 tests, the dead `nowMinutes` 15s-timer write, and the
+  `M12`/`C4`/`DEVELOPMENT_PLAN.md`/`FEATURES.md` lines that documented it — **all complete,
+  all gates green, and deliberately NOT committed at the owner's instruction.**
+  **The two file deletions are on disk but UNSTAGED** (they were staged briefly; unstaging was
+  deliberate, because a bare `git commit` on either side sweeps the whole index and would have
+  taken them into someone else's commit). **Check `git status` before committing here, never
+  `git add -A`, and commit by explicit paths.**
+  The *other* session's `M21` work was left exactly as found throughout, and the edits to
+  `main_plan.md` and `context.md` were made as surgical single-line replacements for exactly
+  that reason. **Supersedes the previous note here**, which recorded those deletions as staged.
 - Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing** (`db`,
   `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`, `handleClearBlock`).
   `allocation-bar.ts` and its test are **clean**.
-- Tests: **23 suites, 357 tests, all green.** `tsc --noEmit` exit 0. Production build clean.
+- Tests: **23 suites, 357 tests green at `c034b9a`.** With the uncommitted M12 retraction
+  applied: **22 suites, 331 tests green** (the 26 deleted `up-next` tests). `tsc --noEmit`
+  exit 0. Production build clean.
 - **Server hygiene this session:** a `next start` on **port 3000**, started at 16:10:49 by the
   *other* session, was still holding the port when this task finished and **was killed** along with
   this session's own 3100 server. **No listener remains on 3000 / 3001 / 3100.**

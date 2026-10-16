@@ -133,7 +133,7 @@ Verified by building, compiling, and (where possible) running it.
 
 | ID | Feature | Phase |
 |---|---|---|
-| M7–M12 | Last-done, capacity indicator, completion fraction, up-next ticker, period colours, wallpaper gauge | P1 |
+| M7–M11 | Last-done, capacity indicator, completion fraction, period colours, wallpaper gauge. **M12 (up-next ticker) retracted 2026-10-16** | P1 |
 | HD17–HD19 | Flexible rollover, vacation/freeze, auto-archive | P2 |
 | S4–S6, HD29–HD30 | Cue/why/identity fields, daily highlight, "frog" | P2 |
 | XL1–XL4 | Avatar world, furniture sync, room themes, nudge engine | P3 |

@@ -280,9 +280,26 @@ export default function JourneyPage() {
                 <span className="text-primary font-bold">{currentXp} / {targetXp} XP ({xpPercent}%)</span>
               </span>
             </div>
-            <div className="w-full h-2.5 rounded-full bg-surface-container-lowest overflow-hidden p-0.5 border border-outline/10">
+            <div className="w-full h-2.5 rounded-full bg-surface-container-high overflow-hidden border border-outline/10">
+              {/* Solid `primary`, and a RECESSIVE track — both reversed from
+                  what was here, because the old bar read backwards.
+
+                  The track was `surface-container-lowest`, which is #FFFFFF in
+                  light mode: a pure-white bar punched across a #F5F0F8 lavender
+                  card, so the part of the bar you had NOT earned was the
+                  loudest thing on it.
+
+                  And the fill was `from-primary to-primary-container` —
+                  #6C00FF fading to #EBDDFF, a hair away from that white track.
+                  So the progress dissolved into the gap it was supposed to be
+                  measured against: at 70% the strongest colour on the bar was
+                  the empty 30%, and the earned 70% was the part that vanished.
+
+                  One solid colour, and the only saturated thing on the bar is
+                  what you have actually earned. `p-0.5` went too — it inset
+                  the fill 2px and left a sliver of track between fill and edge. */}
               <div
-                className="h-full rounded-full bg-gradient-to-r from-primary to-primary-container shadow-sm shadow-primary/50 transition-all duration-700"
+                className="h-full rounded-full bg-primary shadow-sm shadow-primary/30 transition-all duration-700"
                 style={{ width: `${xpPercent}%` }}
               />
             </div>
