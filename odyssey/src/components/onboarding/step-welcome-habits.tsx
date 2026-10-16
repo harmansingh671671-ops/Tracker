@@ -36,8 +36,13 @@ const PILLARS = [
 ] as const;
 
 interface StepWelcomeHabitsProps {
-  /** Opens the shared create-habit modal. M16 passes the tapped tag's suggestion. */
-  onOpenCreate: (suggestion?: GoalTag["suggestion"]) => void;
+  /**
+   * Opens the shared create-habit modal. M16 passes the tapped tag's suggestion;
+   * `A3` also needs the tag **id**, which is what gets persisted so the starter
+   * library can be ordered for this user later. Passing the whole tag rather
+   * than adding a second positional argument keeps the two impossible to swap.
+   */
+  onOpenCreate: (tag?: GoalTag) => void;
   /** How many habits they have added so far, for the live count. */
   addedCount: number;
 }
@@ -98,7 +103,7 @@ export function StepWelcomeHabits({ onOpenCreate, addedCount }: StepWelcomeHabit
               key={tag.id}
               type="button"
               title={tag.blurb}
-              onClick={() => onOpenCreate(tag.suggestion)}
+              onClick={() => onOpenCreate(tag)}
               className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold font-mono bg-surface-container-high border border-outline/15 text-on-surface hover:border-primary/50 hover:bg-primary-container/40 active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <span aria-hidden="true" className="mr-1">

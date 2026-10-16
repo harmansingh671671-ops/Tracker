@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Sparkles,
@@ -9,6 +9,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { type HabitCategory } from "@/lib/db";
+import {
+  orderTemplatesForGoal,
+  readPrimaryGoal,
+} from "@/lib/utils/habit-template-order";
+import type { GoalTagId } from "@/lib/utils/goal-tags";
 
 export interface HabitTemplate {
   id: string;
@@ -297,14 +302,34 @@ export function HabitTemplateLibrary({
   }
 
   // 1. Filter out habits the user has already added OR that have finished exiting
+  // A3 -- the goal chosen during onboarding decides which templates lead.
+  //
+  // Read in an effect and never during render: the storage boundary has no
+  // `localStorage` on the server, so reading it inline would make the first
+  // client render disagree with the server's (AGENTS.md rule 15). Initial `null`
+  // therefore means "unknown", and `orderTemplatesForGoal` leaves the list
+  // untouched for that -- the same output a user who never chose a goal gets.
+  const [goal, setGoal] = useState<GoalTagId | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGoal(readPrimaryGoal());
+  }, []);
+
+  // A stable partition, so the templates the goal did NOT match keep their
+  // relative order -- applying a goal must never reshuffle the other habits.
+  const orderedTemplates = useMemo(
+    () => orderTemplatesForGoal(HABIT_TEMPLATES, goal),
+    [goal]
+  );
+
   const unaddedTemplates = useMemo(() => {
     const existingNorm = new Set(
       existingHabitNames.map((name) => name.trim().toLowerCase())
     );
-    return HABIT_TEMPLATES.filter(
+    return orderedTemplates.filter(
       (tpl) => !existingNorm.has(tpl.name.trim().toLowerCase()) && !permanentlyRemovedIds[tpl.id]
     );
-  }, [existingHabitNames, permanentlyRemovedIds]);
+  }, [existingHabitNames, permanentlyRemovedIds, orderedTemplates]);
 
   // 2. Filter unadded habits by search query and category pack
   const filteredTemplates = useMemo(() => {

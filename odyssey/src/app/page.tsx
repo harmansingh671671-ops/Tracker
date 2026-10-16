@@ -35,6 +35,7 @@ import { StepBasics } from "@/components/onboarding/step-basics";
 import { StepProtocol } from "@/components/onboarding/step-protocol";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { hasCompletedOnboarding, markOnboardingComplete } from "@/lib/utils/onboarding";
+import { writePrimaryGoal } from "@/lib/utils/habit-template-order";
 import { type HabitCategory } from "@/lib/db";
 import {
   FIRST_STEP,
@@ -208,8 +209,12 @@ export default function OnboardingPage() {
 
         {step === "welcome" && (
           <StepWelcomeHabits
-            onOpenCreate={(suggestion) => {
-          setCreateDefaults(suggestion ?? null);
+            onOpenCreate={(tag) => {
+          // A3 -- persist the goal id, not just the suggestion shape. Without
+          // this the library cannot be ordered for this user after onboarding,
+          // because the tag id never left this component's state.
+          if (tag) writePrimaryGoal(tag.id);
+          setCreateDefaults(tag?.suggestion ?? null);
           setIsCreateOpen(true);
         }}
             addedCount={created.length}

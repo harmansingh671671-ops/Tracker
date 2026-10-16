@@ -617,6 +617,61 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-16 — `A3`: the decision on this line was what was **not** built, and the goal was never persisted
+
+**Owner instruction:** *"only explain the things that is required to use the app for basic tasks"* was
+`A2`'s. `A3`'s was a brief, then *"approved"*. The briefing recommended the narrow version — reorder the
+starter library by the goal already chosen — and **recommended dropping the paywall half outright.**
+
+**The spec forbids its own cross-reference.** `A3` (L203) ends *"Do not use profession to obscure or
+discriminate on price."* Its cross-reference **`HD25`** (L1048) asks for profession-driven **paywall copy
+and discount codes** — *"Ask user profession (Student / JEE-NEET Aspirant / Tech / Pro) and customize
+paywall copy, discount codes (e.g. `STUDENTFOCUS40`)"*. **That is the prohibited thing, stated
+explicitly, in the document that forbids it.** It is also unbuildable: local-first, no accounts, no
+payments, nothing to charge, and the app's own competitor research records how the source ended —
+*"no way to use the app without paying."* **`HD25` moved `NOT BUILT` → `NOT APPROVED`**, with the reason
+recorded rather than deferred, so it is not quietly rebuilt later. **`J4`** ("personalise examples, never
+hide terms") became `PARTIAL`: the first half shipped, the second had nothing left to guard, and the
+prohibition is **kept as a standing rule** rather than deleted.
+
+**The load-bearing discovery: the goal was never persisted.** Only a transient `suggestion`
+(`{name, icon, category}`) reached `CreateHabitModal` from the onboarding page. The library is opened
+from `/habits` long after the flow ends, so **the approved behaviour could not exist** without
+persisting the id. That is the kind of gap a briefing cannot see and only reading the wiring exposes.
+The key is `odyssey_primary_goal`, read through `getGoalTag` so an unrecognised value — devtools, or
+any code in the app — returns `null` rather than reordering the library for a goal that does not exist.
+
+**Ordered on `domainLabel` and nothing else.** `HABIT_TEMPLATES` carries **both** a legacy `category`
+("Health", "Productivity" — already documented as dead metadata) and a `domainLabel` ("Vitality &
+Fitness"). The accurate alternative was adding `goalIds: GoalTagId[]` to all 14 templates, but that
+makes **two things able to disagree** about the same habit — the `CONS-1` label/colour class and the
+P0-T3 normaliser collision. One source of truth, even where it costs accuracy, and the cost recorded.
+
+**A stable partition is a requirement, not a nicety.** An unstable sort would reshuffle the other ten
+habits every time a goal applied, so the library would look different for reasons the user never chose.
+Tests assert relative order preserved *within* both groups.
+
+**Recorded limitation, not hidden:** `Deep Focus` and `Mindfulness` **both** resolve to `Mindful Focus`
+— four domains cannot cover five goals, a collision `goal-tags.ts` already documents — so they produce
+the **same** order, and Mindfulness surfaces the deep-work habits. Fixing it is a product decision (a
+fifth domain, or an explicit goal mapping), not something to invent here. A test asserts the collision
+so it cannot be "fixed" by accident without someone seeing the consequence.
+
+**Two of my harness failures were mine, not the app's**, and both would have produced confident wrong
+evidence. `/add habit/i` **never matched** because the empty-state CTA reads *"Add your keystone
+habit"* — 20s timeout for a button that was present under another name. And the dismiss helper was
+scoped to `[role="dialog"]` while the **20:00 evening-plan modal has no such ancestor**, so it
+silently did nothing: the screenshots showed the overlay covering the library while every DOM
+assertion passed. **That is the `#__next` probe again** — the assertions were right and the evidence was
+useless, and only looking at the screenshot caught it.
+
+Gates: `tsc` exit 0; eslint **0 errors** on touched files; **23 suites / 355 tests** green; build
+clean. In-browser at 390 in both themes: **with no goal, the 14 appear in byte-identical default order
+and nothing is stored** — the negative case, which is the one that is easy to claim and never test.
+**Deep Focus leads with the four focus habits, Peak Health with the four vitality habits**, each with
+all 14 present exactly once, read from **rendered positions** rather than DOM order so a CSS reorder
+cannot hide. Order verified to survive the flow via storage rather than incidental in-flight state.
+
 ### 2026-10-16 — The hold's circle started in the wrong place, and 33 green tests never noticed
 
 **Owner instruction:** *"when the tap and hold thing work make sure that the circle center is at the center of the hold button and make the boundry of the circle little animated."*
@@ -2661,12 +2716,12 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2` has shipped** (2026-10-16), cut down on owner instruction to one scene covering the two basic-task actions — plan an hour, tick the habit. **Phase 2's first unchecked line is now `A3`** (optional interests/profession, skip-able), then `A5`, `A6`, `A7`. `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2` and `A3` have both shipped** (2026-10-16). **Phase 2's first unchecked line is now `A5`** — commitment moment, already corrected to `PARTIAL` because its **identity line** half and its *"skippable"* requirement are genuinely missing · `A6` (loading/processing animation), then `A7` (just-in-time permission education). `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
 | Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
 | Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-18`, starts with **`PERF-0`**, a mandatory reconcile (5 of 18 already delivered, 4 figures wrong). Native items need a physical device + release build this machine cannot do (§6.5.4) |
-| Next after Phase 1 | Phase 2 — `A1`/`XL14`, `M16` and now **`A2`** are done. **`A2` landed as ONE scene, not four**: the researched walkthrough asked for wallpaper + habits + schedule + rewards, and was cut on owner instruction to *"only explain the things required to use the app for basic tasks"* — so it teaches **plan an hour** and **tick the habit**, and deliberately does not mention the wallpaper (off by default, costs battery), rewards (need no action), journey or the shop. Remaining gaps are `A3`, `A5`, `A6`, `A7` |
+| Next after Phase 1 | Phase 2 — `A1`/`XL14`, `M16`, **`A2`** and **`A3`** are done. **`A2` landed as ONE scene, not four**: the researched walkthrough asked for wallpaper + habits + schedule + rewards, and was cut on owner instruction to *"only explain the things required to use the app for basic tasks"*. **`A3` landed as reordering, and its paywall half was dropped:** `HD25` asked for profession-driven **discount codes**, which `A3`'s own text forbids (*"do not use profession to obscure or discriminate on price"*) and which this local-first app cannot bill anyway — `HD25` is now **`NOT APPROVED`**. Remaining gaps are `A5` (identity line + skippable), `A6`, `A7` |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
 ---
