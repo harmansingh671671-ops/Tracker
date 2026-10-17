@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { resolveEditedCategory, toJourneyBucket } from "@/lib/utils/schedule-category-edit";
 import { createPortal } from "react-dom";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
@@ -124,6 +125,25 @@ export function JourneyDaySchedule({
   const [editDesc, setEditDesc] = useState("");
   const [editCategory, setEditCategory] = useState<NormalizedCategory>("work");
   const [editStatus, setEditStatus] = useState<"pending" | "completed" | "missed">("pending");
+
+  /**
+   * The category exactly as it is stored, and whether the user touched the
+   * dropdown at all.
+   *
+   * This screen groups blocks into **4** buckets, while the pickers on Day
+   * Schedule and in the planner write **5** categories — `vitality`, `sync` and
+   * `renewal` have no bucket here and collapse: `vitality` → `habits`, `sync`
+   * and `renewal` → `buffer`. So opening a block that the user had categorised
+   * "Sync & Connect" showed the dropdown reading **"Buffer & Breaks"**, and
+   * saving it — for any reason, including a title typo — **overwrote the stored
+   * category with `buffer`.** Three of the five categories a user can choose
+   * were silently rewritten by editing the block in a different screen.
+   *
+   * A ref, not state: it is not rendered, and a state write here would be a
+   * second render purely to carry a flag the save handler reads once.
+   */
+  const originalEditCategoryRef = useRef<string>("");
+  const editCategoryTouchedRef = useRef(false);
 
   // Inline Task Writer State for empty hours
   const [inlineTaskTitles, setInlineTaskTitles] = useState<Record<number, string>>({});
@@ -447,7 +467,11 @@ export function JourneyDaySchedule({
     setEditingBlockId(actualId);
     setEditTitle(originalBlock.title);
     setEditDesc(originalBlock.description || "");
-    setEditCategory(normalizeCategory(originalBlock.category, originalBlock.title));
+    setEditCategory(toJourneyBucket(originalBlock.category, originalBlock.title));
+    // Remember what is ACTUALLY stored, before the 4-key bucketing above folds
+    // it into something this screen can show.
+    originalEditCategoryRef.current = originalBlock.category ?? "";
+    editCategoryTouchedRef.current = false;
     setEditStatus((originalBlock.status as "pending" | "completed" | "missed") || "pending");
     setIsEditModalOpen(true);
   };
@@ -459,18 +483,25 @@ export function JourneyDaySchedule({
     await updateBlock(editingBlockId, {
       title: editTitle.trim(),
       description: editDesc.trim() || undefined,
-      category: editCategory,
+      // Write a category **only when the user picked one in this dialog.**
+      // `toJourneyBucket` above folded the stored value into something this
+      // screen can *show*; saving that back is what rewrote `sync` to `buffer`.
+      category: resolveEditedCategory({
+        stored: originalEditCategoryRef.current,
+        touched: editCategoryTouchedRef.current,
+        chosen: editCategory,
+      }),
       status: editStatus,
       completedAt: editStatus === "completed" ? new Date().toISOString() : undefined,
       missReason: editStatus === "missed" ? "Did not follow" : undefined,
-      tag:
-        editCategory === "work"
-          ? "Deep Work"
-          : editCategory === "habits"
-          ? "Vitality"
-          : editCategory === "sleep"
-          ? "Rest"
-          : "Break",
+      // `tag` is deliberately NOT written here. It is not free text: the planner
+      // reads it as a **habit id** (`edit-hour-modal` seeds its habit picker with
+      // `existingBlock.tag`). This handler used to overwrite it with a
+      // category-derived label -- "Deep Work" / "Vitality" / "Rest" / "Break" --
+      // on every save, so editing a block's title on this screen **silently
+      // detached it from its habit**, and the planner's habit picker then showed
+      // nothing selected because no option has that value. Saving a title must
+      // not edit an unrelated field.
     });
 
     setIsEditModalOpen(false);
@@ -1043,7 +1074,12 @@ export function JourneyDaySchedule({
                 </label>
                 <select
                   value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value as NormalizedCategory)}
+                  onChange={(e) => {
+                    // Record the interaction, not just the value -- see the save
+                    // handler for why comparing the two would be wrong.
+                    editCategoryTouchedRef.current = true;
+                    setEditCategory(e.target.value as NormalizedCategory);
+                  }}
                   className="w-full bg-surface-container-highest border border-outline/30 rounded-xl px-3 py-2 text-xs font-mono text-on-surface focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="work">Deep Work & Study</option>

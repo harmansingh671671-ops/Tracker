@@ -617,6 +617,71 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `BUG-12`: closing the category hatch would have broken every picker, and under it was live data loss
+
+Commit 3 of 3. **Did NOT narrow the type.** Fixed the bug it was hiding; recorded the
+type narrowing as needing an ADR + an owner decision.
+
+**Why the hatch cannot simply be closed.** The schema declares **8** Title Case values
+(`Work, Study, Health, Sleep, Leisure, Admin, Habits, Buffer`); both pickers write **5**
+lowercase ids (`work, vitality, sync, renewal, sleep` — `day-schedule` `CATEGORY_OPTIONS`
+and `edit-hour-modal` `CATEGORIES`, same ids, two different labels). **The two lists
+share no spelling.** So 4 declared values are unwritable and 3 written values are
+undeclared, and the union plus `(string & {})` constrains nothing while *reading* like
+validation. `P0-T3`'s log said "the escape hatch was load-bearing" and was right again.
+
+**The live bug.** `day-schedule/page.tsx` `handleSaveBlock` wrote `category: catToSave`
+on every save, where `catToSave` came from `hourCategories` — seeded from the stored
+value through that screen's **display** normaliser, lossy outside its 5 (`habits` →
+`vitality`, `buffer` → `renewal`). **Editing a title silently recategorised the block.**
+Rows like that exist: imported backups are `bulkAdd`ed verbatim. **Invisible for the 5
+picker values because the fold is identity for those** — that is why it survived.
+
+Fix: preserve the stored value unless the user chose a category **on that screen**,
+tracked as an interaction (`Set<number>` of hours, cleared when blocks change).
+
+**`touched`, never value comparison.** A block stored `buffer` opens showing `buffer`;
+a user who visits `sleep` and picks `buffer` back has made a real choice that
+`stored === chosen` would score as "no change" and discard. Only the interaction answers
+"did the user mean this?".
+
+**The same bug in `journey-day-schedule.tsx`, which ALSO overwrote `tag`** with a
+category label on every save. `edit-hour-modal` seeds its habit picker with
+`existingBlock.tag`, so that silently detached a block from its habit. Fixed identically
+— **but it is dead code** (see below).
+
+**I got the diagnosis wrong and the harness caught it.** I wrote the journey instance up
+as a live user-facing defect. It is not: `journey-day-schedule.tsx` (`JourneyDaySchedule`,
+1,058 lines) and `planner/day-schedule-modal.tsx` (`DayScheduleModal`) are exported and
+**imported by nothing**; `journey/page.tsx`'s day node navigates to `/day-schedule`.
+→ **`BUG-13`.** This is the **second** time in three commits that "is it even mounted?"
+decided the outcome (`BUG-10`, the evening reminder). It is now a hard rule in §11.
+
+The **live** instance is `day-schedule/page.tsx`. Verified by round trip: seeded `habits`
++ `tag: "habit-abc-123"`, retitled through the real UI, read back from IndexedDB →
+`habits → habits`, `tag` intact.
+
+**Verification lessons from this one, each of them cost a run:**
+- **A green assertion can be vacuous.** The category check passed first time because the
+  title edit had never saved — `handleSaveBlock` never ran. The check now **asserts the
+  title saved too**, so a save that never happened cannot masquerade as a fixed bug.
+  Always assert the side effect that proves your code ran.
+- **`<textarea>` values are properties, not text.** `innerText` never contains them, so
+  the block reported as "not on screen" while `textareas: ["Ring the plumber"]` was there.
+- **`el.blur()` on an unfocused element is a no-op**, so React's `onBlur` never fired.
+  Use `page.focus()` + real `page.keyboard` input. Same family as the pointer-routing
+  lesson: `el.click()` bypasses routing, so use real input.
+- **The database is `OdysseyDB`.** A lower-case `.includes('odyssey')` matches nothing and
+  `indexedDB.open(undefined)` **silently creates an empty database with no object
+  stores**. Cost a confusing `NotFoundError`.
+- **The screen filters by the real user id.** Seed *after* a profile exists, using the id
+  from the `profiles` store, or the row is never read and the test looks like a UI failure.
+
+**Known-broken is now executable.** Four `it.fails` tests in `schedule-category-edit.test.ts`
+record the vocabulary disagreement. They pass today and **fail loudly when fixed** — the
+signal to delete `.fails`. `BUG-14`: `planner-content.handleSaveBlock` takes
+`category: string` and would defeat a naive narrowing of `db.ts:180`.
+
 ### 2026-10-17 — `PERF-9`/9c: the repo honours reduced motion for its own animations and not for Tailwind's
 
 Commit 2 of 3. **One CSS rule; no component changed.**
@@ -3150,34 +3215,40 @@ above the vault banner. The follow-up task is closed.
 | Next after Phase 1 | Phase 2 — `A1`/`XL14`, `M16`, **`A2`** and **`A3`** are done. **`A2` landed as ONE scene, not four**: the researched walkthrough asked for wallpaper + habits + schedule + rewards, and was cut on owner instruction to *"only explain the things required to use the app for basic tasks"*. **`A3` landed as reordering, and its paywall half was dropped:** `HD25` asked for profession-driven **discount codes**, which `A3`'s own text forbids (*"do not use profession to obscure or discriminate on price"*) and which this local-first app cannot bill anyway — `HD25` is now **`NOT APPROVED`**. Remaining gaps are `A5` (identity line + skippable), `A6`, `A7` |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
-### 2026-10-17 — after `PERF-4`/4g (commit 1 of 3)
+### 2026-10-17 — after `BUG-12` (commit 3 of 3) · **all three commits landed**
 
-- **HEAD at last update:** this commit — **`PERF-4`/4g**, the 20:00 evening-reminder timer
-  and its UTC dismissal key. Before it: `238a0a0` (**`A7`**), `e4ae4df` (**`A6`**),
-  `8c71e61` (3 `preserve-manual-memoization` errors), `79ff34e` (quote constant).
-- **`main` is ahead of `origin/main` by 3** — `e4ae4df`, `238a0a0`, and this commit.
-  **Do NOT push. Owner instruction, standing:** *"you will not push anything, you will
-  only commit things, i will push the code."*
-- Tests: **25 suites, 381 tests green** (was 24/361). `tsc --noEmit` exit 0,
-  `npx eslint src` exit 0 (0 errors / 100 warnings, all pre-existing `no-unused-vars`),
-  production build clean.
-- **Next: commit 2 of 3** — the `animate-pulse` violations that ignore
-  `prefers-reduced-motion`. `feedback-modal.tsx:189` and `:218` are the two named ones
-  (the pulsing "online" dot). `main_plan.md` **`PERF-9`** `NOT BUILT` is the home for
-  it; **9c** is exactly this. House convention: put the keyframes inside a
-  `prefers-reduced-motion: no-preference` query in `globals.css`, as `keystonePulse`,
-  `slateSweep`, `perfectDayGlow` and `holdRimPulse` already do.
-- **Then commit 3 of 3** — narrow `src/lib/db.ts:180`
-  `category: ScheduleCategory | (string & {})`. **Read `P0-T3`'s session log first
-  (§9, 2026-10-15): the escape hatch was load-bearing.** `P0-T3` narrowed the *habit*
-  category and it immediately exposed **8 real violations**; the `ScheduleBlock`
-  equivalent is unexamined. Expect the same, and do not narrow it until the violations
-  are found and listed.
-- **`PERF-9` is now `PARTIAL`, not `NOT BUILT`** — 9c shipped (commit 2). **9a is scoped
-  and cheap:** `pulseGlow` (animates `box-shadow`) and `shimmerGlow` (animates
-  `background-position`) are the only known repaint-heavy violators, and **both belong to
-  the unused landing-page set** (0 usages in `.tsx`) — so **deleting those dead classes
-  closes 9a** instead of rewriting any animation. 9b, 9d, 9e untouched.
+- **HEAD at last update:** this commit — **`BUG-12`**, the schedule category field.
+  Before it: `da79b69` (**`PERF-9`/9c**), `6367493` (**`PERF-4`/4g**), `238a0a0`
+  (**`A7`**), `e4ae4df` (**`A6`**), `8c71e61` (3 `preserve-manual-memoization` errors).
+- **`main` is ahead of `origin/main` by 5** — `e4ae4df`, `238a0a0`, `6367493`,
+  `da79b69`, and this commit. **Do NOT push. Owner instruction, standing:**
+  *"you will not push anything, you will only commit things, i will push the code."*
+- Tests: **26 suites, 395 tests green** (was 24/361 at the start of this run).
+  `tsc --noEmit` exit 0, `npx eslint src` exit 0 (0 errors / 100 pre-existing
+  `no-unused-vars` warnings), production build clean. All three ports clear.
+- **The three commits, in order:**
+  1. `6367493` — **`PERF-4`/4g.** The 20:00 reminder polled the DB every 60s for the
+     life of the app (~1,440 reads/day) and its dismissal key was on the **UTC** date
+     while the trigger used the local hour, so it could reappear after being dismissed.
+     Found `BUG-10` (never mounted on `/`) and `BUG-11` (4 more UTC keys) along the way.
+  2. `da79b69` — **`PERF-9`/9c.** Reduced motion was honoured for the repo's own
+     animations and structurally **unreachable** for Tailwind's utilities, so 17
+     infinite animations ran for everyone including those who opted out.
+  3. this one — **`BUG-12`.** Every schedule save rewrote the block's category from a
+     **display** normaliser, so editing a title silently recategorised the block.
+- **New findings, all recorded and none silently absorbed:** `BUG-10`, `BUG-11`,
+  `BUG-12`, `BUG-13` (**two whole schedule components are orphaned** —
+  `journey-day-schedule.tsx` at 1,058 lines and `day-schedule-modal.tsx`, imported by
+  nothing; each carries a duplicated normaliser, and one carries a 3 s poll),
+  `BUG-14` (`planner-content.handleSaveBlock` takes `category: string`).
+- **`BUG-13` has a cheap follow-on:** `PERF-4`'s "6 `setInterval` calls app-wide" includes
+  dead code. **Recount from live components only** before doing `PERF-4b` — the real
+  number is lower and the plan's figure is wrong.
+- **Next work is an owner decision, not a task:** closing `db.ts:180`'s escape hatch means
+  choosing one canonical schedule vocabulary. It changes what the user sees on three
+  screens plus imported backup data, so it needs an **ADR** (AGENTS.md rule 2). The four
+  `it.fails` tests in `schedule-category-edit.test.ts` will fail loudly when it is done.
+  **Do not narrow it without reading `BUG-12` and `BUG-13` first.**
 - **New findings recorded, not fixed:** `BUG-10` (the evening reminder is never mounted
   on `/`, so it cannot appear on the landing screen) and `BUG-11` (4 more
   `toISOString().split("T")[0]` UTC keys, recorded as an audit item, not a defect claim).
@@ -3241,7 +3312,26 @@ above the vault banner. The follow-up task is closed.
   the *other* branch — and a check pointed at `/` reported "the fix silenced the feature
   entirely" when the truth was that the feature had never been visible there at all. A
   false negative like that sends you to debug the wrong file. `grep` for the mount site
-  first; it is one call and it is decisive.
+  first; it is one call and it is decisive. **This decided the outcome TWICE in one
+  session** — the evening reminder (`BUG-10`) and the schedule edit
+  (`journey-day-schedule.tsx` → `BUG-13`, a **1,058-line file nothing imports**). Two
+  real defects, both of which I was about to report as user-facing. **Never call a defect
+  user-facing before you have seen the component rendered.**
+- **Assert the side effect that proves your code ran.** A green check can be vacuous: the
+  `BUG-12` category assertion passed on the first attempt because the *title* edit had
+  never saved, so the code under test never executed. The check now also asserts the
+  title saved, so a save that never happened cannot masquerade as a fixed bug.
+- **Drive edit forms with real input.** `el.blur()` on an unfocused element is a no-op so
+  React's `onBlur` never fired; `el.click()` bypasses pointer routing; and **a
+  `<textarea>`'s value is a property, so `innerText` never contains it** — the element
+  reported as "not on screen" while it was plainly there. Use `page.focus()` +
+  `page.keyboard`, and read `input.value`, not `innerText`.
+- **Puppeteer + IndexedDB traps on this app:** the database is **`OdysseyDB`** (capital O)
+  — a lower-case `.includes('odyssey')` matches nothing and `indexedDB.open(undefined)`
+  **silently creates an empty database with no object stores**. And every screen
+  **filters blocks by the current user's real id**, so seed *after* a profile exists,
+  taking the id from the `profiles` store, or the row is never read and the test looks
+  like a UI failure. `check-category.js` has all of this right.
 - **A shorter timer is not automatically a cheaper timer.** Capping a 20:00 re-check
   delay at 90s "for safety" makes the daytime case fire *more* often than the 60s
   interval it replaced. When the worry is a tab that slept through its boundary, the

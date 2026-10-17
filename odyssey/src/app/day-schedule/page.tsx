@@ -9,6 +9,7 @@ import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
+import { resolveEditedCategory } from "@/lib/utils/schedule-category-edit";
 import { LoadingIndicator } from "@/components/common/loading-indicator";
 import {
   ChevronLeft,
@@ -355,6 +356,16 @@ function DayScheduleContent() {
     return init;
   });
 
+  /**
+   * Hours whose category the user explicitly chose on this screen.
+   *
+   * `hourCategories` is seeded from stored blocks through the display
+   * normaliser, so it cannot be trusted to distinguish "the user picked this"
+   * from "this is what we folded the stored value into". Only the interaction can.
+   * See `handleSaveBlock` for what this protects.
+   */
+  const categoryTouchedHoursRef = useRef<Set<number>>(new Set());
+
   // Track which hour's category picker popup is currently open
   const [openCategoryHour, setOpenCategoryHour] = useState<number | null>(null);
 
@@ -401,6 +412,12 @@ function DayScheduleContent() {
   useEffect(() => {
     const newValues: Record<number, string> = {};
     const newCats: Record<number, CategoryKey> = {};
+
+    // Blocks changing means the stored categories were re-read, so any "the user
+    // chose this" claim from the previous set of blocks no longer holds. Without
+    // this, a category picked on Monday would still count as touched on Tuesday
+    // and authorise a rewrite the user never asked for.
+    categoryTouchedHoursRef.current.clear();
 
     for (let h = 0; h < 24; h++) {
       const sTime = formatHour(h);
@@ -552,7 +569,27 @@ function DayScheduleContent() {
           } else {
             await updateBlock(block.id, {
               title: titleToSave,
-              category: catToSave,
+              // **A title edit must not rewrite the category.** `hourCategories`
+              // was seeded from the stored value through this screen's
+              // *display* normaliser, and that normaliser is lossy for anything
+              // outside the five values its picker offers -- a row written as
+              // `habits` folds to `vitality`, a row written as `buffer` folds to
+              // `renewal`. Those rows exist in real databases: an imported
+              // backup is bulk-added verbatim, and earlier builds wrote them
+              // before those components were orphaned.
+              //
+              // This is invisible today for the three values the picker *can*
+              // produce, because for those the fold happens to be identity --
+              // which is exactly why it survived. The moment the vocabulary
+              // changes, every title edit starts silently recategorising blocks.
+              // So the stored value is returned untouched unless the user
+              // actually chose a category on THIS screen, which
+              // `handleCategoryChange` records.
+              category: resolveEditedCategory({
+                stored: block.category ?? "",
+                touched: categoryTouchedHoursRef.current.has(hour),
+                chosen: catToSave,
+              }),
             });
           }
         } else if (titleToSave) {
@@ -591,6 +628,8 @@ function DayScheduleContent() {
       const currentTitle = (editingValues[hour] ?? "").trim();
 
       if (block) {
+        // The one path that is allowed to rewrite a category.
+        categoryTouchedHoursRef.current.add(hour);
         await updateBlock(block.id, { category: newCat });
         syncCurrentScheduleToNative(dateStr);
       } else if (currentTitle) {
