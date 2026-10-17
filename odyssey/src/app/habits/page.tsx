@@ -85,6 +85,8 @@ export default function HabitsPage() {
   const pressStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Detect midnight / day change and automatically advance today and selectedDate
+  const prevTodayRef = useRef(todayStr);
+
   useEffect(() => {
     const checkDateChange = () => {
       const currentToday = getLocalTodayStr();
@@ -96,10 +98,6 @@ export default function HabitsPage() {
             }
             return prevSelected;
           });
-          if (user) {
-            // force: the day rolled over, so logs for the new day must be read.
-            fetchHabits(user.id, currentToday, { force: true });
-          }
           return currentToday;
         }
         return prevToday;
@@ -122,6 +120,17 @@ export default function HabitsPage() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [user, fetchHabits]);
+
+  // Refresh logs for the day that just rolled over. Running fetchHabits here
+  // (after render) instead of inside the setTodayStr updater avoids updating
+  // HabitDateStrip while HabitsPage is still rendering.
+  // fetchHabits is idempotent and short-circuits when nothing changed, so this
+  // is cheap on no-op days; initial load is handled by the selectedDate effect.
+  useEffect(() => {
+    if (!user || todayStr === prevTodayRef.current) return;
+    fetchHabits(user.id, todayStr, { force: true });
+    prevTodayRef.current = todayStr;
+  }, [todayStr, user, fetchHabits]);
 
   /**
    * Settle elapsed rewards (ADR 0002).

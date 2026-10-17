@@ -616,6 +616,20 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+### 2026-10-17 — `HabitsPage` set-during-render fix (pre-existing bug, not from S8)
+
+`checkDateChange` in `src/app/habits/page.tsx` called `fetchHabits` inside the
+`setTodayStr((prevToday) => {...})` functional updater, which React runs during
+render. `fetchHabits` updates the Zustand store, scheduling `HabitDateStrip` to
+re-render while `HabitsPage` was still rendering → "Cannot update a component
+while rendering a different component." Moved `fetchHabits` out of the updater
+into a separate `useEffect` keyed on `todayStr` that fires only on an actual
+day rollover (via a `useRef` comparator). Initial load is unaffected — covered by
+the existing `selectedDate` effect.
+
+Gates: `tsc` exit 0; `npx eslint src` 0 errors; 27 suites / 407 tests green;
+production build clean.
+
 ### 2026-10-17 — `S5`: habit reward field
 
 Added `reward?: string` to `Habit` (additive, optional, no migration). Create/edit modals get
@@ -3321,7 +3335,9 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **`S8` — 2-minute emergency version (commit pending)** — before it `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix). `S6`/`S7` removed from `main_plan.md` — not implemented.
+- HEAD at last update: **page.tsx set-during-render fix (commit pending)** — before it `ea0ebe4` (S8),
+  `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix).
+  `S6`/`S7` removed from `main_plan.md` — not implemented.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **27 suites, 407 tests green**. `tsc --noEmit` exit 0. Production build clean.
 - Ports 3000/3001/3100 clear; no background server left running.
