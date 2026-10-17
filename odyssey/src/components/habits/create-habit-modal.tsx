@@ -15,7 +15,9 @@ interface CreateHabitModalProps {
     frequency: number;
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
-    priority?: "critical" | "focus" | "optional";
+      priority?: "critical" | "focus" | "optional";
+      cue?: string;
+      reward?: string;
   }) => void;
   existingHabitNames?: string[];
   /**
@@ -87,6 +89,9 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon..Fri by default
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
   const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
+  const [cue, setCue] = useState("");
+  const [reward, setReward] = useState("");
+
 
   if (!isOpen) return null;
 
@@ -135,6 +140,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       targetDays: tpl.targetDays,
       timeOfDay: tpl.period,
       priority,
+      cue: cue.trim() || undefined,
+      reward: reward.trim() || undefined,
     });
   };
 
@@ -149,6 +156,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       targetDays: selectedDays,
       timeOfDay,
       priority,
+      cue: cue.trim() || undefined,
+      reward: reward.trim() || undefined,
     });
     handleClose();
   };
@@ -401,6 +410,30 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Cue / trigger */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">CUE / TRIGGER</label>
+              <input
+                type="text"
+                value={cue}
+                onChange={(e) => setCue(e.target.value)}
+                placeholder="After I pour my morning coffee"
+                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+              />
+            </div>
+
+            {/* Reward */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">REWARD</label>
+              <input
+                type="text"
+                value={reward}
+                onChange={(e) => setReward(e.target.value)}
+                placeholder="5 minutes of music"
+                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+              />
             </div>
 
             {/* Gamification Reward Hint */}

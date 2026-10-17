@@ -311,6 +311,8 @@ export interface Habit {
   category: HabitCategory;
   period?: 'morning' | 'afternoon' | 'evening';
   priority?: 'critical' | 'focus' | 'optional';
+  cue?: string; // e.g. "After I pour my morning coffee"
+  reward?: string; // e.g. "5 minutes of music"
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
   targetDaysPerWeek?: number;

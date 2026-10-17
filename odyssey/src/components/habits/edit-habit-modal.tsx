@@ -38,6 +38,8 @@ interface EditHabitModalProps {
       targetDays?: number[];
       period?: "morning" | "afternoon" | "evening";
       priority?: "critical" | "focus" | "optional";
+      cue?: string;
+      reward?: string;
     }
   ) => void;
   onDelete: (habitId: string) => void;
@@ -98,6 +100,9 @@ export function EditHabitModal({
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
   const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
+  const [cue, setCue] = useState("");
+  const [reward, setReward] = useState("");
+
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const today = propTodayStr || getLocalTodayStr();
@@ -131,6 +136,9 @@ export function EditHabitModal({
       } else {
         setTimeOfDay("anytime");
       }
+      setCue(habit.cue ?? "");
+      setReward(habit.reward ?? "");
+
       setIsConfirmingDelete(false);
       setSelectedHistoryDate(selectedDate || today);
     }
@@ -176,6 +184,8 @@ export function EditHabitModal({
       targetDays: selectedDays,
       period: timeOfDay === "anytime" ? undefined : timeOfDay,
       priority,
+      cue: cue.trim() || undefined,
+      reward: reward.trim() || undefined,
     });
     onClose();
   };
@@ -535,6 +545,30 @@ export function EditHabitModal({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Cue / trigger */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">CUE / TRIGGER</label>
+              <input
+                type="text"
+                value={cue}
+                onChange={(e) => setCue(e.target.value)}
+                placeholder="After I pour my morning coffee"
+                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+              />
+            </div>
+
+            {/* Reward */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">REWARD</label>
+              <input
+                type="text"
+                value={reward}
+                onChange={(e) => setReward(e.target.value)}
+                placeholder="5 minutes of music"
+                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+              />
             </div>
 
             {/* Action Buttons: Save and Delete */}

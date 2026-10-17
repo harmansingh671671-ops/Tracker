@@ -616,6 +616,22 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+### 2026-10-17 — `S5`: habit reward field
+
+Added `reward?: string` to `Habit` (additive, optional, no migration). Create/edit modals get
+a "What is your immediate reward?" text input (e.g. "5 minutes of music"), mirroring the S4
+cue field. CSS-var Tailwind tokens only, no raw hex, no card rendering yet.
+
+Gates: `tsc` exit 0; `npx eslint src` 0 errors; 27 suites / 407 tests green; production build
+clean.
+
+### 2026-10-17 — Streak label: show nothing when there is no streak
+
+`getStreakLabel(0)` now returns `""` instead of `"No streak yet"`; positive streaks still render
+as `Nd` / `N-day streak`. Tests updated to expect `""` for zero/NaN/undefined.
+
+Gates: `tsc` exit 0; 27 suites / 407 tests green.
+
 ### 2026-10-17 — `S2`: habit priority tags (critical/focus/optional)
 
 Added `priority?: 'critical' | 'focus' | 'optional'` to `Habit` (additive, no migration).
@@ -3296,21 +3312,12 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **`A2` (this commit)** — the `basics` step, five→six steps · before it
-  `eb3700a` "Fixxes" (**BUG-9**: planner cold-load hydration fix, `planner/page.tsx` 1052→20 lines
-  behind `dynamic(..., { ssr: false })`) · `3970e90` "Essential Fixes" (**M12 retraction**, now
-  committed — the deletions are no longer sitting unstaged, which §10 previously recorded as the
-  case) · `c034b9a` (**M20**) · `808a959` (Shop badge) · `60485f4` (Quick schedule header) ·
-  `022eff1` (**BUG-8**) · `a09d66e` (**M19**) · `7dd58eb` (review toggle / Focus & Title removed) ·
-  `2f9cf5f` (**BUG-7**). **⚠️ CORRECTION, kept from the previous entry.** The Day Schedule half of M20 rode
-  along inside `60485f4` because a concurrent session ran `git add -A`; `git apply --cached` protects
-  only your own commit, never the other direction. Verified via `git show HEAD:…`. History is not being
-  rewritten.
-- **`⚠️ CORRECTED — this section previously claimed the M12 retraction was uncommitted with
-  `up-next.ts` "deleted on disk but UNSTAGED". That is false.** The file is gone from disk *and* absent
-  from `git status`, which means it was committed — in `3970e90`, not in the HEAD list the previous
-  version of this section gave. Any exit-gate claim built on "M12 is uncommitted" was therefore
-  reasoning from a false premise.
+- HEAD at last update: **`S5` — habit reward field (commit pending)** — before it `2baaa19` (zero-streak
+  label fix), `da79b69` (**BUG-12**), `6367493` (**PERF-4**/4g), `238a0a0` (**A7**), `e4ae4df` (**A6**),
+  `8c71e61` (**A5**), `79ff34e` (**A2**).
+- Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
+- Tests: **27 suites, 407 tests green**. `tsc --noEmit` exit 0. Production build clean.
+- Ports 3000/3001/3100 clear; no background server left running.
 - **Lint: `npx eslint src` exits 0 — 0 errors, 96 warnings.** This is the **first clean project-wide
   lint in the repo's recorded history (2026-10-17)**. Three
   `react-hooks/preserve-manual-memoization` errors had sat in `planner-content.tsx` since `3970e90` and

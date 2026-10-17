@@ -360,9 +360,9 @@ src: `MASTER_TODO_REVISED.md §19 L979–1006`
 
 - [x] **S1** — Per-habit streak flames. `SHIPPED` — **status corrected 2026-10-17: the flame was already live and distinct.** The flame icon + streak number renders on every habit card (list, grid, compact views) reading each habit's own `currentStreak`, so it is already distinct from the global profile streak. The `PARTIAL` line was stale; code beats docs (rule 8). No code change required. Any animation/ring work belongs to **S10** (multi-colour date completion rings, still `PARTIAL`) · also: `E2`
 - [x] **S2** — Habit priority tags. `BUILT` — **added 2026-10-17.** `Habit.priority?: 'critical' | 'focus' | 'optional'` (additive, optional, no migration). Create/edit modals get a 3-button priority selector (🔴🟡🟢). Habit cards (list + grid) show a text+icon badge and a colored left-border accent. `normalizeHabitPriority()` helper added to `db.ts`. Unknown stored values render no badge (honest). Energy levels and context tags remain under **B9** · also: `B9`
-- [ ] **S3** — Energy level indicators. `NOT BUILT` · → **Phase 2** · also: `B9`
-- [ ] **S4** — Habit cue/trigger field. `NOT BUILT` · → **Phase 2** · also: `B8`
-- [ ] **S5** — Habit reward field. `NOT BUILT` · → **Phase 2** · also: `B8`
+
+- [x] **S4** — Habit cue/trigger field. `SHIPPED` — "What triggers this habit?" text input added to create/edit habit modals, saved as optional `Habit.cue`, e.g. "After I pour my morning coffee" · → **Phase 2** · also: `B8`
+- [x] **S5** — Habit reward field. `SHIPPED` — "What is your immediate reward?" text input added to create/edit habit modals, saved as optional `Habit.reward`, e.g. "5 minutes of music" · → **Phase 2** · also: `B8`
 - [ ] **S6** — Identity statement field. `NOT BUILT` · → **Phase 2** · also: `B8`, `G4`
 - [ ] **S7** — Habit "Why" purpose statement. `NOT BUILT` · → **Phase 2** · also: `B8`
 - [ ] **S8** — 2-minute emergency version. `NOT BUILT` · → **Phase 2** · also: `B12`
