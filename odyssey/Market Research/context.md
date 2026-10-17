@@ -617,6 +617,57 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 ### 2026-10-17 — `M15`: streak-milestone micro-narratives, once per habit
+### 2026-07-17 — Two agents now work this repo. Branch + worktree isolation, and why
+
+**A second agent is active in this repo.** It installed `ponytail` (whose installer
+overwrote `AGENTS.md` — see below), then built `M15` streak milestones. Mid-session I
+found its work **staged** in the shared checkout while I was committing, which is how I
+nearly committed someone else's half-finished feature under my own message.
+
+**The layout agreed with the owner:**
+
+| | where | branch |
+|---|---|---|
+| owner / second agent | `C:\PROJECTS` | `main` |
+| this agent | `C:\Users\harma\odyssey-wt-mainline` | `agent/mainline` |
+
+**A `git worktree`, not just a branch**, because a shared checkout still shares an index
+— which is exactly what went wrong. Verified, not assumed: a probe file written in my
+worktree appears in *its* status and **not** in `main`'s. `node_modules` is a **directory
+junction** to the shared 563 MB install, so both worktrees build without re-installing.
+
+**Never push — standing owner instruction** (*"you will not push anything, you will only
+commit things, i will push the code"*). So the branches are **local only** and the owner
+merges when satisfied. To take my work:
+
+```
+git checkout main && git merge agent/mainline     # from C:\PROJECTS
+```
+
+**Two things that would bite, recorded so they are not rediscovered:**
+
+1. **The `ponytail` installer overwrote `odyssey/AGENTS.md`** with its own 2.7 KB ruleset,
+   deleting the mandatory rules, the commit sequence and the server-hygiene section. It was
+   restored with `git checkout -- AGENTS.md`. **`C:\PROJECTS\ponytail` has been moved to
+   `C:\Users\harma\Downloads\ponytail`** — it sat inside the workspace root, where agents
+   discover `AGENTS.md` automatically, and it was being loaded as instructions rather than
+   merely sitting on disk. The tool was **never installed**; five rules were reviewed and
+   adopted into `AGENTS.md` as 17–21 (`feb19e7`), four rejected as conflicting.
+2. **A stale Kilo worktree exists** at
+   `~/.local/share/kilo/worktree-pool/.../observant-dash`, detached at `7a98720`. It is
+   **five commits behind `main`** and does **not** contain `PERF-0`, `BUG-12/13/14`, the
+   new `AGENTS` rules, or `M15`. **Work done from it would be based on code that no longer
+   exists here** — including a `BUG-12` fix and a `BUG-13` deletion. Refresh it with
+   `git -C <path> checkout main` (or `git worktree prune` and recreate) before using it.
+
+**A note on PowerShell and UTF-8, which cost a cycle twice:** `Get-Content` reads UTF-8 as
+ANSI in PS 5.1, so splicing a `.md` line with `Get-Content`/`Set-Content` turned every
+em-dash into mojibake across **all 1,142 lines** of `main_plan.md`, and `Set-Content
+-Encoding UTF8` adds a **BOM**. Use the `edit`/`write` tools. If a shell splice is
+unavoidable, read and write with `[System.IO.File]::ReadAllText`/`WriteAllLines` and
+`New-Object System.Text.UTF8Encoding($false)`. **Judge file encoding by codepoint counts
+and the first 3 bytes, never by what the terminal prints** — the console renders a
+correct em-dash as mojibake, which sent me chasing a corruption that was not there.
 
 Shipped the first slice of achievement unlock micro-narratives. New pure module
 `src/lib/utils/achievements.ts`: a 4-item catalogue (3/7/14/30-day streaks), a pure
