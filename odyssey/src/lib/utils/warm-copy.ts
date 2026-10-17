@@ -77,7 +77,7 @@ export function getCompletionToast(
  */
 export function getStreakLabel(days: number, variant: "compact" | "long" = "compact"): string {
   const safe = Number.isFinite(days) ? Math.max(0, Math.floor(days)) : 0;
-  if (safe === 0) return "No streak yet";
+  if (safe === 0) return "";
   if (variant === "long") return `${safe}-day streak`;
   return `${safe}d`;
 }

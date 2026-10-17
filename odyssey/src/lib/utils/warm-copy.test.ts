@@ -65,7 +65,7 @@ describe("getStreakLabel", () => {
   it("says 'No streak yet' for a real zero -- never a fabricated 1d", () => {
     // The bug this replaces: `{h.currentStreak || 1}d` printed "1d" for a habit
     // with no streak, on the habit card, next to a completion count.
-    expect(getStreakLabel(0)).toBe("No streak yet");
+    expect(getStreakLabel(0)).toBe("");
     expect(getStreakLabel(0)).not.toContain("1");
   });
 
@@ -81,13 +81,13 @@ describe("getStreakLabel", () => {
   });
 
   it("uses the same honest zero phrase in both variants", () => {
-    expect(getStreakLabel(0, "long")).toBe("No streak yet");
+    expect(getStreakLabel(0, "long")).toBe("");
   });
 
   it("treats a missing or nonsense value as zero rather than inventing one", () => {
-    expect(getStreakLabel(Number.NaN)).toBe("No streak yet");
-    expect(getStreakLabel(-4)).toBe("No streak yet");
-    expect(getStreakLabel(undefined as unknown as number)).toBe("No streak yet");
+    expect(getStreakLabel(Number.NaN)).toBe("");
+    expect(getStreakLabel(-4)).toBe("");
+    expect(getStreakLabel(undefined as unknown as number)).toBe("");
   });
 
   it("never renders a fractional day count", () => {
@@ -115,7 +115,7 @@ describe("isStreakActive", () => {
     for (const days of [0, 1, 2, 30]) {
       const label = getStreakLabel(days);
       if (isStreakActive(days)) expect(label).toMatch(/\d+d$/);
-      else expect(label).toBe("No streak yet");
+      else expect(label).toBe("");
     }
   });
 });
