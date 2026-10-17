@@ -617,6 +617,50 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `A5` completed, and the hold gesture was already dead for a real finger
+
+**Owner instruction:** *"complete the a5, go with option 3"* — derive the identity line from the goal already
+chosen, editable in one tap, **no new question**. Consistent with cutting `A2` and declining `A3`'s paywall
+half; `A5` moves `PARTIAL` → `BUILT`.
+
+**The important find is unrelated to the feature.** Instrumenting the document showed `pointerdown`
+arriving on the hold button followed **in the same tick** by `pointerout`/`pointerleave` — the button's
+`onPointerLeave={cancel}` turned that into an instant cancel, so **the circle never visibly spread at all**.
+Calling React's handler *directly* worked, which is what localised it to event routing rather than the state
+machine, and `elementFromPoint` plus a React-props dump ruled out an overlay and a detached handler.
+
+**`page.evaluate(el.click())` bypasses pointer routing entirely, so every DOM-driven check had been passing
+over a dead gesture.** This is the `#__next` probe shape — the check that cannot fail — and it is why a real
+`page.mouse.down()` is now in the suite for anything with a gesture. The fix is **`setPointerCapture`** on
+pointerdown: the hold is now about *holding*, not about keeping a finger perfectly still, and `onPointerLeave`
+is gone because cancelling on leave was the wrong rule for this gesture.
+
+**A second regression, caught by re-running the OLD geometry check rather than the new one.** The identity line
+reads its text from storage in an effect, so it renders empty and fills in a moment later, moving the button
+**up 45px**. The viewport never changes, so `resize` never fires and the circle keeps a stale origin —
+**measured 45px off at 430×932.** A **`ResizeObserver` on the section** now catches any shift; it cannot loop,
+because `origin` feeds only `clip-path`. **The lesson is procedural: adding a feature to a screen can break an
+invariant measured for the previous feature, and only re-running the old check finds it.** The new suite was
+green throughout.
+
+**The line is not the app claiming authorship of a sentence.** One first-person line per goal plus a generic
+default that asserts nothing; the **derived line is never written to storage**, and a test asserts that.
+Clearing the field reverts to the derived line rather than showing a blank commitment. The editor is a
+**`<textarea rows={1}>`, not an `<input>`** — an input cannot wrap, it scrolls sideways and clips, the same
+defect the `day-schedule` task field had — and select-on-open lives in an **effect keyed on the editing state,
+never a ref callback**, because React 19 re-runs ref callbacks every render and that cost a real bug once
+already. Escape abandons without writing; blur commits; the line hides once a hold starts.
+
+**The 250-line component limit forced three extractions** (`commit-hold-button`, `commitment-spread`,
+`identity-line`), and moving the button out is what prompted me to read it properly — which is how the dead
+gesture surfaced. That is the rule catching my own change rather than a refactor in its own right.
+
+Gates: `tsc` exit 0; eslint **0 errors** on touched files; **24 suites / 366 tests** green; build clean.
+In-browser at 390 in both themes: derived line correct per goal and **not** stored, whole field selected on
+open, **text intact after 38 keystrokes**, no internal scroll, Escape abandons without writing, blur commits,
+clearing reverts, hidden mid-hold. **Both prior suites re-run green:** circle-to-button offset **0.00px** at
+360/390/430 in both themes, hold still completes and navigates, Space parity intact.
+
 ### 2026-10-16 — The commitment step had no exit at all, and a comment said so
 
 **Owner instruction:** *"approved"* to the recommendation to fix `A5`'s "skippable" half on its own, leaving
@@ -2675,6 +2719,18 @@ to know where things stand.
   each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
   and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
   while measuring multiplied text. Details in §9, 2026-10-16.
+- **A press-and-hold must be tested with a real `page.mouse.down()`, never `el.click()`.** Measured
+  2026-10-17: `pointerdown` on the commitment button was followed **in the same tick** by
+  `pointerout`/`pointerleave`, which the button's `onPointerLeave={cancel}` turned into an instant cancel — **the
+  circle never visibly spread for a real finger**, while `element.click()` (which bypasses pointer routing) had
+  been passing throughout. Fixed with `setPointerCapture`. **If a check cannot distinguish a working gesture
+  from a dead one, it is the `#__next` probe.**
+- **`page.evaluate(el.click())` does not move focus, so no `blur` fires.** A harness that uses it to test
+  "click away and the edit saves" tests nothing — the blur handler never runs. Use
+  `document.activeElement.blur()` or a real mouse click.
+- **Tapping a goal tag during onboarding leaves the create-habit modal open.** It covers the commitment step,
+  and while it is open every coordinate-based mouse press lands on its **backdrop**. DOM assertions keep passing
+  because `.click()` ignores overlays. Close it before any pointer-driven check.
 - **`protocol` (the Day 1 commitment step) was a dead end until 2026-10-16.** The shell's comment —
   *"on `protocol` the hold is the only way forward"* — was **true and wrong**: there was no exit at all
   for anyone who declined the press-and-hold. A **"Skip for now"** control now completes the flow, writing
@@ -2756,7 +2812,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2`, `A3` and `A5`'s skippable half have shipped** (2026-10-16). **Phase 2's first unchecked line is now `A6`** — loading/processing animation instead of blank screens (no new questions; `A6` is the cleanest remaining Phase 2 item) · then **`A7`** (just-in-time permission education, which is where the battery rules live) · `A4` is explicitly routed to **Phase 7**. **One Phase 2 item is deliberately unfinished and waiting on an owner decision, not on capacity: `A5`'s identity line**, which is a *new question* and the same shape the owner cut from `A2` and declined in `A3`. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2`, `A3` and `A5` have all shipped** (A5 completed 2026-10-17). **Phase 2's first unchecked line is now `A6`** — loading/processing animation instead of blank screens (no new questions; the cleanest remaining Phase 2 item) · then **`A7`** (just-in-time permission education, which is where the battery rules live) · `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
 | Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
