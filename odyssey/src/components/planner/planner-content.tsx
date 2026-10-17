@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
-import { db, type ScheduleBlock } from "@/lib/db";
+import { db, type ScheduleBlock, type StoredScheduleCategory } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay, getJourneyDayNumberForDate } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
@@ -506,7 +506,15 @@ export function PlannerContent() {
   const handleSaveBlock = async (data: {
     id?: string;
     title: string;
-    category: string;
+    /**
+     * `BUG-14`. This was `string`, which made it **the widest hole in the
+     * schedule's category field** -- every other write path was narrower, so
+     * closing `db.ts`'s escape hatch without touching this would have left a
+     * parameter that still accepted anything and passed it straight through.
+     * It is constrained in practice by `edit-hour-modal`'s `CATEGORIES` ids;
+     * now the type says so instead of the comment merely implying it.
+     */
+    category: StoredScheduleCategory;
     startTime: string;
     endTime: string;
     date: string;

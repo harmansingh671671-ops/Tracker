@@ -2,7 +2,7 @@
 
 import { logWarn } from "@/lib/utils/logger";
 import { useState, useEffect } from "react";
-import { type ScheduleBlock } from "@/lib/db";
+import { type ScheduleBlock, type StoredScheduleCategory } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { resolveHabitIconString } from "@/components/habits/habit-icon";
 import {
@@ -23,7 +23,12 @@ interface EditHourModalProps {
   onSave: (blockData: {
     id?: string;
     title: string;
-    category: string;
+    /**
+     * `BUG-12` / `BUG-14`. Was `string`, which meant the modal could hand the
+     * planner any text at all. The picker offers five ids and legacy rows may
+     * hold two more, so the contract is the stored union.
+     */
+    category: StoredScheduleCategory;
     startTime: string;
     endTime: string;
     date: string;
@@ -37,13 +42,23 @@ interface EditHourModalProps {
   existingBlock?: ScheduleBlock | null;
 }
 
+/**
+ * The five categories this picker offers.
+ *
+ * `satisfies` rather than a bare type annotation (`BUG-12`): it checks each id is a
+ * real stored category **while still inferring the narrow literal union**, so
+ * `isSelected`'s comparison stays exhaustive and an id can never drift out of the
+ * schema without a type error here. This is the same move `P0-T3` made on the
+ * habit side, for the same reason — a rename should break at the source rather
+ * than produce an unwritable category.
+ */
 const CATEGORIES = [
   { id: "work", label: "Deep Focus", Icon: Brain, activeBg: "bg-primary text-on-primary", pillColor: "text-primary border-primary/30" },
   { id: "vitality", label: "Vitality", Icon: Heart, activeBg: "bg-emerald-500 text-white", pillColor: "text-emerald-400 border-emerald-500/30" },
   { id: "sync", label: "Sync & Connect", Icon: MessageSquare, activeBg: "bg-sky-500 text-white", pillColor: "text-sky-400 border-sky-500/30" },
   { id: "renewal", label: "Renewal", Icon: Coffee, activeBg: "bg-amber-500 text-on-primary", pillColor: "text-amber-400 border-amber-500/30" },
   { id: "sleep", label: "Obsidian Rest", Icon: Moon, activeBg: "bg-indigo-500 text-white", pillColor: "text-indigo-400 border-indigo-500/30" },
-];
+] satisfies ReadonlyArray<{ id: StoredScheduleCategory; label: string; Icon: typeof Brain; activeBg: string; pillColor: string }>;
 
 export function EditHourModal({
   isOpen,
@@ -58,7 +73,11 @@ export function EditHourModal({
   const { habits } = useHabitStore();
 
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("work");
+  // Typed as the stored union (`BUG-12`) rather than `string`, so the picker
+  // and the save contract agree on what a category can be. Seeded from the
+  // existing block, which is already typed, so a legacy row flows through
+  // without a cast.
+  const [category, setCategory] = useState<StoredScheduleCategory>("work");
   const [startH, setStartH] = useState(initialHour);
   const [endH, setEndH] = useState(
     initialEndHour !== undefined

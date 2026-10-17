@@ -87,19 +87,27 @@ describe("build24HourlyBlocks", () => {
     // `tag: matching.category || "Focus"` -- an explicit block.tag is ignored
     // here, so pinning this stops a future "fix" from quietly changing what
     // the wallpaper legend renders.
+    //
+    // This used to use `"Health"`, which is the interesting part: it is a member
+    // of the **old declared union but one no screen can ever write** (`BUG-12`),
+    // so the suite was exercising a category that could only exist in a test.
+    // `vitality` is what both pickers actually produce -- and what `Health` folds
+    // to for display anyway -- so the assertion is unchanged and now describes
+    // something reachable.
     const blocks = build24HourlyBlocks([
-      block("08:00", "09:00", { category: "Health", tag: "morning" }),
+      block("08:00", "09:00", { category: "vitality", tag: "morning" }),
     ]);
-    expect(blocks[8].category).toBe("Health");
-    expect(blocks[8].tag).toBe("Health");
+    expect(blocks[8].category).toBe("vitality");
+    expect(blocks[8].tag).toBe("vitality");
   });
 
   it("falls back to 'work' for category but 'Focus' for tag when category is empty", () => {
     // The two fallbacks differ: category defaults to "work", tag to "Focus".
     // Pinned because the mismatch looks like a typo but changes the legend.
-    const bare = block("08:00", "09:00");
-    (bare as Partial<ScheduleBlock>).category = "" as ScheduleBlock["category"];
-    const blocks = build24HourlyBlocks([bare]);
+    //
+    // The `as ScheduleBlock["category"]` cast is gone: `""` is a real member of
+    // the stored union (`BUG-12`), so writing it needs no coercion at all.
+    const blocks = build24HourlyBlocks([block("08:00", "09:00", { category: "" })]);
     expect(blocks[8].category).toBe("work");
     expect(blocks[8].tag).toBe("Focus");
   });

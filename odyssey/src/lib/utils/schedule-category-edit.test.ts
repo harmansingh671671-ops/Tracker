@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { resolveEditedCategory, toJourneyBucket, JOURNEY_BUCKETS } from "./schedule-category-edit";
-import { SCHEDULE_CATEGORIES, normalizeCategory } from "../db";
+import {
+  SCHEDULE_CATEGORIES,
+  STORED_SCHEDULE_CATEGORIES,
+  isSelectableScheduleCategory,
+  normalizeCategory,
+  type StoredScheduleCategory,
+} from "../db";
 
 /**
  * `ScheduleBlock.category` is typed `ScheduleCategory | (string & {})`.
@@ -23,7 +29,7 @@ const PICKER_IDS = ["work", "vitality", "sync", "renewal", "sleep"] as const;
  * Copied rather than imported: it lives in a page component, and this file must
  * stay importable without React.
  */
-function dayScheduleNormalizer(cat?: string, hour?: number): string {
+function dayScheduleNormalizer(cat?: string, hour?: number): StoredScheduleCategory {
   if (!cat) {
     if (hour !== undefined) {
       if (hour < 7 || hour >= 23) return "sleep";
@@ -69,7 +75,7 @@ describe("resolveEditedCategory", () => {
   it("preserves legacy values the live screen's normaliser would fold away", () => {
     expect(dayScheduleNormalizer("habits")).toBe("vitality");
     expect(dayScheduleNormalizer("buffer")).toBe("renewal");
-    for (const stored of ["habits", "buffer"]) {
+    for (const stored of ["habits", "buffer"] as const) {
       expect(
         resolveEditedCategory({ stored, touched: false, chosen: dayScheduleNormalizer(stored) })
       ).toBe(stored);
@@ -139,10 +145,61 @@ describe("toJourneyBucket (display only, no production caller)", () => {
 });
 
 // =========================================================================
+// The closed type itself. `BUG-12`'s escape hatch is gone, so this list is now
+// the *only* thing that constrains the field — which makes it worth pinning.
+// It must cover everything reachable and admit nothing that is not.
+// =========================================================================
+describe("STORED_SCHEDULE_CATEGORIES", () => {
+  it("contains every category a picker can actually produce", () => {
+    // The positive counterpart to the `it.fails` below. If someone retires a
+    // picker id without touching this list, every block of that category stops
+    // compiling -- which is the entire point of closing the hatch.
+    for (const picked of PICKER_IDS) {
+      expect(STORED_SCHEDULE_CATEGORIES).toContain(picked);
+    }
+  });
+
+  it("contains the legacy values already sitting in real databases", () => {
+    // Written by the deleted journey grouping and by older builds, and still
+    // bulkAdded from imported backup JSON. Removing them would be a lie about
+    // data already on a phone.
+    for (const legacy of ["habits", "buffer"] as const) {
+      expect(STORED_SCHEDULE_CATEGORIES).toContain(legacy);
+    }
+  });
+
+  it("contains the empty category, which both screens render as Deep Work", () => {
+    expect(STORED_SCHEDULE_CATEGORIES).toContain("");
+  });
+
+  it("admits nothing outside the eight storable values", () => {
+    // The escape hatch accepted `any string`. These are the values that must no
+    // longer typecheck: a declared-but-unwritable one, a Title Case spelling,
+    // and free text.
+    for (const bogus of ["Health", "Study", "Work", "Leisure", "Admin", "Deep Work", "whatever"] as const) {
+      expect(STORED_SCHEDULE_CATEGORIES).not.toContain(bogus as never);
+    }
+    expect(STORED_SCHEDULE_CATEGORIES).toHaveLength(8);
+  });
+
+  it("classifies a picker value as selectable and a legacy one as not", () => {
+    for (const picked of PICKER_IDS) expect(isSelectableScheduleCategory(picked)).toBe(true);
+    // Legacy values are storable but not offerable, which is exactly the gap the
+    // vocabulary ADR has to close.
+    expect(isSelectableScheduleCategory("habits")).toBe(false);
+    expect(isSelectableScheduleCategory("")).toBe(false);
+  });
+});
+
+// =========================================================================
 // KNOWN-BROKEN, NOT FIXED. `it.fails` documents the defect and fails LOUDLY the
 // moment someone fixes it, which is the signal to delete the `.fails` and move
 // the assertion up into a normal test. It is the difference between a recorded
 // defect and a silently forgotten one.
+//
+// These are about WHICH vocabulary should win -- still an open product decision
+// needing an ADR. The type above is honest about the union; it does not pretend
+// the disagreement is settled.
 // =========================================================================
 describe("KNOWN-BROKEN: SCHEDULE_CATEGORIES does not describe this app", () => {
   // The schema declares 8 Title Case categories. The pickers write 5 lowercase

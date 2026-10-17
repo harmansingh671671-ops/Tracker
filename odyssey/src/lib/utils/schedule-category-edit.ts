@@ -30,6 +30,8 @@
  * four-bucket scheme is either genuinely wired up or definitively abandoned.
  */
 
+import type { StoredScheduleCategory } from "../db";
+
 /**
  * The four values the orphaned journey grouping collapsed to.
  *
@@ -72,10 +74,10 @@ export function toJourneyBucket(category: string, title?: string): JourneyBucket
  * than being treated as absent and silently restoring the old value.
  */
 export function resolveEditedCategory(args: {
-  stored: string;
+  stored: StoredScheduleCategory;
   touched: boolean;
-  chosen: string;
-}): string {
+  chosen: StoredScheduleCategory;
+}): StoredScheduleCategory {
   const { stored, touched, chosen } = args;
   return touched ? chosen : stored;
 }

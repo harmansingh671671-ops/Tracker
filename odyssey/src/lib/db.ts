@@ -59,6 +59,97 @@ export const SCHEDULE_CATEGORIES = [
 export type ScheduleCategory = (typeof SCHEDULE_CATEGORIES)[number];
 
 /**
+ * Every value `ScheduleBlock.category` can actually hold. `BUG-12`.
+ *
+ * ## What was wrong
+ *
+ * The field was typed `ScheduleCategory | (string & {})`. A union with
+ * `(string & {})` accepts **any** string, so it constrained nothing at all --
+ * and it *read* like validation, which is worse than having no type, because
+ * nothing prompted anyone to check. The reason it existed is that the declared
+ * list and the pickers **share no spelling at all**:
+ *
+ * - **both pickers** (`day-schedule` `CATEGORY_OPTIONS`, `edit-hour-modal`
+ *   `CATEGORIES`) write **5 lowercase ids**: `work`, `vitality`, `sync`,
+ *   `renewal`, `sleep`
+ * - **4 of the 8 declared values can never be written by any screen**, and 3
+ *   of the 5 that can be written are undeclared
+ *
+ * So this list is **not** a claim about which vocabulary should win -- that is
+ * an open product decision needing an ADR. It is the honest union of what the
+ * write paths can produce, which is what a type is for.
+ *
+ * ## The three groups
+ *
+ * | group | why it is here |
+ * |---|---|
+ * | `""` | a block with no category; both screens treat empty as "Deep Work" for display (`allocation-bar`) |
+ * | the **5 picker ids** | every category a user can actually choose, from either picker |
+ * | `habits`, `buffer` | **legacy rows already in real databases.** Written by the now-deleted `journey-day-schedule` / `day-schedule-modal`, and by older builds. Rows stored `habits` fold to `vitality` and `buffer` to `renewal` for *display*, which is how a title edit once recategorised them (`BUG-12`) |
+ *
+ * `habits` and `buffer` are **not** offered by any current picker. They are
+ * listed because deleting them from the type would be a lie about data already
+ * on users' phones, and because narrowing the vocabulary to remove them is the
+ * ADR, not this commit.
+ *
+ * ## IndexedDB is not type-checked
+ *
+ * A backup file is `bulkAdd`ed verbatim by `profile-settings-sheet`, so a row
+ * can hold a value outside even this list -- the same caveat
+ * `normalizeHabitCategory` documents for habits. **Every read path already
+ * routes through a normaliser**, which is what makes the type safe to narrow:
+ * `day-schedule`'s `normalizeCategory`, the planner's `getCategoryType`,
+ * `allocation-bar`'s `allocationCategory`, and the wallpaper's `getCatDetails`
+ * all accept a plain `string` and fold what they cannot place. Those keep
+ * working unchanged.
+ */
+/**
+ * The categories a picker can currently produce -- the five ids shared by
+ * `day-schedule`'s `CATEGORY_OPTIONS` and `edit-hour-modal`'s `CATEGORIES`.
+ *
+ * These are the only values a **user** can choose, which is the same reasoning
+ * `P0-T3` used to make the habit form's four domains canonical.
+ */
+export const SELECTABLE_SCHEDULE_CATEGORIES = [
+  "work",
+  "vitality",
+  "sync",
+  "renewal",
+  "sleep",
+] as const;
+
+/**
+ * Values that can be **read** from a real database but are no longer offered by
+ * any picker. Written by the deleted journey grouping and by older builds, and
+ * still `bulkAdd`ed from imported backup JSON.
+ */
+export const LEGACY_SCHEDULE_CATEGORIES = ["habits", "buffer"] as const;
+
+export const STORED_SCHEDULE_CATEGORIES = [
+  "",
+  ...SELECTABLE_SCHEDULE_CATEGORIES,
+  ...LEGACY_SCHEDULE_CATEGORIES,
+] as const;
+
+export type StoredScheduleCategory = (typeof STORED_SCHEDULE_CATEGORIES)[number];
+
+/** True only for a value a picker can currently **offer**. */
+export function isSelectableScheduleCategory(
+  value: string
+): value is (typeof SELECTABLE_SCHEDULE_CATEGORIES)[number] {
+  // Deliberately against SELECTABLE, not STORED. The first version of this
+  // checked STORED, which made `habits` and `buffer` -- storable but no longer
+  // offered by any picker -- report as selectable. A test caught it; the type
+  // predicate now matches its own name.
+  return (SELECTABLE_SCHEDULE_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** True for a legacy value: storable, but no picker offers it. */
+export function isLegacyScheduleCategory(value: string): boolean {
+  return (LEGACY_SCHEDULE_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
  * Canonical habit categories — P0-T3.
  *
  * These used to be Health / Mindfulness / Learning / Productivity / Social /
@@ -177,7 +268,13 @@ export interface ScheduleBlock {
   endTime: string; // HH:mm
   title: string;
   description?: string;
-  category: ScheduleCategory | (string & {});
+  /**
+   * `BUG-12`: was `ScheduleCategory | (string & {})`, which accepted any string
+   * and therefore validated nothing while looking like it did. Now the honest
+   * union of what the write paths can produce -- see `StoredScheduleCategory`.
+   * The vocabulary decision (which set should win) is deliberately still open.
+   */
+  category: StoredScheduleCategory;
   tag?: string;
   energyLevel?: 'high' | 'medium' | 'low';
   status: 'pending' | 'completed' | 'missed' | 'pivoted';

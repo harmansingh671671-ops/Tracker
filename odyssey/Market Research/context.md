@@ -617,6 +617,49 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `BUG-12`/`BUG-14`: the hatch is closed, and the type was the easy part
+
+Fourth commit of the "ready for new work" pass. `ScheduleBlock.category` was
+`ScheduleCategory | (string & {})` — a union that accepts any string, so it constrains
+nothing **while looking like it does**. Now `STORED_SCHEDULE_CATEGORIES`.
+
+**The change is one array and zero behaviour change.** The design decision is what is
+*absent*: it does **not** pick a winning vocabulary. That is still an open ADR, because
+unifying the four vocabularies changes what three screens display. Keeping
+`SELECTABLE_SCHEDULE_CATEGORIES` separate from `LEGACY_SCHEDULE_CATEGORIES` means
+"storable" and "offerable" stay visibly different rather than averaged into one list —
+and `habits`/`buffer` stay legal because they are **already on real phones** (imported
+backups are `bulkAdd`ed verbatim; older builds wrote them).
+
+**Closing it caught 4 sites the type had been hiding**, which is the entire argument for
+closing a hatch: the planner's `handleSaveBlock(category: string)`, `edit-hour-modal`'s
+`onSave` contract, its `useState("work")`, `CATEGORIES`' inferred ids — and **a test
+fixture using `"Health"`**, one of the four values no screen can produce. **The suite had
+been asserting on a category that could only exist in a test.**
+
+**Fixed at the source with `satisfies`, not at the call site.** `CATEGORIES` is now
+`satisfies ReadonlyArray<{ id: StoredScheduleCategory; ... }>`, which validates each id
+*and keeps the narrow literal union* — the same move `P0-T3` made on `DOMAINS`, so a
+rename breaks where the id is declared.
+
+**A test caught a real defect in a guard I wrote in the same breath.**
+`isSelectableScheduleCategory` checked the **stored** union, so it reported legacy
+`habits` as "selectable". Storable is not offerable. It now checks
+`SELECTABLE_SCHEDULE_CATEGORIES`, with a sibling `isLegacyScheduleCategory`. **The
+predicate disagreed with its own name and only a test could have told.**
+
+**Verified in-browser because tsc cannot cover this.** A mistyped id would render a pill
+that writes an invalid category — no compile error, no unit-test failure.
+`check-picker.js` opens the planner's edit sheet and asserts all five pills render and
+that choosing *"Sync & Connect"* writes exactly `sync` to IndexedDB, both themes. Two
+harness traps on the way: the editor **refuses to open for a past hour**
+(`timeline-hour-slot.tsx:68` — an earlier run silently failed because it seeded 09:00
+after 09:00), and **assert by label, not by container or index** — my first selector
+matched the planner's date strip, reported 100 "pills", and clicked a date.
+
+The four `it.fails` tests stay: the vocabulary decision is still open, and they will fail
+loudly when it is made.
+
 ### 2026-10-17 — `BUG-13` resolved by deletion, and PowerShell 5.1 nearly destroyed `main_plan.md`
 
 Third commit of the "ready for new work" pass. Deleted the two orphaned schedule
