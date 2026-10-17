@@ -19,6 +19,7 @@ import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
+import { useClockTodayStr, useClockHour } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import {
   Clock,
@@ -80,9 +81,11 @@ export function PlannerContent() {
   // highlighted midnight before snapping to the real hour. blocks now seeds
   // from the synchronous local cache, so a returning user sees their real
   // schedule immediately instead of an empty timeline that fills in later.
-  const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
+  const clockToday = useClockTodayStr();
+  const clockHour = useClockHour();
+  const currentHour = clockHour;
+  const todayStr = clockToday;
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
-  const [todayStr, setTodayStr] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
 
   // The planner reads `db` directly rather than going through the schedule store
@@ -251,13 +254,15 @@ export function PlannerContent() {
   }, [selectedDate]);
 
   // When app is reopened/resumed from background, ensure today's live date is updated and synced
+  //
+  // It no longer writes `currentHour` / `todayStr`. Those come from the shared
+  // clock, which already refreshes on `visibilitychange` -- exactly what this
+  // handler was duplicating. `latestToday` is still computed because the
+  // selectedDate advance below needs it.
   useEffect(() => {
     const handleReopen = () => {
       if (document.visibilityState === "visible") {
-        const now = new Date();
-        const latestToday = getLocalDateStr(now);
-        setTodayStr(latestToday);
-        setCurrentHour(now.getHours());
+        const latestToday = getLocalDateStr();
 
         const p = new URLSearchParams(window.location.search);
         const qDate = p.get("date");
@@ -292,19 +297,14 @@ export function PlannerContent() {
 
   // Live timer for current hour and date change.
   //
-  // The third write here used to be `setNowMinutes`, feeding M12's countdown.
-  // M12 is gone, so `nowMinutes` had no reader left -- the state was written
-  // every 15 seconds and read never. Deleting it is why this interval is worth
-  // keeping at all: the surviving two writes (`currentHour`, `todayStr`) are both
-  // still read by the rail's past/current/future hour logic.
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      setCurrentHour(now.getHours());
-      setTodayStr(getLocalDateStr(now));
-    }, 15000);
-    return () => clearInterval(timer);
-  }, []);
+  // Replaced by the shared clock (`PERF-4b`). This was a private 15-second
+  // `setInterval` for two values that only change at a boundary -- the hour
+  // turning, the date rolling over -- so a minute-boundary tick catches both
+  // within 60s. What it really cost was a wake every 15 seconds, forever, for the
+  // life of the screen.
+  //
+  // `currentHour` and `todayStr` are now derived from that clock at the top of the
+  // component, so there is nothing left to write here.
 
   // Fetch user once on mount
   useEffect(() => {

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "measure-bundle": "node scripts/measure-bundle.js",
     "test:watch": "vitest"
   },
   "dependencies": {

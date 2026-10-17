@@ -34,12 +34,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-          rel="stylesheet"
-        />
+        {/* PERF-10a. These four lines fetched a Google-hosted icon font on every cold
+            start - two preconnects plus a render-blocking stylesheet - for a font the app
+            never used. All 45 icon-importing files draw with `lucide-react`; the
+            `.material-symbols-outlined` class that referenced this font was applied by
+            nothing and has been deleted alongside it.
+
+            Inter and Playfair are unaffected: `next/font/google` above already downloads
+            and self-hosts those at build time, so they were never an external fetch.
+
+            Removing this is not a subsetting exercise. The font was dead, and the network
+            cost was being paid anyway. */}
         {/* Anti-FOUC Theme Script: executes synchronously before DOM paint */}
         <script
           dangerouslySetInnerHTML={{

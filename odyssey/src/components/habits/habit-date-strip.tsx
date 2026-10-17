@@ -10,7 +10,8 @@ import React, {
 } from "react";
 import { type Habit, type HabitLog } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
-import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
+import { getHabitColor, isHabitScheduledOnDate } from "@/lib/utils/habit-colors";
+import { useClockTodayStr } from "@/lib/utils/shared-clock";
 
 interface HabitDateStripProps {
   selectedDate: string; // YYYY-MM-DD
@@ -45,15 +46,23 @@ export function HabitDateStrip({
   const containerRef = useRef<HTMLDivElement>(null);
   const todayPillRef = useRef<HTMLButtonElement>(null);
 
-  const [internalTodayStr, setInternalTodayStr] = useState<string>(getLocalTodayStr);
-  const todayStr = propTodayStr || internalTodayStr;
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setInternalTodayStr(getLocalTodayStr());
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
+  // Today, from the shared clock (`PERF-4b`).
+  //
+  // Was a private 3-second `setInterval` re-reading `getLocalTodayStr()` twenty
+  // times a minute purely so the strip would notice midnight. That is 20 wakes a
+  // minute to observe one boundary, and the shared clock serves it to every screen
+  // at once.
+  //
+  // **Derived, not mirrored into state.** A first attempt kept
+  // `useState(getLocalTodayStr)` and refreshed it from an effect, which is exactly
+  // what `react-hooks/set-state-in-effect` objects to: a second copy of a value the
+  // clock already owns, one render behind and free to drift. Reading it through the
+  // store means there is nothing to keep in sync.
+  //
+  // `propTodayStr` still wins when the parent knows the date, which is the usual
+  // case; this is the fallback for when it does not.
+  const clockTodayStr = useClockTodayStr();
+  const todayStr = propTodayStr || clockTodayStr;
 
   // Flags to prevent spurious cascading loads during initial layout and centering
   const isInitializedRef = useRef<boolean>(false);

@@ -615,6 +615,160 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-18 - PERF-10a: the font was dead, and that is the better finding
+
+Branch `agent/mainline`. Small, complete change. No behaviour change, no visual change.
+
+**The plan assumed the fonts were an external fetch that needed self-hosting.** `Inter` and
+`Playfair_Display` already use `next/font/google`, which downloads and self-hosts at build
+time - so they were never a runtime dependency. The remaining one, `Material Symbols Outlined`,
+was fetched from `fonts.googleapis.com`/`fonts.gstatic.com` on every cold start via two
+preconnects and one render-blocking stylesheet.
+
+**It was never used.** All 45 icon-importing files draw with `lucide-react`. The
+`.material-symbols-outlined` CSS class in `globals.css` was applied by nothing. The grep
+returned one match - in `globals.css` itself - and that is the whole story.
+
+**So 10a resolved to deletion, not subsetting.** Removed: the `<link>` stylesheet, both
+preconnects, and the 18-line orphaned class. Three external requests gone per cold start,
+zero visual change, and nothing to subset, cache-bust, or test against a network block.
+
+**The verification that matters is the build output, not a script.** A grep of `.next/`
+for `fonts.googleapis.com` or `fonts.gstatic.com` returns nothing - that is the proof that
+no Google font host reference ships. The runtime check I wrote first used `playwright`,
+which is not installed in this repo; the existing TEMP scripts use `puppeteer-core`, which
+is also not installed here. **Rather than ship a broken verification script, I deleted it
+and relied on the build grep, which is the stronger check anyway.** Recorded as the reason
+`scripts/check-fonts.js` does not exist.
+
+**The shape of the lesson:** the plan said "self-host the fonts". The cheapest correct
+answer was "the font is dead, delete it". Rule 23 - the smallest complete change, and
+deletion beats addition - is what stopped me from subsetting a font nobody referenced.
+### 2026-10-17 - B3/S13 part 1: ADR 0003, additive schema, and the completion predicate
+
+Branch `agent/mainline`. Owner approved the scope cut to **two of four types** (simple +
+counted) and approved continuing on this branch.
+
+**Every habit was a checkbox.** `HabitLog.completed: boolean` was the whole record, so "read
+20 pages" and "read 3 pages" were indistinguishable - both just `true`. That is a missing
+question, not a missing field.
+
+**Shipped:** ADR 0003, the additive schema, and one `isHabitComplete` predicate with 17
+tests. `type`/`unit`/`targetValue` on the habit, `value` on the log. No Dexie version bump,
+no migration, no rewrite of anyone's history - which is the hard requirement, because a
+migration that rewrites logs is exactly how BUG-5 turned a streak of 0 into 1 in nine places.
+
+**The type is a closed union, deliberately.** `BUG-12` exists because
+`HabitCategory | (string & {})` accepted any string and therefore constrained nothing. Same
+trap, same door, so `HabitType` is closed and every new field's *absence* is defined rather
+than arbitrary.
+
+**The risky line is "logged but not done".** For a counted habit `log.completed` is a display
+cache, not the authority - the authority is `value >= targetValue`. A habit at 3 of 20 is
+`completed: true` and is **not** complete, and must not increment a streak, award XP, or fire
+the perfect-day calculation. That is the exact shape of `BUG-5`, which shipped because nine
+call sites each decided for themselves. So the predicate is one pure function, pinned by
+tests, and the test named for it is literally the BUG-5 case.
+
+**BUG-15, found while writing this and deliberately not fixed.** `habit-store.ts:540` computes
+the streak as arithmetic on a toggle: `isCompleted ? currentStreak + 1 : max(0, ... - 1)`.
+Un-ticking an *old* day decrements the *current* streak, and completing a *past* day
+increments it as though it were today. Both predate this feature. **Fixing it here would have
+made a contained feature unreviewable**, so it is recorded with the two concrete failures
+rather than quietly repaired. What this commit does give it is one correct, tested answer for
+"was this day completed" to build on.
+
+**The predicate has no production callers yet, on purpose.** There are **115 call sites
+across 13 files**, 42 of them in `habits/page.tsx` - the file the other agent is editing
+right now. Today every habit is `simple`, so the predicate is behaviourally identical to
+reading `log.completed`: adopting it across 13 files today would be a no-op with a live
+collision hotspot. It lands with the stepper UI, in the same commit that first makes a
+counted habit exist. **Recorded as a deliberate deferral in `main_plan.md`, not left for
+someone to discover as a dead export.**
+
+`avoid` and `timelimit` are deferred, with reasons recorded rather than dropped: `avoid`
+needs a violation state that changes what a completed day means for streaks, and `timelimit`
+needs a running per-habit timer - and `D2` says there is no focus timer at all, so that is a
+different feature wearing this feature's clothes.
+### 2026-10-17 — the ponytail rejection was wrong; rules 22-26 reinstated
+
+The owner asked whether I was following ponytail's rule about ending a reply with what I
+skipped and what risk they must know. **I was not, and the reason was mine: I had rejected
+that exact rule the same day I adopted the rest of the ruleset.**
+
+`AGENTS.md` recorded "five rules taken, four rejected" with the reasoning that a two-line
+reply format "conflicts with the honest-reporting norm". **That reasoning was backwards.**
+A long middle is fine; the short ending is a forcing function that guarantees the gaps get
+named. Rejecting it removed the only rule in the set that would have surfaced the gaps
+automatically. My `PERF-18d` report is the proof: it ended with a pitch for the next feature
+rather than with the fact that the native half is unmeasured and that `18a`-`18c` need CI
+that does not exist.
+
+**Now adopted as rules 22-26:** the disclosure ending, the smallest-complete-change ladder,
+no speculative abstraction, comment the why in one line, and the never-cut list
+(validation, data-loss errors, security, accessibility, hardware calibration, what the owner
+asked for).
+
+**One of the four is a genuine conflict with rules 13/14 and is reconciled, not papered
+over.** ponytail says do not abstract; rules 13/14 require extraction at 250 lines and ban
+inline sub-render functions. Rule 24 therefore bans abstracting for *hypothetical future
+needs* while 13/14 require it once the code is *already large*. Both hold: do not extract
+early, do extract when big. Writing the reconciliation in the rule is what stops the next
+agent from reading "no abstraction" and dissolving rule 13.
+
+**Permanently dropped: `lite`/`full`/`ultra` modes.** They select how much to report, which
+collides with the binding 10-step workflow in AGENTS.md 1. The reporting rule survives as
+22; the mode selector does not.
+
+**The lesson worth more than the rules.** I reviewed a ruleset, took the parts that matched
+my habits, and rejected the part that would have constrained how I behave - then wrote a
+justification that sounded like engineering judgment. It was not. **A rejection reason that
+sounds like "this conflicts with a house rule" deserves a second look, because it is
+usually a preference wearing a principle's clothes.**
+### 2026-10-17 — `PERF-18d`: `PERFORMANCE.md`, and a measurement script that lives in the repo
+
+On branch `agent/mainline`. Docs plus one small script. No behaviour change.
+
+**What shipped:** `PERFORMANCE.md` — measured web baseline, the four rules, native counts,
+and how to re-measure. `PERF-18` moves `NOT BUILT` → **`PARTIAL`**; `18a`/`18b`/`18c` stay
+unbuilt and stay blocked on the same thing, which is **that there is no CI**.
+
+**Three decisions worth keeping.**
+
+**1. Every number is labelled `MEASURED` or `UNVERIFIED`.** The file opens by saying which
+is which, because the failure mode of a perf doc is a structural improvement quoted later as
+a saving. "Three timers became one" is a fact. "That saved X% battery" is not — nothing
+native has ever been profiled here, and `tsc` does not read Kotlin.
+
+**2. The blur budget is marked as proposed, not measured.** Rule 4 says 15 occurrences
+against a current count of 44. That budget is **invented to bound direction of travel**, and
+the file says so in the rule itself: *"A budget invented to match the current number is not
+a budget, it is a ratchet."* Presenting 44 as a passing grade would have made the first
+person to add one blur layer look like a regression against a target nobody chose.
+
+**3. `scripts/measure-bundle.js` was rescued from `%TEMP%`.** `PERFORMANCE.md` tells the
+next person how to re-measure, and it pointed at
+`%TEMP%\opencode\verify\baseline-bundle.js` — which disappears with the temp directory.
+**A measurement instruction that points somewhere ephemeral is not an instruction, it is a
+rumour.** The script is now in the repo and wired to `npm run measure-bundle`. It exits 1
+with an explanation if there is no `.next`, because measuring a stale build reports the
+wrong thing and `next start` will happily serve the previous one while looking healthy.
+
+**The split-by-compressibility rule is preserved in the script and explained in the file.**
+One "total bytes" number hides problems in both directions: JS and CSS compress ~3:1, so
+1.4 MB ships as 436 KB, while images are already compressed and ship at ~92% of raw. Sum
+them and the images look free. **That is how a 1,808 KB logo survived in a directory no
+item was looking at.** The script also reports `public/downloads/odyssey-latest.apk`
+(11,587 KB) separately and judges it neither way — it is the updater payload, never fetched
+on page load, so counting it against "what a page costs" is as wrong as excluding it from
+"what a release costs".
+
+**A wrong date in my own last commit.** Every commit I made today was stamped **2026-07-17**.
+Today is **2026-10-17**. Nine occurrences across `main_plan.md`, `context.md`, `AGENTS.md`
+and `docs/TWO-AGENT-WORKING-GUIDE.md` — all mine, all from today, all fixed here. A status
+record with the wrong dates on it is worse than no date: it makes a month of work look like
+it shipped three months ago, and it is exactly the kind of thing that is impossible to
+notice later. Worth a grep before trusting any of it.
 narrative. **Add an entry in the same commit as the work** (§0.2).
 ### 2026-10-17 — `HabitsPage` set-during-render fix (pre-existing bug, not from S8)
 
@@ -670,6 +824,130 @@ Animation/ring work remains under `S10`.
 
 Gates: `tsc`/lint/test/build unaffected (no code change).
 
+### 2026-10-17 — `PERF-4b`: only 3 of the 6 live timers are clocks
+
+On branch `agent/mainline`. The shared clock shipped; the plan's premise did not survive
+contact with the source.
+
+**"7 `setInterval` calls app-wide" implied seven clocks.** They are not:
+
+| site | period | verdict |
+|---|---|---|
+| `app/habits/page.tsx` | 3s | **day-rollover poll** -> migrate |
+| `habits/habit-date-strip.tsx:52` | 3s | **day-rollover poll** -> migrate |
+| `planner/planner-content.tsx` | 15s | **day + hour boundary poll** -> migrate |
+| `habits/habit-date-strip.tsx:317` | 30ms, max 15 | **layout-settle retry** -> leave |
+| `planner/infinite-date-strip.tsx:295` | 30ms, max 15 | **layout-settle retry** -> leave |
+| `onboarding/step-circadian.tsx` | 4.2s | **UI carousel advance** -> leave |
+| `evening-reminder-modal.tsx` | 60s | already replaced in `6367493` |
+
+The two 30ms timers poll `centerDate()` until the scroll container has laid out, then stop
+after 15 attempts. The 4.2s one advances an onboarding carousel. **None reads the wall
+clock.** A shared minute ticker would have fired the layout retry **60x slower than its own
+30ms timeout** and stalled the carousel. **"One timer total" was the wrong goal**; one timer
+for the things that are actually clocks is the right one.
+
+**The win, measured:** visible and ticking, the three clocks woke **44 times a minute** (two
+3s polls = 20 + 20, one 15s poll = 4). Now **one wake a minute** however many screens are
+open.
+
+**Built:** `src/lib/utils/shared-clock.ts` -- one reference-counted store behind
+`useSyncExternalStore`, armed at the **next real minute boundary** rather than on a fixed
+interval (so drift cannot accumulate; a test accumulates 10,000 delays and asserts the
+total never leaves the boundary), paused while `document.hidden`, refreshed on return. **16
+tests.**
+
+**Three things I got wrong, all caught before shipping:**
+
+1. **Values mirrored into state instead of derived.** My first version kept
+   `useState(getLocalTodayStr)` and refreshed it from an effect. `react-hooks/set-state-in-effect`
+   correctly objected -- it is a second copy of a value the clock already owns, one render
+   behind and free to drift. Reading it through the store removes the copy entirely.
+   Following that through `planner-content` revealed it had **two** writers for those two
+   values: the timer *and* the reopen-on-focus handler. The clock subsumes the second, so
+   that duplication is gone as well.
+2. **A test caught a real bug in my own hidden-tab logic.** Declining to re-arm while hidden
+   still let the *pending* timer fire, so a hidden tab woke exactly once. The documented
+   claim was "arms nothing while hidden". Going hidden now **cancels** the armed timer.
+3. **The environment is injected, not read from the global.** The store needs exactly two
+   things from its host -- is the document hidden, and a visibility subscription -- so it
+   takes a `ClockEnvironment`. That keeps it testable under the repo's deliberate
+   **node-only** vitest setup (`vitest.config.ts`, `P0-T5`) without putting jsdom in front of
+   every suite.
+
+**Test-block lessons, both of which cost a cycle:**
+- **A failed assertion leaks module state.** The store is a singleton, so a test that threw
+  before reaching its `off()` left a subscriber registered for every later test -- and the
+  failures surfaced in unrelated places. Every subscription is now released in `afterEach`,
+  with an assertion that the count is zero.
+- **`vi.resetModules()` per test.** `minuteIndex` survived between tests, so the second test
+  started already holding the current minute and `refresh()` correctly reported "the minute
+  did not turn". The catch-up assertion then failed for reasons unrelated to the clock.
+
+**PowerShell bit me again, in the same session it was documented.** A `-replace` round-trip
+through `Set-Content -Encoding UTF8` mangled em-dashes in **7 lines across two files**. The
+`encoding.test.ts` guard caught it -- `git checkout --` and redo with the `edit` tool. **This
+is the third time.** The rule now reads: `edit`/`write` tools only for source; never
+`Get-Content`/`Set-Content` round-trips on any `.ts`/`.tsx`/`.md`.
+
+**Build note for the worktree:** Turbopack refuses a `node_modules` **junction** that points
+outside the project root (`Symlink [project]/node_modules is invalid`). The worktree needs a
+real copy (~563 MB, ~140 s), not a junction. Removing a junction needs `cmd /c rmdir`, not
+`Remove-Item`, which prompts.
+
+### 2026-10-17 — `M15`: streak-milestone micro-narratives, once per habit
+### 2026-10-17 — Two agents now work this repo. Branch + worktree isolation, and why
+
+**A second agent is active in this repo.** It installed `ponytail` (whose installer
+overwrote `AGENTS.md` — see below), then built `M15` streak milestones. Mid-session I
+found its work **staged** in the shared checkout while I was committing, which is how I
+nearly committed someone else's half-finished feature under my own message.
+
+**The layout agreed with the owner:**
+
+| | where | branch |
+|---|---|---|
+| owner / second agent | `C:\PROJECTS` | `main` |
+| this agent | `C:\Users\harma\odyssey-wt-mainline` | `agent/mainline` |
+
+**A `git worktree`, not just a branch**, because a shared checkout still shares an index
+— which is exactly what went wrong. Verified, not assumed: a probe file written in my
+worktree appears in *its* status and **not** in `main`'s. `node_modules` is a **directory
+junction** to the shared 563 MB install, so both worktrees build without re-installing.
+
+**Never push — standing owner instruction** (*"you will not push anything, you will only
+commit things, i will push the code"*). So the branches are **local only** and the owner
+merges when satisfied. To take my work:
+
+```
+git checkout main && git merge agent/mainline     # from C:\PROJECTS
+```
+
+**Two things that would bite, recorded so they are not rediscovered:**
+
+1. **The `ponytail` installer overwrote `odyssey/AGENTS.md`** with its own 2.7 KB ruleset,
+   deleting the mandatory rules, the commit sequence and the server-hygiene section. It was
+   restored with `git checkout -- AGENTS.md`. **`C:\PROJECTS\ponytail` has been moved to
+   `C:\Users\harma\Downloads\ponytail`** — it sat inside the workspace root, where agents
+   discover `AGENTS.md` automatically, and it was being loaded as instructions rather than
+   merely sitting on disk. The tool was **never installed**; five rules were reviewed and
+   adopted into `AGENTS.md` as 17–21 (`feb19e7`), four rejected as conflicting.
+2. **A stale Kilo worktree exists** at
+   `~/.local/share/kilo/worktree-pool/.../observant-dash`, detached at `7a98720`. It is
+   **five commits behind `main`** and does **not** contain `PERF-0`, `BUG-12/13/14`, the
+   new `AGENTS` rules, or `M15`. **Work done from it would be based on code that no longer
+   exists here** — including a `BUG-12` fix and a `BUG-13` deletion. Refresh it with
+   `git -C <path> checkout main` (or `git worktree prune` and recreate) before using it.
+
+**A note on PowerShell and UTF-8, which cost a cycle twice:** `Get-Content` reads UTF-8 as
+ANSI in PS 5.1, so splicing a `.md` line with `Get-Content`/`Set-Content` turned every
+em-dash into mojibake across **all 1,142 lines** of `main_plan.md`, and `Set-Content
+-Encoding UTF8` adds a **BOM**. Use the `edit`/`write` tools. If a shell splice is
+unavoidable, read and write with `[System.IO.File]::ReadAllText`/`WriteAllLines` and
+`New-Object System.Text.UTF8Encoding($false)`. **Judge file encoding by codepoint counts
+and the first 3 bytes, never by what the terminal prints** — the console renders a
+correct em-dash as mojibake, which sent me chasing a corruption that was not there.
+
 Shipped the first slice of achievement unlock micro-narratives. New pure module
 `src/lib/utils/achievements.ts`: a 4-item catalogue (3/7/14/30-day streaks), a pure
 `newlyCrossedStreakMilestones(prev, next)` that only counts upward crossings (so
@@ -702,8 +980,12 @@ Confirmed correct: `SharedPreferences.commit()` = 9, `WAKE_LOCK` absent from sou
 `REFRESH_INTERVAL_MS = 60_000L`, remote URL via `loadUrl`, no `gradlew`.
 
 **Baselines (production build, gzipped, because uncompressed is not what ships):**
-client JS **435.2 KB**, CSS **24.7 KB**, combined **459.8 KB**. The script
-(`baseline-bundle.js`) **separates compressed from already-compressed assets on purpose** —
+client JS **435.2 KB**, CSS **24.7 KB**, combined **459.8 KB**. **Re-measured 2026-10-17:
+client JS 436.5 KB, CSS 24.7 KB, combined 461.2 KB — up 1.4 KB, because `M15` and `S1`
+landed after this was written. That drift is the honest case for `PERF-18a`; a baseline
+nobody re-checks is a baseline that decays into a lie.** The script
+(`scripts/measure-bundle.js`, now in the repo and wired to `npm run measure-bundle`)
+**separates compressed from already-compressed assets on purpose** —
 a single "total bytes" number would have hidden the 3 MB `public/` problem entirely,
 because those images compress to 99.3% of their size.
 
@@ -3500,10 +3782,10 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **Performance phase (§6.5)** — Phases 1–2 are closed. **Corrected 2026-10-17: this row said "Phase 1" and listed `A2`/`A3`/`A5`/`A6`/`A7` as next, all of which shipped days earlier.** Phase 1's gate is met and Phase 2's onboarding and polish items are done; the only Phase 2 remnants are `A4` (AI coach, routed to Phase 7) and `M17` (`DEFERRED` — its loader target does not exist) |
-| Next feature | **No code feature is blocked or staged** (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty). What is open is a set of **owner decisions**, not work: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
+| Next feature | **`B3` + `S13` — habit types and a numeric stepper. IN PROGRESS, part 1 committed 2026-10-17.** Owner approved the scope cut to **two of four types** (simple + counted) and approved continuing on `agent/mainline`. **Shipped:** ADR 0003, the additive schema, `isHabitComplete` + 17 tests. **Next commit: the stepper UI AND adoption of the predicate at its 115 call sites across 13 files** — it has no production callers yet, deliberately, because until a counted habit can exist the change is a behavioural no-op. Also open: **`BUG-15`** (the streak is `+1/-1` arithmetic on a toggle, wrong for un-ticking an old day and for completing a past day — found 2026-10-17, deliberately not fixed inside `B3`). Earlier this row said "not yet briefed, no code written", which was true on the morning of 2026-10-17 and stopped being true the same afternoon. It is the root of `S9`/`S13`/`C2`/`B4`, and the largest structural gap left: **every habit in the app is still a checkbox.** The owner decisions that were listed here are all still open and none is urgent: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ `P0-T6` ✓ gates clean ✓ no uncommitted work ✓ — re-satisfied 2026-10-17). **Project-wide lint is 0 errors** for the first time in recorded history. **`PERF-0` is `PARTIAL`, not met:** the source-verification half and the web baselines are done and recorded, but the Android half needs `adb`/`dumpsys`/Perfetto and a release build on a real mid/low-end device — **no `gradlew`, no device** (§6.5.4, `R14`). **Anything needing a device measurement is still gated on that** |
 | Also open in Phase 1 | **Nothing open.** This row previously said "`P0-T3` is the only genuinely open Phase 1 code item (category type still dual-case at `db.ts:102`/`117`)". **That was stale twice over and is now corrected: `P0-T3` shipped** (`main_plan.md` line 302 records it `SHIPPED`) and the *habit* category hatch **is** closed. What was actually open was the **`ScheduleBlock.category`** hatch — now closed by `BUG-12`/`BUG-14` as `StoredScheduleCategory`. `DEBT` (`D2`, `D5`) remains; `D5`'s "29 files import `@/lib/db` directly" is **wrong — it is 38** |
-| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded (**459.8 KB gzipped** total client JS + CSS), Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-9`/9c, `PERF-19`, and `BUG-12`/`BUG-13`/`BUG-14`.** Native items need a physical device + release build this machine cannot do (§6.5.4) |
+| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded, Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-4b`, `PERF-9`/9c, `PERF-18d`, `PERF-19`, `BUG-12`/`BUG-13`/`BUG-14`, and the `AGENTS.md` rules 17–21.** `PERFORMANCE.md` exists (measured **461.2 KB** gzipped JS+CSS, four rules, native counts, how to re-measure; `npm run measure-bundle`). **What is left in this phase that is not blocked:** `PERF-9`/9a (3 box-shadow animations), `PERF-5` (route splitting — `planner/page.tsx` 48.3 KB, `habits/page.tsx` 45.4 KB), `PERF-7` (44 blur sites), `PERF-8`/`PERF-8a` (profile first), `PERF-10` (fonts — **no self-hosted fonts exist yet**, 0 files in `public/`), `PERF-16`. **`PERF-18` is `PARTIAL` and its remaining halves need CI, which does not exist.** Native items need a physical device + release build this machine cannot do (§6.5.4) |
 | Next after Phase 1 | **Phase 2 is done** — `A1`/`XL14`, `M16`, `A2`, `A3`, `A5`, `A6`, `A7` all shipped. **`A2` landed as ONE scene, not four** (owner instruction: only explain what is required for basic tasks). **`A3` landed as reordering and its paywall half was dropped** — `HD25` asked for profession-driven discount codes, which `A3`'s own text forbids and which a local-first app cannot bill; `HD25` is `NOT APPROVED`. **In plan order the next phase is §6.5 Performance**, which is now underway |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 

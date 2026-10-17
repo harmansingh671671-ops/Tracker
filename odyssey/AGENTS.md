@@ -99,14 +99,46 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
     regression. A 600-line consolidation happened in the 1.3.6 release; this rule is what keeps
     the next one honest.
 
-17–21 were adopted 2026-07-17 from the `ponytail` ruleset (`DietrichGebert/ponytail`, MIT),
-**selectively and after review** — five rules taken, four rejected as conflicting with rules
-5/13/14 and this repo's reporting norms (its "no abstraction" rule against 13/14; "comment only
-the why, in one line" against the explanatory comments here; the two-line reply format against
-the honest-reporting norm; and its lite/full/ultra modes against the binding workflow in §1).
-**The tool was not installed** — its installer previously overwrote this file — and it now lives
-outside the workspace. Rule 3 already encodes its reuse ladder, so it was not duplicated.
-Provenance and the full rejection list: `context.md` §9, 2026-07-17.
+17–21 were adopted 2026-10-17 from the `ponytail` ruleset (`DietrichGebert/ponytail`, MIT),
+**selectively** — five rules taken, four rejected. **Three of those rejections were sound.
+One was wrong, the owner caught it, and it is reversed below.** I had kept the ruleset's
+engineering discipline and thrown away its *reporting* rule on the grounds that a two-line
+ending "conflicts with the honest-reporting norm". It does not. **It enforces it** — a long
+middle is fine, and the short ending is a forcing function that guarantees the gaps get
+named. My last report ended with a pitch for the next feature instead of what I skipped.
+
+### 22–26 — adopted 2026-10-17, after wrongly rejecting them
+
+22. **End your reply with one or two lines: what you skipped or did not check, and any risk
+    the owner must know.** Not a summary — a disclosure. The worst version of this rule is a
+    report that lists only what went well.
+23. **The smallest change that fully works.** Skip options and flexibility nobody asked for,
+    and **name each one in a line when you skip it.** A vague request gets the smallest
+    version that does the core job. **Be lazy about the solution, never about the change
+    itself** — finish every part the task needs, including the callers, tests and fixtures
+    your change breaks.
+24. **No speculative abstraction** — no wrapper, type shim, option, config or "for later"
+    scaffolding nobody asked for. Deletion beats addition.
+    *Reconciled with rules 13/14, which point the other way:* 13 extracts at **250 lines**
+    and 14 bans inline sub-render functions. Neither is premature abstraction — one is a size
+    limit, the other a correctness rule. **24 bans abstracting for hypothetical future needs;
+    13/14 require it once the code is already large.** Both hold: do not extract early, do
+    extract when large.
+25. **Comment the why the code cannot show, in one line.** This repo's longer explanatory
+    comments stand, but the test applies to both: a comment that restates the code is noise.
+    The exception is a reason a future reader cannot derive — *"these three timers are
+    deliberately **not** on the shared clock"* is that; *"this loops over the array"* is not.
+26. **Never cut, for being lazy:** validation at trust boundaries, error handling that
+    prevents data loss, security, accessibility, the calibration real hardware needs, and
+    anything the owner asked for. Laziness applies to the size of a solution, never to these.
+
+**Dropped permanently: `lite`/`full`/`ultra` modes.** They select how much to report, which
+collides with the binding workflow in §1. The reporting *rule* survives as 22; the mode
+selector does not.
+
+**The tool is still not installed** — its installer previously overwrote this file — and it
+lives read-only outside the workspace at `%USERPROFILE%\Downloads\ponytail`. Rule 3 already
+encodes its reuse ladder. Source: `.agents\rules\ponytail.md`.
 
 ### The commit sequence — order matters
 
