@@ -99,14 +99,14 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
     regression. A 600-line consolidation happened in the 1.3.6 release; this rule is what keeps
     the next one honest.
 
-17–21 were adopted 2026-07-17 from the `ponytail` ruleset (`DietrichGebert/ponytail`, MIT),
+17–21 were adopted 2026-10-17 from the `ponytail` ruleset (`DietrichGebert/ponytail`, MIT),
 **selectively and after review** — five rules taken, four rejected as conflicting with rules
 5/13/14 and this repo's reporting norms (its "no abstraction" rule against 13/14; "comment only
 the why, in one line" against the explanatory comments here; the two-line reply format against
 the honest-reporting norm; and its lite/full/ultra modes against the binding workflow in §1).
 **The tool was not installed** — its installer previously overwrote this file — and it now lives
 outside the workspace. Rule 3 already encodes its reuse ladder, so it was not duplicated.
-Provenance and the full rejection list: `context.md` §9, 2026-07-17.
+Provenance and the full rejection list: `context.md` §9, 2026-10-17.
 
 ### The commit sequence — order matters
 

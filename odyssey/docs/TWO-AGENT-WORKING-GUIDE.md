@@ -97,7 +97,7 @@ that data is intact.
 
 ## 5. `ponytail` is not installed, and its installer damaged this repo
 
-The `ponytail` install at 19:19 on 2026-07-17 **overwrote `odyssey/AGENTS.md`** with its
+The `ponytail` install at 19:19 on 2026-10-17 **overwrote `odyssey/AGENTS.md`** with its
 own 2.7 KB ruleset, deleting the mandatory rules, the commit sequence and the whole
 server-hygiene section. It was restored from git. If your plan assumed ponytail was
 installed: **it is not, and was never deliberately installed.**
@@ -212,6 +212,12 @@ check: `check-category.js` (a save must not rewrite untouched fields),
 `check-motion.js` (reduced motion, **both directions**),
 `check-orphan.js` (all 9 routes, both themes, no surviving references),
 `check-assets.js` (images **decode** — a missing small image is invisible).
+
+⚠️ **These live in `%TEMP%` and will not survive a temp-dir clean.** That is a known gap,
+not an oversight — and it is exactly the mistake `PERF-18d` fixed for the bundle script,
+which now lives at `scripts/measure-bundle.js` and runs as `npm run measure-bundle`. **If
+you depend on one of these, copy it into the repo in the same commit as the feature that
+needed it.** A verification script that disappears is not a verification step.
 
 ---
 

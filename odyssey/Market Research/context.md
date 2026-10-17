@@ -615,8 +615,52 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-17 — `PERF-18d`: `PERFORMANCE.md`, and a measurement script that lives in the repo
+
+On branch `agent/mainline`. Docs plus one small script. No behaviour change.
+
+**What shipped:** `PERFORMANCE.md` — measured web baseline, the four rules, native counts,
+and how to re-measure. `PERF-18` moves `NOT BUILT` → **`PARTIAL`**; `18a`/`18b`/`18c` stay
+unbuilt and stay blocked on the same thing, which is **that there is no CI**.
+
+**Three decisions worth keeping.**
+
+**1. Every number is labelled `MEASURED` or `UNVERIFIED`.** The file opens by saying which
+is which, because the failure mode of a perf doc is a structural improvement quoted later as
+a saving. "Three timers became one" is a fact. "That saved X% battery" is not — nothing
+native has ever been profiled here, and `tsc` does not read Kotlin.
+
+**2. The blur budget is marked as proposed, not measured.** Rule 4 says 15 occurrences
+against a current count of 44. That budget is **invented to bound direction of travel**, and
+the file says so in the rule itself: *"A budget invented to match the current number is not
+a budget, it is a ratchet."* Presenting 44 as a passing grade would have made the first
+person to add one blur layer look like a regression against a target nobody chose.
+
+**3. `scripts/measure-bundle.js` was rescued from `%TEMP%`.** `PERFORMANCE.md` tells the
+next person how to re-measure, and it pointed at
+`%TEMP%\opencode\verify\baseline-bundle.js` — which disappears with the temp directory.
+**A measurement instruction that points somewhere ephemeral is not an instruction, it is a
+rumour.** The script is now in the repo and wired to `npm run measure-bundle`. It exits 1
+with an explanation if there is no `.next`, because measuring a stale build reports the
+wrong thing and `next start` will happily serve the previous one while looking healthy.
+
+**The split-by-compressibility rule is preserved in the script and explained in the file.**
+One "total bytes" number hides problems in both directions: JS and CSS compress ~3:1, so
+1.4 MB ships as 436 KB, while images are already compressed and ship at ~92% of raw. Sum
+them and the images look free. **That is how a 1,808 KB logo survived in a directory no
+item was looking at.** The script also reports `public/downloads/odyssey-latest.apk`
+(11,587 KB) separately and judges it neither way — it is the updater payload, never fetched
+on page load, so counting it against "what a page costs" is as wrong as excluding it from
+"what a release costs".
+
+**A wrong date in my own last commit.** Every commit I made today was stamped **2026-07-17**.
+Today is **2026-10-17**. Nine occurrences across `main_plan.md`, `context.md`, `AGENTS.md`
+and `docs/TWO-AGENT-WORKING-GUIDE.md` — all mine, all from today, all fixed here. A status
+record with the wrong dates on it is worse than no date: it makes a month of work look like
+it shipped three months ago, and it is exactly the kind of thing that is impossible to
+notice later. Worth a grep before trusting any of it.
 narrative. **Add an entry in the same commit as the work** (§0.2).
-### 2026-07-17 — `PERF-4b`: only 3 of the 6 live timers are clocks
+### 2026-10-17 — `PERF-4b`: only 3 of the 6 live timers are clocks
 
 On branch `agent/mainline`. The shared clock shipped; the plan's premise did not survive
 contact with the source.
@@ -688,7 +732,7 @@ real copy (~563 MB, ~140 s), not a junction. Removing a junction needs `cmd /c r
 `Remove-Item`, which prompts.
 
 ### 2026-10-17 — `M15`: streak-milestone micro-narratives, once per habit
-### 2026-07-17 — Two agents now work this repo. Branch + worktree isolation, and why
+### 2026-10-17 — Two agents now work this repo. Branch + worktree isolation, and why
 
 **A second agent is active in this repo.** It installed `ponytail` (whose installer
 overwrote `AGENTS.md` — see below), then built `M15` streak milestones. Mid-session I
@@ -772,8 +816,12 @@ Confirmed correct: `SharedPreferences.commit()` = 9, `WAKE_LOCK` absent from sou
 `REFRESH_INTERVAL_MS = 60_000L`, remote URL via `loadUrl`, no `gradlew`.
 
 **Baselines (production build, gzipped, because uncompressed is not what ships):**
-client JS **435.2 KB**, CSS **24.7 KB**, combined **459.8 KB**. The script
-(`baseline-bundle.js`) **separates compressed from already-compressed assets on purpose** —
+client JS **435.2 KB**, CSS **24.7 KB**, combined **459.8 KB**. **Re-measured 2026-10-17:
+client JS 436.5 KB, CSS 24.7 KB, combined 461.2 KB — up 1.4 KB, because `M15` and `S1`
+landed after this was written. That drift is the honest case for `PERF-18a`; a baseline
+nobody re-checks is a baseline that decays into a lie.** The script
+(`scripts/measure-bundle.js`, now in the repo and wired to `npm run measure-bundle`)
+**separates compressed from already-compressed assets on purpose** —
 a single "total bytes" number would have hidden the 3 MB `public/` problem entirely,
 because those images compress to 99.3% of their size.
 
@@ -3579,10 +3627,10 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **Performance phase (§6.5)** — Phases 1–2 are closed. **Corrected 2026-10-17: this row said "Phase 1" and listed `A2`/`A3`/`A5`/`A6`/`A7` as next, all of which shipped days earlier.** Phase 1's gate is met and Phase 2's onboarding and polish items are done; the only Phase 2 remnants are `A4` (AI coach, routed to Phase 7) and `M17` (`DEFERRED` — its loader target does not exist) |
-| Next feature | **No code feature is blocked or staged** (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty). What is open is a set of **owner decisions**, not work: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
+| Next feature | **`B3` + `S13` — habit types and a numeric stepper.** Approved by the owner 2026-10-17, **not yet briefed, no code written.** It is the root of `S9`/`S13`/`C2`/`B4`, and it is the largest structural gap left: **every habit in the app is still a checkbox.** Because it is a schema + UI decision with knock-on effects it needs a brief first. This row previously said "no code feature is blocked or staged", which was true on 2026-10-07 and stopped being true the moment `PERF-4b` was chosen. The owner decisions that were listed here are all still open and none is urgent: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ `P0-T6` ✓ gates clean ✓ no uncommitted work ✓ — re-satisfied 2026-10-17). **Project-wide lint is 0 errors** for the first time in recorded history. **`PERF-0` is `PARTIAL`, not met:** the source-verification half and the web baselines are done and recorded, but the Android half needs `adb`/`dumpsys`/Perfetto and a release build on a real mid/low-end device — **no `gradlew`, no device** (§6.5.4, `R14`). **Anything needing a device measurement is still gated on that** |
 | Also open in Phase 1 | **Nothing open.** This row previously said "`P0-T3` is the only genuinely open Phase 1 code item (category type still dual-case at `db.ts:102`/`117`)". **That was stale twice over and is now corrected: `P0-T3` shipped** (`main_plan.md` line 302 records it `SHIPPED`) and the *habit* category hatch **is** closed. What was actually open was the **`ScheduleBlock.category`** hatch — now closed by `BUG-12`/`BUG-14` as `StoredScheduleCategory`. `DEBT` (`D2`, `D5`) remains; `D5`'s "29 files import `@/lib/db` directly" is **wrong — it is 38** |
-| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded (**459.8 KB gzipped** total client JS + CSS), Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-9`/9c, `PERF-19`, and `BUG-12`/`BUG-13`/`BUG-14`.** Native items need a physical device + release build this machine cannot do (§6.5.4) |
+| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded, Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-4b`, `PERF-9`/9c, `PERF-18d`, `PERF-19`, `BUG-12`/`BUG-13`/`BUG-14`, and the `AGENTS.md` rules 17–21.** `PERFORMANCE.md` exists (measured **461.2 KB** gzipped JS+CSS, four rules, native counts, how to re-measure; `npm run measure-bundle`). **What is left in this phase that is not blocked:** `PERF-9`/9a (3 box-shadow animations), `PERF-5` (route splitting — `planner/page.tsx` 48.3 KB, `habits/page.tsx` 45.4 KB), `PERF-7` (44 blur sites), `PERF-8`/`PERF-8a` (profile first), `PERF-10` (fonts — **no self-hosted fonts exist yet**, 0 files in `public/`), `PERF-16`. **`PERF-18` is `PARTIAL` and its remaining halves need CI, which does not exist.** Native items need a physical device + release build this machine cannot do (§6.5.4) |
 | Next after Phase 1 | **Phase 2 is done** — `A1`/`XL14`, `M16`, `A2`, `A3`, `A5`, `A6`, `A7` all shipped. **`A2` landed as ONE scene, not four** (owner instruction: only explain what is required for basic tasks). **`A3` landed as reordering and its paywall half was dropped** — `HD25` asked for profession-driven discount codes, which `A3`'s own text forbids and which a local-first app cannot bill; `HD25` is `NOT APPROVED`. **In plan order the next phase is §6.5 Performance**, which is now underway |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
