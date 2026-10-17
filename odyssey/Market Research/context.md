@@ -617,6 +617,42 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — The 3 lint errors, and the real finding: nothing was ever running full-project lint
+
+**Owner instruction:** *"what are these 3 errors"* then *"fix it"*.
+
+**What they were:** three `react-hooks/preserve-manual-memoization` errors across two sites in
+`planner-content.tsx` — `loadBlocks` and `handleSelectDate`, both `useCallback(..., [])` while calling
+`setBlocks` / `setBlocksLoading` / `setSelectedDate`.
+
+**Not a correctness bug.** React guarantees setters are stable, so the empty array was safe at runtime.
+**The cost was that React Compiler skips optimising the ENTIRE planner screen** — not those two functions, the
+whole component, which is a component that mutates state on nearly every interaction. Fixed by listing the
+setters. `db`, `getCachedBlocks`, `setCachedBlocks` and `writeString` are **module bindings and stay out**:
+including them is noise, and they cannot change.
+
+**The code was original**, carried through two extractions (`3970e90` moved it out at 1184 lines, `eb3700a`
+trimmed it). Verified by extracting the pre-extraction file and linting it, then deleting it.
+
+**The real finding is process, not code.** `npm run lint` is in the Definition of Done, and it had **never been
+run across the whole project** — I had been linting only the files I touched, and reporting "3 pre-existing
+errors" honestly without noticing that nothing was *blocking* on them. `tsc`, the production build and 361 tests
+stayed green over a red lint count the entire time. **Phase 1's exit gate line read "gates clean ✓" and had been
+false since `3970e90`** — a status line asserting a criterion that was not met, which is the exact defect this
+file exists to prevent. Corrected in place with the window recorded.
+
+**Two harness failures were mine, and both looked like app breakage.** The planner renders the **empty state
+instead of hour rows** when a day has no blocks, so "24 hour labels are present" fails on a *correct* empty day.
+And day buttons read **`"THU\n17"` — weekday first**, so a selector anchored on a leading digit found nothing
+and read as a missing control. The app was fine on both counts; the first version of the check proved nothing
+either way, and the fix was to seed a **real block into IndexedDB** so the populated path is measured too.
+
+Gates: `tsc` exit 0; **`eslint src` 0 errors / 96 warnings, exit 0** — the first clean lint in the repo's
+recorded history; **24 suites / 361 tests** green; build clean. Planner verified in both themes with seeded
+data: block renders at 09:00, loading clears on first read and again after a date change, selecting a day
+persists the date and shows *that* day rather than today's block, and **"clean slate" does not appear while a
+block exists** — which is the confident-false-display check that matters most here.
+
 ### 2026-10-17 — `A5`'s line became a code-set quote, and the editor it retired had a real liability
 
 **Owner instruction:** *"write this quote, remove the change icon from there, keep it like I can change the
@@ -2721,15 +2757,20 @@ to know where things stand.
   from `git status`, which means it was committed — in `3970e90`, not in the HEAD list the previous
   version of this section gave. Any exit-gate claim built on "M12 is uncommitted" was therefore
   reasoning from a false premise.
-- Lint: **0 errors**, 7 warnings in `day-schedule/page.tsx` — **all pre-existing** (`db`,
-  `ChevronDown`/`ChevronUp`/`ChevronRight`, `Trash2`, `addDiamonds`, `handleClearBlock`).
-  `allocation-bar.ts` and its test are **clean**.
-- Tests: **23 suites, 357 tests green at `c034b9a`.** With the uncommitted M12 retraction
-  applied: **22 suites, 331 tests green** (the 26 deleted `up-next` tests). `tsc --noEmit`
-  exit 0. Production build clean.
-- **Server hygiene this session:** a `next start` on **port 3000**, started at 16:10:49 by the
-  *other* session, was still holding the port when this task finished and **was killed** along with
-  this session's own 3100 server. **No listener remains on 3000 / 3001 / 3100.**
+- **Lint: `npx eslint src` exits 0 — 0 errors, 96 warnings.** This is the **first clean project-wide
+  lint in the repo's recorded history (2026-10-17)**. Three
+  `react-hooks/preserve-manual-memoization` errors had sat in `planner-content.tsx` since `3970e90` and
+  **nothing blocked on them**: `tsc`, the build and the test suite were all green over a red count, and the
+  Phase 1 exit gate line read *"gates clean ✓"*. React Compiler skips optimising an ENTIRE component when it
+  cannot preserve manual memoisation, so the real cost was the whole planner screen, not the two flagged
+  functions. The 96 warnings are all `no-unused-vars` and all pre-existing; none introduced this session.
+  **Run the whole project, not the files you touched** — that gap is why two commits shipped with a red count.
+- Tests: **24 suites, 361 tests green** at `79ff34e` (was 22/331 before `A2`, `A3` and `A5`).
+  `tsc --noEmit` exit 0. Production build clean.
+- **Server hygiene:** port 3000 has carried a **live `next dev`** (started 22:20:23 on 2026-10-16) for
+  most of this session — **deliberately left running**, because a dev server recompiles on request and so
+  cannot serve the stale build that rule exists to prevent. A *stale* `next start` from 18:03 was found on
+  the same port and killed. 3001 and 3100 clear.
 - **⚠️ `with-server.ps1` used to REPORT SUCCESS WHILE LEAVING THE SERVER RUNNING.** An
   earlier line here claimed it "killed port 3100 correctly on both runs". **That was false.**
   It printed `server killed, port 3100 closed` and left a live listener; the next run then
@@ -2751,6 +2792,12 @@ to know where things stand.
   each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
   and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
   while measuring multiplied text. Details in §9, 2026-10-16.
+- **Run `npx eslint src` (the WHOLE project), not just the files you touched.** Measured 2026-10-17: three
+  `react-hooks/preserve-manual-memoization` errors sat in `planner-content.tsx` since `3970e90`, and
+  **nothing blocked on them** — `tsc`, the build and 361 tests were all green over a red lint count, and the
+  Phase 1 exit gate line read *"gates clean ✓"*. React Compiler skips optimising an entire component when it
+  cannot preserve manual memoisation, so the cost was the whole planner screen, not the two flagged functions.
+  Per-file lint finds only what you broke; a gate is only a gate if it runs over everything.
 - **`A5`'s quote is set in code, in one place:** `IDENTITY_QUOTE` and `IDENTITY_ATTRIBUTION` in
   `src/lib/utils/identity-line.ts`. There is **no edit control in the UI** — the owner asked for the change
   icon to be removed. The per-goal, user-editable version shipped 2026-10-17 and was retired the same day;
@@ -2848,7 +2895,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2`, `A3` and `A5` have all shipped** (A5 completed 2026-10-17). **Phase 2's first unchecked line is now `A6`** — loading/processing animation instead of blank screens (no new questions; the cleanest remaining Phase 2 item) · then **`A7`** (just-in-time permission education, which is where the battery rules live) · `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2`, `A3` and `A5` have all shipped** (A5 completed 2026-10-17). **All Phase 1 gates now genuinely pass, including `npm run lint` for the first time.** **Phase 2's first unchecked line is `A6`** — loading/processing animation instead of blank screens (no new questions; the cleanest remaining Phase 2 item) · then **`A7`** (just-in-time permission education, which is where the battery rules live) · `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
 | Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |

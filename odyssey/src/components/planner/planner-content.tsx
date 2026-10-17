@@ -200,6 +200,12 @@ export function PlannerContent() {
     }));
   };
 
+  // The React setters ARE listed, though they are stable by contract and the old
+  // `[]` was safe at runtime. Listing them is what React Compiler needs to be able
+  // to optimise this component at all -- without them it bails out of the WHOLE
+  // planner screen, not just these two functions. `db`, `getCachedBlocks`,
+  // `setCachedBlocks` and `writeString` are module bindings and stay out of the
+  // array: including them would be noise, and they cannot change.
   const loadBlocks = useCallback(async (dateStr: string) => {
     try {
       const cached = getCachedBlocks(dateStr);
@@ -216,7 +222,7 @@ export function PlannerContent() {
       // out", not "this day is empty", and the empty state must not claim it.
       setBlocksLoading(false);
     }
-  }, []);
+  }, [setBlocks, setBlocksLoading]);
 
   // Resolve the schedule date from the URL (falls back to today). The state
   // sync is done during render so React Compiler doesn't flag a synchronous
@@ -325,6 +331,9 @@ export function PlannerContent() {
     fetchHabits(user.id, selectedDate);
   }, [user?.id, selectedDate, fetchHabits]);
 
+  // Same reasoning as `loadBlocks`: the setters are listed so React Compiler can
+  // optimise this component rather than skipping the entire screen. `writeString`
+  // and `getCachedBlocks` are module bindings and stay out.
   const handleSelectDate = useCallback((dateStr: string) => {
     setSelectedDate(dateStr);
     try {
@@ -337,7 +346,7 @@ export function PlannerContent() {
     if (cached.length > 0) {
       setBlocks(cached);
     }
-  }, []);
+  }, [setSelectedDate, setBlocks]);
 
   // Build full 24 hours array (Unscheduled hours remain EMPTY - no fake titles)
   const full24Hours = useMemo(() => {
