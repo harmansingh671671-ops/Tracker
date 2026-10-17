@@ -3,33 +3,44 @@
  *
  * ## Why this is a module and not an `if` in the component
  *
- * `journey-day-schedule.tsx` has **four** buckets (`work` / `habits` / `buffer` /
- * `sleep`) while the pickers on Day Schedule and in the planner write **five**
- * (`work` / `vitality` / `sync` / `renewal` / `sleep`). Three of the five a user
- * can pick have no bucket on that screen, so its `normalizeCategory` folded them:
+ * `day-schedule/page.tsx` seeds each hour's category from **state** that was
+ * populated out of the stored block's value, and that seed step is lossy for
+ * anything outside the five values its picker offers — it maps through a
+ * *display* vocabulary. So writing the seeded value back on every save meant
+ * **editing a block's title silently recategorised it**: a row stored `habits`
+ * came back as `vitality`, a row stored `buffer` as `renewal`.
  *
- * | stored      | Journey shows     |
- * |-------------|-------------------|
- * | `vitality`  | Habits & Vitality |
- * | `sync`      | Buffer & Breaks   |
- * | `renewal`   | Buffer & Breaks   |
+ * Bucketing is a **display** concern and belongs on the way in, not on the way
+ * out. Storing the bucket makes the display grouping the source of truth for
+ * the data.
  *
- * The edit dialog seeded its `<select>` from that folded value and then **saved
- * whatever came back out** — so opening a block to fix a typo in its title, and
- * pressing save, rewrote `sync` to `buffer` permanently. No error, no
- * confirmation, and the mislabel is visible the moment the dialog opens.
+ * ## `toJourneyBucket` has no caller, and that is deliberate
  *
- * Bucketing is a *display* concern and belongs on the way in, not on the way
- * out. Storing the bucket means the display grouping becomes the source of
- * truth for the data.
+ * It records the four-bucket scheme that `journey-day-schedule.tsx` used. That
+ * component was **orphaned** — exported and imported by nothing since September
+ * 2026, superseded by the `/day-schedule` route — and was deleted rather than
+ * left as 1,178 invisible lines carrying a duplicate of this exact trap.
+ *
+ * So this function now has **no production caller**. It is kept anyway, and
+ * tested, for one reason: the four-way fold is the mechanism behind `BUG-12`, and
+ * the whole failure was that the fold was invisible — named in a component
+ * nobody mounted, doing a lossy conversion nobody wrote a test for. Keeping it
+ * here, **named, exported and asserted**, means anyone reviving that grouping
+ * has to import it and read why it must not be written back. Delete it the day a
+ * four-bucket scheme is either genuinely wired up or definitively abandoned.
  */
 
-/** The four values `journey-day-schedule` groups by. */
+/**
+ * The four values the orphaned journey grouping collapsed to.
+ *
+ * Three of the five categories the pickers offer have no bucket here, which is
+ * precisely why it could not be used as a storage vocabulary.
+ */
 export const JOURNEY_BUCKETS = ["work", "habits", "buffer", "sleep"] as const;
 export type JourneyBucket = (typeof JOURNEY_BUCKETS)[number];
 
 /**
- * Folds a stored category into the nearest Journey bucket, for **display only**.
+ * Folds a stored category into the nearest four-bucket group, for **display**.
  *
  * Never call this to decide what to save — that is what silently destroyed data.
  * Its return value belongs in a `<select>`'s `value`, not in a database write.
@@ -44,11 +55,11 @@ export function toJourneyBucket(category: string, title?: string): JourneyBucket
 }
 
 /**
- * What to write as `category` when the edit dialog is saved.
+ * What to write as `category` when a block's edit is saved.
  *
  * **Untouched means unchanged.** The stored value is returned verbatim, so a
- * value this screen cannot display is preserved rather than overwritten with the
- * nearest bucket it *can*.
+ * value the screen cannot display is preserved rather than overwritten with
+ * something it can.
  *
  * `touched` is passed in rather than inferred from `stored === chosen`, and that
  * is the load-bearing detail. Value comparison is wrong in both directions:
@@ -57,8 +68,8 @@ export function toJourneyBucket(category: string, title?: string): JourneyBucket
  * would score as "no change" — and it would be discarded. Only the
  * interaction itself can answer "did the user mean this?".
  *
- * An explicitly emptied category is honoured as the user typing it, rather than
- * being treated as absent and silently restoring the old value.
+ * An explicitly emptied category is honoured as the user clearing it, rather
+ * than being treated as absent and silently restoring the old value.
  */
 export function resolveEditedCategory(args: {
   stored: string;

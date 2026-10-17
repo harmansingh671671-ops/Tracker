@@ -617,6 +617,60 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `BUG-13` resolved by deletion, and PowerShell 5.1 nearly destroyed `main_plan.md`
+
+Third commit of the "ready for new work" pass. Deleted the two orphaned schedule
+components — and then nearly committed a corrupted 1,142-line document, which is the more
+instructive half.
+
+**Deletion, after establishing it was dead rather than merely unwired.** `git log -S` on
+each symbol found when it was *last imported*: `DayScheduleModal` in `624ad42`
+*"Refinement Patch 5"* (2026-09-16), `JourneyDaySchedule` in `0cd4907` *"Refinement
+Patch 7"* (2026-09-17). **Orphaned about a month**, and each was *created by* the patch
+that last imported it — so this was never a refactor that removed a call site; the call
+site was never added. `/day-schedule/page.tsx` (1,103 lines) supersedes the modal: same
+job, **10x the allocation-bar references (10 vs 1)**, same auto-fill-sleep and category
+handling. **1,806 lines deleted.**
+
+`toJourneyBucket` therefore **has no production caller** and is kept anyway, with the
+reason written at the top of the module: it is the named, tested record of the four-bucket
+fold that *caused* `BUG-12`. The whole failure was that the fold was invisible — buried in
+a component nobody mounted. Making it importable and asserted is the fix; deleting it
+would re-hide the trap. The module says to delete it the day that grouping is either
+genuinely wired up or definitively abandoned.
+
+**Verified rather than assumed.** `check-orphan.js` sweeps **all 9 routes in both themes**
+for page errors, 4xx/5xx, layout overflow, and — the one that matters — **any surviving
+reference to the deleted symbols in shipped scripts**, because "imports nothing" is a
+claim a dynamic import or a string reference would defeat. `check-category.js` re-run: the
+`BUG-12` round trip still passes. Lint warnings dropped **100 → 98**.
+
+### ⚠️ The near-miss: **never edit a UTF-8 doc with PowerShell `Get-Content`/`Set-Content`**
+
+`edit` kept dropping my `path` argument on a large payload, so I fell back to splicing the
+line with PowerShell. PowerShell 5.1's `Get-Content` **reads UTF-8 as ANSI**, so every
+em-dash (U+2014) became three mojibake chars; `Set-Content -Encoding UTF8` then wrote
+those back. Result: **928 corruptions across all 1,142 lines**, `git diff --stat` showing
+**571 insertions / 571 deletions**, and a **UTF-8 BOM** on top. Caught by
+`git diff --stat` looking far too large, reverted with `git checkout --`.
+
+- **`Get-Content` / `Set-Content` / `Out-File` on this repo's `.md` files are unsafe.**
+  Use the `edit` / `write` tools. If a shell splice is genuinely unavoidable, read and
+  write with `[System.IO.File]::ReadAllText/WriteAllText` and an explicit
+  `New-Object System.Text.UTF8Encoding($false)`.
+- **`git diff --stat` is the cheap guard.** One line changed should read `1  1`. A
+  whole-file diff means something rewrote every line — investigate before committing.
+- **Two more traps in the same session:** `Set-Content -Encoding UTF8` **adds a BOM** in
+  PS 5.1, and **`encoding.test.ts` does not catch it** — that guard only walks `src/`, so
+  every `.md` in the repo is currently unguarded. A BOM on a markdown file is harmless to
+  git but is exactly the failure `BUG-4` was about. **Worth extending the guard to
+  `.md`; not done here.**
+- **The console lies about encoding.** `main_plan.md`'s 869 real em-dashes render as
+  mojibake in PowerShell output. Judge file encoding by **codepoint counts and first-3-bytes**,
+  never by what the terminal shows.
+
+
+
 ### 2026-10-17 — I was wrong about `PERF-9`/9a, and enumerating beat reasoning
 
 Second commit of the "ready for new work" pass. Deleted the dead animation CSS —

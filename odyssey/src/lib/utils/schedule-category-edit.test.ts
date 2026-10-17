@@ -44,10 +44,14 @@ function dayScheduleNormalizer(cat?: string, hour?: number): string {
 // =========================================================================
 describe("resolveEditedCategory", () => {
   // ---------------------------------------------------------------------
-  // THE FIX. Two live save paths used to write back a *display* normaliser's
-  // output whenever the user edited a block's TITLE:
-  //   - `app/day-schedule/page.tsx`  (LIVE)
-  //   - `journey-day-schedule.tsx`    (currently orphaned -- see below)
+  // THE FIX, on the LIVE path. `app/day-schedule/page.tsx` used to write back a
+  // *display* normaliser's output whenever the user edited a block's TITLE.
+  //
+  // The same bug existed in `journey-day-schedule.tsx`, which additionally
+  // overwrote `tag` (a habit id) with a category label. That component was
+  // orphaned -- imported by nothing since September 2026 -- and has since been
+  // deleted, so `toJourneyBucket` below now has no production caller. It is
+  // retained, named and tested on purpose; see the module doc comment.
   // ---------------------------------------------------------------------
   it("preserves a category it cannot display when the user did not touch the dropdown", () => {
     for (const stored of PICKER_IDS) {
@@ -107,7 +111,7 @@ describe("resolveEditedCategory", () => {
 });
 
 // =========================================================================
-describe("toJourneyBucket (display only)", () => {
+describe("toJourneyBucket (display only, no production caller)", () => {
   it("always returns one of the four buckets", () => {
     for (const c of [...PICKER_IDS, ...SCHEDULE_CATEGORIES, "", "nonsense", "  "]) {
       expect(JOURNEY_BUCKETS).toContain(toJourneyBucket(c));
