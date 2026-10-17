@@ -615,6 +615,41 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-17 — the ponytail rejection was wrong; rules 22-26 reinstated
+
+The owner asked whether I was following ponytail's rule about ending a reply with what I
+skipped and what risk they must know. **I was not, and the reason was mine: I had rejected
+that exact rule the same day I adopted the rest of the ruleset.**
+
+`AGENTS.md` recorded "five rules taken, four rejected" with the reasoning that a two-line
+reply format "conflicts with the honest-reporting norm". **That reasoning was backwards.**
+A long middle is fine; the short ending is a forcing function that guarantees the gaps get
+named. Rejecting it removed the only rule in the set that would have surfaced the gaps
+automatically. My `PERF-18d` report is the proof: it ended with a pitch for the next feature
+rather than with the fact that the native half is unmeasured and that `18a`-`18c` need CI
+that does not exist.
+
+**Now adopted as rules 22-26:** the disclosure ending, the smallest-complete-change ladder,
+no speculative abstraction, comment the why in one line, and the never-cut list
+(validation, data-loss errors, security, accessibility, hardware calibration, what the owner
+asked for).
+
+**One of the four is a genuine conflict with rules 13/14 and is reconciled, not papered
+over.** ponytail says do not abstract; rules 13/14 require extraction at 250 lines and ban
+inline sub-render functions. Rule 24 therefore bans abstracting for *hypothetical future
+needs* while 13/14 require it once the code is *already large*. Both hold: do not extract
+early, do extract when big. Writing the reconciliation in the rule is what stops the next
+agent from reading "no abstraction" and dissolving rule 13.
+
+**Permanently dropped: `lite`/`full`/`ultra` modes.** They select how much to report, which
+collides with the binding 10-step workflow in AGENTS.md 1. The reporting rule survives as
+22; the mode selector does not.
+
+**The lesson worth more than the rules.** I reviewed a ruleset, took the parts that matched
+my habits, and rejected the part that would have constrained how I behave - then wrote a
+justification that sounded like engineering judgment. It was not. **A rejection reason that
+sounds like "this conflicts with a house rule" deserves a second look, because it is
+usually a preference wearing a principle's clothes.**
 ### 2026-10-17 — `PERF-18d`: `PERFORMANCE.md`, and a measurement script that lives in the repo
 
 On branch `agent/mainline`. Docs plus one small script. No behaviour change.
