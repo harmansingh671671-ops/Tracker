@@ -617,6 +617,83 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `PERF-4`/4g: the 20:00 reminder polled all day, and was keyed to the wrong date
+
+Owner instruction: *"except the wallpaper related things fixed everything else"*. Three
+contained fixes were approved as three commits. This is commit 1 of 3.
+
+**The timer.** `evening-reminder-modal.tsx` ran `setInterval(checkTomorrowSchedule, 60000)`
+for the life of the app — **~1,440 DB reads/day** while open. Worse than the count: it
+performed the read **before** checking whether the modal could open, so for the 20 hours
+before 20:00 it queried tomorrow's blocks, called **three `setState`s unconditionally**
+(a re-render a minute for values nobody was reading), and then returned.
+
+- All decisions extracted to `src/lib/utils/evening-reminder.ts` as pure functions,
+  **20 tests**. `msUntilNextEvaluation` is the interesting one.
+- Schedule is now a **self-rescheduling `setTimeout`** at the next moment the answer can
+  change: 20:00 before then, the next minute boundary after. Plus `visibilitychange`
+  → re-evaluate (a suspended tab can miss its own boundary).
+- **No work at all while the modal is open** — a user cannot edit the schedule behind an
+  overlay. Done via `isOpen` in the effect deps + a `cancelled` flag, **not** a ref read
+  during render (`react-hooks/refs` forbids it, correctly).
+
+**Bug found while fixing it — the UTC/local split.** The dismissal key was
+`now.toISOString().split("T")[0]` (**UTC**) while the trigger was `now.getHours()`
+(**local**). Where those disagree, "dismissed" is written under the wrong day and not
+found next evening → the modal reappeared after dismissal. Now `localDateStr()`. Same class
+as the chest key fixed in the `A7` era; it is a **recurring shape in this repo, not a
+one-off** — `grep` found 4 more sites, recorded as `BUG-11` as an *audit item, not a
+defect claim*, because a UTC key is fine when both sides use it.
+
+**Two mistakes of my own, both caught before shipping:**
+
+1. I added a 90s cap on the re-evaluation delay "so a suspended tab can't return to a
+   stale timer". That makes the daytime case fire **more** often than the 60s interval it
+   replaced — a fix that tripled the work while reading like an improvement. A test now
+   asserts the delay is never < 60s anywhere before 20:00 (`is strictly cheaper than a
+   60s poll`, every hour, four minutes each). **`visibilitychange` is the right answer to
+   that concern, not a shorter timer.**
+2. The imported `tomorrowDateStr` was **shadowed by a state variable of the same name**,
+   so `tomorrowDateStr(now)` resolved to a `string`. `tsc` caught it as *not callable*.
+   Now imported as `getTomorrowDateStr`.
+
+**Verification, and the harness lying twice first.**
+
+- **Run 1 asserted on `/` and found no modal at a faked 21:00** — which read exactly like
+  "the fix silenced the feature". It hadn't: `AppShell` returns early for `pathname === "/"`
+  and mounts `<EveningReminderModal />` **only in the non-early-return branch**. The
+  reminder has therefore **never been able to appear on the landing screen**. Recorded as
+  `BUG-10`, **not fixed here** — restoring it is a visible behaviour change to a screen
+  this commit never touched. *Lesson: a component's mount site is part of its behaviour;
+  assert against a page where it is actually mounted.*
+- **Run 2 threw React `#418` hydration errors on both pages**, which looked like a
+  regression. `diag-hydration.js` isolates it to the harness: **0 errors with no clock
+  stub, 1 error with a stub at *any* fixed date — including today's own hour.** Server
+  renders one instant, client another. The assertion is **scoped, not deleted**.
+- The load-bearing check is **the read count, not the dialog**: at a faked 12:00,
+  **zero** `scheduleBlocks` reads after the page settles. Patching `IDBObjectStore`/
+  `IDBIndex` prototypes measures what the browser did, not what the app believes it asked.
+  Also verified: still fires at 21:00, key is the local day, stays dismissed across
+  reload, both themes render with no overflow.
+
+**Durable technique — freezing the clock in Puppeteer.** `evaluateOnNewDocument` with a
+`Date` subclass whose no-arg constructor returns a fixed local instant *while still
+advancing in real time*:
+
+```js
+const base = new Real(2026, 9, 16, 21, 0, 0, 0).getTime();   // LOCAL time
+const t0 = Real.now();
+function FakeDate(...a) {
+  if (a.length === 0) return new Real(base + (Real.now() - t0));
+  return new Real(...a);
+}
+FakeDate.prototype = Real.prototype;   // keeps instanceof working
+```
+
+Build times from components with local-time branches: `new Real(y, m, d, h, ...)` (local),
+**never** a `"...Z"` ISO string (UTC). Keep the real-time drift or anything measuring
+elapsed time spins forever. Cost: one unavoidable `#418` per page — see above.
+
 ### 2026-10-17 — `A7`: two spec halves could not ship, and the honesty bugs were worse than the feature
 
 **Owner instruction:** *"ok implement it"* — build the permission explainer, cost in the copy, no animated
@@ -3021,6 +3098,42 @@ above the vault banner. The follow-up task is closed.
 | Next after Phase 1 | Phase 2 — `A1`/`XL14`, `M16`, **`A2`** and **`A3`** are done. **`A2` landed as ONE scene, not four**: the researched walkthrough asked for wallpaper + habits + schedule + rewards, and was cut on owner instruction to *"only explain the things required to use the app for basic tasks"*. **`A3` landed as reordering, and its paywall half was dropped:** `HD25` asked for profession-driven **discount codes**, which `A3`'s own text forbids (*"do not use profession to obscure or discriminate on price"*) and which this local-first app cannot bill anyway — `HD25` is now **`NOT APPROVED`**. Remaining gaps are `A5` (identity line + skippable), `A6`, `A7` |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
+### 2026-10-17 — after `PERF-4`/4g (commit 1 of 3)
+
+- **HEAD at last update:** this commit — **`PERF-4`/4g**, the 20:00 evening-reminder timer
+  and its UTC dismissal key. Before it: `238a0a0` (**`A7`**), `e4ae4df` (**`A6`**),
+  `8c71e61` (3 `preserve-manual-memoization` errors), `79ff34e` (quote constant).
+- **`main` is ahead of `origin/main` by 3** — `e4ae4df`, `238a0a0`, and this commit.
+  **Do NOT push. Owner instruction, standing:** *"you will not push anything, you will
+  only commit things, i will push the code."*
+- Tests: **25 suites, 381 tests green** (was 24/361). `tsc --noEmit` exit 0,
+  `npx eslint src` exit 0 (0 errors / 100 warnings, all pre-existing `no-unused-vars`),
+  production build clean.
+- **Next: commit 2 of 3** — the `animate-pulse` violations that ignore
+  `prefers-reduced-motion`. `feedback-modal.tsx:189` and `:218` are the two named ones
+  (the pulsing "online" dot). `main_plan.md` **`PERF-9`** `NOT BUILT` is the home for
+  it; **9c** is exactly this. House convention: put the keyframes inside a
+  `prefers-reduced-motion: no-preference` query in `globals.css`, as `keystonePulse`,
+  `slateSweep`, `perfectDayGlow` and `holdRimPulse` already do.
+- **Then commit 3 of 3** — narrow `src/lib/db.ts:180`
+  `category: ScheduleCategory | (string & {})`. **Read `P0-T3`'s session log first
+  (§9, 2026-10-15): the escape hatch was load-bearing.** `P0-T3` narrowed the *habit*
+  category and it immediately exposed **8 real violations**; the `ScheduleBlock`
+  equivalent is unexamined. Expect the same, and do not narrow it until the violations
+  are found and listed.
+- **New findings recorded, not fixed:** `BUG-10` (the evening reminder is never mounted
+  on `/`, so it cannot appear on the landing screen) and `BUG-11` (4 more
+  `toISOString().split("T")[0]` UTC keys, recorded as an audit item, not a defect claim).
+- **Correction to an earlier row in this section:** it says *"Tests: 24 suites, 361 tests
+  green at `79ff34e`"* and lists `P0-T3` as *"the only genuinely open Phase 1 code item …
+  category type still dual-case: `Category | (string & {})` at `db.ts:102`/`117`"*. Both
+  are **stale**. `P0-T3` **shipped** (`main_plan.md` line 302 records it `SHIPPED`, and the
+  `LEGACY_HABIT_CATEGORY_MAP` + `version(2).upgrade()` it introduced are in `db.ts` now),
+  and the `Habit.category` escape hatch **is** closed. What remains open is the
+  **`ScheduleBlock.category`** escape hatch, which is a *different* line
+  (`db.ts:180`, in the `ScheduleBlock` interface) and is not part of `P0-T3`.
+
+
 ---
 
 ## 11. RULES — DO / DO NOT (binding; distilled from `AGENTS.md`, `FEATURE_WORKFLOW.md`, `DEVELOPMENT_PLAN.md` §6, `.clinerules`)
@@ -3045,6 +3158,21 @@ above the vault banner. The follow-up task is closed.
 - Prefer line-range reads; **query Graphify before a broad scan**; run an
   impact analysis before editing a shared file.
 - Run the cheapest gate that can fail, first.
+- **Before asserting a component "did not appear", confirm it is mounted on the page you
+  loaded.** `AppShell` returns early for `/`, so `<EveningReminderModal />` lives only in
+  the *other* branch — and a check pointed at `/` reported "the fix silenced the feature
+  entirely" when the truth was that the feature had never been visible there at all. A
+  false negative like that sends you to debug the wrong file. `grep` for the mount site
+  first; it is one call and it is decisive.
+- **A shorter timer is not automatically a cheaper timer.** Capping a 20:00 re-check
+  delay at 90s "for safety" makes the daytime case fire *more* often than the 60s
+  interval it replaced. When the worry is a tab that slept through its boundary, the
+  answer is a `visibilitychange` re-check, not a smaller number.
+- **When a harness stub causes an error, prove it before filtering it.** React `#418`
+  looked like a hydration regression; a stubbed clock cannot avoid it (server and client
+  render different instants). `diag-hydration.js` — 0 errors with no stub, 1 with a stub
+  at *any* fixed date including today's own hour — is what turned "suppress the warning"
+  into a scoped assertion with a recorded reason.
 - **Never leave a background server running.** Chain
   `Start-Process → assert Ready → use → kill by the port's owning PID` into one
   command. `Start-Process` returns while the server keeps running forever, and a

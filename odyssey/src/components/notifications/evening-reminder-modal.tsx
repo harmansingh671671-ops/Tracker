@@ -6,6 +6,17 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import { Moon, Sparkles, X, ChevronRight } from "lucide-react";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
+import {
+  countPlannedHours,
+  dismissalKeyFor,
+  isPastReminderHour,
+  msUntilNextEvaluation,
+  shouldOpenReminder,
+  // Aliased: the component has a state variable of the same name, and an
+  // un-aliased import is shadowed by it — `tomorrowDateStr(now)` below would
+  // have resolved to the `string` state and thrown at runtime.
+  tomorrowDateStr as getTomorrowDateStr,
+} from "@/lib/utils/evening-reminder";
 
 export function EveningReminderModal() {
   const router = useRouter();
@@ -18,23 +29,31 @@ export function EveningReminderModal() {
   const checkTomorrowSchedule = useCallback(async () => {
     if (!user) return;
 
-    // Check if after 20:00 (8:00 PM)
     const now = new Date();
-    const currentH = now.getHours();
 
-    // Check if dismissed in this browser session
-    const dismissedKey = `odyssey_dismiss_2000_${now.toISOString().split("T")[0]}`;
-    if (typeof window !== "undefined" && sessionStorage.getItem(dismissedKey)) {
-      return;
-    }
+    // **Cheapest guard first.** Before the hour the modal cannot appear, so there
+    // is no reason to touch the database, set state, or re-render at all. The old
+    // version read tomorrow's blocks and only then decided not to open anything —
+    // twenty wasted hours a day.
+    if (!isPastReminderHour(now)) return;
 
-    // Tomorrow's date
+    if (sessionStorage.getItem(dismissalKeyFor(now))) return;
+
+    const tomorrowStr = getTomorrowDateStr(now);
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
-    const yyyy = tomorrow.getFullYear();
-    const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
-    const dd = String(tomorrow.getDate()).padStart(2, "0");
-    const tomorrowStr = `${yyyy}-${mm}-${dd}`;
+
+    const tomorrowBlocks = await db.scheduleBlocks
+      .where("[userId+date]")
+      .equals([user.id, tomorrowStr])
+      .toArray();
+
+    const hoursCount = countPlannedHours(tomorrowBlocks);
+
+    // State is written ONLY when the modal will actually open. Previously all
+    // three setters ran every minute regardless — a re-render a minute for values
+    // nobody was looking at.
+    if (!shouldOpenReminder(hoursCount, now)) return;
 
     setTomorrowDateStr(tomorrowStr);
     setTomorrowFormatted(
@@ -44,66 +63,82 @@ export function EveningReminderModal() {
         day: "numeric",
       })
     );
-
-    // Query tomorrow's blocks
-    const tomorrowBlocks = await db.scheduleBlocks
-      .where("[userId+date]")
-      .equals([user.id, tomorrowStr])
-      .toArray();
-
-    // Calculate total hours
-    const hourMap = new Set<number>();
-    for (const b of tomorrowBlocks) {
-      const [sHStr] = b.startTime.split(":");
-      const [eHStr] = b.endTime.split(":");
-      const sH = parseInt(sHStr, 10);
-      let eH = parseInt(eHStr, 10);
-      if (b.endTime === "24:00" || (eH === 0 && sH > 0)) eH = 24;
-      for (let h = sH; h < eH; h++) {
-        hourMap.add(h);
-      }
-    }
-
-    const hoursCount = hourMap.size;
     setPlannedHours(hoursCount);
+    setIsOpen(true);
 
-    // Trigger if after 20:00 and schedule is incomplete (< 16 hours planned)
-    const isPast2000 = currentH >= 20;
-    if (isPast2000 && hoursCount < 16) {
-      setIsOpen(true);
-
-      // Attempt native browser notification if granted
-      if (typeof window !== "undefined" && "Notification" in window) {
-        if (Notification.permission === "granted") {
-          try {
-            new Notification("Odyssey: Plan Tomorrow's Schedule", {
-              body: `It's past 20:00! Your schedule for tomorrow is incomplete (${hoursCount}/24h planned). Plan your day before bed.`,
-              icon: "/favicon.ico",
-            });
-          } catch {
-            // Notification silenced or unsupported
-          }
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        try {
+          new Notification("Odyssey: Plan Tomorrow's Schedule", {
+            body: `It's past 20:00! Your schedule for tomorrow is incomplete (${hoursCount}/24h planned). Plan your day before bed.`,
+            icon: "/favicon.ico",
+          });
+        } catch {
+          // Notification silenced or unsupported
         }
       }
     }
   }, [user]);
 
+  /**
+   * Self-rescheduling timeout at the next moment the answer could change, plus a
+   * `visibilitychange` re-check.
+   *
+   * **This replaces a 60-second `setInterval` that ran for the life of the app** —
+   * roughly 1,440 database reads a day while it was open, plus four `setState`
+   * calls a minute (`AGENTS.md` rule 16, timer sprawl). Now: before 20:00 it is
+   * **one** timer for the whole afternoon; after 20:00 it is per-minute but only
+   * inside the window where it can matter; and not at all while the modal is open
+   * or the tab is hidden.
+   */
   useEffect(() => {
-    // Deferred to the next tick: the check is async, so its state updates are
-    // not synchronous, but the compiler flags any call to a state-setting
-    // function in an effect body.
-    const immediate = setTimeout(() => { void checkTomorrowSchedule(); }, 0);
-    // Check every 60 seconds
-    const interval = setInterval(checkTomorrowSchedule, 60000);
-    return () => { clearTimeout(immediate); clearInterval(interval); };
-  }, [checkTomorrowSchedule]);
+    // No user, nothing to check. Modal open, nothing to gain: the user cannot
+    // edit the schedule behind an overlay, so the timer does not merely stop
+    // re-checking — it is not created at all.
+    if (!user || isOpen) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    // `cancelled` is what makes the race safe. If the modal opens while this
+    // evaluation is still awaiting the database, the effect tears down and sets
+    // the flag; the `.finally()` below then declines to schedule, so a timer can
+    // never be armed behind a closed-over cancelled effect and leak.
+    const run = () => {
+      if (cancelled) return;
+      void checkTomorrowSchedule().finally(() => {
+        if (cancelled) return;
+        timer = setTimeout(run, msUntilNextEvaluation(new Date()));
+      });
+    };
+
+    // A suspended tab can miss its boundary entirely — the 20:00 timeout would
+    // fire hours late, or the tab may have been throttled past it. Re-evaluating
+    // on wake is both cheaper than a short timer firing into a hidden document
+    // and more correct than trusting a timer that may never have run.
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (timer) clearTimeout(timer);
+      run();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    run();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [checkTomorrowSchedule, user, isOpen]);
 
   const handleDismiss = () => {
     setIsOpen(false);
-    const now = new Date();
-    const dismissedKey = `odyssey_dismiss_2000_${now.toISOString().split("T")[0]}`;
     if (typeof window !== "undefined") {
-      sessionStorage.setItem(dismissedKey, "true");
+      // **Local** day, not `toISOString()`. The key used to be the UTC date while
+      // the trigger used the local hour, so for most timezones "dismissed" was
+      // written under the wrong day and the modal reappeared the next evening.
+      sessionStorage.setItem(dismissalKeyFor(new Date()), "true");
     }
   };
 
