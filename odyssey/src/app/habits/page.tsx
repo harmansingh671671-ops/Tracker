@@ -19,6 +19,7 @@ import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
 import { getCompletionToast, getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
+import { consumeNewAchievements } from "@/lib/utils/achievements";
 import {
   XP_CREATION_DIAMONDS,
   XP_CREATION_XP,
@@ -248,6 +249,7 @@ export default function HabitsPage() {
 
     const isNowCompleted = await toggleHabitLog(user.id, habitId, targetDate);
     const habit = habits.find((h) => h.id === habitId);
+    const prevStreak = habit?.currentStreak ?? 0;
     const habitColor = habit ? getHabitColor(habit) : undefined;
     const isScheduled = habit ? isHabitScheduledOnDate(habit, targetDate) : true;
 
@@ -287,6 +289,19 @@ export default function HabitsPage() {
         live.todayLogs,
         live.historyLogs
       ).isAllCompleted;
+
+      // M15 -- achievement micro-narratives. Only fires on a genuine upward
+      // crossing of a streak milestone, and only once per habit per milestone.
+      const liveHabit = live.habits.find((h) => h.id === habitId);
+      const newStreak = liveHabit?.currentStreak ?? prevStreak;
+      const unlocked = isNowCompleted
+        ? consumeNewAchievements(habitId, prevStreak, newStreak)
+        : [];
+      if (unlocked.length > 0) {
+        unlocked.forEach((a, i) => {
+          window.setTimeout(() => showToast(`${a.title} — ${a.narrative}`), i * 4200);
+        });
+      }
 
       // M13 -- the toast copy lives in a tested module so the rules (never claim
       // more than happened, never call pending XP earned) are enforced once.

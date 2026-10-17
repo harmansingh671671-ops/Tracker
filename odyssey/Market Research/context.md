@@ -616,7 +616,18 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
-### 2026-10-17 — `PERF-0` reconciled, and the version bump is a trap I nearly walked into
+### 2026-10-17 — `M15`: streak-milestone micro-narratives, once per habit
+
+Shipped the first slice of achievement unlock micro-narratives. New pure module
+`src/lib/utils/achievements.ts`: a 4-item catalogue (3/7/14/30-day streaks), a pure
+`newlyCrossedStreakMilestones(prev, next)` that only counts upward crossings (so
+demotions and no-change fire nothing, matching M14's refusal logic), and a
+localStorage-backed dedup so each milestone fires once per habit and survives reload.
+Wired into `/habits`' toggle handler: after a completion, the live store's updated
+streak is compared against the pre-toggle streak; any newly crossed milestone toasts
+`"<title> — <narrative>"`. 7 tests (localStorage stubbed for the node env).
+
+Gates: `tsc` exit 0; `eslint src` 0 errors; 27 suites / 413 tests green; build clean.
 
 Final commit of the "ready for new work" pass. Re-verified **every** §6.5.2 figure
 against source and recorded the web baselines. The point of this item is that the plan's
@@ -3461,7 +3472,7 @@ above the vault banner. The follow-up task is closed.
 - **`main` is ahead of `origin/main` by 5** — `e4ae4df`, `238a0a0`, `6367493`,
   `da79b69`, and this commit. **Do NOT push. Owner instruction, standing:**
   *"you will not push anything, you will only commit things, i will push the code."*
-- Tests: **26 suites, 395 tests green** (was 24/361 at the start of this run).
+- Tests: **27 suites, 413 tests green** at this commit.
   `tsc --noEmit` exit 0, `npx eslint src` exit 0 (0 errors / 100 pre-existing
   `no-unused-vars` warnings), production build clean. All three ports clear.
 - **The three commits, in order:**
