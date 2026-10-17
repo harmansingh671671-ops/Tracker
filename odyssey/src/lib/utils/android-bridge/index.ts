@@ -74,6 +74,9 @@ export {
   isCadenceNotificationsEnabled,
   triggerNativeTestNotification,
   sendTestNotificationToAndroid,
+  getNotificationPermissionState,
+  type NotificationPermissionState,
+  type TestNotificationOutcome,
 } from "./notifications";
 
 export {

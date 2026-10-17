@@ -617,6 +617,58 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `A7`: two spec halves could not ship, and the honesty bugs were worse than the feature
+
+**Owner instruction:** *"ok implement it"* — build the permission explainer, cost in the copy, no animated
+preview, fix the honesty bug.
+
+**Two of `A7`'s three parts could not ship as written, and both are recorded rather than quietly dropped.**
+**The focus-block half is deferred: the app never requests it** — app blocking is `D6`, Phase 6 — so there is
+nothing to explain and the screen could never be reached. **The animated phone preview is deliberately
+omitted** despite the spec asking for it: this repo's research records users disliking pre-setup UI, and a
+mock phone costs the room the *reason* needs.
+
+**The cost leads the copy, deliberately.** A notification is a **device wake-up**, and this repo logs wasted
+wake-ups as a first-class performance concern — so the screen says *"each alert wakes your phone"* and names the
+23:00–06:00 silence rather than listing features. **An education screen that oversells is worse than none.**
+
+**Nothing re-nags.** There is deliberately **no "don't ask again" flag**: whether to show the explainer is the
+user's call every time. A soft refusal must never become permanent.
+
+**Two honesty bugs, and they were worse than the feature:**
+
+1. The test-notification button toasted **"Sent XX:57 heads-up test alert" unconditionally** — including when the
+   call had only *requested* permission and had not been told the answer. **The app claimed a notification
+   existed at the exact moment it knew least.** `sendTestNotificationToAndroid` is now `async` and returns a
+   real outcome (`sent` / `needs-permission` / `denied` / `unavailable`) instead of a boolean it could not
+   honestly fill.
+2. `readString` returns `""` when a key is unset and **never `null`** — so `if (saved !== null)` was **always
+   true**, and an unset preference evaluated `"" === "true"` → **false**. Opening Settings could display the
+   toggle **off for alerts the native scheduler was still firing**. Guard is now `has()`.
+
+**Reduced motion was wrong twice, and both times I had to measure rather than guess.** framer-motion does not
+honour `prefers-reduced-motion` on its own, and neither does tailwindcss-animate's `animate-in`. Fixing only
+the framer-motion side left one animation still running, so I wrote a diagnostic that **names the running
+animation** instead of counting them — it turned out to be a pre-existing pulsing "online" dot in the feedback
+modal, **13 `animate-pulse` usages app-wide**. That also revealed my assertion was wrong: counting animations
+across the whole page was measuring someone else's bug while claiming to measure `A7`. Scoped to the dialog.
+
+**Extracting the card introduced a regression, and the browser check caught it.** The sheet was already 419
+lines and this feature would have grown it further, so the block moved to
+`components/settings/heads-up-alerts-card.tsx`. But the sheet's read-on-open trick used a **`prevIsOpen`
+transition guard, which cannot survive being nested**: the card mounts *at* open, so `prevIsOpen` initialised
+equal, the transition was undetectable, and **an explicitly stored `"false"` was silently ignored**. A lazy
+`useState` initialiser is the correct shape for a component that mounts when it becomes visible. **The first
+assertion passed anyway — because the default happens to be `true`**, so a green check was hiding a real break.
+That is the sixth time this session a check passed for a reason nobody looked at.
+
+Gates: `tsc` exit 0; **`eslint src` 0 errors**; **24 suites / 361 tests** green; build clean. In-browser in both
+themes at 360/390/430: **`requestPermission` call count = 0** before "Show me" and exactly **1** after — the
+whole feature is a single ordering claim, so it is asserted by **counting calls** rather than by watching for a
+dialog a browser context could fake; "Not now" asks nothing and closes; a **denied** grant is **not** reported as
+sent; a pre-blocked permission shows no explainer and is not re-requested; no mock-phone element present; unset
+preference renders **on**, explicit `"false"` renders **off**.
+
 ### 2026-10-17 — `A6`: the spec's premise was false, and the honest version was smaller than the brief
 
 **Owner instruction:** *"approved, complete a6"* after a briefing that already warned the item was the weakest
@@ -2841,6 +2893,19 @@ to know where things stand.
   assertion for `A6` reported success because the **read had already finished**, not because reduced motion was
   honoured. Poll for the state instead. Related: **CPU throttling is two-sided** — 20× was flaky on
   `A6`'s loading indicator and 40× made the page too slow to *reach* the state at all.
+- **A read-on-open `prevIsOpen` transition guard does NOT survive being nested.** Measured 2026-10-17: the
+  trick works in a component that stays mounted across close/open, but a child rendered *inside* the opened
+  panel mounts already-open, so the transition never fires. In `heads-up-alerts-card.tsx` that silently ignored
+  an explicitly stored `false`. **Use a lazy `useState` initialiser when the component mounts when it becomes
+  visible.**
+- **`readString` returns `""` for an unset key — never `null`.** Code of the form
+  `if (readString(K) !== null)` is **always true**. That bug shipped in `profile-settings-sheet.tsx` and made
+  Settings show the Heads-Up toggle off for alerts still firing. **Use `has(K)` to test for "unset"**, and never
+  test a storage helper's return against `null` without reading its signature.
+- **`sendTestNotificationToAndroid` is async and returns an `outcome`, not a boolean** (`A7`). It used to return
+  `true` the moment it *requested* permission, and the caller toasted "Sent…" regardless.
+- **The agent does NOT push.** Owner instruction 2026-10-17: **commit only — the owner pushes.** Report working
+  tree / unpushed state; never run `git push`.
 - **`A6`'s `LoadingIndicator` lives in `src/components/common/loading-indicator.tsx`** and is the app's single
   loading treatment, used by `/day-schedule` and the day-schedule modal. **Three loading states are
   deliberately NOT it**: the planner header skeleton and the two date strips' grey bars are *inline shape
@@ -2948,7 +3013,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2`, `A3`, `A5` and `A6` have all shipped.** All Phase 1 gates pass, including `npm run lint` for the first time. **Phase 2's first unchecked line is now `A7`** — just-in-time permission education (explain notification/focus-block permissions at the moment they are requested, with a reason, a step count and "Not now"; no permission bundle at first launch). **This is the item to weigh above `A6` on value:** it sits where this repo's hardest-won constraints are — the wallpaper is default-off for battery reasons (`P8-E1`), and notifications are exactly the permission most worth explaining *why*. It is just the messier build. `A4` is explicitly routed to **Phase 7**, which is also what holds `M17` (its loader target — AI computation states — does not exist until then). **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2`, `A3`, `A5`, `A6` and `A7` have all shipped — Phase 2's onboarding and polish items are done**, and all Phase 1 gates pass including `npm run lint` for the first time. **The only Phase 2 items left are `A4`** (AI coach, explicitly routed to **Phase 7**) **and `M17`**, which is `DEFERRED` until AI exists because its loader target does not. **In plan order, next is Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` — 5 of its 18 items are already delivered and 4 of its figures are wrong, so nothing should be built until that pass · then **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` is native and uncompiled, needing a device this machine cannot build). **Also worth deciding:** `version.json` still reads 1.3.6 / code 11 from 2026-10-04 with a stale changelog — harmless today (the APK streams Vercel), but Play will reject the next APK build until it is bumped. **And an APK rebuild is needed only for Kotlin changes** — `BUG-7` is one. **Still undecided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so it may already be fixed. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
 | Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |

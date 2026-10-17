@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import { getStreakLabel } from "@/lib/utils/warm-copy";
-import { sendTestNotificationToAndroid, checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
+import { checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
+import { HeadsUpAlertsCard } from "@/components/settings/heads-up-alerts-card";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette, Image as ImageIcon } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
@@ -19,22 +20,13 @@ interface ProfileSettingsSheetProps {
 
 export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetProps) {
   const { user, fetchUser } = useUserStore();
-  const [hourlyAlertsEnabled, setHourlyAlertsEnabled] = useState(true);
-  const [totalBlocks, setTotalBlocks] = useState(0);
+    const [totalBlocks, setTotalBlocks] = useState(0);
   const [totalHabits, setTotalHabits] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const nativeVersion = getNativeAppVersion();
 
-  // Read the saved alert preference when the sheet opens. Done during render so
-  // React Compiler doesn't flag a synchronous setState in an effect.
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (prevIsOpen !== isOpen) {
-    setPrevIsOpen(isOpen);
-    if (isOpen) {
-      const saved = readString("odyssey_hourly_alerts");
-      if (saved !== null) setHourlyAlertsEnabled(saved === "true");
-    }
-  }
+  // The saved Heads-Up Alert preference is read inside
+  // `settings/heads-up-alerts-card.tsx`, which owns that storage key.
   const [latestRelease, setLatestRelease] = useState<{ versionCode: number; versionName: string } | null>(null);
 
   // Master wallpaper switch. This sheet is the ONLY settings surface reachable
@@ -68,12 +60,6 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  const handleToggleHourlyAlerts = (checked: boolean) => {
-    setHourlyAlertsEnabled(checked);
-    writeString("odyssey_hourly_alerts", String(checked));
-    showToast(checked ? "Hourly XX:57 Heads-Up Alerts enabled." : "Hourly alerts paused.");
   };
 
   const handleExportData = async () => {
@@ -121,11 +107,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
     reader.readAsText(file);
   };
 
-  const handleTestHourlyAlert = () => {
-    sendTestNotificationToAndroid("NOW", "Deep Monotasking Sprint", "Focus");
-    showToast("Sent XX:57 heads-up test alert via native engine.");
-  };
-
+  // A7 -- explain BEFORE asking.
   // Closes the sheet before routing, otherwise the sheet stays mounted over
   // the destination page.
   const router = useRouter();
@@ -224,41 +206,10 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
           <ThemeSwitcher />
         </div>
 
-        {/* Hourly Notification Settings */}
-        <div className="rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <Bell className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-on-surface">XX:57 Hourly Heads-Up Alert</h4>
-                <p className="text-xs text-on-surface-variant">Pings 3 minutes before the next hour task starts</p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
-              <input
-                type="checkbox"
-                checked={hourlyAlertsEnabled}
-                onChange={(e) => handleToggleHourlyAlerts(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-surface-container peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container after:rounded-full after:h-5 after:w-5 after:transition-all" />
-            </label>
-          </div>
-
-          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container text-on-surface-variant text-xs w-full">
-            <span>🛡️</span>
-            <span className="truncate">Auto-silenced during Sleep hours (23:00 - 06:00)</span>
-          </div>
-
-          <button
-            onClick={handleTestHourlyAlert}
-            className="w-full py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-bright text-xs font-mono font-medium text-tertiary transition-colors flex items-center justify-center gap-2"
-          >
-            <span>⚡ Send Test XX:57 Notification</span>
-          </button>
-        </div>
+        {/* Hourly Notification Settings -- extracted to `settings/heads-up-alerts-card.tsx`.
+            That file also owns `A7`'s permission education and the `odyssey_hourly_alerts`
+            key, so the whole notification concern sits in one place. */}
+        <HeadsUpAlertsCard isOpen={isOpen} onToast={showToast} />
 
         {/* Odyssey Wallpaper -- master switch, OFF by default.
             Deliberately placed next to the Heads-Up Alert toggle: both control
