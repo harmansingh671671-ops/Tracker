@@ -615,6 +615,52 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-17 - B3/S13 part 1: ADR 0003, additive schema, and the completion predicate
+
+Branch `agent/mainline`. Owner approved the scope cut to **two of four types** (simple +
+counted) and approved continuing on this branch.
+
+**Every habit was a checkbox.** `HabitLog.completed: boolean` was the whole record, so "read
+20 pages" and "read 3 pages" were indistinguishable - both just `true`. That is a missing
+question, not a missing field.
+
+**Shipped:** ADR 0003, the additive schema, and one `isHabitComplete` predicate with 17
+tests. `type`/`unit`/`targetValue` on the habit, `value` on the log. No Dexie version bump,
+no migration, no rewrite of anyone's history - which is the hard requirement, because a
+migration that rewrites logs is exactly how BUG-5 turned a streak of 0 into 1 in nine places.
+
+**The type is a closed union, deliberately.** `BUG-12` exists because
+`HabitCategory | (string & {})` accepted any string and therefore constrained nothing. Same
+trap, same door, so `HabitType` is closed and every new field's *absence* is defined rather
+than arbitrary.
+
+**The risky line is "logged but not done".** For a counted habit `log.completed` is a display
+cache, not the authority - the authority is `value >= targetValue`. A habit at 3 of 20 is
+`completed: true` and is **not** complete, and must not increment a streak, award XP, or fire
+the perfect-day calculation. That is the exact shape of `BUG-5`, which shipped because nine
+call sites each decided for themselves. So the predicate is one pure function, pinned by
+tests, and the test named for it is literally the BUG-5 case.
+
+**BUG-15, found while writing this and deliberately not fixed.** `habit-store.ts:540` computes
+the streak as arithmetic on a toggle: `isCompleted ? currentStreak + 1 : max(0, ... - 1)`.
+Un-ticking an *old* day decrements the *current* streak, and completing a *past* day
+increments it as though it were today. Both predate this feature. **Fixing it here would have
+made a contained feature unreviewable**, so it is recorded with the two concrete failures
+rather than quietly repaired. What this commit does give it is one correct, tested answer for
+"was this day completed" to build on.
+
+**The predicate has no production callers yet, on purpose.** There are **115 call sites
+across 13 files**, 42 of them in `habits/page.tsx` - the file the other agent is editing
+right now. Today every habit is `simple`, so the predicate is behaviourally identical to
+reading `log.completed`: adopting it across 13 files today would be a no-op with a live
+collision hotspot. It lands with the stepper UI, in the same commit that first makes a
+counted habit exist. **Recorded as a deliberate deferral in `main_plan.md`, not left for
+someone to discover as a dead export.**
+
+`avoid` and `timelimit` are deferred, with reasons recorded rather than dropped: `avoid`
+needs a violation state that changes what a completed day means for streaks, and `timelimit`
+needs a running per-habit timer - and `D2` says there is no focus timer at all, so that is a
+different feature wearing this feature's clothes.
 ### 2026-10-17 — the ponytail rejection was wrong; rules 22-26 reinstated
 
 The owner asked whether I was following ponytail's rule about ending a reply with what I
@@ -3662,7 +3708,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **Performance phase (§6.5)** — Phases 1–2 are closed. **Corrected 2026-10-17: this row said "Phase 1" and listed `A2`/`A3`/`A5`/`A6`/`A7` as next, all of which shipped days earlier.** Phase 1's gate is met and Phase 2's onboarding and polish items are done; the only Phase 2 remnants are `A4` (AI coach, routed to Phase 7) and `M17` (`DEFERRED` — its loader target does not exist) |
-| Next feature | **`B3` + `S13` — habit types and a numeric stepper.** Approved by the owner 2026-10-17, **not yet briefed, no code written.** It is the root of `S9`/`S13`/`C2`/`B4`, and it is the largest structural gap left: **every habit in the app is still a checkbox.** Because it is a schema + UI decision with knock-on effects it needs a brief first. This row previously said "no code feature is blocked or staged", which was true on 2026-10-07 and stopped being true the moment `PERF-4b` was chosen. The owner decisions that were listed here are all still open and none is urgent: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
+| Next feature | **`B3` + `S13` — habit types and a numeric stepper. IN PROGRESS, part 1 committed 2026-10-17.** Owner approved the scope cut to **two of four types** (simple + counted) and approved continuing on `agent/mainline`. **Shipped:** ADR 0003, the additive schema, `isHabitComplete` + 17 tests. **Next commit: the stepper UI AND adoption of the predicate at its 115 call sites across 13 files** — it has no production callers yet, deliberately, because until a counted habit can exist the change is a behavioural no-op. Also open: **`BUG-15`** (the streak is `+1/-1` arithmetic on a toggle, wrong for un-ticking an old day and for completing a past day — found 2026-10-17, deliberately not fixed inside `B3`). Earlier this row said "not yet briefed, no code written", which was true on the morning of 2026-10-17 and stopped being true the same afternoon. It is the root of `S9`/`S13`/`C2`/`B4`, and the largest structural gap left: **every habit in the app is still a checkbox.** The owner decisions that were listed here are all still open and none is urgent: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ `P0-T6` ✓ gates clean ✓ no uncommitted work ✓ — re-satisfied 2026-10-17). **Project-wide lint is 0 errors** for the first time in recorded history. **`PERF-0` is `PARTIAL`, not met:** the source-verification half and the web baselines are done and recorded, but the Android half needs `adb`/`dumpsys`/Perfetto and a release build on a real mid/low-end device — **no `gradlew`, no device** (§6.5.4, `R14`). **Anything needing a device measurement is still gated on that** |
 | Also open in Phase 1 | **Nothing open.** This row previously said "`P0-T3` is the only genuinely open Phase 1 code item (category type still dual-case at `db.ts:102`/`117`)". **That was stale twice over and is now corrected: `P0-T3` shipped** (`main_plan.md` line 302 records it `SHIPPED`) and the *habit* category hatch **is** closed. What was actually open was the **`ScheduleBlock.category`** hatch — now closed by `BUG-12`/`BUG-14` as `StoredScheduleCategory`. `DEBT` (`D2`, `D5`) remains; `D5`'s "29 files import `@/lib/db` directly" is **wrong — it is 38** |
 | Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded, Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-4b`, `PERF-9`/9c, `PERF-18d`, `PERF-19`, `BUG-12`/`BUG-13`/`BUG-14`, and the `AGENTS.md` rules 17–21.** `PERFORMANCE.md` exists (measured **461.2 KB** gzipped JS+CSS, four rules, native counts, how to re-measure; `npm run measure-bundle`). **What is left in this phase that is not blocked:** `PERF-9`/9a (3 box-shadow animations), `PERF-5` (route splitting — `planner/page.tsx` 48.3 KB, `habits/page.tsx` 45.4 KB), `PERF-7` (44 blur sites), `PERF-8`/`PERF-8a` (profile first), `PERF-10` (fonts — **no self-hosted fonts exist yet**, 0 files in `public/`), `PERF-16`. **`PERF-18` is `PARTIAL` and its remaining halves need CI, which does not exist.** Native items need a physical device + release build this machine cannot do (§6.5.4) |

@@ -284,6 +284,20 @@ export interface ScheduleBlock {
   createdAt: string;
 }
 
+/**
+ * What kind of habit this is. A closed union on purpose - see ADR 0003.
+ *
+ * `simple` (or absent) means today's behaviour: a check. `counted` means there is a target
+ * and a number gets logged against it. `avoid` and `timelimit` are NOT built yet; they were
+ * deliberately deferred because a violation state changes what a completed day means for
+ * streaks, and a per-habit running timer is a separate feature (`D2` records there is no
+ * focus timer at all).
+ *
+ * This is deliberately NOT `HabitType | (string & {})`. `BUG-12` exists because that
+ * escape hatch accepted any string and therefore constrained nothing.
+ */
+export type HabitType = 'simple' | 'counted';
+
 export interface Habit {
   id: string;
   userId: string;
@@ -296,6 +310,15 @@ export interface Habit {
   // runtime surprise. Legacy rows still read fine: IndexedDB is not
   // type-checked, and `getHabitColor` falls back deterministically.
   category: HabitCategory;
+  /**
+   * Absent means `simple`. Optional so every existing habit keeps reading correctly
+   * with no migration -- see ADR 0003.
+   */
+  type?: HabitType;
+  /** What one step counts, e.g. 'pages', 'cups', 'reps'. `counted` only. */
+  unit?: string;
+  /** The number that makes a day complete. `counted` only. */
+  targetValue?: number;
   period?: 'morning' | 'afternoon' | 'evening';
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
@@ -313,7 +336,15 @@ export interface HabitLog {
   habitId: string;
   userId: string;
   date: string; // YYYY-MM-DD
+  /**
+   * For a `simple` habit this IS the answer. For a `counted` habit it is a cache for
+   * display only -- the authority is `value` against the habit's `targetValue`, via
+   * `isHabitComplete` in `lib/utils/habit-completion.ts`. A counted habit can be
+   * `completed: true` with `value: 0`, and that day is NOT complete.
+   */
   completed: boolean;
+  /** What was actually logged, for a `counted` habit. Absent means zero. */
+  value?: number;
   notes?: string;
   loggedAt: string;
 }
