@@ -358,7 +358,7 @@ src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 
 src: `MASTER_TODO_REVISED.md §19 L979–1006`
 
-- [ ] **S1** — Per-habit streak flames. `PARTIAL` — flame present · also: `E2`
+- [x] **S1** — Per-habit streak flames. `SHIPPED` — **status corrected 2026-10-17: the flame was already live and distinct.** The flame icon + streak number renders on every habit card (list, grid, compact views) reading each habit's own `currentStreak`, so it is already distinct from the global profile streak. The `PARTIAL` line was stale; code beats docs (rule 8). No code change required. Any animation/ring work belongs to **S10** (multi-colour date completion rings, still `PARTIAL`) · also: `E2`
 - [ ] **S2** — Habit priority tags. `NOT BUILT` · → **Phase 2** · also: `B9`
 - [ ] **S3** — Energy level indicators. `NOT BUILT` · → **Phase 2** · also: `B9`
 - [ ] **S4** — Habit cue/trigger field. `NOT BUILT` · → **Phase 2** · also: `B8`

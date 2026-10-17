@@ -616,7 +616,13 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
-### 2026-10-17 — `M15`: streak-milestone micro-narratives, once per habit
+### 2026-10-17 — `S1` closed as `SHIPPED` (doc correction only)
+
+The per-habit flame was already live and distinct from the global streak in all three
+habit views; the `PARTIAL` status was stale. Closed as `SHIPPED` with no code change.
+Animation/ring work remains under `S10`.
+
+Gates: `tsc`/lint/test/build unaffected (no code change).
 
 Shipped the first slice of achievement unlock micro-narratives. New pure module
 `src/lib/utils/achievements.ts`: a 4-item catalogue (3/7/14/30-day streaks), a pure
