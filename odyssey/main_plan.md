@@ -365,7 +365,7 @@ src: `MASTER_TODO_REVISED.md §19 L979–1006`
 - [x] **S5** — Habit reward field. `SHIPPED` — "What is your immediate reward?" text input added to create/edit habit modals, saved as optional `Habit.reward`, e.g. "5 minutes of music" · → **Phase 2** · also: `B8`
 
 
-- [ ] **S8** — 2-minute emergency version. `NOT BUILT` · → **Phase 2** · also: `B12`
+- [x] **S8** — 2-minute emergency version. `SHIPPED` — minimal fall-back version input ("Read 1 page instead of 30 mins") added to create/edit habit modals, saved as optional `Habit.emergencyVersion`; the "streak endangered" trigger rule is not specified, so no card/rendering logic added · → **Phase 2** · also: `B12`
 - [ ] **S9** — Break bad habits / Quit mode. `NOT BUILT` · → **Phase 2** · also: `B3`
 - [ ] **S10** — Multi-colour date completion rings. `PARTIAL` — rings exist, not segmented · also: `B5`
 - [ ] **S11** — Swipe-right to complete gesture. `NOT BUILT` · → **Phase 2** · also: `B4`

@@ -18,6 +18,7 @@ interface CreateHabitModalProps {
       priority?: "critical" | "focus" | "optional";
       cue?: string;
       reward?: string;
+      emergencyVersion?: string;
   }) => void;
   existingHabitNames?: string[];
   /**
@@ -91,6 +92,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
   const [cue, setCue] = useState("");
   const [reward, setReward] = useState("");
+  const [emergencyVersion, setEmergencyVersion] = useState("");
 
 
   if (!isOpen) return null;
@@ -142,6 +144,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       priority,
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
+      emergencyVersion: emergencyVersion.trim() || undefined,
     });
   };
 
@@ -158,6 +161,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       priority,
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
+      emergencyVersion: emergencyVersion.trim() || undefined,
     });
     handleClose();
   };
@@ -432,6 +436,18 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 value={reward}
                 onChange={(e) => setReward(e.target.value)}
                 placeholder="5 minutes of music"
+                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+              />
+            </div>
+
+            {/* Emergency version */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
+              <input
+                type="text"
+                value={emergencyVersion}
+                onChange={(e) => setEmergencyVersion(e.target.value)}
+                placeholder="Read 1 page instead of 30 mins"
                 className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
               />
             </div>

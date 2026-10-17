@@ -632,6 +632,15 @@ as `Nd` / `N-day streak`. Tests updated to expect `""` for zero/NaN/undefined.
 
 Gates: `tsc` exit 0; 27 suites / 407 tests green.
 
+### 2026-10-17 — `S8`: 2-minute emergency version
+
+Added `emergencyVersion?: string` to `Habit` (additive, optional, no migration). Create/edit modals get
+a minimal fall-back version input (e.g. "Read 1 page instead of 30 mins"). The "streak endangered"
+trigger rule is not specified anywhere, so no card/rendering or display logic was added — field only.
+
+Gates: `tsc` exit 0; `npx eslint src` 0 errors; 27 suites / 407 tests green; production build
+clean.
+
 ### 2026-10-17 — `S2`: habit priority tags (critical/focus/optional)
 
 Added `priority?: 'critical' | 'focus' | 'optional'` to `Habit` (additive, no migration).
@@ -3312,9 +3321,7 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **`S5` — habit reward field (commit pending)** — before it `2baaa19` (zero-streak
-  label fix), `da79b69` (**BUG-12**), `6367493` (**PERF-4**/4g), `238a0a0` (**A7**), `e4ae4df` (**A6**),
-  `8c71e61` (**A5**), `79ff34e` (**A2**). `S6` and `S7` removed from `main_plan.md` — not implemented.
+- HEAD at last update: **`S8` — 2-minute emergency version (commit pending)** — before it `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix). `S6`/`S7` removed from `main_plan.md` — not implemented.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **27 suites, 407 tests green**. `tsc --noEmit` exit 0. Production build clean.
 - Ports 3000/3001/3100 clear; no background server left running.

@@ -40,6 +40,7 @@ interface EditHabitModalProps {
       priority?: "critical" | "focus" | "optional";
       cue?: string;
       reward?: string;
+      emergencyVersion?: string;
     }
   ) => void;
   onDelete: (habitId: string) => void;
@@ -102,6 +103,7 @@ export function EditHabitModal({
   const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
   const [cue, setCue] = useState("");
   const [reward, setReward] = useState("");
+  const [emergencyVersion, setEmergencyVersion] = useState("");
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -138,6 +140,7 @@ export function EditHabitModal({
       }
       setCue(habit.cue ?? "");
       setReward(habit.reward ?? "");
+      setEmergencyVersion(habit.emergencyVersion ?? "");
 
       setIsConfirmingDelete(false);
       setSelectedHistoryDate(selectedDate || today);
@@ -186,6 +189,7 @@ export function EditHabitModal({
       priority,
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
+      emergencyVersion: emergencyVersion.trim() || undefined,
     });
     onClose();
   };
@@ -567,6 +571,18 @@ export function EditHabitModal({
                 value={reward}
                 onChange={(e) => setReward(e.target.value)}
                 placeholder="5 minutes of music"
+                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+              />
+            </div>
+
+            {/* Emergency version */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
+              <input
+                type="text"
+                value={emergencyVersion}
+                onChange={(e) => setEmergencyVersion(e.target.value)}
+                placeholder="Read 1 page instead of 30 mins"
                 className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
               />
             </div>

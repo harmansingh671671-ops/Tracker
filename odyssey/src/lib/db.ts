@@ -313,6 +313,7 @@ export interface Habit {
   priority?: 'critical' | 'focus' | 'optional';
   cue?: string; // e.g. "After I pour my morning coffee"
   reward?: string; // e.g. "5 minutes of music"
+  emergencyVersion?: string; // minimal fall-back, e.g. "Read 1 page"
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
   targetDaysPerWeek?: number;
