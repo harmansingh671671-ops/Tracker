@@ -776,3 +776,59 @@ button, a, input, select {
   background-clip: text;
   animation: shimmerGlow 4s linear infinite;
 }
+
+/* ===== PERF-9c — reduced motion for everything the gated pattern above =====
+   The house convention is deliberate and good: each custom animation puts its
+   @keyframes inside a `no-preference` query and adds a `reduce` rule by hand,
+   so honouring the setting costs no JS and no hydration-time flash.
+
+   That pattern **cannot reach Tailwind's own utilities.** `animate-pulse`,
+   `animate-ping` and `animate-spin` are emitted by the framework inside
+   `@layer utilities`, so no hand-written rule in this file was ever stopping
+   them. They ran for everyone, including the people who asked their OS to stop
+   exactly this. Measured: **13 `animate-pulse` + 4 `animate-ping` across 13
+   files** — and one of them is the feedback modal's "online" dot, which pulses
+   on *every route* whether or not the modal is open, so the cost was app-wide
+   rather than confined to the screen that owns it.
+
+   **One rule rather than 17 edits**, and it also covers the next usage: a
+   component reaching for `animate-pulse` is now correct by default and cannot
+   forget the query, which is the failure mode that produced the 13.
+
+   `animation: none` rather than removing the element, for the reason `A6` gives
+   for its own orbit: the indicator keeps its position and still reads as busy,
+   and no labelled gap opens up. Every one of these already sits beside text, or
+   is a dot that is simply a dot when still.
+
+   `!important` is justified on one specific ground — **this is a user
+   accessibility override and must not lose a cascade fight.** Unlayered CSS
+   already beats `@layer utilities`, so the Tailwind utilities do not need it;
+   the house classes are also unlayered and win here on source order alone. But
+   both of those are accidents of *today's* file layout, and if either set is
+   ever moved into a layer this rule would silently stop applying. Losing a
+   reduced-motion setting quietly is exactly the kind of regression nobody
+   notices. */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Framework utilities — 19 usages across 14 files. */
+  .animate-pulse,
+  .animate-ping,
+  .animate-spin {
+    animation: none !important;
+  }
+
+  /* House classes that predate the `no-preference` convention and were never
+     gated. `.animate-spin-slow` is live (the onboarding compass); the other
+     four have **zero usages** and are kept gated anyway, because an ungated
+     infinite animation left in the stylesheet is a trap for whoever reaches
+     for it next. */
+  .animate-spin-slow,
+  .animate-float-slow,
+  .animate-float-reverse,
+  .animate-radar-wave,
+  .animate-pulse-glow,
+  .shimmer-text {
+    animation: none !important;
+  }
+}
+

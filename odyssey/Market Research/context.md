@@ -617,6 +617,58 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `PERF-9`/9c: the repo honours reduced motion for its own animations and not for Tailwind's
+
+Commit 2 of 3. **One CSS rule; no component changed.**
+
+**The gap.** The house convention is deliberate and good — every custom animation puts
+its `@keyframes` inside `@media (prefers-reduced-motion: no-preference)` and adds a
+`reduce` rule by hand, so honouring the setting costs no JS and no hydration flash. Five
+do it: `keystonePulse` (M2), `slateSweep` (M3), `perfectDayGlow` (M4), `holdRimPulse`
+(S14), `odysseyLoadOrbit` (A6).
+
+**That pattern cannot reach Tailwind's utilities.** `animate-pulse`, `animate-ping`,
+`animate-spin` are emitted inside `@layer utilities`, so no hand-written rule in
+`globals.css` was ever stopping them. Measured **13 `animate-pulse` + 4 `animate-ping`
+across 13 files**, running for everyone. The feedback modal's "online" dot is the worst:
+`fixed` FAB, present on **every route** whether or not the modal is open — so this was
+never a cost of that one screen.
+
+- **One `reduce` block, not 17 edits** — and it removes the cause, not just the
+  instances: a component reaching for `animate-pulse` is now correct by default and
+  *cannot forget the query*. That is how 13 accumulated.
+- `animation: none`, not removal, per `A6`'s own reasoning. Verified the dot stays at
+  `opacity: 1` and 8px, i.e. still a dot.
+- **`!important` is scoped and justified.** Unlayered CSS already beats
+  `@layer utilities`; the house classes win on source order. Neither *needs* it. But both
+  are accidents of today's layout — if either set is ever layered, the rule **silently
+  stops applying**. Losing an a11y setting quietly is the regression nobody reports.
+- Also gated with **zero usages**: `.animate-float-slow`, `.animate-float-reverse`,
+  `.animate-radar-wave`, `.animate-pulse-glow`, `.shimmer-text` — plus
+  `.animate-spin-slow` (onboarding compass, **live**, ungated).
+
+**I verified a stale build and burned a cycle on it.** Edited `globals.css`, ran
+`with-server.ps1`, and got 5 failures — animations still running. The cascade reasoning
+(`!important` should win) said the rule was right, so the measurements were wrong. They
+were: **`next start` serves the last production build**, and I had not rebuilt.
+`diag-motion.js` settled it — the served stylesheet had the *existing* `reduce` queries
+but **not** my new block, and `.animate-pulse` was declared under `@layer utilities`.
+`check-motion.js` now **asserts the rule is present in the served CSS and exits 1 before
+running anything else**, so a stale build can no longer produce five plausible-looking
+failures. **`npm run build` after any CSS change, before `with-server.ps1`.**
+
+**Assert both directions.** A rule that silences animations *unconditionally* passes
+"nothing animates under reduce" perfectly while breaking the app for everyone else. So
+`check-motion.js` also asserts `date-ring-pulse` / `keystonePulse` / `slateSweep` /
+`pulse` **still run under `no-preference`**. Both directions green.
+`document.getAnimations()` measures what the engine is actually running, so a rule that
+loses the cascade cannot pass — unlike reading class names off the DOM.
+
+**Scope, stated rather than absorbed:** this also stops **1 animation on `/wallpaper`**,
+the one area the owner excluded. Left in deliberately — reduced motion is an OS
+accessibility switch the user turns on on purpose and expects honoured everywhere — and
+reported, not asserted. Say so; do not carve it out silently.
+
 ### 2026-10-17 — `PERF-4`/4g: the 20:00 reminder polled all day, and was keyed to the wrong date
 
 Owner instruction: *"except the wallpaper related things fixed everything else"*. Three
@@ -3121,6 +3173,11 @@ above the vault banner. The follow-up task is closed.
   category and it immediately exposed **8 real violations**; the `ScheduleBlock`
   equivalent is unexamined. Expect the same, and do not narrow it until the violations
   are found and listed.
+- **`PERF-9` is now `PARTIAL`, not `NOT BUILT`** — 9c shipped (commit 2). **9a is scoped
+  and cheap:** `pulseGlow` (animates `box-shadow`) and `shimmerGlow` (animates
+  `background-position`) are the only known repaint-heavy violators, and **both belong to
+  the unused landing-page set** (0 usages in `.tsx`) — so **deleting those dead classes
+  closes 9a** instead of rewriting any animation. 9b, 9d, 9e untouched.
 - **New findings recorded, not fixed:** `BUG-10` (the evening reminder is never mounted
   on `/`, so it cannot appear on the landing screen) and `BUG-11` (4 more
   `toISOString().split("T")[0]` UTC keys, recorded as an audit item, not a defect claim).
@@ -3158,6 +3215,27 @@ above the vault banner. The follow-up task is closed.
 - Prefer line-range reads; **query Graphify before a broad scan**; run an
   impact analysis before editing a shared file.
 - Run the cheapest gate that can fail, first.
+- **`npm run build` after any CSS change, before `with-server.ps1`.** `next start` serves
+  the last **production** build, so a browser check after editing a stylesheet verifies
+  the *previous* build. It cost a whole cycle on 2026-10-17: five failures that all said
+  "the rule is not working", when the rule had never been served. `diag-motion.js` found
+  it by diffing the served CSS against what was written. `check-motion.js` now asserts
+  the rule is in the served stylesheet and **aborts before running any assertion**, so a
+  stale build cannot produce plausible-looking failures.
+- **When the cascade says your rule must win and the browser says it did not, suspect
+  the build before the cascade.** `!important` in author CSS loses to nothing except
+  another `!important`; if an animation still runs, the declaration is probably not being
+  served at all. Read the CSS, do not reason harder about specificity.
+- **Assert the fix in BOTH directions.** "Nothing animates under reduce" is also satisfied
+  by a rule that silences animations unconditionally — which would break the app for
+  everyone else. Any change that disables something needs a matching assertion that it
+  still happens when the condition is absent. Use `document.getAnimations()` (what the
+  engine is actually running), not class names read off the DOM.
+- **When a global change incidentally touches an excluded area, say so — do not carve it
+  out silently.** The `PERF-9` reduce block also stops 1 animation on `/wallpaper`. It
+  was left in, because reduced motion is a user accessibility switch they turn on
+  deliberately, and reported in the changelog rather than absorbed. The check prints the
+  count and does **not** treat wallpaper as pass/fail, so the owner keeps the decision.
 - **Before asserting a component "did not appear", confirm it is mounted on the page you
   loaded.** `AppShell` returns early for `/`, so `<EveningReminderModal />` lives only in
   the *other* branch — and a check pointed at `/` reported "the fix silenced the feature
