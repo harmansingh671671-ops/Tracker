@@ -616,6 +616,77 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+### 2026-07-17 — `PERF-4b`: only 3 of the 6 live timers are clocks
+
+On branch `agent/mainline`. The shared clock shipped; the plan's premise did not survive
+contact with the source.
+
+**"7 `setInterval` calls app-wide" implied seven clocks.** They are not:
+
+| site | period | verdict |
+|---|---|---|
+| `app/habits/page.tsx` | 3s | **day-rollover poll** -> migrate |
+| `habits/habit-date-strip.tsx:52` | 3s | **day-rollover poll** -> migrate |
+| `planner/planner-content.tsx` | 15s | **day + hour boundary poll** -> migrate |
+| `habits/habit-date-strip.tsx:317` | 30ms, max 15 | **layout-settle retry** -> leave |
+| `planner/infinite-date-strip.tsx:295` | 30ms, max 15 | **layout-settle retry** -> leave |
+| `onboarding/step-circadian.tsx` | 4.2s | **UI carousel advance** -> leave |
+| `evening-reminder-modal.tsx` | 60s | already replaced in `6367493` |
+
+The two 30ms timers poll `centerDate()` until the scroll container has laid out, then stop
+after 15 attempts. The 4.2s one advances an onboarding carousel. **None reads the wall
+clock.** A shared minute ticker would have fired the layout retry **60x slower than its own
+30ms timeout** and stalled the carousel. **"One timer total" was the wrong goal**; one timer
+for the things that are actually clocks is the right one.
+
+**The win, measured:** visible and ticking, the three clocks woke **44 times a minute** (two
+3s polls = 20 + 20, one 15s poll = 4). Now **one wake a minute** however many screens are
+open.
+
+**Built:** `src/lib/utils/shared-clock.ts` -- one reference-counted store behind
+`useSyncExternalStore`, armed at the **next real minute boundary** rather than on a fixed
+interval (so drift cannot accumulate; a test accumulates 10,000 delays and asserts the
+total never leaves the boundary), paused while `document.hidden`, refreshed on return. **16
+tests.**
+
+**Three things I got wrong, all caught before shipping:**
+
+1. **Values mirrored into state instead of derived.** My first version kept
+   `useState(getLocalTodayStr)` and refreshed it from an effect. `react-hooks/set-state-in-effect`
+   correctly objected -- it is a second copy of a value the clock already owns, one render
+   behind and free to drift. Reading it through the store removes the copy entirely.
+   Following that through `planner-content` revealed it had **two** writers for those two
+   values: the timer *and* the reopen-on-focus handler. The clock subsumes the second, so
+   that duplication is gone as well.
+2. **A test caught a real bug in my own hidden-tab logic.** Declining to re-arm while hidden
+   still let the *pending* timer fire, so a hidden tab woke exactly once. The documented
+   claim was "arms nothing while hidden". Going hidden now **cancels** the armed timer.
+3. **The environment is injected, not read from the global.** The store needs exactly two
+   things from its host -- is the document hidden, and a visibility subscription -- so it
+   takes a `ClockEnvironment`. That keeps it testable under the repo's deliberate
+   **node-only** vitest setup (`vitest.config.ts`, `P0-T5`) without putting jsdom in front of
+   every suite.
+
+**Test-block lessons, both of which cost a cycle:**
+- **A failed assertion leaks module state.** The store is a singleton, so a test that threw
+  before reaching its `off()` left a subscriber registered for every later test -- and the
+  failures surfaced in unrelated places. Every subscription is now released in `afterEach`,
+  with an assertion that the count is zero.
+- **`vi.resetModules()` per test.** `minuteIndex` survived between tests, so the second test
+  started already holding the current minute and `refresh()` correctly reported "the minute
+  did not turn". The catch-up assertion then failed for reasons unrelated to the clock.
+
+**PowerShell bit me again, in the same session it was documented.** A `-replace` round-trip
+through `Set-Content -Encoding UTF8` mangled em-dashes in **7 lines across two files**. The
+`encoding.test.ts` guard caught it -- `git checkout --` and redo with the `edit` tool. **This
+is the third time.** The rule now reads: `edit`/`write` tools only for source; never
+`Get-Content`/`Set-Content` round-trips on any `.ts`/`.tsx`/`.md`.
+
+**Build note for the worktree:** Turbopack refuses a `node_modules` **junction** that points
+outside the project root (`Symlink [project]/node_modules is invalid`). The worktree needs a
+real copy (~563 MB, ~140 s), not a junction. Removing a junction needs `cmd /c rmdir`, not
+`Remove-Item`, which prompts.
+
 ### 2026-10-17 — `M15`: streak-milestone micro-narratives, once per habit
 ### 2026-07-17 — Two agents now work this repo. Branch + worktree isolation, and why
 

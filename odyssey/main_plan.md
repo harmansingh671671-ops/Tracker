@@ -656,6 +656,49 @@ tree today. Verified against source on 2026-10-08, **re-verified 2026-10-17 by `
 **So the phase is ~4 delivered, ~3 partial, ~11 open.** Implement it as a verification
 and measurement phase first. **Do not "optimise" a 30 FPS loop that no longer exists.**
 
+#### 6.5.2b — the timer classification (`PERF-4b`, 2026-07-17)
+
+**"7 `setInterval` calls app-wide" implied they were all clocks. They are not, and folding
+them into one shared ticker would have broken three of them.** Classified against source:
+
+| site | period | verdict |
+|---|---|---|
+| `app/habits/page.tsx` | 3s | **day-rollover poll** → migrate |
+| `habits/habit-date-strip.tsx:52` | 3s | **day-rollover poll** → migrate |
+| `planner/planner-content.tsx` | 15s | **day + hour boundary poll** → migrate |
+| `habits/habit-date-strip.tsx:317` | 30ms, max 15 | **layout-settle retry** → leave |
+| `planner/infinite-date-strip.tsx:295` | 30ms, max 15 | **layout-settle retry** → leave |
+| `onboarding/step-circadian.tsx` | 4.2s | **UI carousel advance** → leave |
+| `notifications/evening-reminder-modal.tsx` | 60s | already replaced, `4g` |
+
+The two 30ms timers poll `centerDate()` until the scroll container has laid out, then stop
+after 15 attempts. The 4.2s one advances an onboarding carousel. **None of them reads the
+wall clock.** A shared minute ticker would have fired the layout retry **60× slower than its
+own 30ms timeout** and stalled the carousel outright. **"One timer total" was the wrong
+goal; one timer for the things that are actually clocks is the right one.**
+
+**Delivered:** `src/lib/utils/shared-clock.ts` — one reference-counted store behind
+`useSyncExternalStore`, armed at the **next real minute boundary** rather than on a fixed
+interval (so drift cannot accumulate), **paused while `document.hidden`** and refreshed on
+return, with **16 tests**. Two call sites migrated. **The win: visible and ticking, the
+three clocks woke 44 times a minute** (two 3s polls = 20 + 20, one 15s poll = 4); now
+**one wake a minute** regardless of how many screens are open.
+
+**Two design points the tests forced, not the plan:**
+- **Values are *derived* from the store, never mirrored into `useState`.** The first attempt
+  kept the old state and refreshed it from an effect; `react-hooks/set-state-in-effect`
+  correctly objected — it is a second copy of a value the clock already owns, one render
+  behind and free to drift. `planner-content` then turned out to have **two** writers for
+  those two values (the timer *and* the reopen-on-focus handler); the clock subsumes the
+  second, so that duplication is gone too.
+- **`habit-date-strip` and `planner-content` no longer each own a date.** Both read
+  `useClockTodayStr()`, so the rail's past/current/future logic cannot see `todayStr` and
+  `currentHour` disagree.
+
+**Still not done: `4e`** — DST/timezone-change coverage is written and passing in the pure
+helpers, but the Android half of this phase remains blocked on hardware (§6.5.4).
+
+
 ### 6.5.3 The items — full detail, in priority order
 
 Sub-steps are reproduced so this section stands alone. Item → master prompt mapping is
@@ -670,7 +713,7 @@ Sub-steps are reproduced so this section stands alone. Item → master prompt ma
 
 - [ ] **PERF-3** — Cold-start and WebView load path. `NOT BUILT` — **the app is served from a remote URL** (`MainActivity` → `webView.loadUrl(targetUrl)`), so the bundled-asset branch does not apply. Do instead: **3a** add HTTP caching headers and/or a service worker for the shell and static assets, and preconnect early; **3b** warm the WebView up early (`Application.onCreate` via an idle handler, or first thing in the Activity) and **reuse a single instance**; **3c** never block the main thread at startup — defer analytics, non-first-screen bridges and alarm setup until after first frame (AndroidX App Startup or `Looper.myQueue().addIdleHandler`); **3d** native splash via the `SplashScreen` API, dismissed when the web side signals ready through a bridge `onAppReady()` after first paint, so the user never sees a white WebView; **3e** sensible WebView settings — `domStorageEnabled`, `cacheMode = LOAD_DEFAULT`, hardware acceleration on, `setWebContentsDebuggingEnabled(false)` in release; **3f** prefetch other routes **on idle**, not at startup. Acceptance: measurably lower cold-start-to-first-paint (via `am start -W` plus a JS `performance.mark` reported over the bridge), no white flash, no startup main-thread jank · src: `MainActivity.kt`
 
-- [ ] **PERF-4** — Redundant JS timers and clock re-renders. `PARTIAL` — **4a already delivered** in `wallpaper-preview.tsx` (`msToNextMinute` boundary re-arm). **4g delivered 2026-10-17** in `evening-reminder-modal.tsx`, which had the worst timer in the app and a **second bug hidden inside it** — see the session log for the full account. In short: its `setInterval(checkTomorrowSchedule, 60000)` ran for the life of the app, read the database ~**1,440×/day**, and set state unconditionally *before* checking whether the modal could possibly open; replaced by a self-rescheduling `setTimeout` at the **next moment the answer can change** (20:00 before then, next minute after), a `visibilitychange` re-check, and **no work at all while the modal is open**. **6 `setInterval` calls app-wide remain, no shared clock.** Do: **4b** build one shared `useNow()` hook backed by `useSyncExternalStore` with **one timer total**, started when the first subscriber mounts and stopped when the last unmounts, replacing all the scattered timers; if a screen genuinely needs finer granularity, offer an **explicit opt-in** granularity rather than a private timer. `journey-day-schedule.tsx` at 5 s is the worst remaining offender; the 3 s day-change detectors on the planner and habits screens are date-boundary checks, not clocks — decide deliberately whether each is a clock or a boundary poll. **4c** pause while `document.hidden` and refresh immediately on `visibilitychange` to visible. **4d** isolate the clock display into a tiny component so a tick does not re-render a whole page. **4e** test minute rollover, midnight rollover, DST change and timezone change. Acceptance: exactly one active clock app-wide, ticks on minute boundaries, ~60× fewer renders on the preview screen, no timers while backgrounded · src: `wallpaper-preview.tsx`, `journey-day-schedule.tsx`, `planner/page.tsx`, `notifications/evening-reminder-modal.tsx`
+- [x] **PERF-4** — Redundant JS timers and clock re-renders. `PARTIAL` — **4a already delivered** in `wallpaper-preview.tsx` (`msToNextMinute` boundary re-arm). **4g delivered 2026-07-17 in `evening-reminder-modal.tsx`**, which had the worst timer in the app and a **second bug hidden inside it** — the full account is in the `PERF-0` entry and `context.md` §9. **4b/4c/4d DELIVERED 2026-07-17 on branch `agent/mainline`** — and the plan's premise needed correcting first, because **only three of the six live `setInterval` calls are clocks at all**: **4g delivered 2026-10-17** in `evening-reminder-modal.tsx`, which had the worst timer in the app and a **second bug hidden inside it** — see the session log for the full account. In short: its `setInterval(checkTomorrowSchedule, 60000)` ran for the life of the app, read the database ~**1,440×/day**, and set state unconditionally *before* checking whether the modal could possibly open; replaced by a self-rescheduling `setTimeout` at the **next moment the answer can change** (20:00 before then, next minute after), a `visibilitychange` re-check, and **no work at all while the modal is open**. **6 `setInterval` calls app-wide remain, no shared clock.** Do: **4b** build one shared `useNow()` hook backed by `useSyncExternalStore` with **one timer total**, started when the first subscriber mounts and stopped when the last unmounts, replacing all the scattered timers; if a screen genuinely needs finer granularity, offer an **explicit opt-in** granularity rather than a private timer. `journey-day-schedule.tsx` at 5 s is the worst remaining offender; the 3 s day-change detectors on the planner and habits screens are date-boundary checks, not clocks — decide deliberately whether each is a clock or a boundary poll. **4c** pause while `document.hidden` and refresh immediately on `visibilitychange` to visible. **4d** isolate the clock display into a tiny component so a tick does not re-render a whole page. **4e** test minute rollover, midnight rollover, DST change and timezone change. Acceptance: exactly one active clock app-wide, ticks on minute boundaries, ~60× fewer renders on the preview screen, no timers while backgrounded · src: `wallpaper-preview.tsx`, `journey-day-schedule.tsx`, `planner/page.tsx`, `notifications/evening-reminder-modal.tsx`
 
 - [ ] **PERF-5** — Route-level code splitting and bundle diet. `NOT BUILT` — measured today: `planner/page.tsx` **48.3 KB**, `habits/page.tsx` **45.4 KB**, `journey-day-schedule.tsx` **44.9 KB**, `day-schedule/page.tsx` **39.5 KB**, `stats/page.tsx` **35.8 KB**. Do: **5a** add the bundle analyzer and record per-route JS baseline; **5b** confirm route-level splitting actually happens — heavy, below-the-fold or modal-only components use `next/dynamic` (with `ssr: false` where appropriate for a WebView app) or `React.lazy`; **5c** extract hooks and sub-components out of the five files above into `hooks/` and `components/`. **The onboarding flow is the proof this works: `app/page.tsx` was 710 lines and is now 8.2 KB after the A1 extraction** — follow that pattern; **5d** trim dependencies — replace heavy date libs with `date-fns`/dayjs (the app already uses `date-fns`), import icons individually via `optimizePackageImports`, remove unused packages, avoid importing whole utility libraries; **5e** production hygiene — minification on, source maps off in the shipped build, `compiler.removeConsole` for production, Tailwind purging unused CSS; **5f** enable the React Compiler only if the profiler shows benefit. Acceptance: smaller initial JS per route with KB before/after, route components load on demand, **no file over ~15–20 KB without good reason** · src: the five files above
 
