@@ -616,6 +616,70 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
+### 2026-10-17 — `PERF-0` reconciled, and the version bump is a trap I nearly walked into
+
+Final commit of the "ready for new work" pass. Re-verified **every** §6.5.2 figure
+against source and recorded the web baselines. The point of this item is that the plan's
+numbers came from a code review, not measurement — and that keeps being true.
+
+**What was wrong (all now corrected in §6.5.2):**
+
+| figure | plan said | measured |
+|---|---|---|
+| `backdrop-blur` | 41 across 21 files | **43 across 22** |
+| `RTC_WAKEUP` | 2 sites, 1 file | **4 sites, 2 files** |
+| `setInterval` | 7 app-wide | **6, all live** |
+| Tailwind infinite animations | 17 | **16** (13 pulse, 3 ping, 7 spin) |
+
+**Two directions of wrong, and the dangerous one was understating.** `RTC_WAKEUP` was
+*under*counted — `OdysseyHourlyWallpaperWorker.kt` was missed entirely. And the timer
+count was **6 all along**: the plan's "7" included one in `journey-day-schedule.tsx`,
+which `BUG-13` deleted. So a figure that had been "verified" was counting dead code.
+Confirmed correct: `SharedPreferences.commit()` = 9, `WAKE_LOCK` absent from source,
+`REFRESH_INTERVAL_MS = 60_000L`, remote URL via `loadUrl`, no `gradlew`.
+
+**Baselines (production build, gzipped, because uncompressed is not what ships):**
+client JS **435.2 KB**, CSS **24.7 KB**, combined **459.8 KB**. The script
+(`baseline-bundle.js`) **separates compressed from already-compressed assets on purpose** —
+a single "total bytes" number would have hidden the 3 MB `public/` problem entirely,
+because those images compress to 99.3% of their size.
+
+**The Android half is BLOCKED, and recorded as blocked rather than quietly claimed.**
+`PERF-0` wants `adb`/`dumpsys`/Perfetto and a release build on a real mid/low-end device.
+None is possible here — **no `gradlew`, no device**, and JBR 25 cannot start the Kotlin
+1.9.22 daemon (`R14`). Calling the item done would repeat exactly the failure it exists
+to catch.
+
+### ⚠️ `version.json` is NOT a standalone bump — it is coupled to an APK rebuild
+
+I went to bump it, wrote the new changelog, and then read what consumes it.
+`/api/app-version` serves the file, and `checkForAppUpdate`
+(`android-bridge/app-update.ts:96`) computes `hasUpdate` as
+`data.versionCode > current.versionCode`, where `current` is **the installed APK's code**.
+
+So bumping it alone shows every installed user **"Update available → Download & Install
+v1.3.7"** — and the 11.6 MB at `/downloads/odyssey-latest.apk` is **the build from
+2026-10-04**, because `android/` has not been rebuilt. That is an 11.6 MB download for
+nothing and a changelog promising fixes the download does not contain. **Reverted**, and
+recorded as **`REL-1`** with the correct order: bump → rebuild the APK → replace the file
+→ verify the served code matches.
+
+**The asymmetry that makes this safe to defer:** the APK loads web content from Vercel
+via `loadUrl`, so **every web change in this session has already reached installed users
+with no rebuild at all.** The APK is only needed for native code, and none was touched.
+The bump is a release chore, not a blocker.
+
+**Also corrected: the §10 status table had been lying for days** — it still read
+"Phase 1" and listed `A2`/`A3`/`A5`/`A6`/`A7` as next, all shipped. Replaced, and it
+now carries the open **owner decisions** rather than stale feature ids. Its "Also open in
+Phase 1" row claimed `P0-T3` was open with a dual-case category type; `P0-T3` **shipped**
+and that hatch is closed. The genuinely open one was `ScheduleBlock.category`, now closed
+by `BUG-12`/`BUG-14`.
+
+**Re-spliced that table with explicit UTF-8 and no BOM**, per the PowerShell lesson
+recorded below. Verified: em-dash count sane, **zero** U+FFFD, no BOM, and a
+**7-added / 8-removed** diff rather than a whole-file rewrite.
+
 
 ### 2026-10-17 — `BUG-12`/`BUG-14`: the hatch is closed, and the type was the easy part
 
@@ -3381,13 +3445,12 @@ above the vault banner. The follow-up task is closed.
 
 | Item | State |
 |---|---|
-| Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2`, `A3`, `A5`, `A6` and `A7` have all shipped — Phase 2's onboarding and polish items are done**, and all Phase 1 gates pass including `npm run lint` for the first time. **The only Phase 2 items left are `A4`** (AI coach, explicitly routed to **Phase 7**) **and `M17`**, which is `DEFERRED` until AI exists because its loader target does not. **In plan order, next is Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` — 5 of its 18 items are already delivered and 4 of its figures are wrong, so nothing should be built until that pass · then **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` is native and uncompiled, needing a device this machine cannot build). **Also worth deciding:** `version.json` still reads 1.3.6 / code 11 from 2026-10-04 with a stale changelog — harmless today (the APK streams Vercel), but Play will reject the next APK build until it is bumped. **And an APK rebuild is needed only for Kotlin changes** — `BUG-7` is one. **Still undecided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so it may already be fixed. |
-| **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
-| **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
-| Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
-| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-18`, starts with **`PERF-0`**, a mandatory reconcile (5 of 18 already delivered, 4 figures wrong). Native items need a physical device + release build this machine cannot do (§6.5.4) |
-| Next after Phase 1 | Phase 2 — `A1`/`XL14`, `M16`, **`A2`** and **`A3`** are done. **`A2` landed as ONE scene, not four**: the researched walkthrough asked for wallpaper + habits + schedule + rewards, and was cut on owner instruction to *"only explain the things required to use the app for basic tasks"*. **`A3` landed as reordering, and its paywall half was dropped:** `HD25` asked for profession-driven **discount codes**, which `A3`'s own text forbids (*"do not use profession to obscure or discriminate on price"*) and which this local-first app cannot bill anyway — `HD25` is now **`NOT APPROVED`**. Remaining gaps are `A5` (identity line + skippable), `A6`, `A7` |
+| Phase | **Performance phase (§6.5)** — Phases 1–2 are closed. **Corrected 2026-10-17: this row said "Phase 1" and listed `A2`/`A3`/`A5`/`A6`/`A7` as next, all of which shipped days earlier.** Phase 1's gate is met and Phase 2's onboarding and polish items are done; the only Phase 2 remnants are `A4` (AI coach, routed to Phase 7) and `M17` (`DEFERRED` — its loader target does not exist) |
+| Next feature | **No code feature is blocked or staged** (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty). What is open is a set of **owner decisions**, not work: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
+| **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ `P0-T6` ✓ gates clean ✓ no uncommitted work ✓ — re-satisfied 2026-10-17). **Project-wide lint is 0 errors** for the first time in recorded history. **`PERF-0` is `PARTIAL`, not met:** the source-verification half and the web baselines are done and recorded, but the Android half needs `adb`/`dumpsys`/Perfetto and a release build on a real mid/low-end device — **no `gradlew`, no device** (§6.5.4, `R14`). **Anything needing a device measurement is still gated on that** |
+| Also open in Phase 1 | **Nothing open.** This row previously said "`P0-T3` is the only genuinely open Phase 1 code item (category type still dual-case at `db.ts:102`/`117`)". **That was stale twice over and is now corrected: `P0-T3` shipped** (`main_plan.md` line 302 records it `SHIPPED`) and the *habit* category hatch **is** closed. What was actually open was the **`ScheduleBlock.category`** hatch — now closed by `BUG-12`/`BUG-14` as `StoredScheduleCategory`. `DEBT` (`D2`, `D5`) remains; `D5`'s "29 files import `@/lib/db` directly" is **wrong — it is 38** |
+| Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded (**459.8 KB gzipped** total client JS + CSS), Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-9`/9c, `PERF-19`, and `BUG-12`/`BUG-13`/`BUG-14`.** Native items need a physical device + release build this machine cannot do (§6.5.4) |
+| Next after Phase 1 | **Phase 2 is done** — `A1`/`XL14`, `M16`, `A2`, `A3`, `A5`, `A6`, `A7` all shipped. **`A2` landed as ONE scene, not four** (owner instruction: only explain what is required for basic tasks). **`A3` landed as reordering and its paywall half was dropped** — `HD25` asked for profession-driven discount codes, which `A3`'s own text forbids and which a local-first app cannot bill; `HD25` is `NOT APPROVED`. **In plan order the next phase is §6.5 Performance**, which is now underway |
 | Staged/approved | Nothing awaiting approval (`FEATURE_WORKFLOW.md` §CURRENTLY STAGED FEATURE is empty) |
 
 ### 2026-10-17 — after `BUG-12` (commit 3 of 3) · **all three commits landed**
