@@ -260,6 +260,19 @@ export function normalizeHabitCategory(value: string): string {
   return LEGACY_HABIT_CATEGORY_MAP[lower] ?? value;
 }
 
+/**
+ * Normalises a habit priority onto the canonical three-level set. Unknown or
+ * empty values yield `undefined` rather than a fabricated priority — the honest
+ * answer is "none set", matching the `percent: null` convention.
+ */
+export function normalizeHabitPriority(value: unknown): 'critical' | 'focus' | 'optional' | undefined {
+  const lower = String(value ?? "").trim().toLowerCase();
+  if (lower === "critical" || lower === "focus" || lower === "optional") {
+    return lower as 'critical' | 'focus' | 'optional';
+  }
+  return undefined;
+}
+
 export interface ScheduleBlock {
   id: string;
   userId: string;
@@ -297,6 +310,7 @@ export interface Habit {
   // type-checked, and `getHabitColor` falls back deterministically.
   category: HabitCategory;
   period?: 'morning' | 'afternoon' | 'evening';
+  priority?: 'critical' | 'focus' | 'optional';
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';
   targetDaysPerWeek?: number;

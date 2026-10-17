@@ -359,7 +359,7 @@ src for all: `MASTER_TODO_REVISED.md §19 L959–977`
 src: `MASTER_TODO_REVISED.md §19 L979–1006`
 
 - [x] **S1** — Per-habit streak flames. `SHIPPED` — **status corrected 2026-10-17: the flame was already live and distinct.** The flame icon + streak number renders on every habit card (list, grid, compact views) reading each habit's own `currentStreak`, so it is already distinct from the global profile streak. The `PARTIAL` line was stale; code beats docs (rule 8). No code change required. Any animation/ring work belongs to **S10** (multi-colour date completion rings, still `PARTIAL`) · also: `E2`
-- [ ] **S2** — Habit priority tags. `NOT BUILT` · → **Phase 2** · also: `B9`
+- [x] **S2** — Habit priority tags. `BUILT` — **added 2026-10-17.** `Habit.priority?: 'critical' | 'focus' | 'optional'` (additive, optional, no migration). Create/edit modals get a 3-button priority selector (🔴🟡🟢). Habit cards (list + grid) show a text+icon badge and a colored left-border accent. `normalizeHabitPriority()` helper added to `db.ts`. Unknown stored values render no badge (honest). Energy levels and context tags remain under **B9** · also: `B9`
 - [ ] **S3** — Energy level indicators. `NOT BUILT` · → **Phase 2** · also: `B9`
 - [ ] **S4** — Habit cue/trigger field. `NOT BUILT` · → **Phase 2** · also: `B8`
 - [ ] **S5** — Habit reward field. `NOT BUILT` · → **Phase 2** · also: `B8`

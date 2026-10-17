@@ -327,6 +327,7 @@ export default function HabitsPage() {
     frequency: number;
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
+    priority?: "critical" | "focus" | "optional";
   }) => {
     if (!user) return;
     await addHabit({
@@ -338,6 +339,7 @@ export default function HabitsPage() {
       targetDays: data.targetDays || [1, 2, 3, 4, 5, 6, 7],
       icon: data.icon,
       period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
+      priority: data.priority,
       archivedAt: undefined,
     });
     // One-off rewards for creating a habit. Deliberately NOT routed through the
@@ -361,9 +363,12 @@ export default function HabitsPage() {
       targetDaysPerWeek: number;
       targetDays?: number[];
       period?: "morning" | "afternoon" | "evening";
+      priority?: "critical" | "focus" | "optional";
     }
   ) => {
     await updateHabit(habitId, updates);
+    // force: the habit list itself just changed in the database.
+    if (user) await fetchHabits(user.id, selectedDate, { force: true });
     // force: the habit list itself just changed in the database.
     if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit updated.");
@@ -685,10 +690,19 @@ export default function HabitsPage() {
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
                           <span className="font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
                           <span>•</span>
-                          <span className={`flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                            <Flame className="w-3 h-3" />
-                            {getStreakLabel(h.currentStreak)}
-                          </span>
+                            <span className={`flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                              <Flame className="w-3 h-3" />
+                              {getStreakLabel(h.currentStreak)}
+                            </span>
+                            {h.priority && (
+                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
+                                h.priority === "critical" ? "border-red-500/40 text-red-500" :
+                                h.priority === "focus" ? "border-amber-500/40 text-amber-500" :
+                                "border-emerald-500/40 text-emerald-500"
+                              }`}>
+                                {h.priority === "critical" ? "🔴 Critical" : h.priority === "focus" ? "🟡 Focus" : "🟢 Optional"}
+                              </span>
+                            )}
                         </div>
 
                         {/* M7 -- "Last done: Today at 8:15 AM". Renders nothing at
@@ -962,10 +976,19 @@ export default function HabitsPage() {
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
                       <span className="truncate font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
-                      <span className={`font-bold shrink-0 flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                        <Flame className="w-3 h-3" />
-                        {getStreakLabel(h.currentStreak)}
-                      </span>
+                        <span className={`font-bold shrink-0 flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                          <Flame className="w-3 h-3" />
+                          {getStreakLabel(h.currentStreak)}
+                        </span>
+                        {h.priority && (
+                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
+                            h.priority === "critical" ? "border-red-500/40 text-red-500" :
+                            h.priority === "focus" ? "border-amber-500/40 text-amber-500" :
+                            "border-emerald-500/40 text-emerald-500"
+                          }`}>
+                            {h.priority === "critical" ? "🔴 Critical" : h.priority === "focus" ? "🟡 Focus" : "🟢 Optional"}
+                          </span>
+                        )}
                     </div>
                   </div>
                 </motion.div>
@@ -1007,8 +1030,12 @@ export default function HabitsPage() {
                     e.preventDefault();
                     setEditingHabit(h);
                   }}
-                  className={`p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border shadow-xs transition-colors duration-200 select-none flex flex-col justify-between hover:bg-surface-container-high/40 active:scale-[0.98] ${
+                  className={`p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border shadow-xs transition-colors duration-200 select-none flex flex-col justify-between hover:bg-surface-container-high/40 active:scale-[0.98] border-l-4 ${
                     !isScheduled ? "border-dashed border-outline/20 opacity-90" : "border-outline/15"
+                  } ${
+                    h.priority === "critical" ? "border-l-red-500" :
+                    h.priority === "focus" ? "border-l-amber-500" :
+                    h.priority === "optional" ? "border-l-emerald-500" : "border-l-transparent"
                   }`}
                   style={{
                     borderColor: isScheduled ? `${habitColor}35` : undefined,
@@ -1040,10 +1067,19 @@ export default function HabitsPage() {
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
-                      <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                        <Flame className="w-3 h-3" />
-                        {getStreakLabel(h.currentStreak)}
-                      </span>
+                        <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                          <Flame className="w-3 h-3" />
+                          {getStreakLabel(h.currentStreak)}
+                        </span>
+                        {h.priority && (
+                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
+                            h.priority === "critical" ? "border-red-500/40 text-red-500" :
+                            h.priority === "focus" ? "border-amber-500/40 text-amber-500" :
+                            "border-emerald-500/40 text-emerald-500"
+                          }`}>
+                            {h.priority === "critical" ? "🔴 Critical" : h.priority === "focus" ? "🟡 Focus" : "🟢 Optional"}
+                          </span>
+                        )}
                       {!isScheduled && (
                         <span className="px-1 py-0.2 rounded bg-surface-container-highest text-on-surface-variant text-[8px] font-mono font-bold">
                           Rest

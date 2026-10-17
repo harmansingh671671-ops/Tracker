@@ -37,6 +37,7 @@ interface EditHabitModalProps {
       targetDaysPerWeek: number;
       targetDays?: number[];
       period?: "morning" | "afternoon" | "evening";
+      priority?: "critical" | "focus" | "optional";
     }
   ) => void;
   onDelete: (habitId: string) => void;
@@ -96,6 +97,7 @@ export function EditHabitModal({
   const [domain, setDomain] = useState<HabitCategory>("Vitality & Fitness");
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
+  const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const today = propTodayStr || getLocalTodayStr();
@@ -123,6 +125,9 @@ export function EditHabitModal({
 
       if (habit.period) {
         setTimeOfDay(habit.period);
+      }
+      if (habit.priority) {
+        setPriority(habit.priority);
       } else {
         setTimeOfDay("anytime");
       }
@@ -170,6 +175,7 @@ export function EditHabitModal({
       targetDaysPerWeek: selectedDays.length,
       targetDays: selectedDays,
       period: timeOfDay === "anytime" ? undefined : timeOfDay,
+      priority,
     });
     onClose();
   };
@@ -500,6 +506,32 @@ export function EditHabitModal({
                       {slot.label}
                     </span>
                     <span className="text-[10px] font-mono">{slot.sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>
+              <div className="flex gap-2">
+                {[
+                  { id: "critical", label: "Critical", emoji: "🔴" },
+                  { id: "focus", label: "Focus", emoji: "🟡" },
+                  { id: "optional", label: "Optional", emoji: "🟢" },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPriority(p.id as "critical" | "focus" | "optional")}
+                    className={`flex-1 p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                      priority === p.id
+                        ? "bg-primary/15 border-primary/40 text-primary"
+                        : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
+                    }`}
+                  >
+                    <span className="mr-1">{p.emoji}</span>
+                    {p.label}
                   </button>
                 ))}
               </div>

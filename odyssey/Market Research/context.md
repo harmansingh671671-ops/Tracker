@@ -616,7 +616,14 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
-### 2026-10-17 — `S1` closed as `SHIPPED` (doc correction only)
+### 2026-10-17 — `S2`: habit priority tags (critical/focus/optional)
+
+Added `priority?: 'critical' | 'focus' | 'optional'` to `Habit` (additive, no migration).
+Create/edit modals get a 3-button priority selector. Habit cards show a text+icon badge
+and a colored left-border accent. `normalizeHabitPriority()` helper added to `db.ts`.
+Unknown stored values render no badge.
+
+Gates: `tsc` exit 0; `eslint src` 0 errors; build clean.
 
 The per-habit flame was already live and distinct from the global streak in all three
 habit views; the `PARTIAL` status was stale. Closed as `SHIPPED` with no code change.

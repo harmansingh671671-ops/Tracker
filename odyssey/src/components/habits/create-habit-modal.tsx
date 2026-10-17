@@ -15,6 +15,7 @@ interface CreateHabitModalProps {
     frequency: number;
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
+    priority?: "critical" | "focus" | "optional";
   }) => void;
   existingHabitNames?: string[];
   /**
@@ -85,6 +86,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   );
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon..Fri by default
   const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
+  const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
 
   if (!isOpen) return null;
 
@@ -132,6 +134,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       frequency: tpl.targetDays.length,
       targetDays: tpl.targetDays,
       timeOfDay: tpl.period,
+      priority,
     });
   };
 
@@ -145,6 +148,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       frequency: selectedDays.length,
       targetDays: selectedDays,
       timeOfDay,
+      priority,
     });
     handleClose();
   };
@@ -368,6 +372,32 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                       {slot.label}
                     </span>
                     <span className="text-[10px] font-mono">{slot.sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>
+              <div className="flex gap-2">
+                {[
+                  { id: "critical", label: "Critical", emoji: "🔴" },
+                  { id: "focus", label: "Focus", emoji: "🟡" },
+                  { id: "optional", label: "Optional", emoji: "🟢" },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPriority(p.id as "critical" | "focus" | "optional")}
+                    className={`flex-1 p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                      priority === p.id
+                        ? "bg-primary/15 border-primary/40 text-primary"
+                        : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
+                    }`}
+                  >
+                    <span className="mr-1">{p.emoji}</span>
+                    {p.label}
                   </button>
                 ))}
               </div>
