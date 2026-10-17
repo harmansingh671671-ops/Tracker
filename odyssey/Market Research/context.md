@@ -3335,7 +3335,7 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **page.tsx set-during-render fix (commit pending)** — before it `ea0ebe4` (S8),
+- HEAD at last update: **page.tsx set-during-render fix (committed: 47a0ceb)** — before it `ea0ebe4` (S8),
   `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix).
   `S6`/`S7` removed from `main_plan.md` — not implemented.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
