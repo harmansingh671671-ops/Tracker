@@ -617,6 +617,48 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `PERF-19`: the baseline found a 1.8 MB logo displayed at 64px, plus 3 MB of dead assets
+
+Started the "get ready to add new things" pass with the gate everything depends on:
+**`PERF-0`**, whose job is re-verifying every §6.5.2 figure against source. The first
+thing that baseline measured was `public/` — which **no plan item was looking at**.
+
+- **`public/` was 3,050 KB of images, 99.3% of which gzip cannot reduce.** PNG/JPEG are
+  already compressed, so unlike the 435 KB of JS measured in the same run, this weight
+  transfers to a phone nearly intact. The baseline had to separate *compressed* from
+  *already-compressed* assets or it would have reported a flattering number.
+- **`logo.png`: 1,808 KB at 1254×1254, largest display anywhere is 64px.** Measured every
+  usage rather than assuming: header `w-6 h-6`, a round avatar, `profile-settings-sheet`
+  `w-16 h-16`, and **`notifications.ts:107` uses it as the notification icon**. Now
+  **512×512 / 88 KB** (95.1% smaller) — still 8× the 192px a 64px slot needs at 3× DPR.
+- **Deleted `logo_master.png` (1,168 KB), `icon.png` (61 KB), and 5 `create-next-app`
+  boilerplate SVGs** — all zero references **anywhere in the repo**, checked with `grep`
+  across `.ts/.tsx/.js/.json/.md/.css/.html/.yml` and not just `src/`.
+- **`public/`: 3,050 KB → 93 KB.**
+
+**Kept deliberately, and said so: `public/downloads/odyssey-latest.apk`, 11,587 KB.** It
+looks exactly like a stray build artifact. It is not — `/api/sync/route.ts:26` serves its
+URL, and `profile-settings-sheet.tsx:376` and `app-update.ts:65` download it, so it is
+the **in-app updater's payload**. The cost is real (11.6 MB blob in git history,
+publicly fetchable) and is now written down instead of being discovered later as a
+mystery file. Also kept `logo.svg` (5 KB, unreferenced but plausibly the vector source).
+
+**Verify assets by decoding, not by absence of errors.** An 88 KB image that fails to load
+is *invisible* — "no console errors, no 404s" would pass while the logo was a blank
+avatar. `check-assets.js` asserts `naturalWidth/naturalHeight` non-zero at every usage
+in both themes, and the 60px profile render was confirmed by eye.
+
+**`PERF-15` verified with an honest gap.** Source manifest declares `WAKE_LOCK` nowhere
+(only the comment recording removal) — clean. But the item's acceptance criterion names
+the **merged** manifest, and the 4 merged/packaged manifests under
+`android/app/build/intermediates/` **still declare it alongside that comment** — they are
+pre-removal build residue. Gitignored, `git ls-files` → **0 tracked files**, so nothing
+stale can ship. **Nearly recorded this as a live defect:** a `Select-String` over
+`$kt.FullName + $xml.FullName` reported `AndroidManifest.xml:25` declaring the permission,
+but line 25 of the source manifest is `android:label` — the grep had conflated the
+**6 manifest variants** (4 build artifacts + source) under one leaf filename. **Always
+print the full path when grepping a generated tree.**
+
 ### 2026-10-17 — `BUG-12`: closing the category hatch would have broken every picker, and under it was live data loss
 
 Commit 3 of 3. **Did NOT narrow the type.** Fixed the bug it was hiding; recorded the
