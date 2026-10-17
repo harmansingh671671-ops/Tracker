@@ -698,6 +698,36 @@ button, a, input, select {
   }
 }
 
+/* A6 -- the shared loading indicator's orbit.
+   ONE rotating container carries all three dots (they differ only by transform and
+   a negative animation-delay), so this is a single keyframe rather than three
+   animations. Gated inside `no-preference` for the same reason as `keystonePulse`
+   (M2), `slateSweep` (M3), `perfectDayGlow` (M4) and `holdRimPulse`: honouring
+   reduced motion then costs no JS and no hydration-time flash.
+
+   Under `reduce` the dots keep their orbit positions and simply stop moving, so the
+   indicator still reads as "busy" -- removing it entirely would leave a labelled gap. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes odysseyLoadOrbit {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+.odyssey-load-orbit {
+  animation: odysseyLoadOrbit 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odyssey-load-orbit {
+    animation: none;
+  }
+}
+
 .animate-spin-slow {
   animation: spin 20s linear infinite;
 }

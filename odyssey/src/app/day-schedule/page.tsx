@@ -9,6 +9,7 @@ import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
+import { LoadingIndicator } from "@/components/common/loading-indicator";
 import {
   ChevronLeft,
   ChevronDown,
@@ -1031,10 +1032,7 @@ function DayScheduleContent() {
 
         {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks (Structured Vertical Rail) */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <Loader2 className="w-7 h-7 text-primary animate-spin" />
-            <span className="text-xs font-mono text-on-surface-variant">Loading schedule blocks...</span>
-          </div>
+          <LoadingIndicator label="Loading schedule blocks" className="py-24" />
         ) : (
           <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
             {full24Hours.map((slot) => renderHourSlot(slot))}

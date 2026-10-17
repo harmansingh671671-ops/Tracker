@@ -3,6 +3,7 @@
 import { logWarn } from "@/lib/utils/logger";
 import { useState, useEffect, useMemo } from "react";
 import { db, type ScheduleBlock } from "@/lib/db";
+import { LoadingIndicator } from "@/components/common/loading-indicator";
 import { v4 as uuidv4 } from "uuid";
 import {
   X,
@@ -500,9 +501,7 @@ export function DayScheduleModal({
         {/* 24-Hour Sequential Timeline List (Same sleek look as Today page) */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
           {loading ? (
-            <div className="py-12 text-center text-xs text-on-surface-variant font-mono">
-              Loading schedule...
-            </div>
+            <LoadingIndicator label="Loading schedule" className="py-12" />
           ) : (
             groupedTimeline.map((item, idx) => {
               if (item.type === "empty") {

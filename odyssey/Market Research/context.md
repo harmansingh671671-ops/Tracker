@@ -617,6 +617,51 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `A6`: the spec's premise was false, and the honest version was smaller than the brief
+
+**Owner instruction:** *"approved, complete a6"* after a briefing that already warned the item was the weakest
+in Phase 2.
+
+**Measured before writing anything: the app has no blank processing screens.** The spec asks for animation
+*"instead of blank processing screens"*. Every screen with a loading state already had one, and **three of the
+five are inline placeholders sized to their real content** so nothing shifts when data lands — the planner
+header's skeleton and the two date strips' grey bars, each carrying a comment explaining it prevents a
+confident false display or a layout jump. The `if (!user) return;` guards that looked like blank renders are
+**all inside handlers and effects**, not component bodies. **`A6` was consolidation, not gap-filling**, and the
+briefing's "one ring in each of those places" was overstated: converting the three inline placeholders would have
+**reintroduced the layout jump their comments exist to prevent**. A ring is a *processing* indicator; a
+same-height bar is a *shape reservation*.
+
+**`M17` moved `NOT BUILT` → `DEFERRED`**, and the reason is absence, not capacity: it specifies a loader for
+*"all AI and background computation states"*, and **this app has neither** — `A4`, the AI coach, is Phase 7. The
+**animation** shipped with `A6`; what remains is AI-only wiring, which should reopen when `A4` does.
+
+**"Allow cancel if slow" deliberately omitted.** Everything that loads is a local IndexedDB read finishing in
+milliseconds, and a cancel on a finished read is a control that does nothing. Recorded on the line rather than
+built.
+
+Three dots on one orbit, in the app's own `--primary`/`--secondary`/`--tertiary` — measured resolving to
+**violet / purple / brown in light and mint / periwinkle / peach in dark**, so it re-themes with no second token
+set. **One rotating container carries all three**: a single keyframe plus three `animation-delay`s, gated on
+`prefers-reduced-motion` like every other animation here. Under `reduce` the orbit **stops but the indicator
+stays** — removing it would leave a labelled gap, and "busy without movement" is the right reading.
+
+**Verification needed CPU throttling to observe the state at all**, and throttling is a **two-sided lever**: at
+20× it was **flaky** — one run passed and the next did not — and at 40× the page was **too slow to reach the
+loading state** before the poller expired. The working configuration is mild throttling plus polling from
+navigation with a generous timeout.
+
+**The reduced-motion branch passed for the wrong reason first**, and that is the part worth keeping: it sampled
+once after a fixed wait, so it reported success because **the read had simply finished** — not because reduced
+motion was honoured. Rewritten to poll, it now proves **0 running animations with the indicator still present**.
+**A green check that passed for a reason nobody looked at is the single most dangerous thing in a verification
+suite**, and this one had my own name on it.
+
+Gates: `tsc` exit 0; `eslint src` **0 errors**; **24 suites / 361 tests** green; build clean. In-browser at 390
+in both themes: three dots, three distinct resolved theme colours, all three at **one radius (~13px)** from
+centre, orbit animating, `role=status` + `aria-busy=true` + `aria-live=polite`, label visibly rendered,
+no horizontal overflow, 0 console errors; reduced motion verified with **0 running animations**.
+
 ### 2026-10-17 — The 3 lint errors, and the real finding: nothing was ever running full-project lint
 
 **Owner instruction:** *"what are these 3 errors"* then *"fix it"*.
@@ -2792,6 +2837,14 @@ to know where things stand.
   each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
   and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
   while measuring multiplied text. Details in §9, 2026-10-16.
+- **Never sample a transient state once after a fixed wait.** Measured 2026-10-17: the reduced-motion
+  assertion for `A6` reported success because the **read had already finished**, not because reduced motion was
+  honoured. Poll for the state instead. Related: **CPU throttling is two-sided** — 20× was flaky on
+  `A6`'s loading indicator and 40× made the page too slow to *reach* the state at all.
+- **`A6`'s `LoadingIndicator` lives in `src/components/common/loading-indicator.tsx`** and is the app's single
+  loading treatment, used by `/day-schedule` and the day-schedule modal. **Three loading states are
+  deliberately NOT it**: the planner header skeleton and the two date strips' grey bars are *inline shape
+  reservations* sized to prevent layout shift, not processing indicators. **Do not "unify" them.**
 - **Run `npx eslint src` (the WHOLE project), not just the files you touched.** Measured 2026-10-17: three
   `react-hooks/preserve-manual-memoization` errors sat in `planner-content.tsx` since `3970e90`, and
   **nothing blocked on them** — `tsc`, the build and 361 tests were all green over a red lint count, and the
@@ -2895,7 +2948,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **1** — polish, micro-interactions, stabilise |
-| Next feature | **`A2`, `A3` and `A5` have all shipped** (A5 completed 2026-10-17). **All Phase 1 gates now genuinely pass, including `npm run lint` for the first time.** **Phase 2's first unchecked line is `A6`** — loading/processing animation instead of blank screens (no new questions; the cleanest remaining Phase 2 item) · then **`A7`** (just-in-time permission education, which is where the battery rules live) · `A4` is explicitly routed to **Phase 7**. **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
+| Next feature | **`A2`, `A3`, `A5` and `A6` have all shipped.** All Phase 1 gates pass, including `npm run lint` for the first time. **Phase 2's first unchecked line is now `A7`** — just-in-time permission education (explain notification/focus-block permissions at the moment they are requested, with a reason, a step count and "Not now"; no permission bundle at first launch). **This is the item to weigh above `A6` on value:** it sits where this repo's hardest-won constraints are — the wallpaper is default-off for battery reasons (`P8-E1`), and notifications are exactly the permission most worth explaining *why*. It is just the messier build. `A4` is explicitly routed to **Phase 7**, which is also what holds `M17` (its loader target — AI computation states — does not exist until then). **Then, in plan order:** **Phase 4.5 Performance**, which must start with the mandatory reconcile `PERF-0` (5 of its 18 items are already delivered and 4 of its figures are wrong) · **Phase 5 §7.2 wallpaper defects** (`BUG-1`, `BUG-2`, **`BUG-7`** — `BUG-7` sits there because it is native master-switch behaviour whose fix is written but uncompiled and needs a device/APK this machine cannot produce). **Still not decided: is `BUG-1`'s "colour defined 4×" claim true?** `CONS-1` shipped concluding there is now exactly ONE map, so `BUG-1` may already be fixed — `CONS-1` itself was found stale in exactly this way. |
 | **Owner-instruction UI work 2026-10-16** | **Not plan items — no `main_plan.md` id, so no status line exists for them.** On `/day-schedule`: the Tick/Cross/Unreviewed review toggle and the "Day N Focus & Title" card are gone, the hour-row task field became a wrapping auto-growing `<textarea>`, and the header lost the day count and the pulsing dot. **One consequence to carry forward:** `/day-schedule` can no longer complete or miss a block — `XP_PER_BLOCK_COMPLETED` is reachable from `/planner` and `/journey` only. **The day-title retirement was REVERSED the same session, also on owner instruction:** removing the card removed the app's only writer of `odyssey_day_name_*` and appeared to retire naming a day entirely, but the header title is now click-to-edit, so **both storage keys are written again** and a new user CAN name a day. `/journey` reads those keys and is verified to display a title set on `/day-schedule`. The card itself stays removed — the editing happens in the header. |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ · `P0-T6` ✓ · gates clean ✓ · no uncommitted work ✓). **The fourth criterion is satisfied again** — the uncommitted work this row previously reported was the M12 retraction, which is now committed (see the correction at the top of §10). A stale port-3000 `next start` serving the previous build was also found and cleared. |
 | Also open in Phase 1 | **`P0-T3` is the only genuinely open Phase 1 code item** (category type still dual-case: `Category \| (string & {})` at `db.ts:102`/`117` defeats the union; ~50 colour aliases remain). **`P0-T7` and `CONS-1` are NOT open and this row previously said they were** — both shipped (`d50e112`, `e058567`) and §4/§5 of this file already record that. `DEBT` (`D2`, `D5`) remains. ~~The 360px FAB/CTA overlap~~ — closed by `CONS-2`, which found the recorded 2.4% figure was a mid-scroll artifact |
