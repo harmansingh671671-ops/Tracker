@@ -364,7 +364,7 @@ src: `MASTER_TODO_REVISED.md §19 L979–1006`
 - [x] **S4** — Habit cue/trigger field. `SHIPPED` — "What triggers this habit?" text input added to create/edit habit modals, saved as optional `Habit.cue`, e.g. "After I pour my morning coffee" · → **Phase 2** · also: `B8`
 - [x] **S5** — Habit reward field. `SHIPPED` — "What is your immediate reward?" text input added to create/edit habit modals, saved as optional `Habit.reward`, e.g. "5 minutes of music" · → **Phase 2** · also: `B8`
 
-- [ ] **S7** — Habit "Why" purpose statement. `NOT BUILT` · → **Phase 2** · also: `B8`
+
 - [ ] **S8** — 2-minute emergency version. `NOT BUILT` · → **Phase 2** · also: `B12`
 - [ ] **S9** — Break bad habits / Quit mode. `NOT BUILT` · → **Phase 2** · also: `B3`
 - [ ] **S10** — Multi-colour date completion rings. `PARTIAL` — rings exist, not segmented · also: `B5`
