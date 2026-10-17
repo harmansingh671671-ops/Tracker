@@ -617,6 +617,42 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — I was wrong about `PERF-9`/9a, and enumerating beat reasoning
+
+Second commit of the "ready for new work" pass. Deleted the dead animation CSS —
+and in doing so **found that my own `PERF-9` line, written two commits ago, was
+wrong.**
+
+**What I claimed:** `pulseGlow` (animates `box-shadow`) and `shimmerGlow` (animates
+`background-position`) were "the only known repaint-heavy violators", and because both
+belonged to the **unused** landing-page set, deleting them would close **9a**.
+
+**What is true:** sweeping **every** `@keyframes` block for layout/paint properties finds
+**five** violators — `date-ring-pulse`, **`keystonePulse` (M2)**, **`perfectDayGlow` (M4)**
+all animate `box-shadow` too, and all three are **live**. Deleting the dead CSS removes
+**2 of 5**.
+
+**Why the claim was wrong, which is the transferable part:** it reasoned from *which
+classes were dead* instead of *which keyframes animate what*. Nothing in the repo had
+ever enumerated the keyframes, so I filled the gap with a plausible-sounding inference —
+and wrote it into the plan as a status. **A status line is a claim; verify it the way you
+verify code.** The sweep is now the check, and the three live names are written down so
+the next person does not re-infer.
+
+- **Deleted:** `.animate-float-slow`, `.animate-float-reverse`, `.animate-radar-wave`,
+  `.animate-pulse-glow`, `.shimmer-text` and the `floatSlow` / `floatReverse` /
+  `radarWave` / `pulseGlow` / `shimmerGlow` keyframes — **zero usages anywhere**, verified
+  across the whole repo. **22 lines out of `globals.css`.** The reduce block I wrote last
+  commit was carrying five entries for classes that do not exist; it now names only
+  `.animate-spin-slow`, with the deletions recorded as *why*.
+- **Left alone deliberately:** the 3 live `box-shadow` glows. Reimplementing each as an
+  `opacity` breath on a pseudo-element composites instead of repainting, but it changes
+  how three shipped visuals look — an owner's call, not a cleanup's. Recorded as open
+  with the exact names.
+- **Re-ran `check-motion.js`:** still 0 animations under `reduce` on all six screens, and
+  `date-ring-pulse` / `keystonePulse` / `slateSweep` still running under `no-preference`.
+  Deleting CSS can silently remove something live; this proves it did not.
+
 ### 2026-10-17 — `PERF-19`: the baseline found a 1.8 MB logo displayed at 64px, plus 3 MB of dead assets
 
 Started the "get ready to add new things" pass with the gate everything depends on:
