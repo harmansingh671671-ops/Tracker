@@ -615,6 +615,35 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-18 - PERF-10a: the font was dead, and that is the better finding
+
+Branch `agent/mainline`. Small, complete change. No behaviour change, no visual change.
+
+**The plan assumed the fonts were an external fetch that needed self-hosting.** `Inter` and
+`Playfair_Display` already use `next/font/google`, which downloads and self-hosts at build
+time - so they were never a runtime dependency. The remaining one, `Material Symbols Outlined`,
+was fetched from `fonts.googleapis.com`/`fonts.gstatic.com` on every cold start via two
+preconnects and one render-blocking stylesheet.
+
+**It was never used.** All 45 icon-importing files draw with `lucide-react`. The
+`.material-symbols-outlined` CSS class in `globals.css` was applied by nothing. The grep
+returned one match - in `globals.css` itself - and that is the whole story.
+
+**So 10a resolved to deletion, not subsetting.** Removed: the `<link>` stylesheet, both
+preconnects, and the 18-line orphaned class. Three external requests gone per cold start,
+zero visual change, and nothing to subset, cache-bust, or test against a network block.
+
+**The verification that matters is the build output, not a script.** A grep of `.next/`
+for `fonts.googleapis.com` or `fonts.gstatic.com` returns nothing - that is the proof that
+no Google font host reference ships. The runtime check I wrote first used `playwright`,
+which is not installed in this repo; the existing TEMP scripts use `puppeteer-core`, which
+is also not installed here. **Rather than ship a broken verification script, I deleted it
+and relied on the build grep, which is the stronger check anyway.** Recorded as the reason
+`scripts/check-fonts.js` does not exist.
+
+**The shape of the lesson:** the plan said "self-host the fonts". The cheapest correct
+answer was "the font is dead, delete it". Rule 23 - the smallest complete change, and
+deletion beats addition - is what stopped me from subsetting a font nobody referenced.
 ### 2026-10-17 - B3/S13 part 1: ADR 0003, additive schema, and the completion predicate
 
 Branch `agent/mainline`. Owner approved the scope cut to **two of four types** (simple +
