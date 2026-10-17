@@ -80,6 +80,33 @@ process rules (§6), the risk register (§7), and resolved conflicts (§2).
     on frame-0 MUST use `next/dynamic` with `{ ssr: false }`.
 16. **No timer sprawl.** Never spawn uncoordinated `setInterval` loops in React components.
     Use shared hooks, minute-boundary triggers, or `visibilitychange` events.
+17. **Before editing a shared function, `grep` every caller — then fix the root cause once, in
+    the shared code.** Not at each call site. The call-site version ships a second bug later.
+    This is how `P0-T3` found 8 real violations the moment it narrowed `Habit.category`.
+18. **List every place your change must reach before you write it:** callers, tests, fixtures,
+    config, exports, migrations. Then check each one. **A change is not done because the file
+    you edited compiles.**
+19. **Ask what your change could do to the user's data — destroy it, silently alter it, or
+    expose it.** Silent data alteration is the failure this repo has hit most: `BUG-5` reported
+    a streak of 0 as 1 in **9 places**, `BUG-12` rewrote a block's category on every title edit,
+    and the UTF/local-date split let a dismissed reminder return. If a save path writes a field
+    the user did not touch, that is a bug even when every test passes.
+20. **Mark a deliberate shortcut in code: `shortcut: <the limit>, <when to upgrade>`.** Deferred
+    debt with no limit and no trigger becomes permanent. `DEBT` (`D2`, `D5`) predates this
+    convention and should be restated this way.
+21. **Code you move, merge, or consolidate keeps its error handling and validation.** Do not
+    drop a guard because the happy path still works — that is how a "cleanup" commit ships a
+    regression. A 600-line consolidation happened in the 1.3.6 release; this rule is what keeps
+    the next one honest.
+
+17–21 were adopted 2026-07-17 from the `ponytail` ruleset (`DietrichGebert/ponytail`, MIT),
+**selectively and after review** — five rules taken, four rejected as conflicting with rules
+5/13/14 and this repo's reporting norms (its "no abstraction" rule against 13/14; "comment only
+the why, in one line" against the explanatory comments here; the two-line reply format against
+the honest-reporting norm; and its lite/full/ultra modes against the binding workflow in §1).
+**The tool was not installed** — its installer previously overwrote this file — and it now lives
+outside the workspace. Rule 3 already encodes its reuse ladder, so it was not duplicated.
+Provenance and the full rejection list: `context.md` §9, 2026-07-17.
 
 ### The commit sequence — order matters
 
