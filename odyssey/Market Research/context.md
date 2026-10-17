@@ -617,6 +617,38 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 narrative. **Add an entry in the same commit as the work** (§0.2).
 
+### 2026-10-17 — `A5`'s line became a code-set quote, and the editor it retired had a real liability
+
+**Owner instruction:** *"write this quote, remove the change icon from there, keep it like I can change the
+quote in the code to anything"* — the Jim Rohn line, *"We must all suffer one of two things: the pain of
+discipline or the pain of regret."*
+
+**The retirement is the substance, not the styling.** The per-goal "derive it, edit it in one tap" version had
+shipped **hours earlier** and carried a `<textarea rows={1}>`, auto-sizing, a focus/select-on-open effect,
+Escape/blur handling, an `odyssey_identity_line` storage key, and 11 tests. All gone, and a check now asserts
+that key is **never written again**.
+
+**That version had a real liability, which is the reason to prefer the constant.** It made the app **store a
+sentence it had written itself**, and then needed a standing rule that it must never claim the user had written
+it — a test existed purely to catch the app attributing its own words to the user. **A constant cannot be wrong
+about who said something.** Two edits in one file, with the attribution held **separately beside** the text so
+repointing the quote cannot leave a stale name underneath it, and `""` for no attribution.
+
+**The remaining tests do not pin the value** — the owner edits it by hand, so pinning would fight them. They
+guard the ways a hand-edit fails invisibly: a stray newline from a copy-paste, a sentence left ending
+mid-clause, an em-dash inside the text producing a second attribution underneath it, or a quote long enough to
+be clipped rather than wrapped on a phone.
+
+**The layout risk was re-measured rather than assumed.** This quote changes the height of the step, and that is
+*exactly* what left the circle 45px off its origin earlier in the same session, so the check asserts
+**circle-to-button offset 0.00px mid-hold with the quote on screen**, not just that the quote rendered.
+
+Gates: `tsc` exit 0; eslint **0 errors** on touched files; **24 suites / 361 tests** green (five storage tests
+retired, six quote guards added); build clean. In-browser at **360/390/430 in light and dark**: quote verbatim
+and attributed, **wraps to ~2 lines with no ellipsis and no horizontal overflow**, edit affordance **fully
+absent** — no button, no textarea, not even the word "change" — retired key untouched, 0 console errors; skip
+still present and the hold still completes.
+
 ### 2026-10-17 — `A5` completed, and the hold gesture was already dead for a real finger
 
 **Owner instruction:** *"complete the a5, go with option 3"* — derive the identity line from the goal already
@@ -2719,6 +2751,10 @@ to know where things stand.
   each run appends to the previous one. Use `browser.createBrowserContext()` per combination,
   and assert the field holds exactly the seeded string — otherwise a wrapping assertion passes
   while measuring multiplied text. Details in §9, 2026-10-16.
+- **`A5`'s quote is set in code, in one place:** `IDENTITY_QUOTE` and `IDENTITY_ATTRIBUTION` in
+  `src/lib/utils/identity-line.ts`. There is **no edit control in the UI** — the owner asked for the change
+  icon to be removed. The per-goal, user-editable version shipped 2026-10-17 and was retired the same day;
+  its `odyssey_identity_line` key must stay unwritten, and a check asserts that.
 - **A press-and-hold must be tested with a real `page.mouse.down()`, never `el.click()`.** Measured
   2026-10-17: `pointerdown` on the commitment button was followed **in the same tick** by
   `pointerout`/`pointerleave`, which the button's `onPointerLeave={cancel}` turned into an instant cancel — **the

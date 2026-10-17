@@ -1,118 +1,45 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { GOAL_TAGS } from "./goal-tags";
-import {
-  DEFAULT_IDENTITY_LINE,
-  GOAL_IDENTITY_LINES,
-  IDENTITY_STORAGE_KEY,
-  derivedIdentityLine,
-  readIdentityLine,
-  resolveIdentityLine,
-  writeIdentityLine,
-} from "./identity-line";
+import { describe, it, expect } from "vitest";
+import { IDENTITY_ATTRIBUTION, IDENTITY_QUOTE } from "./identity-line";
 
-describe("derivedIdentityLine", () => {
-  it("gives every real goal a distinct line", () => {
-    const lines = GOAL_TAGS.map((t) => derivedIdentityLine(t.id));
-    expect(new Set(lines).size).toBe(GOAL_TAGS.length);
-    for (const line of lines) {
-      expect(line.trim().length).toBeGreaterThan(10);
-      expect(line.endsWith(".")).toBe(true);
-    }
+/**
+ * These constants are **edited by hand** -- that is the whole point of `A5`'s
+ * quote. So these tests are not pinning a value to freeze it; they are guards
+ * against the edit going wrong in the ways that are easy to make and hard to see:
+ * a stray newline from a copy-paste, an unbalanced quote mark, a name left behind
+ * from the previous quote, or a line long enough to be clipped on a phone.
+ *
+ * Change the quote freely. If one of these fails, read the message before
+ * "fixing" the test.
+ */
+
+describe("identity quote", () => {
+  it("is not empty", () => {
+    expect(IDENTITY_QUOTE.trim().length).toBeGreaterThan(0);
   });
 
-  it("falls back to the generic default when no goal was chosen", () => {
-    expect(derivedIdentityLine(null)).toBe(DEFAULT_IDENTITY_LINE);
-    expect(derivedIdentityLine(undefined)).toBe(DEFAULT_IDENTITY_LINE);
-    expect(derivedIdentityLine("")).toBe(DEFAULT_IDENTITY_LINE);
-    expect(derivedIdentityLine("warlord")).toBe(DEFAULT_IDENTITY_LINE);
+  it("has no stray newlines or tabs, which would render as odd gaps", () => {
+    expect(IDENTITY_QUOTE).not.toMatch(/[\n\r\t]/);
   });
 
-  it("is tolerant of case and padding, like every other stored value", () => {
-    expect(derivedIdentityLine("  FOCUS  ")).toBe(GOAL_IDENTITY_LINES.focus);
+  it("is attributed, and the attribution is single-line", () => {
+    expect(IDENTITY_ATTRIBUTION.trim().length).toBeGreaterThan(0);
+    expect(IDENTITY_ATTRIBUTION).not.toMatch(/[\n\r\t]/);
   });
 
-  // These are offered to the user, not asserted about them. A line that reads
-  // like a product claim would be a "confident display that contradicts the fact
-  // it reports" -- the failure mode this repo keeps finding.
-  it("never names a feature, a streak or a reward", () => {
-    const banned = /\b(streak|xp|diamond|reward|wallpaper|level|rank|unlock)\b/i;
-    for (const line of Object.values(GOAL_IDENTITY_LINES)) {
-      expect(line).not.toMatch(banned);
-    }
-    expect(DEFAULT_IDENTITY_LINE).not.toMatch(banned);
+  it("is not so long that it would be clipped rather than wrapped", () => {
+    // It wraps, so this is a legibility bound rather than a hard limit. A quote
+    // that runs to many lines stops being a line you read at a glance.
+    expect(IDENTITY_QUOTE.trim().length).toBeLessThanOrEqual(140);
   });
 
-  it("is first person throughout", () => {
-    for (const line of [...Object.values(GOAL_IDENTITY_LINES), DEFAULT_IDENTITY_LINE]) {
-      expect(line).toMatch(/\b(I|me|my)\b/);
-    }
-  });
-});
-
-describe("identity line storage", () => {
-  function mkStorage(): Storage {
-    return {
-      getItem: (k: string) => (k in store ? store[k] : null),
-      setItem: (k: string, v: string) => {
-        store[k] = v;
-      },
-      key: (i: number) => Object.keys(store)[i] ?? null,
-      get length() {
-        return Object.keys(store).length;
-      },
-      removeItem: (k: string) => {
-        delete store[k];
-      },
-      clear: () => {
-        for (const k of Object.keys(store)) delete store[k];
-      },
-    } as Storage;
-  }
-
-  let store: Record<string, string>;
-
-  beforeEach(() => {
-    store = {};
-    vi.stubGlobal("window", { localStorage: mkStorage() });
-    vi.stubGlobal("localStorage", mkStorage());
-  });
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("reports nothing when the user never wrote one", () => {
-    expect(readIdentityLine()).toBeNull();
+  it("does not begin or end mid-sentence", () => {
+    expect(IDENTITY_QUOTE.trim()).toMatch(/^[A-Z"'\u201c]/);
+    expect(IDENTITY_QUOTE.trim()).toMatch(/[.!?"'\u201d]$/);
   });
 
-  it("round-trips a written line", () => {
-    expect(writeIdentityLine("  I will show up.  ")).toBe(true);
-    expect(readIdentityLine()).toBe("I will show up.");
-    expect(store[IDENTITY_STORAGE_KEY]).toBe("I will show up.");
-  });
-
-  it("treats an empty or whitespace line as never having written one", () => {
-    // So clearing the field returns the step to the derived line rather than
-    // leaving a blank commitment on the screen.
-    store[IDENTITY_STORAGE_KEY] = "   ";
-    expect(readIdentityLine()).toBeNull();
-    writeIdentityLine("");
-    expect(readIdentityLine()).toBeNull();
-  });
-
-  it("prefers the user's words over the derived line", () => {
-    expect(resolveIdentityLine("focus")).toBe(derivedIdentityLine("focus"));
-    writeIdentityLine("My own words");
-    expect(resolveIdentityLine("focus")).toBe("My own words");
-  });
-
-  it("falls back to the derived line again if the stored line is cleared", () => {
-    writeIdentityLine("My own words");
-    writeIdentityLine("   ");
-    expect(resolveIdentityLine("focus")).toBe(derivedIdentityLine("focus"));
-  });
-
-  it("keeps a user's line rather than overwriting it with the derived one", () => {
-    writeIdentityLine("Mine");
-    resolveIdentityLine("health");
-    expect(readIdentityLine()).toBe("Mine");
-    expect(store[IDENTITY_STORAGE_KEY]).toBe("Mine");
+  it("does not carry its own em-dash attribution that could contradict the one beside it", () => {
+    // An em-dash inside the text plus a rendered "— Name" underneath would read as
+    // two attributions. Keep the name out of the sentence.
+    expect(IDENTITY_QUOTE).not.toContain("\u2014");
   });
 });
