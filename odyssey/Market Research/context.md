@@ -3314,7 +3314,7 @@ to know where things stand.
   branch `main`.
 - HEAD at last update: **`S5` — habit reward field (commit pending)** — before it `2baaa19` (zero-streak
   label fix), `da79b69` (**BUG-12**), `6367493` (**PERF-4**/4g), `238a0a0` (**A7**), `e4ae4df` (**A6**),
-  `8c71e61` (**A5**), `79ff34e` (**A2**).
+  `8c71e61` (**A5**), `79ff34e` (**A2**). `S6` removed from `main_plan.md` — not implemented.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **27 suites, 407 tests green**. `tsc --noEmit` exit 0. Production build clean.
 - Ports 3000/3001/3100 clear; no background server left running.
