@@ -103,6 +103,7 @@ export function PlannerContent() {
   const [editingEndHour, setEditingEndHour] = useState<number>(10);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
+  const [floatingBlocks, setFloatingBlocks] = useState<ScheduleBlock[]>([]);
   const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
   const [hintToast, setHintToast] = useState<string | null>(null);
 
@@ -506,21 +507,54 @@ export function PlannerContent() {
   const handleMoveBlock = useCallback(async (block: ScheduleBlock, toHour: number) => {
     if (!block?.id) return;
     const fromHour = parseInt(block.startTime.split(":")[0], 10);
+    if (fromHour === toHour) return;
+    // If the target hour is occupied, displace that block into a floating icon.
+    const occupant = blocks.find(
+      (b) => b.id !== block.id && parseInt(b.startTime.split(":")[0], 10) === toHour
+    );
+    if (occupant) {
+      setFloatingBlocks((prev) => [...prev, occupant]);
+      setBlocks((prev) => prev.filter((b) => b.id !== occupant.id));
+    }
     const delta = toHour - fromHour;
-    if (delta === 0) return;
     const shift = (t: string) => {
       const h = parseInt(t.split(":")[0], 10);
       const m = t.split(":")[1] || "00";
       const nh = (h + delta + 240) % 24;
       return `${String(nh).padStart(2, "0")}:${m}`;
     };
+    const updated = { ...block, startTime: shift(block.startTime), endTime: shift(block.endTime) };
     await db.scheduleBlocks.update(block.id, {
-      startTime: shift(block.startTime),
-      endTime: shift(block.endTime),
+      startTime: updated.startTime,
+      endTime: updated.endTime,
     });
-    await loadBlocks(selectedDate);
+    setBlocks((prev) => prev.map((b) => (b.id === block.id ? updated : b)));
     syncCurrentScheduleToNative(selectedDate);
-  }, [selectedDate, loadBlocks]);
+  }, [blocks, selectedDate, setBlocks, setFloatingBlocks]);
+
+  const handleDropFloating = useCallback(async (block: ScheduleBlock, toHour: number) => {
+    if (!block?.id) return;
+    // Displace any occupant.
+    const occupant = blocks.find(
+      (b) => b.id !== block.id && parseInt(b.startTime.split(":")[0], 10) === toHour
+    );
+    if (occupant) {
+      setFloatingBlocks((prev) => [...prev, occupant]);
+      setBlocks((prev) => prev.filter((b) => b.id !== occupant.id));
+    }
+    const fromHour = parseInt(block.startTime.split(":")[0], 10);
+    const toEndHourRaw = parseInt(block.endTime.split(":")[0], 10);
+    const duration = (toEndHourRaw - fromHour + 24) % 24 || 1;
+    const newStart = toHour;
+    const newEnd = (toHour + duration) % 24;
+    const startTime = `${String(newStart).padStart(2, "0")}:00`;
+    const endTime = `${String(newEnd === 0 ? 24 : newEnd).padStart(2, "0")}:00`;
+    const updated = { ...block, startTime, endTime };
+    await db.scheduleBlocks.update(block.id, { startTime, endTime });
+    setBlocks((prev) => [...prev.filter((b) => b.id !== block.id), updated]);
+    setFloatingBlocks((prev) => prev.filter((f) => f.id !== block.id));
+    syncCurrentScheduleToNative(selectedDate);
+  }, [blocks, selectedDate, setBlocks, setFloatingBlocks]);
 
   const handleSaveBlock = async (data: {
     id?: string;
@@ -663,7 +697,13 @@ export function PlannerContent() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentHour]);
 
+  // Render floating displaced blocks as draggable icons.
+  const floatingElements = floatingBlocks.map((b) => (
+    <FloatingBlock key={b.id} block={b} onDrop={handleDropFloating} />
+  ));
+
   return (
+    <>
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
       {/* M9 - Completion fraction ("3/5 Habits Done · 60%"). Sits above the
@@ -890,6 +930,53 @@ export function PlannerContent() {
           </div>
         </div>
       )}
+
+      {floatingElements}
+    </div>
+    </>
+  );
+}
+
+function FloatingBlock({ block, onDrop }: { block: ScheduleBlock; onDrop: (b: ScheduleBlock, hour: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const startRef = useRef({ x: 0, y: 0, dragging: false });
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    startRef.current = { x: e.clientX, y: e.clientY, dragging: false };
+    try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
+  };
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const dx = e.clientX - startRef.current.x;
+    const dy = e.clientY - startRef.current.y;
+    if (!startRef.current.dragging && Math.hypot(dx, dy) < 8) return;
+    startRef.current.dragging = true;
+    setOffset({ x: dx, y: dy });
+  };
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (startRef.current.dragging) {
+      const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
+      const h = el ? parseInt(el.getAttribute("data-hour") as string, 10) : null;
+      if (h !== null && !Number.isNaN(h)) {
+        onDrop(block, h);
+      }
+    }
+    setOffset({ x: 0, y: 0 });
+    startRef.current.dragging = false;
+  };
+
+  return (
+    <div
+      ref={ref}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+      className="fixed bottom-28 right-4 z-50 cursor-grab touch-none rounded-2xl border border-primary/30 bg-surface-container-low px-3 py-2 shadow-lg"
+    >
+      <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">Floating</div>
+      <div className="text-xs font-semibold truncate max-w-[140px]">{block.title}</div>
     </div>
   );
 }
