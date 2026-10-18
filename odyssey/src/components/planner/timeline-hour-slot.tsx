@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { logWarn } from "@/lib/utils/logger";
 import { type ScheduleBlock } from "@/lib/db";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
@@ -44,6 +44,7 @@ interface TimelineHourSlotProps {
     status?: string
   ) => void;
   onShowHint: (msg: string) => void;
+  onMoveBlock?: (block: ScheduleBlock, toHour: number) => void;
 }
 
 export function TimelineHourSlot({
@@ -58,9 +59,13 @@ export function TimelineHourSlot({
   onOpenHour,
   onToggleStatus,
   onShowHint,
+  onMoveBlock,
 }: TimelineHourSlotProps) {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggeredRef = useRef(false);
+  const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragTarget, setDragTarget] = useState<number | null>(null);
 
   const cat = getPlannerCatStyle(slot.category, slot.isCustom);
   const CatIcon = cat.Icon;
@@ -153,7 +158,54 @@ export function TimelineHourSlot({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onContextMenu={(e) => e.preventDefault()}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${
+        onPointerDown={(e) => {
+          if (!slot.block || !onMoveBlock) return;
+          dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, prevTargetEl: null };
+        }}
+        onPointerMove={(e) => {
+          const ds = dragStateRef.current;
+          if (!ds || !slot.block || !onMoveBlock) return;
+          const dx = e.clientX - ds.startX;
+          const dy = e.clientY - ds.startY;
+          if (!ds.moved && Math.hypot(dx, dy) < 10) return;
+          if (!ds.moved) {
+            ds.moved = true;
+            setIsDragging(true);
+            try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
+          }
+          e.preventDefault();
+          const targetEl = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
+          const hourAttr = targetEl?.getAttribute("data-hour");
+          const h = hourAttr ? parseInt(hourAttr, 10) : null;
+          if (h !== null && !Number.isNaN(h)) {
+            if (ds.prevTargetEl && ds.prevTargetEl !== targetEl) {
+              ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+            }
+            if (targetEl && targetEl !== ds.prevTargetEl) {
+              targetEl.classList.add("ring-2", "ring-primary");
+              ds.prevTargetEl = targetEl;
+            }
+            if (h !== dragTarget) setDragTarget(h);
+          }
+        }}
+        onPointerUp={() => {
+          const ds = dragStateRef.current;
+          if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+          if (ds && ds.moved && slot.block && onMoveBlock && dragTarget !== null && dragTarget !== ds.hour) {
+            onMoveBlock(slot.block, dragTarget);
+          }
+          dragStateRef.current = null;
+          setIsDragging(false);
+          setDragTarget(null);
+        }}
+        onPointerCancel={() => {
+          const ds = dragStateRef.current;
+          if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+          dragStateRef.current = null;
+          setIsDragging(false);
+          setDragTarget(null);
+        }}
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-none transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${
           options?.isInsideGroup
             ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
             : cat.cardBg
