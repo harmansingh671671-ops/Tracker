@@ -625,6 +625,31 @@ export function PlannerContent() {
     router.push(`/day-schedule?date=${dateStr}&day=${dayNum}`);
   }, [selectedDate, user, router]);
 
+  const scrollToUpcoming = useCallback(() => {
+    if (typeof window === "undefined") return;
+    let targetHour: number | null = null;
+    if (selectedDate === todayStr) {
+      const future = blocks
+        .filter((b) => {
+          const h = parseInt(b.startTime.split(":")[0], 10);
+          return !Number.isNaN(h) && h >= currentHour;
+        })
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      if (future.length > 0) {
+        targetHour = parseInt(future[0].startTime.split(":")[0], 10);
+      }
+    }
+    if (targetHour === null && blocks.length > 0) {
+      const sorted = [...blocks].sort((a, b) =>
+        a.startTime.localeCompare(b.startTime)
+      );
+      targetHour = parseInt(sorted[0].startTime.split(":")[0], 10);
+    }
+    if (targetHour === null) targetHour = currentHour;
+    const el = document.querySelector(`[data-hour="${targetHour}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [blocks, selectedDate, todayStr, currentHour]);
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
@@ -639,6 +664,7 @@ export function PlannerContent() {
         todayLogs={todayLogs}
         historyLogs={historyLogs}
         loading={habitsLoading || !user?.id}
+        onStart={scrollToUpcoming}
       />
 
       {/* The M12 "Now / Up next in 35 min · <title> (1h)" line was removed here

@@ -615,6 +615,14 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-18 - Compact planner header chips (C3, scoped)
+
+Shipped a compact, snap-scrolling two-chip header on the planner: "X/Y done · Start"
+(scrolls to the next upcoming block) and "Habits" (opens the Habits page). Dropped
+streak, capacity, date and the progress bar to keep it small, per owner instruction.
+Added `data-hour` attributes to timeline slots so the Start chip can scroll to the
+upcoming block. tsc/lint/build clean in the worktree.
+
 ### 2026-10-18 - PERF-10a: the font was dead, and that is the better finding
 
 Branch `agent/mainline`. Small, complete change. No behaviour change, no visual change.
