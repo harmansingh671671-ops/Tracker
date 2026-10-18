@@ -636,20 +636,20 @@ export function EditHabitModal({
                     className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
                   />
                 </div>
+
+                {/* Emergency version - only for counted habits */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
+                  <input
+                    type="text"
+                    value={emergencyVersion}
+                    onChange={(e) => setEmergencyVersion(e.target.value)}
+                    placeholder="Read 1 page instead of 30 mins"
+                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                  />
+                </div>
               </>
             )}
-
-            {/* Emergency version */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
-              <input
-                type="text"
-                value={emergencyVersion}
-                onChange={(e) => setEmergencyVersion(e.target.value)}
-                placeholder="Read 1 page instead of 30 mins"
-                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-              />
-            </div>
 
             {/* Action Buttons: Save and Delete */}
             <div className="pt-2 space-y-2">

@@ -54,16 +54,20 @@ export default function HabitsPage() {
     fetchTemporaryWallet,
     settleElapsedRewards,
     toggleHabitLog,
+    setHabitLogValue,
     addHabit,
     updateHabit,
     deleteHabit,
     loading: habitsLoading,
+    loadedUserId,
   } = useHabitStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<HabitViewMode>("list");
+  const [valueInputHabit, setValueInputHabit] = useState<{ habit: Habit; log: { completed?: boolean; value?: number } | undefined; date: string } | null>(null);
+  const [valueInputAmount, setValueInputAmount] = useState("");
 
   const [todayStr, setTodayStr] = useState<string>(getLocalTodayStr);
   const [selectedDate, setSelectedDate] = useState<string>(getLocalTodayStr);
@@ -79,6 +83,36 @@ export default function HabitsPage() {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
   }, []);
+
+  const openValueInput = useCallback((
+    habit: Habit,
+    log: { completed?: boolean; value?: number } | undefined,
+    date: string
+  ) => {
+    if (isFutureSelectedDate) return;
+    setValueInputHabit({ habit, log, date });
+    setValueInputAmount(String(typeof log?.value === "number" ? log.value : 0));
+  }, [isFutureSelectedDate]);
+
+  const closeValueInput = useCallback(() => {
+    setValueInputHabit(null);
+    setValueInputAmount("");
+  }, []);
+
+  const submitValueInput = useCallback(async () => {
+    if (!valueInputHabit) return;
+    const { habit, date } = valueInputHabit;
+    const value = parseInt(valueInputAmount, 10);
+    if (isNaN(value) || value < 0) {
+      showToast("Enter a valid number");
+      return;
+    }
+    if (loadedUserId && setHabitLogValue) {
+      await setHabitLogValue(loadedUserId, habit.id, date, value);
+    }
+    closeValueInput();
+    showToast(`Logged ${value} ${habit.unit ?? "units"}`);
+  }, [valueInputHabit, valueInputAmount, loadedUserId, setHabitLogValue, showToast, closeValueInput]);
 
   // Long press / tap-and-hold timer refs
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -733,55 +767,55 @@ AnimatePresence, which suppresses the enter transition and leaves the
                             {lastDone}
                           </p>
                         )}
+
+                        {/* Counted habit progress bar + stepper */}
+                        {(h.type ?? "simple") === "counted" && (
+                          <div className="mt-2 w-full">
+                            {/* Water-fill progress bar */}
+                            <div className="relative w-full h-3 rounded-full bg-surface-container-high overflow-hidden" style={{ borderColor: habitColor }}>
+                              <div
+                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-300 ease-out"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, (typeof log?.value === "number" ? log.value : 0) / (h.targetValue ?? 1) * 100))}%`,
+                                  backgroundColor: habitColor,
+                                  boxShadow: `0 0 8px ${habitColor}80`,
+                                }}
+                              />
+                            </div>
+                            {/* Stepper controls - click to open value input popup */}
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openValueInput(h, log, selectedDate)}
+                                disabled={isFutureSelectedDate}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
+                              >
+                                <span className="font-mono text-xs">-</span>
+                              </button>
+                              <div className="flex-1 flex items-center justify-between text-xs font-mono text-on-surface-variant">
+                                <span>{typeof log?.value === "number" ? log.value : 0}</span>
+                                <span>/ {h.targetValue ?? "-"}</span>
+                                <span>{h.unit ?? "units"}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openValueInput(h, log, selectedDate)}
+                                disabled={isFutureSelectedDate}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
+                              >
+                                <span className="font-mono text-xs">+</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Completion Action: Stepper for counted, Ring for simple */}
+                    {/* Completion Action: Ring for simple habits only (counted uses inline stepper below name) */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {(h.type ?? "simple") === "counted" ? (
-                        <div className="flex items-center gap-2 p-1 rounded-xl bg-surface-container-low border border-outline/10">
-                          <button
-                            type="button"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isFutureSelectedDate) {
-                                showToast("Cannot log for future dates.");
-                                return;
-                              }
-                              handleToggle(h.id, selectedDate, e);
-                            }}
-                            disabled={isFutureSelectedDate}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={isFutureSelectedDate ? "Cannot log for future dates" : isCompleted ? "Tap to decrease" : "Tap to increase"}
-                          >
-                            <span className="font-mono text-xs">-</span>
-                          </button>
-                          <div className="flex flex-col items-center min-w-[48px]">
-                            <span className="font-mono text-sm font-bold text-on-surface">{typeof log?.value === "number" ? log.value : 0}</span>
-                            <span className="text-[10px] font-mono text-on-surface-variant">/ {h.targetValue ?? "-"}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isFutureSelectedDate) {
-                                showToast("Cannot log for future dates.");
-                                return;
-                              }
-                              handleToggle(h.id, selectedDate, e);
-                            }}
-                            disabled={isFutureSelectedDate}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={isFutureSelectedDate ? "Cannot log for future dates" : isCompleted ? "Tap to decrease" : "Tap to increase"}
-                          >
-                            <span className="font-mono text-xs">+</span>
-                          </button>
-                        </div>
-                      ) : (
+                      {(h.type ?? "simple") === "simple" ? (
                         <div
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
@@ -852,7 +886,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                             ) : null}
                           </AnimatePresence>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
@@ -948,55 +982,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
                       <HabitIcon icon={h.icon} name={h.name} className="w-4 h-4" style={{ color: habitColor }} />
                     </div>
 
-                    {/* Completion Action: Stepper for counted, Ring for simple */}
-                    {(h.type ?? "simple") === "counted" ? (
-                      <div
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isFutureSelectedDate) {
-                            showToast("Cannot log for future dates.");
-                            return;
-                          }
-                          handleToggle(h.id, selectedDate, e);
-                        }}
-                        title={
-                          isFutureSelectedDate
-                            ? "Cannot log for future dates"
-                            : isCompleted
-                            ? "Tap to decrease"
-                            : "Tap to increase"
-                        }
-                        className={`flex items-center gap-1 p-1.5 rounded-xl bg-surface-container-low border border-outline/10 ${
-                          isFutureSelectedDate ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-                        }`}
-                        style={{ backgroundColor: isFutureSelectedDate ? "transparent" : undefined }}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={isFutureSelectedDate}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={isCompleted ? "Decrease" : "Increase"}
-                        >
-                          <span className="font-mono text-[10px]">-</span>
-                        </button>
-                        <div className="flex flex-col items-center min-w-[36px]">
-                          <span className="font-mono text-xs font-bold text-on-surface">{typeof log?.value === "number" ? log.value : 0}</span>
-                          <span className="text-[8px] font-mono text-on-surface-variant">/ {h.targetValue ?? "-"}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={isFutureSelectedDate}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={isCompleted ? "Decrease" : "Increase"}
-                        >
-                          <span className="font-mono text-[10px]">+</span>
-                        </button>
-                      </div>
-                    ) : (
+                    {/* Completion Action: Ring for simple habits only (counted uses inline stepper below metadata) */}
+                    {(h.type ?? "simple") === "simple" ? (
                       <div
                         onMouseDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
@@ -1067,7 +1054,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                           ) : null}
                         </AnimatePresence>
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   <div>
@@ -1084,7 +1071,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                           Rest
                         </span>
                       )}
-                    </div>
+</div>
                     <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
                       <span className="truncate font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
                         <span className={`font-bold shrink-0 flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
@@ -1101,6 +1088,49 @@ AnimatePresence, which suppresses the enter transition and leaves the
                           </span>
                         )}
                     </div>
+
+                    {/* Counted habit progress bar + stepper */}
+                    {(h.type ?? "simple") === "counted" && (
+                      <div className="mt-2 w-full">
+                        {/* Water-fill progress bar */}
+                        <div className="relative w-full h-2 rounded-full bg-surface-container-high overflow-hidden" style={{ borderColor: habitColor }}>
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full transition-all duration-300 ease-out"
+                            style={{
+                              width: `${Math.min(100, Math.max(0, (typeof log?.value === "number" ? log.value : 0) / (h.targetValue ?? 1) * 100))}%`,
+                              backgroundColor: habitColor,
+                              boxShadow: `0 0 6px ${habitColor}80`,
+                            }}
+                          />
+                        </div>
+                        {/* Stepper controls - click to open value input popup */}
+                        <div className="mt-1 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openValueInput(h, log, selectedDate)}
+                            disabled={isFutureSelectedDate}
+                            className="w-6 h-6 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
+                          >
+                            <span className="font-mono text-[10px]">-</span>
+                          </button>
+                          <div className="flex-1 flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
+                            <span>{typeof log?.value === "number" ? log.value : 0}</span>
+                            <span>/ {h.targetValue ?? "-"}</span>
+                            <span>{h.unit ?? "units"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openValueInput(h, log, selectedDate)}
+                            disabled={isFutureSelectedDate}
+                            className="w-6 h-6 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
+                          >
+                            <span className="font-mono text-[10px]">+</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -1241,6 +1271,71 @@ AnimatePresence, which suppresses the enter transition and leaves the
         onSave={handleCreateHabit}
         existingHabitNames={habits.map((h) => h.name)}
       />
+
+      {/* Value Input Popup for Counted Habits */}
+      <AnimatePresence mode="wait">
+        {valueInputHabit && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-container-lowest/80 backdrop-blur-md"
+            onClick={closeValueInput}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              className="w-full max-w-sm bg-surface-container rounded-2xl border border-outline/15 shadow-2xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-on-surface">Set Amount</h3>
+                <button
+                  type="button"
+                  onClick={closeValueInput}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
+                >
+                  <span className="font-mono text-lg">×</span>
+                </button>
+              </div>
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-on-surface mb-1">{valueInputHabit.habit.name}</p>
+                <p className="text-xs text-on-surface-variant">
+                  Target: {valueInputHabit.habit.targetValue} {valueInputHabit.habit.unit ?? "units"} / day
+                </p>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={valueInputAmount}
+                onChange={(e) => setValueInputAmount(e.target.value)}
+                autoFocus
+                className="w-full mb-4 rounded-xl bg-surface-container-low border border-outline/10 px-4 py-3 text-lg font-mono text-on-surface text-center focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="0"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeValueInput}
+                  className="flex-1 py-3 px-4 rounded-xl bg-surface-container-high text-on-surface-variant font-semibold transition-colors hover:bg-surface-container"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitValueInput}
+                  className="flex-1 py-3 px-4 rounded-xl bg-primary text-on-primary font-semibold shadow-lg shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast Notification */}
       {toastMsg && (

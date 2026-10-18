@@ -93,6 +93,7 @@ interface HabitState {
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'currentStreak' | 'longestStreak' | 'totalCompletions'>) => Promise<Habit>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitLog: (userId: string, habitId: string, date: string) => Promise<boolean>;
+  setHabitLogValue: (userId: string, habitId: string, date: string, value: number) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   clearAllHabits: (userId: string) => Promise<void>;
 }
@@ -587,6 +588,104 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     // so it is deliberately not passed (ADR 0001 section 6).
     await get().fetchTemporaryWallet(userId);
     return isCompleted;
+  },
+
+  setHabitLogValue: async (userId, habitId, date, value) => {
+    const habit = await db.habits.get(habitId);
+    if (!habit) return;
+
+    const existingLogs = await db.habitLogs
+      .where('[habitId+date]')
+      .equals([habitId, date])
+      .toArray();
+    const existingLog = existingLogs[0];
+
+    const counted = (habit.type ?? "simple") === "counted";
+    const target = counted ? habit.targetValue : undefined;
+    const wasCompleted = counted ? isHabitComplete({ type: "counted", targetValue: target }, existingLog) : Boolean(existingLog?.completed);
+    const isCompleted = counted
+      ? (typeof target === "number" && Number.isFinite(target) && target > 0 ? value >= target : false)
+      : value > 0;
+
+    if (existingLog) {
+      await db.habitLogs.update(existingLog.id, {
+        completed: isCompleted,
+        ...(counted ? { value } : {}),
+        loggedAt: new Date().toISOString()
+      });
+    } else if (value > 0 || !counted) {
+      const newLog: HabitLog = {
+        id: uuidv4(),
+        habitId,
+        userId,
+        date,
+        completed: isCompleted,
+        ...(counted ? { value } : {}),
+        loggedAt: new Date().toISOString()
+      };
+      await db.habitLogs.add(newLog);
+    }
+
+    const todayStr = getLocalTodayStr();
+
+    set((state) => {
+      const updatedToday = { ...state.todayLogs };
+      if (date === todayStr) {
+        if (existingLog) {
+          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted ? { value } : {}) };
+        } else if (value > 0 || !counted) {
+          updatedToday[habitId] = {
+            id: uuidv4(),
+            habitId,
+            userId,
+            date,
+            completed: isCompleted,
+            ...(counted ? { value } : {}),
+            loggedAt: new Date().toISOString()
+          };
+        }
+      }
+
+      const updatedHistory = { ...state.historyLogs };
+      if (!updatedHistory[habitId]) {
+        updatedHistory[habitId] = {};
+      }
+      updatedHistory[habitId] = {
+        ...updatedHistory[habitId],
+        [date]: isCompleted,
+      };
+
+      return {
+        todayLogs: updatedToday,
+        historyLogs: updatedHistory,
+      };
+    });
+
+    // Update streak based on isCompleted transition
+    if (habit) {
+      const becameCompleted = isCompleted && !wasCompleted;
+      const becameIncomplete = !isCompleted && wasCompleted;
+      const newTotal = becameCompleted ? habit.totalCompletions + 1 : becameIncomplete ? Math.max(0, habit.totalCompletions - 1) : habit.totalCompletions;
+      const newStreak = isCompleted ? habit.currentStreak + 1 : Math.max(0, habit.currentStreak - 1);
+      const newLongest = Math.max(habit.longestStreak, newStreak);
+      
+      await db.habits.update(habitId, {
+        totalCompletions: newTotal,
+        currentStreak: newStreak,
+        longestStreak: newLongest
+      });
+
+      set((state) => ({
+        habits: state.habits.map(h => h.id === habitId ? {
+          ...h,
+          totalCompletions: newTotal,
+          currentStreak: newStreak,
+          longestStreak: newLongest
+        } : h)
+      }));
+    }
+
+    await get().fetchTemporaryWallet(userId);
   },
 
   deleteHabit: async (id) => {
