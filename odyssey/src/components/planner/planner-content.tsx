@@ -503,6 +503,25 @@ export function PlannerContent() {
     setIsEditModalOpen(true);
   };
 
+  const handleMoveBlock = useCallback(async (block: ScheduleBlock, toHour: number) => {
+    if (!block?.id) return;
+    const fromHour = parseInt(block.startTime.split(":")[0], 10);
+    const delta = toHour - fromHour;
+    if (delta === 0) return;
+    const shift = (t: string) => {
+      const h = parseInt(t.split(":")[0], 10);
+      const m = t.split(":")[1] || "00";
+      const nh = (h + delta + 240) % 24;
+      return `${String(nh).padStart(2, "0")}:${m}`;
+    };
+    await db.scheduleBlocks.update(block.id, {
+      startTime: shift(block.startTime),
+      endTime: shift(block.endTime),
+    });
+    await loadBlocks(selectedDate);
+    syncCurrentScheduleToNative(selectedDate);
+  }, [selectedDate, loadBlocks]);
+
   const handleSaveBlock = async (data: {
     id?: string;
     title: string;
@@ -613,6 +632,7 @@ export function PlannerContent() {
         onOpenHour={handleOpenHour}
         onToggleStatus={handleToggleBlockStatus}
         onShowHint={showHint}
+        onMoveBlock={handleMoveBlock}
       />
     );
   };
