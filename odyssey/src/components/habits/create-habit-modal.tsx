@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { type Habit, type HabitCategory } from "@/lib/db";
+import { type Habit, type HabitCategory, type HabitType } from "@/lib/db";
 import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/habit-template-library";
 import { X, Check, Sparkles, Plus, ArrowLeft } from "lucide-react";
 
@@ -15,10 +15,13 @@ interface CreateHabitModalProps {
     frequency: number;
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
-      priority?: "critical" | "focus" | "optional";
-      cue?: string;
-      reward?: string;
-      emergencyVersion?: string;
+    priority?: "critical" | "focus" | "optional";
+    cue?: string;
+    reward?: string;
+    emergencyVersion?: string;
+    type?: HabitType;
+    unit?: string;
+    targetValue?: number;
   }) => void;
   existingHabitNames?: string[];
   /**
@@ -93,6 +96,9 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   const [cue, setCue] = useState("");
   const [reward, setReward] = useState("");
   const [emergencyVersion, setEmergencyVersion] = useState("");
+  const [type, setType] = useState<HabitType>("simple");
+  const [unit, setUnit] = useState("");
+  const [targetValue, setTargetValue] = useState("");
 
 
   if (!isOpen) return null;
@@ -145,6 +151,9 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
       emergencyVersion: emergencyVersion.trim() || undefined,
+      type: type === "simple" ? undefined : type,
+      unit: type === "counted" ? unit.trim() || undefined : undefined,
+      targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
     });
   };
 
@@ -162,6 +171,9 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
       emergencyVersion: emergencyVersion.trim() || undefined,
+      type: type === "simple" ? undefined : type,
+      unit: type === "counted" ? unit.trim() || undefined : undefined,
+      targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
     });
     handleClose();
   };
@@ -439,6 +451,58 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
               />
             </div>
+
+            {/* Emergency version */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT TYPE</label>
+              <div className="flex gap-2">
+                {[
+                  { id: "simple", label: "Simple", desc: "Tap to complete" },
+                  { id: "counted", label: "Counted", desc: "Log a number toward a target" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setType(t.id as HabitType)}
+                    className={`flex-1 p-3 rounded-xl text-left flex flex-col gap-0.5 transition-all cursor-pointer border ${
+                      type === t.id
+                        ? "bg-primary/15 border-primary/40 text-primary"
+                        : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{t.label}</span>
+                    <span className="text-[10px] font-mono text-on-surface-variant">{t.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {type === "counted" && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">UNIT</label>
+                  <input
+                    type="text"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="pages, cups, reps..."
+                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">DAILY TARGET</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={targetValue}
+                    onChange={(e) => setTargetValue(e.target.value)}
+                    placeholder="20"
+                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Emergency version */}
             <div className="space-y-1.5">

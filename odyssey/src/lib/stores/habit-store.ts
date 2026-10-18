@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate } from '../utils/habit-colors';
+import { isHabitComplete } from '../utils/habit-completion';
 import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
 import {
   DIAMONDS_PER_COMPLETION,
@@ -480,11 +481,31 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       .equals([habitId, date])
       .toArray();
     const existingLog = existingLogs[0];
-    const isCompleted = !(existingLog?.completed);
+    const habit = await db.habits.get(habitId);
+
+    // A counted habit logs a number toward its target; completed is derived
+    // from value >= target via isHabitComplete, never toggled directly.
+    const counted = (habit?.type ?? "simple") === "counted";
+    const target = counted ? habit?.targetValue : undefined;
+    const currentValue = counted ? (typeof existingLog?.value === "number" ? existingLog.value : 0) : 0;
+    const subject = counted && habit ? { type: "counted" as const, targetValue: target } : { type: "simple" as const };
+    const wasCompleted = counted && habit ? isHabitComplete(subject, existingLog) : Boolean(existingLog?.completed);
+
+    let isCompleted: boolean;
+    let value: number | undefined;
+    if (counted) {
+      // Tap moves toward completion: increment unless already done (then undo one).
+      const next = wasCompleted ? Math.max(0, currentValue - 1) : currentValue + 1;
+      value = next;
+      isCompleted = typeof target === "number" && Number.isFinite(target) && target > 0 ? next >= target : false;
+    } else {
+      isCompleted = !wasCompleted;
+    }
 
     if (existingLog) {
       await db.habitLogs.update(existingLog.id, {
         completed: isCompleted,
+        ...(counted ? { value } : {}),
         loggedAt: new Date().toISOString()
       });
     } else {
@@ -493,7 +514,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         habitId,
         userId,
         date,
-        completed: true,
+        completed: isCompleted,
+        ...(counted ? { value } : {}),
         loggedAt: new Date().toISOString()
       };
       await db.habitLogs.add(newLog);
@@ -505,14 +527,15 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const updatedToday = { ...state.todayLogs };
       if (date === todayStr) {
         if (existingLog) {
-          updatedToday[habitId] = { ...existingLog, completed: isCompleted };
+          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted ? { value } : {}) };
         } else {
           updatedToday[habitId] = {
             id: uuidv4(),
             habitId,
             userId,
             date,
-            completed: true,
+            completed: isCompleted,
+            ...(counted ? { value } : {}),
             loggedAt: new Date().toISOString()
           };
         }
@@ -533,10 +556,13 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       };
     });
 
-    // Update streak for this habit
-    const habit = get().habits.find(h => h.id === habitId);
+    // Update streak for this habit. A day counts toward the streak only when it
+    // is genuinely complete (value >= target for counted), so a counted habit at
+    // 3 of 20 never inflates the streak -- that is the BUG-5 class of defect.
     if (habit) {
-      const newTotal = isCompleted ? habit.totalCompletions + 1 : Math.max(0, habit.totalCompletions - 1);
+      const becameCompleted = isCompleted && !wasCompleted;
+      const becameIncomplete = !isCompleted && wasCompleted;
+      const newTotal = becameCompleted ? habit.totalCompletions + 1 : becameIncomplete ? Math.max(0, habit.totalCompletions - 1) : habit.totalCompletions;
       const newStreak = isCompleted ? habit.currentStreak + 1 : Math.max(0, habit.currentStreak - 1);
       const newLongest = Math.max(habit.longestStreak, newStreak);
       

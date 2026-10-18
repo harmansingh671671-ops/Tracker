@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { type HabitCategory, type Habit } from "@/lib/db";
+import { type HabitCategory, type Habit, type HabitType } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -41,6 +41,9 @@ interface EditHabitModalProps {
       cue?: string;
       reward?: string;
       emergencyVersion?: string;
+      type?: HabitType;
+      unit?: string;
+      targetValue?: number;
     }
   ) => void;
   onDelete: (habitId: string) => void;
@@ -104,6 +107,9 @@ export function EditHabitModal({
   const [cue, setCue] = useState("");
   const [reward, setReward] = useState("");
   const [emergencyVersion, setEmergencyVersion] = useState("");
+  const [type, setType] = useState<HabitType>("simple");
+  const [unit, setUnit] = useState("");
+  const [targetValue, setTargetValue] = useState("");
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -141,6 +147,9 @@ export function EditHabitModal({
       setCue(habit.cue ?? "");
       setReward(habit.reward ?? "");
       setEmergencyVersion(habit.emergencyVersion ?? "");
+      setType(habit.type ?? "simple");
+      setUnit(habit.unit ?? "");
+      setTargetValue(habit.targetValue ? String(habit.targetValue) : "");
 
       setIsConfirmingDelete(false);
       setSelectedHistoryDate(selectedDate || today);
@@ -190,6 +199,9 @@ export function EditHabitModal({
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
       emergencyVersion: emergencyVersion.trim() || undefined,
+      type: type === "simple" ? undefined : type,
+      unit: type === "counted" ? unit.trim() || undefined : undefined,
+      targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
     });
     onClose();
   };
@@ -574,6 +586,58 @@ export function EditHabitModal({
                 className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
               />
             </div>
+
+            {/* Emergency version */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT TYPE</label>
+              <div className="flex gap-2">
+                {[
+                  { id: "simple", label: "Simple", desc: "Tap to complete" },
+                  { id: "counted", label: "Counted", desc: "Log a number toward a target" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setType(t.id as HabitType)}
+                    className={`flex-1 p-3 rounded-xl text-left flex flex-col gap-0.5 transition-all cursor-pointer border ${
+                      type === t.id
+                        ? "bg-primary/15 border-primary/40 text-primary"
+                        : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{t.label}</span>
+                    <span className="text-[10px] font-mono text-on-surface-variant">{t.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {type === "counted" && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">UNIT</label>
+                  <input
+                    type="text"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="pages, cups, reps..."
+                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">DAILY TARGET</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={targetValue}
+                    onChange={(e) => setTargetValue(e.target.value)}
+                    placeholder="20"
+                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Emergency version */}
             <div className="space-y-1.5">

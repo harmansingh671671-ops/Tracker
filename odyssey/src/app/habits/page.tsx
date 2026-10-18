@@ -16,6 +16,7 @@ import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
+import { isHabitComplete } from "@/lib/utils/habit-completion";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
 import { getCompletionToast, getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
@@ -587,16 +588,19 @@ export default function HabitsPage() {
            unmounts the old set and mounts a new one, which is what lets the
            enter animation play. The date must be in the KEY, not on the parent
            div: putting key= on the parent remounts the whole subtree including
-           AnimatePresence, which suppresses the enter transition and leaves the
-           cards stuck at the initial opacity of 0. */
-        <div className="space-y-2.5">
-          <AnimatePresence mode="popLayout" initial={false}>
-            {habits.map((h) => {
-              const isScheduled = isHabitScheduledOnDate(h, selectedDate);
-              const isCompleted = selectedDate === todayStr
-                ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
-                : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
-              const habitColor = getHabitColor(h);
+AnimatePresence, which suppresses the enter transition and leaves the
+            cards stuck at the initial opacity of 0. */
+         <div className="space-y-2.5">
+           <AnimatePresence mode="popLayout" initial={false}>
+{habits.map((h) => {
+                const isScheduled = isHabitScheduledOnDate(h, selectedDate);
+                const rawLog = selectedDate === todayStr
+                  ? (todayLogs[h.id] ?? historyLogs[h.id]?.[selectedDate])
+                  : (historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]);
+                // Normalize to CompletionRecord: historyLogs stores booleans, todayLogs stores HabitLog
+                const log: { completed?: boolean; value?: number } | undefined = rawLog && typeof rawLog === "object" ? rawLog : rawLog ? { completed: true } : undefined;
+                const isCompleted = isHabitComplete(h, log);
+                const habitColor = getHabitColor(h);
               // M7 -- computed once per card rather than twice in the JSX. Null for
               // a habit never completed, and then no line renders at all.
               const lastDone = lastDoneLabel(h.id);
@@ -732,78 +736,123 @@ export default function HabitsPage() {
                       </div>
                     </div>
 
-                    {/* Completion Action Ring / Solid Circle */}
+                    {/* Completion Action: Stepper for counted, Ring for simple */}
                     <div className="flex items-center gap-2 shrink-0">
-                      <div
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isFutureSelectedDate) {
-                            showToast("Cannot complete habits for future dates.");
-                            return;
+                      {(h.type ?? "simple") === "counted" ? (
+                        <div className="flex items-center gap-2 p-1 rounded-xl bg-surface-container-low border border-outline/10">
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isFutureSelectedDate) {
+                                showToast("Cannot log for future dates.");
+                                return;
+                              }
+                              handleToggle(h.id, selectedDate, e);
+                            }}
+                            disabled={isFutureSelectedDate}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={isFutureSelectedDate ? "Cannot log for future dates" : isCompleted ? "Tap to decrease" : "Tap to increase"}
+                          >
+                            <span className="font-mono text-xs">-</span>
+                          </button>
+                          <div className="flex flex-col items-center min-w-[48px]">
+                            <span className="font-mono text-sm font-bold text-on-surface">{typeof log?.value === "number" ? log.value : 0}</span>
+                            <span className="text-[10px] font-mono text-on-surface-variant">/ {h.targetValue ?? "-"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isFutureSelectedDate) {
+                                showToast("Cannot log for future dates.");
+                                return;
+                              }
+                              handleToggle(h.id, selectedDate, e);
+                            }}
+                            disabled={isFutureSelectedDate}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={isFutureSelectedDate ? "Cannot log for future dates" : isCompleted ? "Tap to decrease" : "Tap to increase"}
+                          >
+                            <span className="font-mono text-xs">+</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isFutureSelectedDate) {
+                              showToast("Cannot complete habits for future dates.");
+                              return;
+                            }
+                            handleToggle(h.id, selectedDate, e);
+                          }}
+                          title={
+                            isFutureSelectedDate
+                              ? "Cannot complete habits for future dates"
+                              : isCompleted
+                              ? isScheduled
+                                ? "Completed (tap to undo)"
+                                : "Unscheduled Completed (!) • Tap to undo"
+                              : !isScheduled
+                              ? "Rest Day (tap to register)"
+                              : "Tap to complete"
                           }
-                          handleToggle(h.id, selectedDate, e);
-                        }}
-                        title={
-                          isFutureSelectedDate
-                            ? "Cannot complete habits for future dates"
-                            : isCompleted
-                            ? isScheduled
-                              ? "Completed (tap to undo)"
-                              : "Unscheduled Completed (!) • Tap to undo"
-                            : !isScheduled
-                            ? "Rest Day (tap to register)"
-                            : "Tap to complete"
-                        }
-                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${
-                          isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-                        } ${
-                          isCompleted
-                            ? "text-white shadow-sm scale-105"
-                            : isFutureSelectedDate
-                            ? "bg-transparent"
-                            : !isScheduled
-                            ? "bg-transparent hover:scale-105 opacity-75"
-                            : "bg-transparent hover:scale-105"
-                        }`}
-                        style={{
-                          backgroundColor: isCompleted
-                            ? isScheduled
-                              ? habitColor
-                              : `${habitColor}70`
-                            : "transparent",
-                          borderColor: isFutureSelectedDate && !isCompleted
-                            ? `${habitColor}60`
-                            : !isScheduled && !isCompleted
-                            ? `${habitColor}70`
-                            : habitColor,
-                          borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2.5px",
-                          borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
-                          boxShadow: isCompleted
-                            ? `0 0 10px ${habitColor}${isScheduled ? "66" : "35"}`
-                            : undefined,
-                        }}
-                      >
-                        <AnimatePresence mode="wait">
-                          {isCompleted ? (
-                            <motion.div
-                              key={isScheduled ? "check" : "excl"}
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              transition={{ duration: 0.15 }}
-                              className="flex items-center justify-center"
-                            >
-                              {isScheduled ? (
-                                <Check className="w-4 h-4 stroke-[3]" />
-                              ) : (
-                                <span className="font-black text-xs leading-none">!</span>
-                              )}
-                            </motion.div>
-                          ) : null}
-                        </AnimatePresence>
-                      </div>
+                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${
+                            isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                          } ${
+                            isCompleted
+                              ? "text-white shadow-sm scale-105"
+                              : isFutureSelectedDate
+                              ? "bg-transparent"
+                              : !isScheduled
+                              ? "bg-transparent hover:scale-105 opacity-75"
+                              : "bg-transparent hover:scale-105"
+                          }`}
+                          style={{
+                            backgroundColor: isCompleted
+                              ? isScheduled
+                                ? habitColor
+                                : `${habitColor}70`
+                              : "transparent",
+                            borderColor: isFutureSelectedDate && !isCompleted
+                              ? `${habitColor}60`
+                              : !isScheduled && !isCompleted
+                              ? `${habitColor}70`
+                              : habitColor,
+                            borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2.5px",
+                            borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
+                            boxShadow: isCompleted
+                              ? `0 0 10px ${habitColor}${isScheduled ? "66" : "35"}`
+                              : undefined,
+                          }}
+                        >
+                          <AnimatePresence mode="wait">
+                            {isCompleted ? (
+                              <motion.div
+                                key={isScheduled ? "check" : "excl"}
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex items-center justify-center"
+                              >
+                                {isScheduled ? (
+                                  <Check className="w-4 h-4 stroke-[3]" />
+                                ) : (
+                                  <span className="font-black text-xs leading-none">!</span>
+                                )}
+                              </motion.div>
+                            ) : null}
+                          </AnimatePresence>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -830,9 +879,12 @@ export default function HabitsPage() {
           <AnimatePresence mode="popLayout" initial={false}>
             {habits.map((h) => {
               const isScheduled = isHabitScheduledOnDate(h, selectedDate);
-              const isCompleted = selectedDate === todayStr
-                ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
-                : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
+              const rawLog = selectedDate === todayStr
+                ? (todayLogs[h.id] ?? historyLogs[h.id]?.[selectedDate])
+                : (historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]);
+              // Normalize to CompletionRecord: historyLogs stores booleans, todayLogs stores HabitLog
+              const log = rawLog && typeof rawLog === "object" ? rawLog as { completed?: boolean; value?: number } : rawLog ? { completed: true } : undefined;
+              const isCompleted = isHabitComplete(h, log);
               const habitColor = getHabitColor(h);
 
               return (
@@ -896,76 +948,126 @@ export default function HabitsPage() {
                       <HabitIcon icon={h.icon} name={h.name} className="w-4 h-4" style={{ color: habitColor }} />
                     </div>
 
-                    <div
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isFutureSelectedDate) {
-                          showToast("Cannot complete habits for future dates.");
-                          return;
+                    {/* Completion Action: Stepper for counted, Ring for simple */}
+                    {(h.type ?? "simple") === "counted" ? (
+                      <div
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isFutureSelectedDate) {
+                            showToast("Cannot log for future dates.");
+                            return;
+                          }
+                          handleToggle(h.id, selectedDate, e);
+                        }}
+                        title={
+                          isFutureSelectedDate
+                            ? "Cannot log for future dates"
+                            : isCompleted
+                            ? "Tap to decrease"
+                            : "Tap to increase"
                         }
-                        handleToggle(h.id, selectedDate, e);
-                      }}
-                      title={
-                        isFutureSelectedDate
-                          ? "Cannot complete habits for future dates"
-                          : isCompleted
-                          ? isScheduled
-                            ? "Completed (tap to undo)"
-                            : "Unscheduled Completed (!) • Tap to undo"
-                          : !isScheduled
-                          ? "Rest Day (tap to register)"
-                          : "Tap to complete"
-                      }
-                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ${
-                        isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-                      } ${
-                        isCompleted
-                          ? "text-white shadow-xs scale-105"
-                          : isFutureSelectedDate
-                          ? "bg-transparent"
-                          : !isScheduled
-                          ? "bg-transparent hover:scale-105 opacity-75"
-                          : "bg-transparent hover:scale-105"
-                      }`}
-                      style={{
-                        backgroundColor: isCompleted
-                          ? isScheduled
-                            ? habitColor
-                            : `${habitColor}70`
-                          : "transparent",
-                        borderColor: isFutureSelectedDate && !isCompleted
-                          ? `${habitColor}60`
-                          : !isScheduled && !isCompleted
-                          ? `${habitColor}70`
-                          : habitColor,
-                        borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2px",
-                        borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
-                        boxShadow: isCompleted
-                          ? `0 0 8px ${habitColor}${isScheduled ? "66" : "35"}`
-                          : undefined,
-                      }}
-                    >
-                      <AnimatePresence mode="wait">
-                        {isCompleted ? (
-                          <motion.div
-                            key={isScheduled ? "check" : "excl"}
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="flex items-center justify-center"
-                          >
-                            {isScheduled ? (
-                              <Check className="w-3.5 h-3.5 stroke-[3]" />
-                            ) : (
-                              <span className="font-black text-[11px] leading-none">!</span>
-                            )}
-                          </motion.div>
-                        ) : null}
-                      </AnimatePresence>
-                    </div>
+                        className={`flex items-center gap-1 p-1.5 rounded-xl bg-surface-container-low border border-outline/10 ${
+                          isFutureSelectedDate ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                        }`}
+                        style={{ backgroundColor: isFutureSelectedDate ? "transparent" : undefined }}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={isFutureSelectedDate}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={isCompleted ? "Decrease" : "Increase"}
+                        >
+                          <span className="font-mono text-[10px]">-</span>
+                        </button>
+                        <div className="flex flex-col items-center min-w-[36px]">
+                          <span className="font-mono text-xs font-bold text-on-surface">{typeof log?.value === "number" ? log.value : 0}</span>
+                          <span className="text-[8px] font-mono text-on-surface-variant">/ {h.targetValue ?? "-"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={isFutureSelectedDate}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={isCompleted ? "Decrease" : "Increase"}
+                        >
+                          <span className="font-mono text-[10px]">+</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isFutureSelectedDate) {
+                            showToast("Cannot complete habits for future dates.");
+                            return;
+                          }
+                          handleToggle(h.id, selectedDate, e);
+                        }}
+                        title={
+                          isFutureSelectedDate
+                            ? "Cannot complete habits for future dates"
+                            : isCompleted
+                            ? isScheduled
+                              ? "Completed (tap to undo)"
+                              : "Unscheduled Completed (!) • Tap to undo"
+                            : !isScheduled
+                            ? "Rest Day (tap to register)"
+                            : "Tap to complete"
+                        }
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ${
+                          isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                        } ${
+                          isCompleted
+                            ? "text-white shadow-xs scale-105"
+                            : isFutureSelectedDate
+                            ? "bg-transparent"
+                            : !isScheduled
+                            ? "bg-transparent hover:scale-105 opacity-75"
+                            : "bg-transparent hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: isCompleted
+                            ? isScheduled
+                              ? habitColor
+                              : `${habitColor}70`
+                            : "transparent",
+                          borderColor: isFutureSelectedDate && !isCompleted
+                            ? `${habitColor}60`
+                            : !isScheduled && !isCompleted
+                            ? `${habitColor}70`
+                            : habitColor,
+                          borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2px",
+                          borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
+                          boxShadow: isCompleted
+                            ? `0 0 8px ${habitColor}${isScheduled ? "66" : "35"}`
+                            : undefined,
+                        }}
+                      >
+                        <AnimatePresence mode="wait">
+                          {isCompleted ? (
+                            <motion.div
+                              key={isScheduled ? "check" : "excl"}
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="flex items-center justify-center"
+                            >
+                              {isScheduled ? (
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              ) : (
+                                <span className="font-black text-[11px] leading-none">!</span>
+                              )}
+                            </motion.div>
+                          ) : null}
+                        </AnimatePresence>
+                      </div>
+                    )}
                   </div>
 
                   <div>

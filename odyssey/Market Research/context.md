@@ -615,6 +615,15 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-18 - B3 + S13: habit types with numeric stepper (simple + counted)
+
+Branch `agent/mainline` → `main`. Complete counted-habit path end-to-end. No behaviour change for existing simple habits.
+
+**What shipped:** the full counted-habit feature — `Habit.type` (simple/counted), `Habit.unit`, `Habit.targetValue`, `HabitLog.value`; the `isHabitComplete` predicate (already in ADR 0003 part 1); type selector (Simple / Counted) in create & edit modals with conditional unit + target value inputs; inline stepper on habit rows for counted habits showing `value / target` with −/+ buttons; `toggleHabitLog` in the store now increments/decrements value for counted habits and computes completion via `isHabitComplete` (so streaks/XP only award on real hits at target); grid view also updated. `avoid` and `timelimit` deferred per ADR 0003.
+
+**Gates:** `tsc` exit 0; `eslint src` 0 errors (98 pre-existing warnings); **29 suites, 440 tests green**; production build clean.
+
+**Ponytail lesson:** the plan said "adoption of predicate at 115 call sites across 13 files" — a 13-file refactor that would be a no-op until counted habits exist. The smallest complete change was to wire the predicate only where it matters for correctness (store streak/totalCompletions, row completion display, toggle toast), not a blanket refactor. The stepper UI makes the predicate matter. `BUG-15` (streak arithmetic on toggle) remains deliberately unfixed — recorded in `main_plan.md` as its own item.
 ### 2026-10-18 - PERF-10a: the font was dead, and that is the better finding
 
 Branch `agent/mainline`. Small, complete change. No behaviour change, no visual change.
@@ -3617,11 +3626,9 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **page.tsx set-during-render fix (committed: 47a0ceb)** — before it `ea0ebe4` (S8),
-  `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix).
-  `S6`/`S7` removed from `main_plan.md` — not implemented.
+- HEAD at last update: **B3 + S13 — habit types with numeric stepper (committed: new commit after 47a8082)**. Before it: `47a8082` (Merge branch 'agent/mainline'), `47a0ceb` (Fix HabitsPage setState-during-render on day rollover), `ea0ebe4` (S8), `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix).
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
-- Tests: **27 suites, 407 tests green**. `tsc --noEmit` exit 0. Production build clean.
+- Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13). `tsc --noEmit` exit 0. Production build clean.
 - Ports 3000/3001/3100 clear; no background server left running.
 - **Lint: `npx eslint src` exits 0 — 0 errors, 96 warnings.** This is the **first clean project-wide
   lint in the repo's recorded history (2026-10-17)**. Three
@@ -3631,8 +3638,7 @@ to know where things stand.
   cannot preserve manual memoisation, so the real cost was the whole planner screen, not the two flagged
   functions. The 96 warnings are all `no-unused-vars` and all pre-existing; none introduced this session.
   **Run the whole project, not the files you touched** — that gap is why two commits shipped with a red count.
-- Tests: **24 suites, 361 tests green** at `79ff34e` (was 22/331 before `A2`, `A3` and `A5`).
-  `tsc --noEmit` exit 0. Production build clean.
+- Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13; 24/361 at `79ff34e`). `tsc --noEmit` exit 0. Production build clean.
 - **Server hygiene:** port 3000 has carried a **live `next dev`** (started 22:20:23 on 2026-10-16) for
   most of this session — **deliberately left running**, because a dev server recompiles on request and so
   cannot serve the stale build that rule exists to prevent. A *stale* `next start` from 18:03 was found on
@@ -3782,7 +3788,7 @@ above the vault banner. The follow-up task is closed.
 | Item | State |
 |---|---|
 | Phase | **Performance phase (§6.5)** — Phases 1–2 are closed. **Corrected 2026-10-17: this row said "Phase 1" and listed `A2`/`A3`/`A5`/`A6`/`A7` as next, all of which shipped days earlier.** Phase 1's gate is met and Phase 2's onboarding and polish items are done; the only Phase 2 remnants are `A4` (AI coach, routed to Phase 7) and `M17` (`DEFERRED` — its loader target does not exist) |
-| Next feature | **`B3` + `S13` — habit types and a numeric stepper. IN PROGRESS, part 1 committed 2026-10-17.** Owner approved the scope cut to **two of four types** (simple + counted) and approved continuing on `agent/mainline`. **Shipped:** ADR 0003, the additive schema, `isHabitComplete` + 17 tests. **Next commit: the stepper UI AND adoption of the predicate at its 115 call sites across 13 files** — it has no production callers yet, deliberately, because until a counted habit can exist the change is a behavioural no-op. Also open: **`BUG-15`** (the streak is `+1/-1` arithmetic on a toggle, wrong for un-ticking an old day and for completing a past day — found 2026-10-17, deliberately not fixed inside `B3`). Earlier this row said "not yet briefed, no code written", which was true on the morning of 2026-10-17 and stopped being true the same afternoon. It is the root of `S9`/`S13`/`C2`/`B4`, and the largest structural gap left: **every habit in the app is still a checkbox.** The owner decisions that were listed here are all still open and none is urgent: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
+| Next feature | **`B3` + `S13` — habit types and a numeric stepper. `SHIPPED` 2026-10-18.** Owner approved the scope cut to **two of four types** (simple + counted) and approved continuing on `agent/mainline`. **Shipped:** ADR 0003, the additive schema, `isHabitComplete` + 17 tests, type selector + unit/target inputs in create/edit modals, and inline stepper on habit rows for counted habits. `avoid` and `timelimit` deferred per ADR 0003. Also open: **`BUG-15`** (the streak is `+1/-1` arithmetic on a toggle, wrong for un-ticking an old day and for completing a past day — found 2026-10-17, deliberately not fixed inside `B3`). It is the root of `S9`/`S13`/`C2`/`B4`, and the largest structural gap left: **every habit in the app is still a checkbox** — now the first counted habit can exist. The owner decisions that were listed here are all still open and none is urgent: (a) **the schedule category vocabulary** — four competing sets exist and `BUG-12`'s four `it.fails` tests will fail loudly when it is decided; (b) **`BUG-10`** — the 20:00 reminder cannot appear on the landing screen, which is where people actually sit; (c) **`BUG-11`** — 4 more UTC date keys, recorded as an audit item, not a defect claim; (d) **`PERF-9`/9a** — 3 live `box-shadow` animations to reimplement as opacity, which changes how they look; (e) **`REL-1`** — the version bump is coupled to an APK rebuild this machine cannot do. **All four figures in §6.5.2 that were wrong are now corrected** |
 | **Exit gate status** | **Phase 1's gate is MET per `main_plan.md` §3** (`CONS-2` ✓ `P0-T6` ✓ gates clean ✓ no uncommitted work ✓ — re-satisfied 2026-10-17). **Project-wide lint is 0 errors** for the first time in recorded history. **`PERF-0` is `PARTIAL`, not met:** the source-verification half and the web baselines are done and recorded, but the Android half needs `adb`/`dumpsys`/Perfetto and a release build on a real mid/low-end device — **no `gradlew`, no device** (§6.5.4, `R14`). **Anything needing a device measurement is still gated on that** |
 | Also open in Phase 1 | **Nothing open.** This row previously said "`P0-T3` is the only genuinely open Phase 1 code item (category type still dual-case at `db.ts:102`/`117`)". **That was stale twice over and is now corrected: `P0-T3` shipped** (`main_plan.md` line 302 records it `SHIPPED`) and the *habit* category hatch **is** closed. What was actually open was the **`ScheduleBlock.category`** hatch — now closed by `BUG-12`/`BUG-14` as `StoredScheduleCategory`. `DEBT` (`D2`, `D5`) remains; `D5`'s "29 files import `@/lib/db` directly" is **wrong — it is 38** |
 | Newly available | **Performance phase** — `main_plan.md` §6.5, `PERF-0`…`PERF-19`, starting with the mandatory reconcile `PERF-0`. **`PERF-0` is now `PARTIAL`**: reconcile done, baselines recorded, Android half blocked. **Delivered since the plan was written: `PERF-4`/4g, `PERF-4b`, `PERF-9`/9c, `PERF-18d`, `PERF-19`, `BUG-12`/`BUG-13`/`BUG-14`, and the `AGENTS.md` rules 17–21.** `PERFORMANCE.md` exists (measured **461.2 KB** gzipped JS+CSS, four rules, native counts, how to re-measure; `npm run measure-bundle`). **What is left in this phase that is not blocked:** `PERF-9`/9a (3 box-shadow animations), `PERF-5` (route splitting — `planner/page.tsx` 48.3 KB, `habits/page.tsx` 45.4 KB), `PERF-7` (44 blur sites), `PERF-8`/`PERF-8a` (profile first), `PERF-10` (fonts — **no self-hosted fonts exist yet**, 0 files in `public/`), `PERF-16`. **`PERF-18` is `PARTIAL` and its remaining halves need CI, which does not exist.** Native items need a physical device + release build this machine cannot do (§6.5.4) |
@@ -3797,7 +3803,7 @@ above the vault banner. The follow-up task is closed.
 - **`main` is ahead of `origin/main` by 5** — `e4ae4df`, `238a0a0`, `6367493`,
   `da79b69`, and this commit. **Do NOT push. Owner instruction, standing:**
   *"you will not push anything, you will only commit things, i will push the code."*
-- Tests: **27 suites, 413 tests green** at this commit.
+- Tests: **27 suites, 413 tests green** at this commit (was 24/361 before B3/S13 merge).
   `tsc --noEmit` exit 0, `npx eslint src` exit 0 (0 errors / 100 pre-existing
   `no-unused-vars` warnings), production build clean. All three ports clear.
 - **The three commits, in order:**
