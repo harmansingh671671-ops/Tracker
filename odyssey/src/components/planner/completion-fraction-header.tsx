@@ -20,15 +20,15 @@ interface CompletionFractionHeaderProps {
   historyLogs?: Record<string, Record<string, boolean>>;
   loading?: boolean;
   currentBlockTitle?: string;
-  /** Scrolls the planner to the block currently in progress. */
   onNowClick?: () => void;
 }
 
 /**
  * Compact animated planner header.
  *
- * A full-width two-slide carousel that auto-advances in a loop and can also
- * be scrolled manually (snap per slide).
+ * A full-width two-slide carousel (auto-loops, manually scrollable):
+ *   - Habits: "Habits  X/Y done  ·  Next: name" (single line)
+ *   - Now:    "Now: block title" (single line)
  */
 export function CompletionFractionHeader({
   selectedDate,
@@ -65,7 +65,6 @@ export function CompletionFractionHeader({
       return scheduled && !done;
     }) ?? null;
 
-  // Auto-advance, looping back to the first slide.
   useEffect(() => {
     const id = setInterval(() => {
       setIndex((i) => {
@@ -80,7 +79,6 @@ export function CompletionFractionHeader({
     return () => clearInterval(id);
   }, []);
 
-  // Keep the dot indicator in sync with manual scrolling.
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -96,7 +94,7 @@ export function CompletionFractionHeader({
     return (
       <div
         aria-hidden="true"
-        className="h-16 rounded-2xl bg-surface-container-highest animate-pulse"
+        className="h-10 rounded-2xl bg-surface-container-highest animate-pulse"
       />
     );
   }
@@ -112,40 +110,37 @@ export function CompletionFractionHeader({
         <button
           type="button"
           onClick={() => router.push("/habits")}
-          className="w-full shrink-0 snap-start flex items-center gap-2.5 px-3 py-1.5 text-left rounded-2xl bg-gradient-to-br from-primary/10 to-surface-container-low border border-primary/20 hover:border-primary/40 transition-colors"
+          className="w-full shrink-0 snap-start flex items-center gap-2.5 px-3 py-2 text-left"
         >
-          <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
+          <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
           </div>
-          <div className="min-w-0 space-y-0">
-            <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
-              Habits
-            </div>
-            <div className="font-mono font-bold text-sm leading-tight">
-              {hasHabits ? `${completedCount}/${denominator} done` : "No habits"}
-            </div>
-            <div className="text-[11px] text-on-surface-variant truncate leading-tight">
-              Next: {nextHabit ? nextHabit.name : "—"}
-            </div>
-          </div>
+          <span className="text-sm font-semibold truncate">
+            Habits{" "}
+            <span className="font-mono font-bold text-primary">
+              {hasHabits ? `${completedCount}/${denominator} done` : "none"}
+            </span>
+            <span className="text-on-surface-variant"> · Next: </span>
+            <span className="text-on-surface-variant">
+              {nextHabit ? nextHabit.name : "—"}
+            </span>
+          </span>
         </button>
 
         <button
           type="button"
           onClick={onNowClick}
-          className="w-full shrink-0 snap-start flex items-center gap-2.5 px-3 py-1.5 text-left rounded-2xl bg-gradient-to-br from-secondary/10 to-surface-container-low border border-secondary/20 hover:border-secondary/40 transition-colors"
+          className="w-full shrink-0 snap-start flex items-center gap-2.5 px-3 py-2 text-left"
         >
-          <div className="w-8 h-8 rounded-xl bg-secondary/15 flex items-center justify-center shrink-0">
-            <Clock className="w-4 h-4 text-secondary" />
+          <div className="w-7 h-7 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
+            <Clock className="w-3.5 h-3.5 text-secondary" />
           </div>
-          <div className="min-w-0 space-y-0">
-            <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
-              Now
-            </div>
-            <div className="text-xs font-semibold truncate leading-tight">
+          <span className="text-sm font-semibold truncate">
+            Now:{" "}
+            <span className="text-on-surface-variant">
               {currentBlockTitle || "Nothing scheduled"}
-            </div>
-          </div>
+            </span>
+          </span>
         </button>
       </div>
 
