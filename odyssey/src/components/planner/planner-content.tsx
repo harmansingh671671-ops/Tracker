@@ -625,29 +625,16 @@ export function PlannerContent() {
     router.push(`/day-schedule?date=${dateStr}&day=${dayNum}`);
   }, [selectedDate, user, router]);
 
-  const scrollToUpcoming = useCallback(() => {
-    if (typeof window === "undefined") return;
-    let targetHour: number | null = null;
-    if (selectedDate === todayStr) {
-      const future = blocks
-        .filter((b) => {
-          const h = parseInt(b.startTime.split(":")[0], 10);
-          return !Number.isNaN(h) && h >= currentHour;
-        })
-        .sort((a, b) => a.startTime.localeCompare(b.startTime));
-      if (future.length > 0) {
-        targetHour = parseInt(future[0].startTime.split(":")[0], 10);
-      }
-    }
-    if (targetHour === null && blocks.length > 0) {
-      const sorted = [...blocks].sort((a, b) =>
-        a.startTime.localeCompare(b.startTime)
-      );
-      targetHour = parseInt(sorted[0].startTime.split(":")[0], 10);
-    }
-    if (targetHour === null) targetHour = currentHour;
-    const el = document.querySelector(`[data-hour="${targetHour}"]`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const currentBlockTitle = useMemo(() => {
+    if (selectedDate !== todayStr) return undefined;
+    const block = blocks.find((b) => {
+      const start = parseInt(b.startTime.split(":")[0], 10);
+      let end = parseInt(b.endTime.split(":")[0], 10);
+      if (Number.isNaN(end)) end = start + 1;
+      if (end <= start) end = start + 1;
+      return !Number.isNaN(start) && currentHour >= start && currentHour < end;
+    });
+    return block?.title;
   }, [blocks, selectedDate, todayStr, currentHour]);
 
   return (
@@ -664,7 +651,7 @@ export function PlannerContent() {
         todayLogs={todayLogs}
         historyLogs={historyLogs}
         loading={habitsLoading || !user?.id}
-        onStart={scrollToUpcoming}
+        currentBlockTitle={currentBlockTitle}
       />
 
       {/* The M12 "Now / Up next in 35 min · <title> (1h)" line was removed here
