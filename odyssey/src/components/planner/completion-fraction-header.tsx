@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 import {
@@ -17,16 +18,15 @@ interface CompletionFractionHeaderProps {
   todayLogs?: Record<string, HabitLog>;
   historyLogs?: Record<string, Record<string, boolean>>;
   loading?: boolean;
-  /** Title of the block currently in progress, if any. */
   currentBlockTitle?: string;
 }
 
 /**
  * Compact animated planner header.
  *
- * A horizontal, snap-scrolling row of small blocks:
- *   - Habits: "X/Y done" plus the name of the next habit to do.
- *   - Now: the block currently in progress.
+ * A full-width two-slide carousel that auto-advances in a loop:
+ *   - Slide 1 (Habits): "X/Y done" + name of the next habit.
+ *   - Slide 2 (Now): the block currently in progress.
  */
 export function CompletionFractionHeader({
   selectedDate,
@@ -37,6 +37,15 @@ export function CompletionFractionHeader({
   loading = false,
   currentBlockTitle,
 }: CompletionFractionHeaderProps) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % 2);
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+
   const progress: DayHabitProgress = getDayHabitProgress(
     habits,
     selectedDate,
@@ -60,48 +69,55 @@ export function CompletionFractionHeader({
 
   if (loading) {
     return (
-      <motion.div
+      <div
         aria-hidden="true"
-        initial={{ opacity: 0, y: -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1"
-      >
-        <div className="h-14 w-40 shrink-0 rounded-2xl bg-surface-container-highest animate-pulse snap-start" />
-        <div className="h-14 w-40 shrink-0 rounded-2xl bg-surface-container-highest animate-pulse snap-start" />
-      </motion.div>
+        className="h-16 rounded-2xl bg-surface-container-highest animate-pulse"
+      />
     );
   }
 
   const { completedCount, denominator, hasHabits } = progress;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <div className="snap-start shrink-0 min-w-[150px] rounded-2xl px-3 py-2 bg-surface-container-low border border-outline/10 space-y-0.5">
-        <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
-          Habits
+    <div className="relative overflow-hidden rounded-2xl border border-outline/10 bg-surface-container-low">
+      <motion.div
+        animate={{ x: `-${index * 100}%` }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+        className="flex w-full"
+      >
+        <div className="w-full shrink-0 px-3 py-2 space-y-0.5">
+          <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
+            Habits
+          </div>
+          <div className="font-mono font-bold text-sm">
+            {hasHabits ? `${completedCount}/${denominator} done` : "No habits"}
+          </div>
+          <div className="text-xs text-on-surface-variant truncate">
+            Next: {nextHabit ? nextHabit.name : "—"}
+          </div>
         </div>
-        <div className="font-mono font-bold text-sm">
-          {hasHabits ? `${completedCount}/${denominator} done` : "No habits"}
-        </div>
-        <div className="text-xs text-on-surface-variant truncate">
-          Next: {nextHabit ? nextHabit.name : "—"}
-        </div>
-      </div>
 
-      <div className="snap-start shrink-0 min-w-[150px] rounded-2xl px-3 py-2 bg-surface-container-low border border-outline/10 space-y-0.5">
-        <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
-          Now
+        <div className="w-full shrink-0 px-3 py-2 space-y-0.5">
+          <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
+            Now
+          </div>
+          <div className="text-xs font-semibold truncate">
+            {currentBlockTitle || "Nothing scheduled"}
+          </div>
         </div>
-        <div className="text-xs font-semibold truncate">
-          {currentBlockTitle || "Nothing scheduled"}
-        </div>
+      </motion.div>
+
+      {/* Dots */}
+      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+        {[0, 1].map((i) => (
+          <span
+            key={i}
+            className={`h-1 w-1 rounded-full transition-colors ${
+              i === index ? "bg-primary" : "bg-on-surface-variant/30"
+            }`}
+          />
+        ))}
       </div>
-    </motion.div>
+    </div>
   );
 }
