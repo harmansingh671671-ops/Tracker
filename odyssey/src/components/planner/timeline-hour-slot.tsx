@@ -143,6 +143,7 @@ export function TimelineHourSlot({
     return (
       <div
         key={`slot-${slot.hour}`}
+        data-hour={slot.hour}
         onClick={handleSlotClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -292,6 +293,7 @@ export function TimelineHourSlot({
   return (
     <div
       key={`slot-${slot.hour}`}
+        data-hour={slot.hour}
       onClick={handleSlotClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
