@@ -1,12 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronDown } from "lucide-react";
 
 import {
   getDayHabitProgress,
+  isHabitCompletedOnDate,
   type DayHabitProgress,
 } from "@/lib/utils/habit-progress";
+import { isHabitScheduledOnDate } from "@/lib/utils/habit-colors";
 import { type Habit, type HabitLog } from "@/lib/db";
 
 interface CompletionFractionHeaderProps {
@@ -16,15 +17,16 @@ interface CompletionFractionHeaderProps {
   todayLogs?: Record<string, HabitLog>;
   historyLogs?: Record<string, Record<string, boolean>>;
   loading?: boolean;
-  /** Scrolls the planner to the next upcoming block. */
-  onStart?: () => void;
+  /** Title of the block currently in progress, if any. */
+  currentBlockTitle?: string;
 }
 
 /**
  * Compact animated planner header.
  *
- * A single clickable bar: shows how many blocks are done, and tapping it
- * scrolls the planner to the next upcoming block. Deliberately compact.
+ * A horizontal, snap-scrolling row of small blocks:
+ *   - Habits: "X/Y done" plus the name of the next habit to do.
+ *   - Now: the block currently in progress.
  */
 export function CompletionFractionHeader({
   selectedDate,
@@ -33,7 +35,7 @@ export function CompletionFractionHeader({
   todayLogs = {},
   historyLogs = {},
   loading = false,
-  onStart,
+  currentBlockTitle,
 }: CompletionFractionHeaderProps) {
   const progress: DayHabitProgress = getDayHabitProgress(
     habits,
@@ -43,6 +45,19 @@ export function CompletionFractionHeader({
     historyLogs
   );
 
+  const nextHabit =
+    habits.find((h) => {
+      const scheduled = isHabitScheduledOnDate(h, selectedDate);
+      const done = isHabitCompletedOnDate(
+        h,
+        selectedDate,
+        todayStr,
+        todayLogs,
+        historyLogs
+      );
+      return scheduled && !done;
+    }) ?? null;
+
   if (loading) {
     return (
       <motion.div
@@ -50,38 +65,43 @@ export function CompletionFractionHeader({
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="h-9 rounded-2xl bg-surface-container-highest animate-pulse"
-      />
+        className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1"
+      >
+        <div className="h-14 w-40 shrink-0 rounded-2xl bg-surface-container-highest animate-pulse snap-start" />
+        <div className="h-14 w-40 shrink-0 rounded-2xl bg-surface-container-highest animate-pulse snap-start" />
+      </motion.div>
     );
   }
 
-  const { fraction, hasHabits, isAllCompleted } = progress;
-  const isRestDay = !hasHabits;
+  const { completedCount, denominator, hasHabits } = progress;
 
   return (
-    <motion.button
-      type="button"
+    <motion.div
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      onClick={onStart}
-      className="w-full flex items-center justify-between gap-2 rounded-2xl px-3 py-2 text-xs font-semibold bg-surface-container-low border border-outline/10 hover:border-primary/40 transition-colors"
+      className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      <span className="inline-flex items-center gap-1.5">
-        {isAllCompleted ? (
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-        ) : (
-          <span className="font-mono font-bold">{fraction}</span>
-        )}
-        <span className="text-on-surface-variant">
-          {isRestDay ? "No habits scheduled" : "done"}
-        </span>
-      </span>
-      <span className="inline-flex items-center gap-1 text-primary font-bold">
-        Start
-        <ChevronDown className="w-3.5 h-3.5" />
-      </span>
-    </motion.button>
+      <div className="snap-start shrink-0 min-w-[150px] rounded-2xl px-3 py-2 bg-surface-container-low border border-outline/10 space-y-0.5">
+        <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
+          Habits
+        </div>
+        <div className="font-mono font-bold text-sm">
+          {hasHabits ? `${completedCount}/${denominator} done` : "No habits"}
+        </div>
+        <div className="text-xs text-on-surface-variant truncate">
+          Next: {nextHabit ? nextHabit.name : "—"}
+        </div>
+      </div>
+
+      <div className="snap-start shrink-0 min-w-[150px] rounded-2xl px-3 py-2 bg-surface-container-low border border-outline/10 space-y-0.5">
+        <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
+          Now
+        </div>
+        <div className="text-xs font-semibold truncate">
+          {currentBlockTitle || "Nothing scheduled"}
+        </div>
+      </div>
+    </motion.div>
   );
 }
