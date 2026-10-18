@@ -62,6 +62,7 @@ export function TimelineHourSlot({
   onMoveBlock,
 }: TimelineHourSlotProps) {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const isLongPressTriggeredRef = useRef(false);
   const justDraggedRef = useRef(false);
   const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null; isSwipe: boolean; isDrag: boolean; dx: number } | null>(null);
@@ -156,6 +157,7 @@ export function TimelineHourSlot({
   if (slot.isCustom) {
     return (
       <div
+        ref={rootRef}
         key={`slot-${slot.hour}`}
         data-hour={slot.hour}
         onClick={handleSlotClick}
@@ -191,6 +193,10 @@ export function TimelineHourSlot({
             try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
           }
           ds.dx = e.clientX - ds.startX;
+          if (ds.isSwipe && rootRef.current) {
+            rootRef.current.style.transition = "none";
+            rootRef.current.style.transform = `translateX(${ds.dx}px)`;
+          }
           e.preventDefault();
           if (ds.isDrag && onMoveBlock) {
             const targetEl = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
@@ -215,10 +221,24 @@ export function TimelineHourSlot({
           if (wasMoved) {
             justDraggedRef.current = true;
             setTimeout(() => { justDraggedRef.current = false; }, 100);
-            if (ds?.isSwipe && ds.dx < 0) {
-              onOpenHour(slot.hour, slot.block, slot.hour + 1);
+            if (ds?.isSwipe && rootRef.current) {
+              rootRef.current.style.transition = "transform 0.18s ease";
+              rootRef.current.style.transform = ds.dx < 0 ? "translateX(-18px)" : "translateX(0)";
+              setTimeout(() => {
+                if (rootRef.current) {
+                  rootRef.current.style.transition = "";
+                  rootRef.current.style.transform = "";
+                }
+              }, 180);
+              if (ds.dx < 0) {
+                setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
+              }
             } else if (ds?.isDrag && ds.hour !== null && dragTarget !== null && dragTarget !== ds.hour && onMoveBlock && slot.block) {
               onMoveBlock(slot.block, dragTarget);
+              if (rootRef.current) {
+                rootRef.current.style.transition = "";
+                rootRef.current.style.transform = "";
+              }
             }
           }
           dragStateRef.current = null;
