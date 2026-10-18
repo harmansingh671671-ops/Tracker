@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 
 import {
   getDayHabitProgress,
@@ -24,9 +23,8 @@ interface CompletionFractionHeaderProps {
 /**
  * Compact animated planner header.
  *
- * A full-width two-slide carousel that auto-advances in a loop:
- *   - Slide 1 (Habits): "X/Y done" + name of the next habit.
- *   - Slide 2 (Now): the block currently in progress.
+ * A full-width two-slide carousel that auto-advances in a loop and can also
+ * be scrolled manually (snap per slide).
  */
 export function CompletionFractionHeader({
   selectedDate,
@@ -37,14 +35,8 @@ export function CompletionFractionHeader({
   loading = false,
   currentBlockTitle,
 }: CompletionFractionHeaderProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % 2);
-    }, 4000);
-    return () => clearInterval(id);
-  }, []);
 
   const progress: DayHabitProgress = getDayHabitProgress(
     habits,
@@ -67,6 +59,33 @@ export function CompletionFractionHeader({
       return scheduled && !done;
     }) ?? null;
 
+  // Auto-advance, looping back to the first slide.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setIndex((i) => {
+        const next = (i + 1) % 2;
+        const el = scrollerRef.current;
+        if (el) {
+          el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
+        }
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Keep the dot indicator in sync with manual scrolling.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+      setIndex(i === 1 ? 1 : 0);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
   if (loading) {
     return (
       <div
@@ -80,12 +99,11 @@ export function CompletionFractionHeader({
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-outline/10 bg-surface-container-low">
-      <motion.div
-        animate={{ x: `-${index * 100}%` }}
-        transition={{ duration: 0.6, ease: "easeInOut" }}
-        className="flex w-full"
+      <div
+        ref={scrollerRef}
+        className="flex w-full overflow-x-auto snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="w-full shrink-0 px-3 py-2 space-y-0.5">
+        <div className="w-full shrink-0 snap-start px-3 py-2 space-y-0.5">
           <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
             Habits
           </div>
@@ -97,7 +115,7 @@ export function CompletionFractionHeader({
           </div>
         </div>
 
-        <div className="w-full shrink-0 px-3 py-2 space-y-0.5">
+        <div className="w-full shrink-0 snap-start px-3 py-2 space-y-0.5">
           <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
             Now
           </div>
@@ -105,10 +123,9 @@ export function CompletionFractionHeader({
             {currentBlockTitle || "Nothing scheduled"}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Dots */}
-      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 pointer-events-none">
         {[0, 1].map((i) => (
           <span
             key={i}
