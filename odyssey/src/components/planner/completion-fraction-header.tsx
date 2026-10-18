@@ -112,7 +112,7 @@ export function CompletionFractionHeader({
         <button
           type="button"
           onClick={() => router.push("/habits")}
-          className="w-full shrink-0 snap-start flex items-center gap-2.5 px-3 py-1.5 text-left rounded-2xl bg-gradient-to-br from-primary/10 to-surface-container-low border border-primary/20 hover:border-primary/40 transition-colors"
+          className="w-full shrink-0 snap-start flex items-center justify-center gap-2.5 px-3 py-1.5 text-left rounded-2xl bg-gradient-to-br from-primary/10 to-surface-container-low border border-primary/20 hover:border-primary/40 transition-colors"
         >
           <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-4 h-4 text-primary" />
@@ -133,7 +133,7 @@ export function CompletionFractionHeader({
         <button
           type="button"
           onClick={onNowClick}
-          className="w-full shrink-0 snap-start flex items-center gap-2.5 px-3 py-1.5 text-left rounded-2xl bg-gradient-to-br from-secondary/10 to-surface-container-low border border-secondary/20 hover:border-secondary/40 transition-colors"
+          className="w-full shrink-0 snap-start flex items-center justify-center gap-2.5 px-3 py-1.5 text-left rounded-2xl bg-gradient-to-br from-secondary/10 to-surface-container-low border border-secondary/20 hover:border-secondary/40 transition-colors"
         >
           <div className="w-8 h-8 rounded-xl bg-secondary/15 flex items-center justify-center shrink-0">
             <Clock className="w-4 h-4 text-secondary" />
