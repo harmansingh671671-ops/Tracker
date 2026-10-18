@@ -120,10 +120,16 @@ export function CompletionFractionHeader({
             <span className="font-mono font-bold text-primary">
               {hasHabits ? `${completedCount}/${denominator} done` : "none"}
             </span>
-            <span className="text-on-surface-variant"> · Next: </span>
-            <span className="text-on-surface-variant">
-              {nextHabit ? nextHabit.name : "—"}
-            </span>
+            {nextHabit ? (
+              <>
+                <span className="text-on-surface-variant"> · Next: </span>
+                <span className="text-on-surface-variant">{nextHabit.name}</span>
+              </>
+            ) : hasHabits && completedCount >= denominator ? (
+              <span className="text-emerald-400"> · All done ✓</span>
+            ) : (
+              <span className="text-on-surface-variant"> · Next: —</span>
+            )}
           </span>
         </button>
 
