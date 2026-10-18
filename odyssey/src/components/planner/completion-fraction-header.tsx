@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   getDayHabitProgress,
@@ -18,6 +19,8 @@ interface CompletionFractionHeaderProps {
   historyLogs?: Record<string, Record<string, boolean>>;
   loading?: boolean;
   currentBlockTitle?: string;
+  /** Scrolls the planner to the block currently in progress. */
+  onNowClick?: () => void;
 }
 
 /**
@@ -34,7 +37,9 @@ export function CompletionFractionHeader({
   historyLogs = {},
   loading = false,
   currentBlockTitle,
+  onNowClick,
 }: CompletionFractionHeaderProps) {
+  const router = useRouter();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
 
@@ -103,7 +108,11 @@ export function CompletionFractionHeader({
         ref={scrollerRef}
         className="flex w-full overflow-x-auto snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="w-full shrink-0 snap-start px-3 py-2 space-y-0.5">
+        <button
+          type="button"
+          onClick={() => router.push("/habits")}
+          className="w-full shrink-0 snap-start px-3 py-2 space-y-0.5 text-left"
+        >
           <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
             Habits
           </div>
@@ -113,16 +122,20 @@ export function CompletionFractionHeader({
           <div className="text-xs text-on-surface-variant truncate">
             Next: {nextHabit ? nextHabit.name : "—"}
           </div>
-        </div>
+        </button>
 
-        <div className="w-full shrink-0 snap-start px-3 py-2 space-y-0.5">
+        <button
+          type="button"
+          onClick={onNowClick}
+          className="w-full shrink-0 snap-start px-3 py-2 space-y-0.5 text-left"
+        >
           <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">
             Now
           </div>
           <div className="text-xs font-semibold truncate">
             {currentBlockTitle || "Nothing scheduled"}
           </div>
-        </div>
+        </button>
       </div>
 
       <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 pointer-events-none">
