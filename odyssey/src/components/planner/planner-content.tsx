@@ -21,6 +21,7 @@ import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocatio
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import { useClockTodayStr, useClockHour } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
+import { FloatingBlock } from "@/components/planner/floating-block";
 import {
   Clock,
   CheckCircle2,
@@ -61,6 +62,13 @@ const setCachedBlocks = (dateStr: string, blocksList: ScheduleBlock[]) => {
     writeString(`odyssey_blocks_cache_${dateStr}`, JSON.stringify(blocksList));
   } catch (e) { logWarn("page", "could not write to storage", e); }
 };
+
+// Hour arithmetic for the drag/swap. Hours are whole (`HH:00`), so only the hour
+// part matters; `hourLabel` wraps midnight back to `00:00` the way the seed data does.
+const hourOf = (t: string) => parseInt(t.split(":")[0], 10);
+const hourLabel = (h: number) => `${String(((h % 24) + 24) % 24).padStart(2, "0")}:00`;
+const durationOf = (startTime: string, endTime: string) =>
+  (((hourOf(endTime) - hourOf(startTime)) % 24) + 24) % 24 || 1;
 
 export function PlannerContent() {
   const searchParams = useSearchParams();
@@ -104,6 +112,14 @@ export function PlannerContent() {
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
   const [floatingBlocks, setFloatingBlocks] = useState<ScheduleBlock[]>([]);
+  // A displaced block is parked in the DB at the mover's old slot (a swap) but is
+  // hidden from the timeline until it is dropped, so a re-read must not resurrect
+  // it as a second block on that hour. The ref keeps `loadBlocks` current without
+  // making it -- and every effect that calls it -- depend on the floating list.
+  const floatingIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    floatingIdsRef.current = new Set(floatingBlocks.map((f) => f.id));
+  }, [floatingBlocks]);
   const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
   const [hintToast, setHintToast] = useState<string | null>(null);
 
@@ -217,8 +233,11 @@ export function PlannerContent() {
         setBlocks((prev) => (prev.length === 0 ? cached : prev));
       }
       const dayBlocks = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
-      setBlocks(dayBlocks);
-      setCachedBlocks(dateStr, dayBlocks);
+      // Blocks being floated from a swap are still in the DB (nothing is lost if the
+      // user leaves mid-swap); hide them so they cannot render twice on one hour.
+      const visible = dayBlocks.filter((b) => !floatingIdsRef.current.has(b.id));
+      setBlocks(visible);
+      setCachedBlocks(dateStr, visible);
     } catch (err) {
       console.error("Failed to load blocks:", err);
     } finally {
@@ -506,55 +525,81 @@ export function PlannerContent() {
 
   const handleMoveBlock = useCallback(async (block: ScheduleBlock, toHour: number) => {
     if (!block?.id) return;
-    const fromHour = parseInt(block.startTime.split(":")[0], 10);
+    const fromHour = hourOf(block.startTime);
     if (fromHour === toHour) return;
-    // If the target hour is occupied, displace that block into a floating icon.
+    const floatingIds = new Set(floatingBlocks.map((f) => f.id));
+    // Only a block actually on the timeline can be displaced -- never one that is
+    // already floating, or the same id would be pushed into the floating list twice.
     const occupant = blocks.find(
-      (b) => b.id !== block.id && parseInt(b.startTime.split(":")[0], 10) === toHour
+      (b) => b.id !== block.id && !floatingIds.has(b.id) && hourOf(b.startTime) === toHour
     );
-    if (occupant) {
-      setFloatingBlocks((prev) => [...prev, occupant]);
-      setBlocks((prev) => prev.filter((b) => b.id !== occupant.id));
-    }
     const delta = toHour - fromHour;
-    const shift = (t: string) => {
-      const h = parseInt(t.split(":")[0], 10);
-      const m = t.split(":")[1] || "00";
-      const nh = (h + delta + 240) % 24;
-      return `${String(nh).padStart(2, "0")}:${m}`;
+    const shift = (t: string) => hourLabel(hourOf(t) + delta);
+    const mover: ScheduleBlock = {
+      ...block,
+      startTime: shift(block.startTime),
+      endTime: shift(block.endTime),
     };
-    const updated = { ...block, startTime: shift(block.startTime), endTime: shift(block.endTime) };
     await db.scheduleBlocks.update(block.id, {
-      startTime: updated.startTime,
-      endTime: updated.endTime,
+      startTime: mover.startTime,
+      endTime: mover.endTime,
     });
-    setBlocks((prev) => prev.map((b) => (b.id === block.id ? updated : b)));
+    if (occupant) {
+      // Swap: the displaced block takes the mover's vacated slot and floats until
+      // placed. Parking it in the DB keeps the two time ranges consistent, so a
+      // reload shows the swap rather than two blocks sharing one hour.
+      const parked: ScheduleBlock = {
+        ...occupant,
+        startTime: block.startTime,
+        endTime: block.endTime,
+      };
+      await db.scheduleBlocks.update(occupant.id, {
+        startTime: parked.startTime,
+        endTime: parked.endTime,
+      });
+      setFloatingBlocks((prev) => (prev.some((f) => f.id === parked.id) ? prev : [...prev, parked]));
+    }
+    setBlocks((prev) => {
+      const without = occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
+      return without.map((b) => (b.id === block.id ? mover : b));
+    });
     syncCurrentScheduleToNative(selectedDate);
-  }, [blocks, selectedDate, setBlocks, setFloatingBlocks]);
+  }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
 
   const handleDropFloating = useCallback(async (block: ScheduleBlock, toHour: number) => {
     if (!block?.id) return;
-    // Displace any occupant.
+    const floatingIds = new Set(floatingBlocks.map((f) => f.id));
     const occupant = blocks.find(
-      (b) => b.id !== block.id && parseInt(b.startTime.split(":")[0], 10) === toHour
+      (b) => b.id !== block.id && !floatingIds.has(b.id) && hourOf(b.startTime) === toHour
     );
+    const placed: ScheduleBlock = {
+      ...block,
+      startTime: hourLabel(toHour),
+      endTime: hourLabel(toHour + durationOf(block.startTime, block.endTime)),
+    };
+    await db.scheduleBlocks.update(block.id, {
+      startTime: placed.startTime,
+      endTime: placed.endTime,
+    });
     if (occupant) {
-      setFloatingBlocks((prev) => [...prev, occupant]);
-      setBlocks((prev) => prev.filter((b) => b.id !== occupant.id));
+      const parked: ScheduleBlock = {
+        ...occupant,
+        startTime: block.startTime,
+        endTime: block.endTime,
+      };
+      await db.scheduleBlocks.update(occupant.id, {
+        startTime: parked.startTime,
+        endTime: parked.endTime,
+      });
+      setFloatingBlocks((prev) => (prev.some((f) => f.id === parked.id) ? prev : [...prev, parked]));
     }
-    const fromHour = parseInt(block.startTime.split(":")[0], 10);
-    const toEndHourRaw = parseInt(block.endTime.split(":")[0], 10);
-    const duration = (toEndHourRaw - fromHour + 24) % 24 || 1;
-    const newStart = toHour;
-    const newEnd = (toHour + duration) % 24;
-    const startTime = `${String(newStart).padStart(2, "0")}:00`;
-    const endTime = `${String(newEnd === 0 ? 24 : newEnd).padStart(2, "0")}:00`;
-    const updated = { ...block, startTime, endTime };
-    await db.scheduleBlocks.update(block.id, { startTime, endTime });
-    setBlocks((prev) => [...prev.filter((b) => b.id !== block.id), updated]);
+    setBlocks((prev) => {
+      const without = occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
+      return [...without.filter((b) => b.id !== block.id), placed];
+    });
     setFloatingBlocks((prev) => prev.filter((f) => f.id !== block.id));
     syncCurrentScheduleToNative(selectedDate);
-  }, [blocks, selectedDate, setBlocks, setFloatingBlocks]);
+  }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
 
   const handleSaveBlock = async (data: {
     id?: string;
@@ -931,52 +976,12 @@ export function PlannerContent() {
         </div>
       )}
 
-      {floatingElements}
+      {floatingBlocks.length > 0 && (
+        <div className="fixed bottom-28 right-4 z-50 flex flex-col items-end gap-2">
+          {floatingElements}
+        </div>
+      )}
     </div>
     </>
-  );
-}
-
-function FloatingBlock({ block, onDrop }: { block: ScheduleBlock; onDrop: (b: ScheduleBlock, hour: number) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const startRef = useRef({ x: 0, y: 0, dragging: false });
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    startRef.current = { x: e.clientX, y: e.clientY, dragging: false };
-    try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
-  };
-  const handlePointerMove = (e: React.PointerEvent) => {
-    const dx = e.clientX - startRef.current.x;
-    const dy = e.clientY - startRef.current.y;
-    if (!startRef.current.dragging && Math.hypot(dx, dy) < 8) return;
-    startRef.current.dragging = true;
-    setOffset({ x: dx, y: dy });
-  };
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (startRef.current.dragging) {
-      const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
-      const h = el ? parseInt(el.getAttribute("data-hour") as string, 10) : null;
-      if (h !== null && !Number.isNaN(h)) {
-        onDrop(block, h);
-      }
-    }
-    setOffset({ x: 0, y: 0 });
-    startRef.current.dragging = false;
-  };
-
-  return (
-    <div
-      ref={ref}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
-      className="fixed bottom-28 right-4 z-50 cursor-grab touch-none rounded-2xl border border-primary/30 bg-surface-container-low px-3 py-2 shadow-lg"
-    >
-      <div className="text-[10px] uppercase tracking-wide text-on-surface-variant/60">Floating</div>
-      <div className="text-xs font-semibold truncate max-w-[140px]">{block.title}</div>
-    </div>
   );
 }

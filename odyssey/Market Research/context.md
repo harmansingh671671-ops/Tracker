@@ -615,6 +615,44 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-18 - C2 swap/chain: the displaced block was never really displaced
+
+Fix committed on `main` (no push). One bug found by reproduction, a second by fixing it.
+
+**The reported error was a React key collision, not a crash in the floating icon.** The
+overlay screenshot pointed at `<FloatingBlock key={b.id}>` (`planner-content.tsx:702`).
+Reproduced it exactly: dragging a block onto an occupied hour displaced the occupant into
+`floatingBlocks` but **left its DB row at the target hour**, so the mover and the displaced
+block both sat on that hour. The next read (`loadBlocks` — a status toggle, a date change, an
+edit-save) restored the displaced block into `blocks` while it was *still* floating, and the
+next drag onto that hour pushed the **same id** into `floatingBlocks` twice:
+`Encountered two children with the same key, aa-beta`. Three blocks ended up stacked on 22:00.
+
+**The fix is a real swap.** `handleMoveBlock` parks the displaced block in the mover's vacated
+slot — in the DB *and* in memory — and `handleDropFloating` parks each chain's occupant the same
+way, so every block keeps its own hour and nothing is lost if the user leaves mid-swap.
+Displaced blocks are hidden from the timeline through a ref that `loadBlocks` consults, so a
+re-read cannot render one twice; the occupant lookup never matches an already-floating block,
+and the push is de-duplicated by id.
+
+**Second bug, found while driving the fix: the floating icon could not be dropped at all.** It
+follows the finger, so `document.elementFromPoint` on release returned the icon itself and
+`closest('[data-hour]')` was always null. Switched to `elementsFromPoint` and walked the whole
+stack. The full chain now works end-to-end (drag → float → re-drop → chain → place), with all
+blocks ending on distinct hours.
+
+**Verification trap worth keeping:** the planner renders **nothing but the app shell** when a
+headless browser loads the dev server over `127.0.0.1` — Next 16 blocks "cross-origin" dev
+resources, which silently kills the `dynamic(..., { ssr: false })` planner chunk (no console
+error, only an `/_next/hmr` WebSocket warning). Over `localhost` it renders normally. The
+giveaway is `hours: 0` and no "Daily Schedule Rail" text. Cost most of a session.
+
+Extracted the icon to `components/planner/floating-block.tsx`; the icons now sit in a stacking
+container (they were `fixed` at the same spot and overlapped once a chain started).
+
+Gates: `tsc --noEmit` 0; `eslint` on both touched files 0 errors/20 pre-existing warnings;
+production build clean.
+
 ### 2026-10-18 - Compact planner header chips (C3, scoped)
 
 Shipped a compact, snap-scrolling two-chip header on the planner: "X/Y done · Start"
@@ -3634,7 +3672,8 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **B3 + S13 — habit types with numeric stepper (committed: new commit after 47a8082)**. Before it: `47a8082` (Merge branch 'agent/mainline'), `47a0ceb` (Fix HabitsPage setState-during-render on day rollover), `ea0ebe4` (S8), `8d307db` (remove S7), `58cfb8a` (remove S6), `ce7dffe` (S5), `2baaa19` (zero-streak label fix).
+- HEAD at last update: **C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable** (committed on `main`, not pushed). Before it: `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
+- **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13). `tsc --noEmit` exit 0. Production build clean.
 - Ports 3000/3001/3100 clear; no background server left running.
