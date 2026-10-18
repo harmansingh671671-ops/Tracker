@@ -63,6 +63,7 @@ export function TimelineHourSlot({
 }: TimelineHourSlotProps) {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggeredRef = useRef(false);
+  const justDraggedRef = useRef(false);
   const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragTarget, setDragTarget] = useState<number | null>(null);
@@ -71,6 +72,10 @@ export function TimelineHourSlot({
   const CatIcon = cat.Icon;
 
   const handleSlotClick = (e: React.MouseEvent) => {
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
     if (isPastHour) {
       if (isLongPressTriggeredRef.current) {
         isLongPressTriggeredRef.current = false;
@@ -170,6 +175,11 @@ export function TimelineHourSlot({
           if (!ds.moved && Math.hypot(dx, dy) < 10) return;
           if (!ds.moved) {
             ds.moved = true;
+            justDraggedRef.current = true;
+            if (longPressTimerRef.current) {
+              clearTimeout(longPressTimerRef.current);
+              longPressTimerRef.current = null;
+            }
             setIsDragging(true);
             try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
           }
@@ -191,7 +201,12 @@ export function TimelineHourSlot({
         onPointerUp={() => {
           const ds = dragStateRef.current;
           if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
-          if (ds && ds.moved && slot.block && onMoveBlock && dragTarget !== null && dragTarget !== ds.hour) {
+          const wasDrag = !!ds?.moved;
+          if (wasDrag) {
+            justDraggedRef.current = true;
+            setTimeout(() => { justDraggedRef.current = false; }, 100);
+          }
+          if (wasDrag && slot.block && onMoveBlock && dragTarget !== null && ds && dragTarget !== ds.hour) {
             onMoveBlock(slot.block, dragTarget);
           }
           dragStateRef.current = null;
