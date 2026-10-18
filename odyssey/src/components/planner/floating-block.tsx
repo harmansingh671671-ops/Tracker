@@ -16,10 +16,10 @@ interface FloatingBlockProps {
  */
 export function FloatingBlock({ block, onDrop }: FloatingBlockProps) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const startRef = useRef({ x: 0, y: 0, dragging: false });
+  const startRef = useRef({ x: 0, y: 0, active: false, dragging: false });
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    startRef.current = { x: e.clientX, y: e.clientY, dragging: false };
+    startRef.current = { x: e.clientX, y: e.clientY, active: true, dragging: false };
     try {
       (e.target as Element).setPointerCapture(e.pointerId);
     } catch (err) {
@@ -28,6 +28,10 @@ export function FloatingBlock({ block, onDrop }: FloatingBlockProps) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    // `active` is what makes this a drag rather than a hover. Without it the icon
+    // jumps to the cursor's raw screen coordinates the moment the pointer crosses
+    // it, because the deltas are measured from an untouched {0,0} origin.
+    if (!startRef.current.active) return;
     const dx = e.clientX - startRef.current.x;
     const dy = e.clientY - startRef.current.y;
     // A tap must not be read as a drag, or the icon jumps under the finger.
@@ -37,7 +41,7 @@ export function FloatingBlock({ block, onDrop }: FloatingBlockProps) {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (startRef.current.dragging) {
+    if (startRef.current.active && startRef.current.dragging) {
       // The icon follows the finger, so `elementFromPoint` would return the icon
       // itself -- walk the whole stack to find the hour slot underneath it.
       const slot = document
@@ -47,8 +51,9 @@ export function FloatingBlock({ block, onDrop }: FloatingBlockProps) {
       const hour = slot ? parseInt(slot.getAttribute("data-hour") as string, 10) : NaN;
       if (!Number.isNaN(hour)) onDrop(block, hour);
     }
-    setOffset({ x: 0, y: 0 });
+    startRef.current.active = false;
     startRef.current.dragging = false;
+    setOffset({ x: 0, y: 0 });
   };
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { logWarn } from "@/lib/utils/logger";
 import { type ScheduleBlock } from "@/lib/db";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
@@ -68,6 +68,59 @@ export function TimelineHourSlot({
   const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null; isSwipe: boolean; isDrag: boolean; dx: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragTarget, setDragTarget] = useState<number | null>(null);
+
+  const ghostRef = useRef<HTMLDivElement | null>(null);
+  const ghostGrabRef = useRef({ x: 0, y: 0 });
+
+  // The card that follows the finger during a drag. It is a clone of the real
+  // card, so it carries the exact theme and category styling this slot already
+  // renders, and it is positioned by writing to the DOM directly -- a pointer
+  // move must not re-render the whole planner.
+  const placeGhost = (clientX: number, clientY: number) => {
+    const ghost = ghostRef.current;
+    if (!ghost) return;
+    ghost.style.transform = `translate3d(${clientX - ghostGrabRef.current.x}px, ${
+      clientY - ghostGrabRef.current.y
+    }px, 0)`;
+  };
+
+  const showGhost = (clientX: number, clientY: number) => {
+    const root = rootRef.current;
+    if (!root || typeof document === "undefined" || ghostRef.current) return;
+    const rect = root.getBoundingClientRect();
+    // Grab point within the card, so it does not jump under the finger.
+    ghostGrabRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+    const ghost = root.cloneNode(true) as HTMLDivElement;
+    // The clone must not be a drop target: the hit test below walks `[data-hour]`.
+    ghost.removeAttribute("data-hour");
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.style.position = "fixed";
+    ghost.style.left = "0";
+    ghost.style.top = "0";
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.margin = "0";
+    ghost.style.zIndex = "60";
+    ghost.style.pointerEvents = "none";
+    ghost.style.transition = "none";
+    ghost.classList.remove("scale-95", "opacity-50");
+    document.body.appendChild(ghost);
+    ghostRef.current = ghost;
+    placeGhost(clientX, clientY);
+  };
+
+  const hideGhost = () => {
+    ghostRef.current?.remove();
+    ghostRef.current = null;
+  };
+
+  // A drag can also end by this slot unmounting (a re-read repaints the rail),
+  // which never reaches `onPointerUp`.
+  useEffect(() => {
+    return () => {
+      ghostRef.current?.remove();
+      ghostRef.current = null;
+    };
+  }, []);
 
   const cat = getPlannerCatStyle(slot.category, slot.isCustom);
   const CatIcon = cat.Icon;
@@ -191,8 +244,10 @@ export function TimelineHourSlot({
             ds.isDrag = !ds.isSwipe;
             ds.dx = dx;
             try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
+            if (ds.isDrag) showGhost(e.clientX, e.clientY);
           }
           ds.dx = e.clientX - ds.startX;
+          if (ds.isDrag) placeGhost(e.clientX, e.clientY);
           if (ds.isSwipe && rootRef.current) {
             rootRef.current.style.transition = "none";
             rootRef.current.style.transform = `translateX(${ds.dx}px)`;
@@ -216,6 +271,7 @@ export function TimelineHourSlot({
         }}
         onPointerUp={() => {
           const ds = dragStateRef.current;
+          hideGhost();
           if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
           const wasMoved = !!ds?.moved;
           if (wasMoved) {
@@ -247,6 +303,7 @@ export function TimelineHourSlot({
         }}
         onPointerCancel={() => {
           const ds = dragStateRef.current;
+          hideGhost();
           if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
           dragStateRef.current = null;
           setIsDragging(false);

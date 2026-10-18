@@ -615,6 +615,74 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+### 2026-10-18 - C2 reworked: the displaced block is now held, not swapped (ADR 0004)
+
+**Supersedes the entry below.** The swap was wrong in exactly the way the owner then reported:
+*"the place from where I drag it stays as it is."* Parking the displaced block in the mover's
+vacated hour meant that hour was empty **only while the block was floating** — the row was still
+sitting in it, so the next read from storage put a block back there. Reproduced it (drag, then
+reload: 21 was empty, and after the refresh 21 held the pushed-out block again). The live re-read
+paths — `focus` and `visibilitychange`, both of which call `loadBlocks` — were **not** the cause.
+
+**The fix is structural, not another filter.** A displaced block is taken **off the timeline**
+and held in its own store (`src/lib/utils/floating-blocks.ts`, `OdysseyFloatingBlocks/blocks:
+'id, date'`). Everything that reads `scheduleBlocks` reads it as *the day* — the rail, the
+first-paint cache, the native wallpaper sync, the stats rollups — so held blocks simply are not
+in it, and no reader needs to learn to skip them. The alternative (an `isFloating` flag on the
+block) would have required every one of those readers to remember, and the one that forgot
+would count a held block as scheduled time. See **ADR 0004** for the full argument.
+
+**Second silent-alteration bug, found while fixing the first.** Parking copied the *mover's*
+time range onto the displaced block, so a 3-hour block dropped on a 1-hour block **stretched it
+to 3 hours**. Same class as `BUG-5`/`BUG-12`. A held block now keeps its own `startTime` and
+`endTime` verbatim; only a drop rewrites them.
+
+**Write order is the safety argument, and it differs per direction.** Displace: hold **then**
+delete from `scheduleBlocks` — if the hold fails the block must stay on the timeline, because a
+block held nowhere is a lost block. Place: put back into `scheduleBlocks` **then** release the
+held copy — the worst case is a block that is on the day *and* still held, which the read path
+de-duplicates by id. Never the reverse of either.
+
+**Hovering the floating icon made it fly away.** Its `pointermove` moved the icon whenever it
+fired, with no test for the pointer being *down*: with an untouched `{x:0,y:0}` origin the delta
+was the cursor's raw screen coordinates, so merely crossing the icon flung it off-screen. Fixed
+with an `active` flag set on `pointerdown`. **Any pointer-follow element needs that guard** —
+and the guard must be on "a pointer is down", not on "the delta got big enough", because a hover
+delta is large.
+
+**The dragged card now follows the finger.** It is a `cloneNode(true)` of the real card appended
+to `<body>` and positioned by writing `style.transform` directly — a clone so it cannot drift
+from the slot's theme/category styling, and direct DOM writes because the planner is a ~1000-line
+component and a pointer move must not re-render it. The clone gets `data-hour` **removed**, or it
+becomes its own drop target, and `pointer-events: none`, or the hit test under the finger finds
+it instead of the hour.
+
+**Two verification traps, both mine.** (1) Measuring the floating icon: the `fixed` wrapper is
+not the element carrying the transform — the child is — so `getComputedStyle(wrapper).transform`
+read `none` and **hid the hover bug entirely**; measure the element whose bounds you actually
+saw move. (2) Four of my checks failed on first run and **all four were assertion bugs, not app
+bugs** — a 3-hour block dragged up by 2 hours legitimately still covers its old hour, and an empty
+slot's text starts with the hour label. Print the observed value in the failure, then read it.
+
+**Deliberate deviation, flagged for the owner:** `src/lib/db.ts` has another agent's uncommitted
+change, so the new store was **not** added to `OdysseyDB`. It lives in its own IndexedDB database
+instead. AGENTS.md rule 2 calls `db.ts` the canonical schema, so when that file is free the store
+should probably move in (§10 tracks it).
+
+**A wiped schedule must take the held blocks with it.** `scheduleBlocks` is cleared in two
+flows — restoring a backup (`profile-settings-sheet.tsx`) and **Reset All**
+(`seed.ts:resetAllDataToZero`) — and both would have left held rows behind, so a user who reset
+their data would be handed floating icons for blocks they had just cleared. That is the
+"resurrect deleted data" class this repo has been bitten by before. Both call sites now call
+`clearFloatingBlocks()`; it is deliberately best-effort, because it runs inside a reset whose
+job is to finish. **Verified end-to-end**, not by inspection: drive a block into the held state,
+press Reset All on `/profile`, and the held store is empty afterwards with no stale icon.
+
+Gates: `tsc --noEmit` 0; `eslint` on all six touched files 0 errors (only pre-existing
+`no-unused-vars` warnings); production build clean; a scripted 4-scenario walk against the live
+dev server (displace → **refresh** → place → chain, plus a 3-hour mover) and a separate
+reset-flow walk both pass every check, in both light and dark themes.
+
 ### 2026-10-18 - C2 swap/chain: the displaced block was never really displaced
 
 Fix committed on `main` (no push). One bug found by reproduction, a second by fixing it.
@@ -3672,11 +3740,12 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable** (committed on `main`, not pushed). Before it: `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
+- HEAD at last update: **C2 rework — a displaced block is held in its own store, so the hour a block is dragged from stays empty across a refresh** (committed on `main`, **not pushed**). Before it: `6f53dbd` (C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable), `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
+- **Working tree (2026-10-18):** this commit touched only `src/components/planner/**`, `src/lib/utils/floating-blocks.ts` (new), `docs/adr/0004-floating-blocks.md` (new), the two schedule-wipe call sites (`src/lib/seed.ts`, `src/components/layout/profile-settings-sheet.tsx`), `main_plan.md` and `context.md`. **Another agent has uncommitted work in `src/app/habits/page.tsx`, `src/components/habits/**`, `src/lib/db.ts`, `src/lib/habit-cache.ts`, `src/lib/stores/habit-store.ts`, `src/lib/utils/habit-colors.ts`, `src/lib/utils/habit-completion.ts`** — do not commit it, and it is the reason `npx eslint src` currently reports 2 `react-hooks/rules-of-hooks` errors (`habits/page.tsx:1055`, another `useRef` inside a callback) that are **not** from this commit. Because `db.ts` is dirty, **ADR 0004's `OdysseyFloatingBlocks` store lives in its own IndexedDB database rather than in `OdysseyDB`** — AGENTS.md rule 2 calls `db.ts` the canonical schema, so **fold it into `OdysseyDB` once that file is free**, as a new store + version bump (additive, no field change).
 - **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13). `tsc --noEmit` exit 0. Production build clean.
-- Ports 3000/3001/3100 clear; no background server left running.
+- Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live `next dev`** (pid 2412) and was **deliberately left running** — this session's planner verification drove that server over `localhost`, so it compiled and served the session's code.
 - **Lint: `npx eslint src` exits 0 — 0 errors, 96 warnings.** This is the **first clean project-wide
   lint in the repo's recorded history (2026-10-17)**. Three
   `react-hooks/preserve-manual-memoization` errors had sat in `planner-content.tsx` since `3970e90` and

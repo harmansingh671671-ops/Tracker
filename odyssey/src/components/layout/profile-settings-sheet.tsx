@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
+import { clearFloatingBlocks } from "@/lib/utils/floating-blocks";
 import { getStreakLabel } from "@/lib/utils/warm-copy";
 import { checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
 import { HeadsUpAlertsCard } from "@/components/settings/heads-up-alerts-card";
@@ -93,6 +94,8 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
         if (json.blocks && Array.isArray(json.blocks)) {
           await db.scheduleBlocks.clear();
           await db.scheduleBlocks.bulkAdd(json.blocks);
+          // A block held off the timeline belonged to the schedule being replaced.
+          await clearFloatingBlocks();
         }
         if (json.habits && Array.isArray(json.habits)) {
           await db.habits.clear();

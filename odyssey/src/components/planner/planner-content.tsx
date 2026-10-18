@@ -7,6 +7,11 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { db, type ScheduleBlock, type StoredScheduleCategory } from "@/lib/db";
+import {
+  holdFloatingBlock,
+  releaseFloatingBlock,
+  listFloatingBlocks,
+} from "@/lib/utils/floating-blocks";
 import { getJourneyDayNumber, getDateForJourneyDay, getJourneyDayNumberForDate } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { EditHourModal } from "@/components/planner/edit-hour-modal";
@@ -112,14 +117,6 @@ export function PlannerContent() {
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
   const [floatingBlocks, setFloatingBlocks] = useState<ScheduleBlock[]>([]);
-  // A displaced block is parked in the DB at the mover's old slot (a swap) but is
-  // hidden from the timeline until it is dropped, so a re-read must not resurrect
-  // it as a second block on that hour. The ref keeps `loadBlocks` current without
-  // making it -- and every effect that calls it -- depend on the floating list.
-  const floatingIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    floatingIdsRef.current = new Set(floatingBlocks.map((f) => f.id));
-  }, [floatingBlocks]);
   const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
   const [hintToast, setHintToast] = useState<string | null>(null);
 
@@ -233,11 +230,15 @@ export function PlannerContent() {
         setBlocks((prev) => (prev.length === 0 ? cached : prev));
       }
       const dayBlocks = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
-      // Blocks being floated from a swap are still in the DB (nothing is lost if the
-      // user leaves mid-swap); hide them so they cannot render twice on one hour.
-      const visible = dayBlocks.filter((b) => !floatingIdsRef.current.has(b.id));
-      setBlocks(visible);
-      setCachedBlocks(dateStr, visible);
+      // Blocks pushed off their hour by a drag are held in their own store, so they
+      // are already absent here -- and they come back as draggable icons until the
+      // user drops them somewhere. Anything that is on the timeline wins over a held
+      // copy of the same id, so a half-finished drop can never render a block twice.
+      const onTimeline = new Set(dayBlocks.map((b) => b.id));
+      const held = (await listFloatingBlocks(dateStr)).filter((b) => !onTimeline.has(b.id));
+      setFloatingBlocks(held);
+      setBlocks(dayBlocks);
+      setCachedBlocks(dateStr, dayBlocks);
     } catch (err) {
       console.error("Failed to load blocks:", err);
     } finally {
@@ -544,25 +545,28 @@ export function PlannerContent() {
       startTime: mover.startTime,
       endTime: mover.endTime,
     });
+    let heldOccupant = false;
     if (occupant) {
-      // Swap: the displaced block takes the mover's vacated slot and floats until
-      // placed. Parking it in the DB keeps the two time ranges consistent, so a
-      // reload shows the swap rather than two blocks sharing one hour.
-      const parked: ScheduleBlock = {
-        ...occupant,
-        startTime: block.startTime,
-        endTime: block.endTime,
-      };
-      await db.scheduleBlocks.update(occupant.id, {
-        startTime: parked.startTime,
-        endTime: parked.endTime,
-      });
-      setFloatingBlocks((prev) => (prev.some((f) => f.id === parked.id) ? prev : [...prev, parked]));
+      // The displaced block is taken OFF the timeline and held, keeping its own
+      // start and end time -- its length is not rewritten to the slot it was pushed
+      // out of, so nothing about it is silently altered. Held first: if that write
+      // fails the block must stay where it is, because a displaced block that is
+      // held nowhere is a lost block.
+      try {
+        await holdFloatingBlock(occupant);
+        await db.scheduleBlocks.delete(occupant.id);
+        heldOccupant = true;
+      } catch (e) {
+        logWarn("planner", "could not hold the displaced block", e);
+      }
     }
     setBlocks((prev) => {
-      const without = occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
+      const without = heldOccupant && occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
       return without.map((b) => (b.id === block.id ? mover : b));
     });
+    if (heldOccupant && occupant) {
+      setFloatingBlocks((prev) => (prev.some((f) => f.id === occupant.id) ? prev : [...prev, occupant]));
+    }
     syncCurrentScheduleToNative(selectedDate);
   }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
 
@@ -577,27 +581,32 @@ export function PlannerContent() {
       startTime: hourLabel(toHour),
       endTime: hourLabel(toHour + durationOf(block.startTime, block.endTime)),
     };
-    await db.scheduleBlocks.update(block.id, {
-      startTime: placed.startTime,
-      endTime: placed.endTime,
-    });
+    // Back onto the timeline before it stops being held: the worst case is then a
+    // block that is on the day and still has a held copy (which the read path
+    // de-duplicates), never a block that is held nowhere.
+    await db.scheduleBlocks.put(placed);
+    await releaseFloatingBlock(block.id);
+    let heldOccupant = false;
     if (occupant) {
-      const parked: ScheduleBlock = {
-        ...occupant,
-        startTime: block.startTime,
-        endTime: block.endTime,
-      };
-      await db.scheduleBlocks.update(occupant.id, {
-        startTime: parked.startTime,
-        endTime: parked.endTime,
-      });
-      setFloatingBlocks((prev) => (prev.some((f) => f.id === parked.id) ? prev : [...prev, parked]));
+      // Dropping onto an occupied hour pushes that block off the timeline too, and
+      // it takes a turn as a floating icon -- the same chain as a rail drag.
+      try {
+        await holdFloatingBlock(occupant);
+        await db.scheduleBlocks.delete(occupant.id);
+        heldOccupant = true;
+      } catch (e) {
+        logWarn("planner", "could not hold the displaced block", e);
+      }
     }
     setBlocks((prev) => {
-      const without = occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
+      const without = heldOccupant && occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
       return [...without.filter((b) => b.id !== block.id), placed];
     });
-    setFloatingBlocks((prev) => prev.filter((f) => f.id !== block.id));
+    setFloatingBlocks((prev) => {
+      const next = prev.filter((f) => f.id !== block.id);
+      if (heldOccupant && occupant && !next.some((f) => f.id === occupant.id)) next.push(occupant);
+      return next;
+    });
     syncCurrentScheduleToNative(selectedDate);
   }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
 

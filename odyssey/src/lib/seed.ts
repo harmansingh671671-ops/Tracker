@@ -1,5 +1,6 @@
 import { db, type Profile } from './db';
 import { remove } from "@/lib/utils/logger";
+import { clearFloatingBlocks } from './utils/floating-blocks';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function resetAllDataToZero(): Promise<Profile> {
@@ -13,6 +14,10 @@ export async function resetAllDataToZero(): Promise<Profile> {
     // that no longer exist, and the new profile could never be paid for them.
     await db.rewardSettlements.clear();
   });
+
+  // Different database, so it cannot join the transaction above. Without it a
+  // reset user is handed floating icons for blocks they just cleared.
+  await clearFloatingBlocks();
 
   if (typeof window !== 'undefined') {
     remove('odyssey_journey_start_date');
