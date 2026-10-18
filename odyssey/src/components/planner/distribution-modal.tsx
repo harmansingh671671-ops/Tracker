@@ -82,8 +82,8 @@ export function DistributionModal({
         subtitle: "Health & Habits",
         hours: categoryStats.vitalityH,
         pct: Math.round((categoryStats.vitalityH / 24) * 100),
-        badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-        cardBg: "bg-emerald-950/20 border-emerald-500/20",
+        badge: "bg-emerald-500/15 text-emerald-600 border-emerald-500/35 dark:text-emerald-400 dark:border-emerald-500/30",
+        cardBg: "bg-emerald-50/70 border-emerald-500/30 dark:bg-emerald-950/20 dark:border-emerald-500/20",
         Icon: Zap,
         blocks: filterCatBlocks("vitality"),
       },
@@ -93,8 +93,8 @@ export function DistributionModal({
         subtitle: "Meetings & Collab",
         hours: categoryStats.syncH,
         pct: Math.round((categoryStats.syncH / 24) * 100),
-        badge: "bg-sky-500/15 text-sky-400 border-sky-500/30",
-        cardBg: "bg-sky-950/20 border-sky-500/20",
+        badge: "bg-sky-500/15 text-sky-600 border-sky-500/35 dark:text-sky-400 dark:border-sky-500/30",
+        cardBg: "bg-sky-50/70 border-sky-500/30 dark:bg-sky-950/20 dark:border-sky-500/20",
         Icon: Users,
         blocks: filterCatBlocks("sync"),
       },
@@ -104,8 +104,8 @@ export function DistributionModal({
         subtitle: "Buffer & Rest",
         hours: categoryStats.renewalH,
         pct: Math.round((categoryStats.renewalH / 24) * 100),
-        badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-        cardBg: "bg-amber-950/20 border-amber-500/20",
+        badge: "bg-amber-500/15 text-amber-700 border-amber-500/40 dark:text-amber-400 dark:border-amber-500/30",
+        cardBg: "bg-amber-50/70 border-amber-500/35 dark:bg-amber-950/20 dark:border-amber-500/20",
         Icon: Coffee,
         blocks: filterCatBlocks("renewal"),
       },
@@ -115,8 +115,8 @@ export function DistributionModal({
         subtitle: "Sleep & Slumber",
         hours: categoryStats.restH,
         pct: Math.round((categoryStats.restH / 24) * 100),
-        badge: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
-        cardBg: "bg-indigo-950/20 border-indigo-500/20",
+        badge: "bg-indigo-500/15 text-indigo-600 border-indigo-500/35 dark:text-indigo-400 dark:border-indigo-500/30",
+        cardBg: "bg-indigo-50/70 border-indigo-500/30 dark:bg-indigo-950/20 dark:border-indigo-500/20",
         Icon: Moon,
         blocks: filterCatBlocks("sleep"),
       },
@@ -227,9 +227,9 @@ export function DistributionModal({
               {categoryStats.plannedTotal > 0 ? (
                 <>
                   <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full transition-all duration-300" title="Focus" />
-                  <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-400 h-full transition-all duration-300" title="Vitality" />
-                  <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-400 h-full transition-all duration-300" title="Sync" />
-                  <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-400 h-full transition-all duration-300" title="Renewal" />
+                  <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-500 h-full transition-all duration-300" title="Vitality" />
+                  <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-500 h-full transition-all duration-300" title="Sync" />
+                  <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-500 h-full transition-all duration-300" title="Renewal" />
                   <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full transition-all duration-300" title="Rest" />
                 </>
               ) : (
