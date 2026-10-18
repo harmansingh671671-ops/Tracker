@@ -637,6 +637,12 @@ export function PlannerContent() {
     return block?.title;
   }, [blocks, selectedDate, todayStr, currentHour]);
 
+  const scrollToCurrent = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const el = document.querySelector(`[data-hour="${currentHour}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [currentHour]);
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
 
@@ -652,6 +658,7 @@ export function PlannerContent() {
         historyLogs={historyLogs}
         loading={habitsLoading || !user?.id}
         currentBlockTitle={currentBlockTitle}
+        onNowClick={scrollToCurrent}
       />
 
       {/* The M12 "Now / Up next in 35 min · <title> (1h)" line was removed here
