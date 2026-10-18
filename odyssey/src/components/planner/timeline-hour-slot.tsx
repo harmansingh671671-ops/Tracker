@@ -64,7 +64,7 @@ export function TimelineHourSlot({
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggeredRef = useRef(false);
   const justDraggedRef = useRef(false);
-  const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null } | null>(null);
+  const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null; isSwipe: boolean; isDrag: boolean; dx: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragTarget, setDragTarget] = useState<number | null>(null);
 
@@ -76,6 +76,8 @@ export function TimelineHourSlot({
       justDraggedRef.current = false;
       return;
     }
+    // Edit is now opened by a right-to-left swipe, not a tap.
+    return;
     if (isPastHour) {
       if (isLongPressTriggeredRef.current) {
         isLongPressTriggeredRef.current = false;
@@ -88,9 +90,10 @@ export function TimelineHourSlot({
   };
 
   const handleTouchStart = () => {
+    return;
     if (!isPastHour) return;
     isLongPressTriggeredRef.current = false;
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    // long-press edit disabled
     longPressTimerRef.current = setTimeout(() => {
       isLongPressTriggeredRef.current = true;
       if (typeof window !== "undefined" && window.getSelection) {
@@ -126,9 +129,10 @@ export function TimelineHourSlot({
   };
 
   const handleMouseDown = () => {
+    return;
     if (!isPastHour) return;
     isLongPressTriggeredRef.current = false;
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    // long-press edit disabled
     longPressTimerRef.current = setTimeout(() => {
       isLongPressTriggeredRef.current = true;
       if (typeof window !== "undefined" && window.getSelection) {
@@ -164,12 +168,12 @@ export function TimelineHourSlot({
         onMouseLeave={handleMouseUp}
         onContextMenu={(e) => e.preventDefault()}
         onPointerDown={(e) => {
-          if (!slot.block || !onMoveBlock) return;
-          dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, prevTargetEl: null };
+          if (!slot.block) return;
+          dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, prevTargetEl: null, isSwipe: false, isDrag: false, dx: 0 };
         }}
         onPointerMove={(e) => {
           const ds = dragStateRef.current;
-          if (!ds || !slot.block || !onMoveBlock) return;
+          if (!ds || !slot.block) return;
           const dx = e.clientX - ds.startX;
           const dy = e.clientY - ds.startY;
           if (!ds.moved && Math.hypot(dx, dy) < 10) return;
@@ -181,33 +185,41 @@ export function TimelineHourSlot({
               longPressTimerRef.current = null;
             }
             setIsDragging(true);
+            ds.isSwipe = Math.abs(dx) > Math.abs(dy);
+            ds.isDrag = !ds.isSwipe;
+            ds.dx = dx;
             try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
           }
+          ds.dx = e.clientX - ds.startX;
           e.preventDefault();
-          const targetEl = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
-          const hourAttr = targetEl?.getAttribute("data-hour");
-          const h = hourAttr ? parseInt(hourAttr, 10) : null;
-          if (h !== null && !Number.isNaN(h)) {
-            if (ds.prevTargetEl && ds.prevTargetEl !== targetEl) {
-              ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+          if (ds.isDrag && onMoveBlock) {
+            const targetEl = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
+            const hourAttr = targetEl?.getAttribute("data-hour");
+            const h = hourAttr ? parseInt(hourAttr, 10) : null;
+            if (h !== null && !Number.isNaN(h)) {
+              if (ds.prevTargetEl && ds.prevTargetEl !== targetEl) {
+                ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+              }
+              if (targetEl && targetEl !== ds.prevTargetEl) {
+                targetEl.classList.add("ring-2", "ring-primary");
+                ds.prevTargetEl = targetEl;
+              }
+              if (h !== dragTarget) setDragTarget(h);
             }
-            if (targetEl && targetEl !== ds.prevTargetEl) {
-              targetEl.classList.add("ring-2", "ring-primary");
-              ds.prevTargetEl = targetEl;
-            }
-            if (h !== dragTarget) setDragTarget(h);
           }
         }}
         onPointerUp={() => {
           const ds = dragStateRef.current;
           if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
-          const wasDrag = !!ds?.moved;
-          if (wasDrag) {
+          const wasMoved = !!ds?.moved;
+          if (wasMoved) {
             justDraggedRef.current = true;
             setTimeout(() => { justDraggedRef.current = false; }, 100);
-          }
-          if (wasDrag && slot.block && onMoveBlock && dragTarget !== null && ds && dragTarget !== ds.hour) {
-            onMoveBlock(slot.block, dragTarget);
+            if (ds?.isSwipe && ds.dx < 0) {
+              onOpenHour(slot.hour, slot.block, slot.hour + 1);
+            } else if (ds?.isDrag && ds.hour !== null && dragTarget !== null && dragTarget !== ds.hour && onMoveBlock && slot.block) {
+              onMoveBlock(slot.block, dragTarget);
+            }
           }
           dragStateRef.current = null;
           setIsDragging(false);
