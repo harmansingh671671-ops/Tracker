@@ -48,6 +48,15 @@ interface TimelineHourSlotProps {
   onMoveBlock?: (block: ScheduleBlock, toHour: number) => void;
 }
 
+/**
+ * How long a finger has to rest on a block before it owns the gesture. Below
+ * this, a moving finger is scrolling the day and must not move anything.
+ */
+const HOLD_TO_DRAG_MS = 450;
+
+/** The movement that turns a press into a page scroll rather than a grab. */
+const DRAG_SLOP_PX = 10;
+
 export function TimelineHourSlot({
   slot,
   isPastHour,
@@ -66,7 +75,8 @@ export function TimelineHourSlot({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const isLongPressTriggeredRef = useRef(false);
   const justDraggedRef = useRef(false);
-  const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; prevTargetEl: HTMLElement | null; isSwipe: boolean; isDrag: boolean; dx: number } | null>(null);
+  const dragStateRef = useRef<{ startX: number; startY: number; hour: number; moved: boolean; armed: boolean; prevTargetEl: HTMLElement | null; isSwipe: boolean; isDrag: boolean; dx: number } | null>(null);
+  const grabTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragTarget, setDragTarget] = useState<number | null>(null);
 
@@ -114,15 +124,50 @@ export function TimelineHourSlot({
     ghostRef.current = null;
   };
 
+  const cancelGrab = () => {
+    if (grabTimerRef.current) {
+      clearTimeout(grabTimerRef.current);
+      grabTimerRef.current = null;
+    }
+  };
+
+  // A finger that rested on the block without moving now owns the gesture: the
+  // page would otherwise scroll out from under it. The grab is announced before
+  // the first move, because after 450 ms of stillness the user gets no other
+  // signal that the block came loose.
+  const armGrab = () => {
+    grabTimerRef.current = null;
+    const ds = dragStateRef.current;
+    if (!ds || ds.armed || ds.moved) return;
+    ds.armed = true;
+    justDraggedRef.current = true;
+    setIsDragging(true);
+  };
+
   // A drag can also end by this slot unmounting (a re-read repaints the rail),
   // which never reaches `onPointerUp`: the ghost and the landing ring would both
   // be left behind.
   useEffect(() => {
     return () => {
+      if (grabTimerRef.current) clearTimeout(grabTimerRef.current);
       ghostRef.current?.remove();
       ghostRef.current = null;
       setHourHighlight(dragStateRef.current?.prevTargetEl ?? null, false);
     };
+  }, []);
+
+  // While the block is grabbed the page must not take the gesture back and
+  // scroll instead. The card allows vertical panning (`touch-pan-y` below) so a
+  // finger that is only passing over it still scrolls the day, which means the
+  // scroll has to be vetoed here -- and only a non-passive listener may do that.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const vetoScroll = (e: TouchEvent) => {
+      if (dragStateRef.current?.armed) e.preventDefault();
+    };
+    el.addEventListener("touchmove", vetoScroll, { passive: false });
+    return () => el.removeEventListener("touchmove", vetoScroll);
   }, []);
 
   const cat = getPlannerCatStyle(slot.category, slot.isCustom);
@@ -133,7 +178,8 @@ export function TimelineHourSlot({
       justDraggedRef.current = false;
       return;
     }
-    // Edit is now opened by a right-to-left swipe, not a tap.
+    // Edit is now opened by a right-to-left swipe, not a tap -- and the swipe
+    // only counts after the block has been grabbed by holding it. See onPointerDown.
     return;
     if (isPastHour) {
       if (isLongPressTriggeredRef.current) {
@@ -227,21 +273,33 @@ export function TimelineHourSlot({
         onContextMenu={(e) => e.preventDefault()}
         onPointerDown={(e) => {
           if (!slot.block) return;
-          dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, prevTargetEl: null, isSwipe: false, isDrag: false, dx: 0 };
+          // The card's own controls are their own gesture: a press on the tick,
+          // the cross or the sleep chevron must never start a block move.
+          if ((e.target as Element | null)?.closest?.("button, a, input, select, textarea")) return;
+          const isMouse = e.pointerType === "mouse";
+          cancelGrab();
+          dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, armed: isMouse, prevTargetEl: null, isSwipe: false, isDrag: false, dx: 0 };
+          // Mouse has no scroll to fight, so its drag stays instant; a finger has
+          // to hold first and only then takes the gesture away from the page.
+          if (!isMouse) grabTimerRef.current = setTimeout(armGrab, HOLD_TO_DRAG_MS);
         }}
         onPointerMove={(e) => {
           const ds = dragStateRef.current;
           if (!ds || !slot.block) return;
           const dx = e.clientX - ds.startX;
           const dy = e.clientY - ds.startY;
-          if (!ds.moved && Math.hypot(dx, dy) < 10) return;
+          if (!ds.moved && Math.hypot(dx, dy) < DRAG_SLOP_PX) return;
           if (!ds.moved) {
+            // Not grabbed: the finger is only passing over the block, so the
+            // gesture is the page's. Drop it and let the scroll run.
+            if (!ds.armed) {
+              cancelGrab();
+              dragStateRef.current = null;
+              return;
+            }
             ds.moved = true;
             justDraggedRef.current = true;
-            if (longPressTimerRef.current) {
-              clearTimeout(longPressTimerRef.current);
-              longPressTimerRef.current = null;
-            }
+            cancelGrab();
             setIsDragging(true);
             ds.isSwipe = Math.abs(dx) > Math.abs(dy);
             ds.isDrag = !ds.isSwipe;
@@ -271,6 +329,7 @@ export function TimelineHourSlot({
         }}
         onPointerUp={() => {
           const ds = dragStateRef.current;
+          cancelGrab();
           hideGhost();
           if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
           const wasMoved = !!ds?.moved;
@@ -296,6 +355,12 @@ export function TimelineHourSlot({
                 rootRef.current.style.transform = "";
               }
             }
+          } else if (ds?.armed) {
+            // Grabbed but never moved: nothing to drop, and the tap that follows
+            // a grab must not be swallowed by it.
+            setTimeout(() => {
+              justDraggedRef.current = false;
+            }, 0);
           }
           dragStateRef.current = null;
           setIsDragging(false);
@@ -303,13 +368,14 @@ export function TimelineHourSlot({
         }}
         onPointerCancel={() => {
           const ds = dragStateRef.current;
+          cancelGrab();
           hideGhost();
           if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
           dragStateRef.current = null;
           setIsDragging(false);
           setDragTarget(null);
         }}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-none transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${
           options?.isInsideGroup
             ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
             : cat.cardBg
