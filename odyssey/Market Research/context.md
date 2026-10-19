@@ -621,6 +621,54 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (l) - `PERF-8` shipped: the habits row was the hot spot, and the trace proved where NOT to refactor
+
+**Profile-first changed the target.** A CDP `devtools.timeline` trace around scripted
+interactions (the Chrome Performance panel's own data, headless) on a six-habit profile
+showed the cost was **the habits list view rendering its rows inline** — ~300 lines of JSX
+per habit with merged-store records as props, so every data write re-rendered every row
+(toggle cost scaled 84 ms at one habit → 228 ms at six). The screens the plan suspected
+were innocent: day-schedule's 24 inline hour rows re-render for **~20 ms total**, and the
+planner's day switch (~103–116 ms) is legitimate work on a genuinely content-changing
+action. The evidence saved a 300-line extraction nobody would have gotten value from.
+
+**The memo contract is the whole fix, and it has three precise ingredients** (any one
+missing defeats it):
+1. **Habit-scoped slices** (`todayLogs[h.id]`, …) instead of merged records — possible
+   only because the store's write path already does top-level `{...prev}` spreads, which
+   preserves unaffected habits' record identities. Verified in the store before trusting it.
+2. **Handler identities that don't churn on the very writes the rows belong to**:
+   `handleToggle` reads its pre-toggle state from the store snapshot (`getState()`), and
+   all row handlers take the `userId` **scalar** — an XP award replaces the whole `user`
+   object, and a `user` dependency would have re-rendered every memoised row after every
+   completion, silently halving the win.
+3. The `motion.div` wrapper stays at page level (AnimatePresence needs it for enter/exit);
+   the memoised card is its child — wrapper re-renders are cheap, row re-renders skip.
+
+**Numbers (medians, 3 before / 5 after runs):** toggle **178.3 → 142.3 ms (−20%)**, editor
+open **134.3 → 104.4 ms (−22%)**; untouched screens unchanged. Single runs mislead: one
+after-run read the *untouched* planner as +21% — medians, and the untouched screen acting
+as control, separated noise from signal.
+
+**Probe mechanics for next time:** `puppeteer`'s `tracing.stop()` may return the trace as a
+**decimal char-code CSV string** ("123,34,116,…") — normalise before `JSON.parse`. Anchor
+the interaction on the **first** `EventDispatch` in a settled session (400 ms window is
+enough — animations still land inside it, which *is* the user-visible cost). Partly
+minified `(anon)` functions dominate the breakdown; per-name attribution needs a dev
+build — the honest headline numbers stay at the scripting/layout/paint bucket level.
+
+**The owner's dev server shares `.next` with the production build.** Its type generator
+got cut mid-write and `.next/dev/types/routes.d.ts` + `validator.ts` corrupted, failing
+`next build`'s typecheck on generated files. Deleting `.next/dev/types` entirely is safe —
+everything in it regenerates.
+
+**Transferable lessons:**
+- "React.memo the rows" is a hypothesis until the profiler says which rows.
+- A memo contract that survives data writes depends on the *store's* update shape,
+  not React — check the spread structure before quoting the win.
+- For unchanged screens during an A/B, treat medians + a control screen as the minimum
+  evidence; one-shot numbers are how a noise regression gets "fixed".
+
 ### 2026-10-19 (k) - `PERF-7` shipped: 36 of 45 blur applications removed or capped, and a fallback that strips the rest on low-end devices
 
 **7a audit, recount:** 48 text hits, **45 live applications across 24 files** (the plan said
@@ -4290,25 +4338,36 @@ to know where things stand.
   `perf7-scroll-{before,after}.json` (frame-delta probe), plus the three
   `perf7-*.js` drivers. The `before` build for the probe came from stashing the tree;
   `git stash pop` restored it byte-identical.
-- **Next feature queued (owner pre-approved): `PERF-8`** render efficiency, then
-  `PERF-16` dead-weight deletion (16c holds the 9 remaining orphan `ui/` components:
-  avatar/badge/card/dropdown-menu/input/progress/select/tabs/textarea). One commit each.
-- HEAD at last update: **this commit** — **`PERF-5` remainder (`SHIPPED`)**: five zero-import
-  dependencies deleted + `ui/calendar.tsx`; `compiler.removeConsole` (`error`/`warn` excluded)
-  verified on a Turbopack build by a marker-string build+scan; source maps confirmed
-  production-off; **the "db + sync off header-less screens" win built, measured, and rejected** —
-  the lazy sync duplicated its graph per entry (build +24.6/+52.2 KB gzip across variants), four
-  routes got heavier, and the db stayed shared through the header's profile chain; reverted to
-  static. `PERFORMANCE.md` §2.1 carries the correction and the deferred structural variant.
-  Committed on `main`; **the agent does not push**. Before it:
-  **`77b55a1`** (`B25` review pass), **`d0c8dc8`** (`B25` follow-up: autofill sleep counts as planned, not auto-reviewed),
-  **`fe8202d`** (BUG-16 record correction), **`9b19f96`** (`B25` fixes + `BUG-16`),
-  **`abbc6ac`** (`B25` — the streak becomes two cumulative counters), **`2dc684e`** (`S9` the
-  violation state), **`8700852`** (`PERF-5` 5a + 5b), **`b4d9eff`** (habit types), **`e67dc01`**
-  (C2 polish round two), `239c833` (C2 round one), `8a3a4a0` (C2 hold-not-swap), `6f53dbd`,
-  `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`.
+- HEAD at last update: **this commit** — **`PERF-8` (`SHIPPED`)**: the habits list row
+  extracted from ~320 lines of inline page JSX into `components/habits/habit-list-card.tsx`
+  and `React.memo`-wrapped on habit-scoped log slices; `handleToggle` reads pre-toggle
+  state from the store snapshot; press/click handlers and row identity stabilised
+  (`useCallback`, `userId` scalar). Measured with a CDP trace profiler, six-habit profile,
+  medians (before ×3 / after ×5): **habit toggle 178.3 → 142.3 ms (−20%)**, editor open
+  **134.3 → 104.4 ms (−22%)**; untouched screens unchanged. 8c virtualisation declined (no
+  heavy-screen list nears 50 rows); 8f index keys audited — all four sites static.
+  Full disposition in `main_plan.md`; row in `PERFORMANCE.md` §3; lessons in §9 `(l)`.
+  Committed on `main`; **the agent does not push**. Before it: **`47ce1fd`** (`PERF-7`,
+  `SHIPPED`), **`1b9cb28`** (`PERF-5` 5d + 5e, `SHIPPED`), **`77b55a1`** (`B25` review
+  pass), `d0c8dc8`, `fe8202d`, `9b19f96`, `abbc6ac` (`B25`), `2dc684e` (`S9`),
+  `8700852` (`PERF-5` 5a+b), `b4d9eff`, `e67dc01`, and earlier C2 rounds.
   **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
-  `b4d9eff` through this commit are **not**.
+  `8700852` onward are **not**.
+- **Working tree (2026-10-19, `PERF-8`):** clean after that commit. It touched
+  `src/app/habits/page.tsx` (row extraction, callback stabilisation, dead imports
+  removed), `src/components/habits/habit-list-card.tsx` (new, memo-wrapped),
+  `main_plan.md` (PERF-8 → `SHIPPED`), `PERFORMANCE.md` (§3 row), `context.md`
+  (entry `(l)`, §10). Measurement artifacts live outside the repo:
+  `%TEMP%\opencode\verify\perf8-trace-{before,before2,before3,after,after2..5}.json`,
+  `perf8-shots\` (screenshot pairs for all three habit views, light + dark),
+  `perf8-trace.js` (trace probe driver), `perf8-splice.js` (the boundary-asserted
+  splice used for the 320-line extraction), `perf8-dbg*.js`. The `before` build came
+  from stashing the tree; stash pop restored. Shared-`.next` note: the owner's dev
+  server corrupted `.next/dev/types` mid-session — deleted the directory (it regenerates).
+- **Next feature queued (owner pre-approved): `PERF-16`** dead-weight deletion (16c holds
+  the 9 remaining orphan `ui/` components: avatar/badge/card/dropdown-menu/input/
+  progress/select/tabs/textarea). One commit. Then pause for the owner unless they queue
+  more.
 - **Working tree (2026-10-19, `PERF-5` remainder):** clean after that commit. It touched
   `package.json` + `package-lock.json` (5 deps removed), `src/components/ui/calendar.tsx`
   (**deleted** — orphan, sole `react-day-picker` importer), `next.config.ts`

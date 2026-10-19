@@ -8,18 +8,15 @@ import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitHeatmap } from "@/components/habits/habit-heatmap";
 import { GridHabitCard } from "@/components/habits/grid-habit-card";
-import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
+import { HabitListCard } from "@/components/habits/habit-list-card";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
-import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
-import { isHabitComplete, getCompletionRecord, isHabitSlipped } from "@/lib/utils/habit-completion";
-import { formatLastDone } from "@/lib/utils/last-done";
-import { getTimePeriodAccent } from "@/lib/utils/time-period";
+import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
 import { consumeNewAchievements } from "@/lib/utils/achievements";
 import {
@@ -31,7 +28,6 @@ import {
 import {
   Plus,
   Flame,
-  Check,
   Sparkles,
   Lock,
   LayoutList,
@@ -45,6 +41,9 @@ type HabitViewMode = "list" | "grid" | "heatmap";
 
 export default function HabitsPage() {
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
+  // PERF-8b: the id as a scalar keeps the memoised rows' handler props stable
+  // when the profile object itself is replaced (an XP award, a settings save).
+  const userId = user?.id ?? null;
   const {
     habits,
     todayLogs,
@@ -255,25 +254,6 @@ export default function HabitsPage() {
   }).length;
    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  /**
-   * M7 -- the "last done" line for a habit, or null when there is nothing true to
-   * say.
-   *
-   * Memoised on the two inputs that actually change it. Memoising per habit inside
-   * the loop would allocate a cache entry per card per render, which is worse than
-   * recomputing: `formatLastDone` is a date subtraction and a string build.
-   *
-   * Returns null while the list is still loading, because `lastCompletedAt` is
-   * empty until the authoritative read lands -- the same rule as everywhere else
-   * in this screen, and the reason a returning user never sees the line flicker
-   * out on arrival.
-   */
-  const lastDoneLabel = useCallback(
-    (habitId: string): string | null =>
-      formatLastDone(lastCompletedAt[habitId], todayStr),
-    [lastCompletedAt, todayStr]
-  );
-
   const formattedSelectedDate = useMemo(() => {
     if (selectedDate === todayStr) return "Today";
     const [y, m, d] = selectedDate.split("-").map(Number);
@@ -281,24 +261,31 @@ export default function HabitsPage() {
     return dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }, [selectedDate, todayStr]);
 
-  const handleToggle = async (
-    habitId: string,
-    targetDate: string = selectedDate,
-    e?: React.MouseEvent | React.TouchEvent
-  ) => {
-    if (!user) return;
-    if (targetDate > todayStr) {
-      showToast("Cannot complete habits for future dates.");
-      return;
-    }
+  const handleToggle = useCallback(
+    async (
+      habitId: string,
+      targetDate: string = selectedDate,
+      e?: React.MouseEvent | React.TouchEvent
+    ) => {
+      if (!userId) return;
+      if (targetDate > todayStr) {
+        showToast("Cannot complete habits for future dates.");
+        return;
+      }
 
-    const habit = habits.find((h) => h.id === habitId);
-    // Captured before the toggle: after it, the store's counter already includes
-    // this day, so the milestone check would never see the crossing.
-    const prevDaysDone = daysDoneByHabit[habitId] ?? 0;
-    const isNowCompleted = await toggleHabitLog(user.id, habitId, targetDate);
-    const habitColor = habit ? getHabitColor(habit) : undefined;
-    const isScheduled = habit ? isHabitScheduledOnDate(habit, targetDate) : true;
+      // PERF-8b: the pre-toggle reads come from the store snapshot at call
+      // time, not from this render's closure, so this callback stays
+      // referentially stable and the memoised habit rows do not have to
+      // re-render on every store write. Calling `getState()` BEFORE
+      // `toggleHabitLog` sees the same values the previous render read.
+      const before = useHabitStore.getState();
+      const habit = before.habits.find((h) => h.id === habitId);
+      // Captured before the toggle: after it, the store's counter already includes
+      // this day, so the milestone check would never see the crossing.
+      const prevDaysDone = before.daysDoneByHabit[habitId] ?? 0;
+      const isNowCompleted = await toggleHabitLog(userId, habitId, targetDate);
+      const habitColor = habit ? getHabitColor(habit) : undefined;
+      const isScheduled = habit ? isHabitScheduledOnDate(habit, targetDate) : true;
 
     if (isNowCompleted) {
       let clientX: number | undefined;
@@ -322,7 +309,7 @@ export default function HabitsPage() {
       // No XP is credited here. Rewards accrue in the vault and are paid on
       // rollover (ADR 0002). Crediting the profile at the moment of the tick AND
       // settling the same day's accrual later was paying every completion twice.
-      await fetchTemporaryWallet(user.id);
+      await fetchTemporaryWallet(userId);
 
       // Read the *store*, not the `habits`/`historyLogs` captured in this
       // closure: those are the values from before the toggle, so asking them
@@ -356,13 +343,19 @@ export default function HabitsPage() {
         )
       );
     } else {
-      await fetchTemporaryWallet(user.id);
+      await fetchTemporaryWallet(userId);
       showToast(getCompletionToast("reverted", {
         xpPerCompletion: XP_PER_COMPLETION,
         perfectDayBonus: XP_PERFECT_DAY_BONUS,
       }));
     }
-  };
+    },
+    // `selectedDate` is only the default-parameter fallback; it belongs in the
+    // list so a day change does not hand the rows a stale callback.
+    // `userId` (scalar) instead of `user`: an XP award replaces the user
+    // object, and churning this identity would re-render every memoised row.
+    [userId, todayStr, selectedDate, showToast, toggleHabitLog, fetchTemporaryWallet]
+  );
 
   const handleCreateHabit = async (data: {
     name: string;
@@ -463,18 +456,20 @@ export default function HabitsPage() {
   // ends), or cleared. Tapping the active choice clears the day, which is the only way
   // back from a mis-tap without opening the edit sheet.
   const handleAvoidClean = useCallback(async (habit: Habit, date: string, isClean: boolean) => {
-    if (!user?.id || isFutureSelectedDate) return;
-    if (isClean) await toggleHabitLog(user.id, habit.id, date);
-    else await markHabitSlip(user.id, habit.id, date, false);
-  }, [user, isFutureSelectedDate, toggleHabitLog, markHabitSlip]);
+    if (!userId || isFutureSelectedDate) return;
+    if (isClean) await toggleHabitLog(userId, habit.id, date);
+    else await markHabitSlip(userId, habit.id, date, false);
+  }, [userId, isFutureSelectedDate, toggleHabitLog, markHabitSlip]);
 
   const handleAvoidSlip = useCallback(async (habit: Habit, date: string, isSlipped: boolean) => {
-    if (!user?.id || isFutureSelectedDate) return;
-    await markHabitSlip(user.id, habit.id, date, !isSlipped);
-  }, [user, isFutureSelectedDate, markHabitSlip]);
+    if (!userId || isFutureSelectedDate) return;
+    await markHabitSlip(userId, habit.id, date, !isSlipped);
+  }, [userId, isFutureSelectedDate, markHabitSlip]);
 
-  // Long press gesture listeners to open habit editing modal
-  const startPress = (habit: Habit, e: React.TouchEvent | React.MouseEvent) => {
+  // Long press gesture listeners to open habit editing modal.
+  // PERF-8b: `useCallback` because these are props of the memoised habit
+  // rows; refs and a stable setState keep them identity-stable.
+  const startPress = useCallback((habit: Habit, e: React.TouchEvent | React.MouseEvent) => {
     if ("button" in e && e.button !== 0) return;
     isLongPressRef.current = false;
     if ("touches" in e && e.touches.length > 0) {
@@ -492,9 +487,9 @@ export default function HabitsPage() {
       } catch (e) { logWarn("page", "haptic feedback failed", e); }
       setEditingHabit(habit);
     }, 400);
-  };
+  }, [setEditingHabit]);
 
-  const movePress = (e: React.TouchEvent | React.MouseEvent) => {
+  const movePress = useCallback((e: React.TouchEvent | React.MouseEvent) => {
     if (!pressTimerRef.current) return;
     const clientX = "touches" in e && e.touches.length > 0 ? e.touches[0].clientX : "clientX" in e ? e.clientX : 0;
     const clientY = "touches" in e && e.touches.length > 0 ? e.touches[0].clientY : "clientY" in e ? e.clientY : 0;
@@ -503,14 +498,14 @@ export default function HabitsPage() {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const endPress = () => {
+  const endPress = useCallback(() => {
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
-  };
+  }, []);
 
   // Drag gesture handlers for counted habits progress bar
   const handleDragStart = useCallback((habit: Habit, e: React.MouseEvent | React.TouchEvent, currentValue: number) => {
@@ -586,7 +581,7 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     showToast("Target completed for all counted habits");
   }, [habits, isFutureSelectedDate, user, setHabitLogValue, showToast]);
 
-const handleCardClick = async (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
+  const handleCardClick = useCallback(async (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
       if (isLongPressRef.current) {
         isLongPressRef.current = false;
         return;
@@ -602,7 +597,7 @@ const handleCardClick = async (habit: Habit, e?: React.MouseEvent | React.TouchE
         return;
       }
       handleToggle(habit.id, selectedDate, e);
-    };
+    }, [isFutureSelectedDate, selectedDate, showToast, openValueInput, handleToggle]);
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
@@ -760,13 +755,6 @@ AnimatePresence, which suppresses the enter transition and leaves the
                 const log = getCompletionRecord(h, selectedDate, todayStr, { todayLogs, historyLogs, historyValues });
                 const isCompleted = isHabitComplete(h, log);
                 const habitColor = getHabitColor(h);
-              // M7 -- computed once per card rather than twice in the JSX. Null for
-              // a habit never completed, and then no line renders at all.
-              const lastDone = lastDoneLabel(h.id);
-              // M11 -- null for a habit with no period set ("anytime"), and for a
-              // habit whose stored value is not one of the three known periods.
-              // Both render nothing rather than an undefined class.
-              const period = getTimePeriodAccent(h);
 
               return (
                 <motion.div
@@ -811,265 +799,24 @@ AnimatePresence, which suppresses the enter transition and leaves the
                       : undefined,
                   }}
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform ${
-                          isCompleted
-                            ? "border group-hover:scale-105"
-                            : "bg-surface-container-high group-hover:scale-105"
-                        }`}
-                        style={{
-                          backgroundColor: isCompleted
-                            ? isScheduled
-                              ? `${habitColor}20`
-                              : `${habitColor}14`
-                            : undefined,
-                          borderColor: isCompleted
-                            ? `${habitColor}${isScheduled ? "40" : "25"}`
-                            : undefined,
-                        }}
-                      >
-                        <HabitIcon icon={h.icon} name={h.name} className="w-5 h-5" style={{ color: habitColor }} />
-                      </div>
-
-                      <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4
-                            className={`text-sm font-semibold truncate ${
-                              isCompleted ? "text-on-surface line-through opacity-80" : "text-on-surface"
-                            }`}
-                          >
-                            {h.name}
-                          </h4>
-                          {!isScheduled && (
-                            <span className="px-1.5 py-0.2 rounded-md bg-surface-container-highest text-on-surface-variant text-[9.5px] font-mono font-bold shrink-0">
-                              Rest Day
-                            </span>
-                          )}
-                          {/* M11 -- ambient time-period accent. The WORD is
-                              rendered, not just the colour: accessibility rule
-                              5.3 #3, so a user who cannot tell amber from purple
-                              still reads which part of the day this belongs to. */}
-                          {period && (
-                            <span
-                              className={`px-1.5 py-0.2 rounded-md text-[9.5px] font-mono font-bold shrink-0 ${period.containerClass} ${period.accentClass}`}
-                            >
-                              {period.label}
-                            </span>
-                          )}
-                        </div>
-                        {(h.type ?? "simple") === "counted" && (
-                          <div className="mt-1.5 w-1/2 max-w-[180px]">
-                            {/* Water-fill progress bar */}
-                            <div
-                              className="relative w-full h-3 rounded-full bg-surface-container-high overflow-hidden cursor-pointer select-none"
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                if (isFutureSelectedDate) return;
-                                const currentValue = typeof log?.value === "number" ? log.value : 0;
-                                handleDragStart(h, e, currentValue);
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                if (isFutureSelectedDate) return;
-                                const currentValue = typeof log?.value === "number" ? log.value : 0;
-                                handleDragStart(h, e, currentValue);
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isFutureSelectedDate) {
-                                  showToast("Cannot complete habits for future dates.");
-                                  return;
-                                }
-                                // Single click: increment by 1
-                                const currentValue = typeof log?.value === "number" ? log.value : 0;
-                                if (user?.id) {
-                                  setHabitLogValue(user.id, h.id, selectedDate, currentValue + 1);
-                                }
-                              }}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (isFutureSelectedDate) return;
-                                // Long press / right click: fill to target
-                                if (user?.id && h.targetValue) {
-                                  setHabitLogValue(user.id, h.id, selectedDate, h.targetValue);
-                                  showToast(`Filled to ${h.targetValue} ${h.unit ?? "units"}`);
-                                }
-                              }}
-                            >
-                              <div
-                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-150 ease-out"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, (typeof log?.value === "number" ? log.value : 0) / (h.targetValue ?? 1) * 100))}%`,
-                                  backgroundColor: habitColor,
-                                  boxShadow: `0 0 8px ${habitColor}80`,
-                                }}
-                              />
-                            </div>
-                            <div className="mt-0.5 flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
-                              <span>{typeof log?.value === "number" ? log.value : 0}</span>
-                              <span>/ {h.targetValue ?? "-"}</span>
-                              <span>{h.unit ?? "units"}</span>
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
-                          <span className="font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
-                          {/* Counted/simple at 0 days renders nothing at all (M13's
-                              honest-zero rule): a bare flame with no number behind
-                              it reads as broken. The separator goes with it. */}
-                          {(h.type === "avoid" || getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0) !== "") && (
-                            <>
-                              <span>•</span>
-                              <span className={`flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                                {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
-                                {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0) || "0d"} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
-                              </span>
-                            </>
-                          )}
-                          {h.type === "avoid" && (
-                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">
-                              Quit
-                            </span>
-                          )}
-                        {h.priority && (
-                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
-                                h.priority === "critical" ? "border-red-500/40 text-red-500" :
-                                h.priority === "focus" ? "border-amber-500/40 text-amber-500" :
-                                "border-emerald-500/40 text-emerald-500"
-                              }`}>
-                                {h.priority === "critical" ? "🔴 Critical" : h.priority === "focus" ? "🟡 Focus" : "🟢 Optional"}
-                              </span>
-                            )}
-                        </div>
-
-                        {/* M7 -- "Last done: Today at 8:15 AM". Renders nothing at
-                            all for a habit never completed: `formatLastDone`
-                            returns null rather than a placeholder, because
-                            printing "never" puts a word where the honest answer is
-                            that we do not know.
-
-                            Anchored to `todayStr`, not the selected date. This is
-                            a property of the habit, so browsing to a past date
-                            still answers "when did I last do this" truthfully
-                            rather than pretending you stopped existing. */}
-                        {lastDone && (
-                          <p className="mt-0.5 text-[11px] font-mono text-on-surface-variant/80 truncate">
-                            {lastDone}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Completion Action: clean/slip pair for quit habits, ring for simple
-                        habits, inline stepper below the name for counted. */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {h.type === "avoid" ? (
-                        <AvoidHabitControl
-                          isClean={isCompleted}
-                          isSlipped={isHabitSlipped(h, log)}
-                          disabled={isFutureSelectedDate}
-                          onClean={(isClean) => handleAvoidClean(h, selectedDate, isClean)}
-                          onSlip={(isSlipped) => handleAvoidSlip(h, selectedDate, isSlipped)}
-                        />
-                      ) : (h.type ?? "simple") === "simple" ? (
-                        <div
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (isFutureSelectedDate) {
-                              showToast("Cannot complete habits for future dates.");
-                              return;
-                            }
-                            handleToggle(h.id, selectedDate, e);
-                          }}
-                          title={
-                            isFutureSelectedDate
-                              ? "Cannot complete habits for future dates"
-                              : isCompleted
-                              ? isScheduled
-                                ? "Completed (tap to undo)"
-                                : "Unscheduled Completed (!) • Tap to undo"
-                              : !isScheduled
-                              ? "Rest Day (tap to register)"
-                              : "Tap to complete"
-                          }
-                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${
-                            isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-                          } ${
-                            isCompleted
-                              ? "text-white shadow-sm scale-105"
-                              : isFutureSelectedDate
-                              ? "bg-transparent"
-                              : !isScheduled
-                              ? "bg-transparent hover:scale-105 opacity-75"
-                              : "bg-transparent hover:scale-105"
-                          }`}
-                          style={{
-                            backgroundColor: isCompleted
-                              ? isScheduled
-                                ? habitColor
-                                : `${habitColor}70`
-                              : "transparent",
-                            borderColor: isFutureSelectedDate && !isCompleted
-                              ? `${habitColor}60`
-                              : !isScheduled && !isCompleted
-                              ? `${habitColor}70`
-                              : habitColor,
-                            borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2.5px",
-                            borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
-                            boxShadow: isCompleted
-                              ? `0 0 10px ${habitColor}${isScheduled ? "66" : "35"}`
-                              : undefined,
-                          }}
-                        >
-                          <AnimatePresence mode="wait">
-                            {isCompleted ? (
-                              <motion.div
-                                key={isScheduled ? "check" : "excl"}
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0, opacity: 0 }}
-                                transition={{ duration: 0.15 }}
-                                className="flex items-center justify-center"
-                              >
-                                {isScheduled ? (
-                                  <Check className="w-4 h-4 stroke-[3]" />
-                                ) : (
-                                  <span className="font-black text-xs leading-none">!</span>
-                                )}
-                              </motion.div>
-                            ) : null}
-                          </AnimatePresence>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {/* Inline Monthly Calendar preview */}
-                  <HabitMonthCalendar
-                    habitId={h.id}
-                    name={h.name}
-                    targetDays={h.targetDays}
-                    targetDaysPerWeek={h.targetDaysPerWeek}
-                    category={h.category}
+                  <HabitListCard
+                    habit={h}
                     selectedDate={selectedDate}
                     todayStr={todayStr}
-                    onSelectDate={(newDate) => setSelectedDate(newDate)}
-                    onToggleDate={(dateStr, e) => {
-                      if ((h.type ?? "simple") === "counted") {
-                        const log = getCompletionRecord(h, dateStr, todayStr, { todayLogs, historyLogs, historyValues });
-                        const current = typeof log?.value === "number" ? log.value : 0;
-                        if (user?.id) {
-                          setHabitLogValue(user.id, h.id, dateStr, current + 1);
-                        }
-                      } else {
-                        handleToggle(h.id, dateStr, e);
-                      }
-                    }}
+                    isFutureSelectedDate={isFutureSelectedDate}
+                    todayRecord={todayLogs[h.id]}
+                    historyRecord={historyLogs[h.id]}
+                    valueRecord={historyValues[h.id]}
+                    daysDone={daysDoneByHabit[h.id] ?? 0}
+                    lastDoneAt={lastCompletedAt[h.id]}
+                    userId={userId}
+                    onSelectDate={setSelectedDate}
+                    onToggle={handleToggle}
+                    onAvoidClean={handleAvoidClean}
+                    onAvoidSlip={handleAvoidSlip}
+                    onDragStart={handleDragStart}
+                    showToast={showToast}
+                    setHabitLogValue={setHabitLogValue}
                   />
                 </motion.div>
               );
