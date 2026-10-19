@@ -617,6 +617,67 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (g) - `BUG-16`: the habit edit sheet reset every field, and the lint pass that did it
+
+Owner-reported against a counted habit: opening **Edit Details** showed `Simple` selected with a
+blank unit and target. The counted type was the *tell*, not the cause — it hit every habit type.
+
+**Root cause, a regression from `635182a` ("chore(lint): clear all React Compiler errors").** That
+commit converted `edit-habit-modal.tsx`'s hydration effect into a render-phase guard:
+
+```
+useEffect(() => { ...hydrate... }, [habit, initialTab, selectedDate, today]);   // before
+const [prevHabit, setPrevHabit] = useState(habit);                              // after
+if (prevHabit !== habit) { setPrevHabit(habit); ...hydrate... }
+```
+
+A `useEffect` runs on mount; a guard seeded from the prop cannot. The modal is mounted fresh on
+each open (`{editingHabit && <EditHabitModal habit={editingHabit} .../>}`), so `prevHabit` begins
+*equal* to `habit` and the block never runs — the form keeps its `useState` defaults (`simple`, no
+unit/target, Mon–Fri, `Vitality & Fitness`, blank cue/reward/emergency). The sheet header reads the
+prop, not the state, so it looked correct until "Edit Details" was tapped.
+
+**Not cosmetic.** `handleSubmit` sends the state, so editing a habit and saving wrote those
+defaults over it — icon, category, type, target days, cue, reward, colour and emergency version
+flattened at once. The name survived only via `finalName = name.trim() || habit.name`. That is the
+rule-19 class: a save path writing fields the user never touched.
+
+**Fix:** seed the sentinel empty — `useState<Habit | null>(null)` — so the block runs on the first
+render, with a comment naming `635182a` and *"do not simplify this back"*.
+
+**The other 9 guards `635182a` created were checked (rule 17) and are fine:** each seeds its
+comparison key with a real sentinel (`useState<string | null>(null)`). The two seeded from a value
+— `habit-month-calendar.tsx:59` ("keep view aligned if `selectedDate` *jumps*"; its mount values
+come from separate initialisers) and `profile/page.tsx:57` (whose `user` genuinely starts `null`,
+so the guard does fire when the store populates) — are correct by construction.
+
+**Transferable lesson: the render-phase "adjust state on prop change" pattern is only safe when the
+sentinel cannot equal the first prop.** `useEffect` ran on mount for free; the guard does not, and a
+component that is *conditionally mounted* — so its prop is never null at mount — is exactly the case
+where the difference bites. When converting an effect into a guard, the sentinel must be a value the
+prop can never hold on frame 0.
+
+**Gates:** `tsc --noEmit` exit 0 · `npm run lint` **0 errors, 95 warnings** (unchanged; the fix adds
+no warning) · **30 suites / 462 tests** · production build clean. **No visual pass** — no browser
+automation is installed on this machine, so it was verified by reading the mount sites and all 9
+sibling guards, not by tapping the sheet.
+
+### 2026-10-19 (g) - `B25` fixes: autofill sleep counts, rank consistency, perf, cleanup
+
+Follow-ups to `B25` found in review, committed as `a9f58ed`. No new feature.
+
+- **Auto-fill sleep blocks are now `completed`, not `pending`**, so those 8 hours count toward
+  both planned and reviewed. This unblocks the common path (waking hours + autofill sleep)
+  to the 18-hour "day done" bar — the decision point the owner flagged.
+- **Wallpaper page rank now reads days done**, matching Profile/Journey/Stats instead of the
+  legacy streak rank. The streak value sent to the phone is unchanged.
+- **`habit-store` rebuilds the days-done map for the one habit that changed** on each log
+  write instead of all habits.
+- The avoid chip no longer renders a dangling " clean" at zero clean days.
+- `daysComplied` is filtered by `userId` instead of reading every profile's blocks.
+
+Gates: tsc 0, lint 0 errors (95 warnings), 30 suites / 462 tests, build clean.
+
 ### 2026-10-19 (f) - `B25`: the streak becomes two cumulative counters, derived from history
 
 Owner's brief: replace the consecutive streak with **cumulative "days done"**, at two
@@ -4043,19 +4104,16 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`B25` (days done)**: the streak is replaced by two
-  cumulative, derived counters — per habit (`habit-store.daysDoneByHabit`) and app-wide schedule
-  compliance (`user-store.daysComplied`) — which drive rank and the 3/7/14/30 milestones; the
-  Streak Freeze Shield is retired; `day-status.ts`'s `fully_completed` now actually requires 18h
-  (ADR 0005). Committed on `main`; **the agent does not push**. Before it: **`2dc684e`** (`S9` the
-  violation state — clean/slip controls, `HabitLog.value = 1`, `isHabitSlipped`,
-  `markHabitSlip`), **`8700852`** (`PERF-5` 5a + 5b — per-route first-load
-  measurement and the shell diet; shared set 261.4 → 178.4 KB gzip, `/planner` 263.0 → 178.8 KB, build
-  total 431.9 → 476.7, see `PERFORMANCE.md` §2.1), **`b4d9eff`** (habit types — counted stepper + quit
-  surface, `S13` part 2 / `S9`), **`e67dc01`** (C2 polish round two), `239c833` (C2 round one),
-  `8a3a4a0` (C2 hold-not-swap), `6f53dbd`, `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`,
-  `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`. **Everything up to and including `e67dc01` is on
-  `origin/main`** — the owner pushed; `b4d9eff`, `8700852`, `2dc684e` and this commit are **not**.
+- HEAD at last update: **this commit** — **`a9f58ed` (`B25` fixes)**: autofill sleep blocks are now
+  completed (so they count toward planned and reviewed), the wallpaper page rank reads days done,
+  the days-done map rebuilds per habit on writes, the avoid chip no longer dangles " clean", and
+  `daysComplied` is scoped by user. Committed on `main`; **the agent does not push**. Before it:
+  **`abbc6ac`** (`B25` — the streak becomes two cumulative counters), **`2dc684e`** (`S9` the
+  violation state), **`8700852`** (`PERF-5` 5a + 5b), **`b4d9eff`** (habit types), **`e67dc01`**
+  (C2 polish round two), `239c833` (C2 round one), `8a3a4a0` (C2 hold-not-swap), `6f53dbd`,
+  `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`.
+  **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
+  `b4d9eff`, `8700852`, `2dc684e`, `abbc6ac` and this commit are **not**.
 - **Working tree (2026-10-19, `B25`):** clean after this commit. `B25` touched
   `src/lib/utils/compliance.ts` + `.test.ts` (**new**, the pure counters),
   `src/lib/utils/day-status.ts` + test (strict `fully_completed`),

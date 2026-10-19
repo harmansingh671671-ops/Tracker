@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 
 export default function WallpaperPage() {
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, daysComplied } = useUserStore();
   const { habits, fetchHabits } = useHabitStore();
 
   // The master switch is the single source of truth. Hiding the Stats entry
@@ -170,8 +170,8 @@ export default function WallpaperPage() {
   }, [selectedDateStr]);
 
   const rankInfo = useMemo(() => {
-    return getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0));
-  }, [user?.militaryRank, user?.streak]);
+    return getRankInfo(calculateRank(daysComplied));
+  }, [daysComplied]);
 
   const wallpaperData: WallpaperData = useMemo(() => {
     return {

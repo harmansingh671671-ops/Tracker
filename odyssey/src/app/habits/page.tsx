@@ -920,7 +920,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                           <span>•</span>
                           <span className={`flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                             {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
-                            {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
+                            {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0) || "0d"} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
                           </span>
                           {h.type === "avoid" && (
                             <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">
@@ -1172,7 +1172,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
                         <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                           {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
-                          {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
+                          {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0) || "0d"} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
                         </span>
                         {h.type === "avoid" && (
                           <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">

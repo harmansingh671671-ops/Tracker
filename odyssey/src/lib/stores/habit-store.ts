@@ -3,7 +3,7 @@ import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate, getHabitColor } from '../utils/habit-colors';
 import { isHabitComplete } from '../utils/habit-completion';
-import { buildDaysDoneMap } from '../utils/compliance';
+import { buildDaysDoneMap, countDaysDoneForHabit } from '../utils/compliance';
 import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
 import { triggerStreaksConfetti } from '../utils/confetti';
 import {
@@ -592,7 +592,12 @@ const valuesMap: Record<string, Record<string, number>> = {};
         todayLogs: updatedToday,
         historyLogs: updatedHistory,
         historyValues: updatedValues,
-        daysDoneByHabit: buildDaysDoneMap(state.habits, updatedHistory, updatedValues),
+        daysDoneByHabit: {
+          ...state.daysDoneByHabit,
+          ...(habit
+            ? { [habitId]: countDaysDoneForHabit(habit, updatedHistory[habitId] ?? {}, updatedValues[habitId] ?? {}) }
+            : {}),
+        },
       };
     });
 
@@ -714,7 +719,12 @@ const valuesMap: Record<string, Record<string, number>> = {};
         todayLogs: updatedToday,
         historyLogs: updatedHistory,
         historyValues: updatedValues,
-        daysDoneByHabit: buildDaysDoneMap(state.habits, updatedHistory, updatedValues),
+        daysDoneByHabit: {
+          ...state.daysDoneByHabit,
+          ...(habit
+            ? { [habitId]: countDaysDoneForHabit(habit, updatedHistory[habitId] ?? {}, updatedValues[habitId] ?? {}) }
+            : {}),
+        },
       };
     });
 
@@ -797,7 +807,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       if (!updatedValues[habitId]) updatedValues[habitId] = {};
       updatedValues[habitId] = { ...updatedValues[habitId], [date]: value };
 
-      return { todayLogs: updatedToday, historyLogs: updatedHistory, historyValues: updatedValues, daysDoneByHabit: buildDaysDoneMap(state.habits, updatedHistory, updatedValues) };
+      return { todayLogs: updatedToday, historyLogs: updatedHistory, historyValues: updatedValues, daysDoneByHabit: { ...state.daysDoneByHabit, ...(habit ? { [habitId]: countDaysDoneForHabit(habit, updatedHistory[habitId] ?? {}, updatedValues[habitId] ?? {}) } : {}) } };
     });
 
     // Only today moves the clean-day run, the rule the rest of the store follows

@@ -29,8 +29,8 @@ interface UserState {
  * day, so the number is stable within a session except when the user reviews the
  * last pending hour, which calls `fetchUser` again.
  */
-async function countDaysDone(): Promise<number> {
-  const blocks = await db.scheduleBlocks.toArray();
+async function countDaysDone(userId: string): Promise<number> {
+  const blocks = (await db.scheduleBlocks.toArray()).filter((b) => b.userId === userId);
   return countScheduleCompliedDays(blocks);
 }
 
@@ -40,7 +40,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   daysComplied: 0,
   fetchUser: async () => {
     const user = await getOrCreateUser();
-    const daysComplied = await countDaysDone();
+    const daysComplied = await countDaysDone(user.id);
     set({ user, loading: false, daysComplied });
     return user;
   },

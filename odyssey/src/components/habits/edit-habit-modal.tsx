@@ -120,7 +120,15 @@ export function EditHabitModal({
 
   const habitColor = useMemo(() => (habit ? getHabitColor(habit) : "#6C00FF"), [habit]);
 
-  const [prevHabit, setPrevHabit] = useState(habit);
+  // The sentinel must start EMPTY rather than at `habit`. This modal is mounted
+  // fresh on every open with a non-null habit, so `useState(habit)` would begin
+  // equal to the prop and the block below would never run on that first render --
+  // the form would open on its defaults (blank fields, `simple` type, no unit or
+  // target) and saving would write those defaults over the stored habit. `635182a`
+  // turned the `useEffect` that used to run this on mount into a render-phase
+  // guard and lost the on-mount run. `useEffect` ran on mount; a guard seeded from
+  // the prop cannot. Do not "simplify" this back to `useState(habit)`.
+  const [prevHabit, setPrevHabit] = useState<Habit | null>(null);
   if (prevHabit !== habit) {
     setPrevHabit(habit);
     if (habit) {

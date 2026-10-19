@@ -91,7 +91,8 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
           description: '',
           category: 'sleep',
           tag: 'Rest',
-          status: 'pending',
+          status: 'completed',
+           completedAt: new Date().toISOString(),
           isCommitted: true,
           createdAt: new Date().toISOString(),
         };
