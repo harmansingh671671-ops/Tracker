@@ -381,7 +381,7 @@ export default function StatsPage() {
       </div>
 
       {/* Hero Rank Card - Akiflow Obsidian Glassmorphism */}
-      <div className="relative overflow-hidden rounded-3xl bg-surface-container-low/80 backdrop-blur-xl p-4 sm:p-5 border border-outline/[0.08] shadow-lg space-y-3.5">
+      <div className="relative overflow-hidden rounded-3xl bg-surface-container-low/95 p-4 sm:p-5 border border-outline/[0.08] shadow-lg space-y-3.5">
         <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
         <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-center gap-3 min-w-0">
@@ -428,7 +428,7 @@ export default function StatsPage() {
       </div>
 
       {/* MONTHLY HEATMAP CALENDAR (Akiflow Dark Glassmorphism) */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-4 shadow-sm">
+      <div className="p-4 sm:p-5 rounded-3xl bg-surface-container-low/95 border border-outline/[0.08] space-y-4 shadow-sm">
         {/* Month Navigation Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -573,7 +573,7 @@ export default function StatsPage() {
       {/* 2x2 KPI Matrix (Akiflow Obsidian Glass) */}
       <div className="grid grid-cols-2 gap-3">
         {/* Days Done */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
             <Flame className="w-4 h-4 shrink-0" />
             <span>Days Done</span>
@@ -590,7 +590,7 @@ export default function StatsPage() {
         </div>
 
         {/* Diamonds */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
             <Gem className="w-4 h-4 shrink-0" />
             <span>Diamonds</span>
@@ -607,7 +607,7 @@ export default function StatsPage() {
         </div>
 
         {/* Total XP */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-400">
             <Zap className="w-4 h-4 shrink-0" />
             <span>Total XP</span>
@@ -624,7 +624,7 @@ export default function StatsPage() {
         </div>
 
         {/* Adherence */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
             <TrendingUp className="w-4 h-4 shrink-0" />
             <span>Adherence</span>
@@ -644,7 +644,7 @@ export default function StatsPage() {
       {popupDate && popupDayStats && (
         <div
           onClick={() => setPopupDate(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}

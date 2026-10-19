@@ -599,7 +599,7 @@ export function HabitDateStrip({
   }, [selectedDate, todayStr]);
 
   return (
-    <div className="relative w-full rounded-2xl bg-surface-container-low/90 backdrop-blur-md border border-outline/10 p-3 sm:p-3.5 shadow-sm space-y-2 select-none overflow-hidden">
+    <div className="relative w-full rounded-2xl bg-surface-container-low/95 border border-outline/10 p-3 sm:p-3.5 shadow-sm space-y-2 select-none overflow-hidden">
       {/* Month Header */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface">

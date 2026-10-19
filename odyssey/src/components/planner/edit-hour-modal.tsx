@@ -174,7 +174,7 @@ export function EditHourModal({
     <div
       onClick={handleClose}
       onContextMenu={(e) => e.preventDefault()}
-      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md cursor-pointer select-none ${
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/85 cursor-pointer select-none ${
         isClosing ? "modal-backdrop-out" : "modal-backdrop-in"
       }`}
     >

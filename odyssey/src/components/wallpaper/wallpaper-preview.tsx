@@ -216,8 +216,11 @@ export function WallpaperPreview({
         </div>
       </div>
 
-      {/* 2. HEADER ANCHOR CARD (Utilizes the upper screen area with high-radius corners) */}
-      <div className="px-4 pt-1 z-10 animate-in fade-in duration-300">
+      {/* 2. HEADER ANCHOR CARD (Utilizes the upper screen area with high-radius corners).
+          PERF-7d: the wrapper used to fade in, animating the blurred card inside
+          it; the card keeps its frost over the wallpaper photo, so the
+          one-shot entrance here is what had to go instead. */}
+      <div className="px-4 pt-1 z-10">
         <div className="rounded-[28px] p-3 sm:p-3.5 bg-[#13151D]/85 border border-white/15 backdrop-blur-md flex items-center justify-between shadow-xl">
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-2">

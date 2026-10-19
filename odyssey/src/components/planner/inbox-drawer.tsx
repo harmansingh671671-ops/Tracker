@@ -100,11 +100,11 @@ export function InboxDrawer({
       {/* Frosted Backdrop */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/60 animate-in fade-in duration-200"
       />
 
       {/* Drawer Card */}
-      <div className="relative w-full max-w-lg bg-surface-container-low/95 border border-outline/[0.12] rounded-t-[32px] sm:rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[85vh] flex flex-col z-10 animate-in slide-in-from-bottom-6 duration-250">
+      <div className="relative w-full max-w-lg bg-surface-container-low/95 border border-outline/[0.12] rounded-t-[32px] sm:rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col z-10 animate-in slide-in-from-bottom-6 duration-250">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-outline/[0.08]">
           <div className="flex items-center gap-2.5">

@@ -151,7 +151,7 @@ export function EveningReminderModal() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-300">
       <div className="relative w-full max-w-md bg-surface-container-high border border-amber-400/30 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 text-left overflow-hidden">
         {/* Ambient Background Glow */}
         <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />

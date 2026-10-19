@@ -22,7 +22,7 @@ export function RewardCelebrationModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-container-lowest/85 backdrop-blur-md animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-container-lowest/90 animate-in fade-in duration-300">
       {/* Radiant Glow Behind Modal */}
       <div className="absolute w-80 h-80 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
 

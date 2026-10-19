@@ -861,3 +861,25 @@ button, a, input, select {
   }
 }
 
+/* PERF-7e -- the low-end fallback. A device the shell flags via
+   `<html data-lowend>` (rule: src/lib/utils/low-end.ts) gets flat translucent
+   surfaces instead of live backdrop-filter passes; `prefers-reduced-transparency`
+   is the same switch driven by the user instead of the hardware.
+
+   `[data-blur-essential]` is carved out because on the day schedule each hour
+   card's blur is not decoration -- it is what makes the card a stacking
+   context and containing block, which the category picker's measured z-order
+   fix depends on. Losing the blur there breaks the picker, not just the frost.
+
+   Unlayered CSS beats Tailwind's layered utilities, so plain selectors win
+   without !important. */
+@media (prefers-reduced-transparency: reduce) {
+  [class*="backdrop-blur"]:not([data-blur-essential]) {
+    backdrop-filter: none;
+  }
+}
+
+html[data-lowend] [class*="backdrop-blur"]:not([data-blur-essential]) {
+  backdrop-filter: none;
+}
+

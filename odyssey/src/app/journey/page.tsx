@@ -533,7 +533,7 @@ export default function JourneyPage() {
         <button
           type="button"
           onClick={() => scrollToToday(true)}
-          className="fixed bottom-[var(--app-stack-offset)] right-4 sm:right-6 z-40 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-highest/95 border border-primary/40 shadow-2xl text-primary font-mono text-xs font-bold backdrop-blur-md hover:scale-105 active:scale-95 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 group cursor-pointer"
+          className="fixed bottom-[var(--app-stack-offset)] right-4 sm:right-6 z-40 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-highest/95 border border-primary/40 shadow-2xl text-primary font-mono text-xs font-bold hover:scale-105 active:scale-95 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 group cursor-pointer"
           title="Scroll to Today"
         >
           <div className="relative flex items-center justify-center">

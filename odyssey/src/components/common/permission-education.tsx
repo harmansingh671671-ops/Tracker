@@ -48,7 +48,7 @@ export function PermissionEducation({ onProceed, onDismiss }: PermissionEducatio
   // screen are all gone. Same 0.25s ease-out entrance; nothing else changed.
   return (
     <div
-      className="permission-backdrop-in fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md"
+      className="permission-backdrop-in fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/85"
       onClick={onDismiss}
       role="dialog"
       aria-modal="true"

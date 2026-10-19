@@ -393,7 +393,7 @@ export function InfiniteDateStrip({
   }, [checkStickyPosition, prependDays, appendDays]);
 
   return (
-    <div className="relative w-full rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-outline/[0.08] overflow-visible select-none shadow-sm">
+    <div className="relative w-full rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] overflow-visible select-none shadow-sm">
       {/* Scrollable Date Track
           NOTE: vertical padding is load-bearing, not cosmetic.
           `overflow-x-auto` forces overflow-y to `auto` as well, so this element

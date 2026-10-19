@@ -99,7 +99,7 @@ export function AppUpdateModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 animate-in fade-in duration-200">
       <div className="w-full sm:max-w-md bg-surface-container-low rounded-t-3xl sm:rounded-3xl border border-primary/20 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">

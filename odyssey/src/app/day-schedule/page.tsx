@@ -728,6 +728,10 @@ function DayScheduleContent() {
         key={`slot-${slot.hour}`}
         id={`hour-row-${slot.hour}`}
         onContextMenu={(e) => e.preventDefault()}
+        /* PERF-7e: data-blur-essential marks the blur here as load-bearing
+           (stacking context + containing block for the in-card category
+           dropdown above), so the low-end kill-switch must not strip it. */
+        data-blur-essential
         className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border border-l-4 ${cat.leftBorder} select-none ${
           cat.cardBg
         } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${stackClass} ${
@@ -786,7 +790,7 @@ function DayScheduleContent() {
               screen, as it always was meant to. */}
           {isCategoryPickerOpen && (
             <div
-              className="absolute left-0 top-full mt-1.5 z-50 w-52 p-1.5 rounded-2xl bg-surface-container border border-outline/25 shadow-2xl space-y-1 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
+              className="absolute left-0 top-full mt-1.5 z-50 w-52 p-1.5 rounded-2xl bg-surface-container border border-outline/25 shadow-2xl space-y-1 animate-in fade-in zoom-in-95 duration-150"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-2.5 py-1 text-[10px] font-mono text-on-surface-variant font-bold uppercase tracking-wider">

@@ -922,7 +922,7 @@ export function PlannerContent() {
               setIsDistributionModalOpen(true);
             }
           }}
-          className="p-3.5 rounded-2xl bg-surface-container-low/90 backdrop-blur-xl border border-outline/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
+          className="p-3.5 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
         >
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
@@ -1004,7 +1004,7 @@ export function PlannerContent() {
                 // Same palette as every other category group. This branch used
                 // to hardcode `bg-indigo-950/20`, which is a dark navy at 20%
                 // and reads as a flat grey plate over a light page.
-                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
                   isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
                 }`}
               >
@@ -1033,7 +1033,7 @@ export function PlannerContent() {
             return (
               <div
                 key={group.id}
-                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-xl p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
+                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
                   isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
                 }`}
               >
@@ -1074,7 +1074,7 @@ export function PlannerContent() {
       {/* Scheduled Confirmation Toast Feedback */}
       {saveToast && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-surface-container-low/95 border border-primary/50 text-on-surface shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-md">
+          <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-surface-container-low/95 border border-primary/50 text-on-surface shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
             <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 animate-pulse">
               <Sparkles className="w-3.5 h-3.5" />
             </div>
@@ -1090,7 +1090,7 @@ export function PlannerContent() {
       {/* Past Hour Tap & Hold Hint Toast */}
       {hintToast && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
-          <div className="px-4 py-2 rounded-full bg-surface-container-highest/95 border border-outline/25 text-on-surface text-xs font-mono font-medium shadow-xl backdrop-blur-md flex items-center gap-2">
+          <div className="px-4 py-2 rounded-full bg-surface-container-highest/95 border border-outline/25 text-on-surface text-xs font-mono font-medium shadow-xl flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span>{hintToast}</span>
           </div>
@@ -1102,7 +1102,7 @@ export function PlannerContent() {
           above the cross so a drag started while it is up cannot cover it. */}
       {removedToast && (
         <div className="fixed bottom-44 left-1/2 -translate-x-1/2 z-[60] transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center gap-3 rounded-2xl border border-error/40 bg-surface-container-low/95 px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md">
+          <div className="flex items-center gap-3 rounded-2xl border border-error/40 bg-surface-container-low/95 px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
             <span className="text-xs font-mono">
               <span className="font-semibold text-on-surface">{removedToast.title}</span>
               <span className="ml-1.5 text-[11px] text-on-surface-variant/80">removed</span>

@@ -39,7 +39,7 @@ export function DeleteTarget({ elRef, armed, near }: DeleteTargetProps) {
       ref={elRef}
       data-delete-target
       aria-hidden="true"
-      className={`pointer-events-none fixed bottom-28 left-1/2 z-[60] flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border-2 backdrop-blur-md transition-all duration-150 animate-in fade-in ${
+      className={`pointer-events-none fixed bottom-28 left-1/2 z-[60] flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border-2 transition-all duration-150 animate-in fade-in ${
         armed
           ? "scale-110 border-error bg-error/25 text-error shadow-[0_0_24px_rgba(244,63,94,0.45)]"
           : near

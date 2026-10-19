@@ -621,6 +621,54 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (k) - `PERF-7` shipped: 36 of 45 blur applications removed or capped, and a fallback that strips the rest on low-end devices
+
+**7a audit, recount:** 48 text hits, **45 live applications across 24 files** (the plan said
+"41 across 21 files" — stale; three hits were comments). Every occurrence got a disposition:
+cap, remove, or keep-with-reason.
+
+**The audit's best find was not a heavy blur — it was an animated one.** Twelve modal
+scrims, three planner toasts, two FABs, the drag delete-target and the wallpaper section
+wrapper all paired an entrance animation (or a drag-time scale) with a blurred element —
+the exact combination 7d forbids, because the GPU pass re-runs through every painted frame
+of the animation. Fixing them took two shapes: where the blur also did real work (a scrim's
+dimming, a card's tint), the blur left and the opacity rose one notch; where the blur
+needed the photo behind it (the wallpaper preview card), the *animation* left instead.
+
+**A "decorative" class carried a measured mechanism.** The day-schedule's 24 hour cards
+keep their `backdrop-blur-xl` — that blur is what makes each card a stacking context and
+containing block, which the category picker's measured z-order fix (BUG-8 class) depends
+on. They now carry `data-blur-essential`, and the 7e kill-switch's selector excludes the
+attribute. Browser-verified both ways: flag set → planner strips to **0** painted blur
+layers, day-schedule keeps exactly 24.
+
+**7e works in one effect + one CSS clause.** `isLowEndDevice()` (`deviceMemory` ≤ 2 GB,
+else `hardwareConcurrency` ≤ 2 cores; unknown → not low) is pure and unit-tested (7 new
+tests); the shell sets `<html data-lowend>` once; `globals.css` strips every non-essential
+backdrop-filter on that flag, and `prefers-reduced-transparency: reduce` drives the same
+clause user-side. Verified under emulation in the browser too.
+
+**The honest gap: the headless scroll probe is flat.** Before- and after-builds measured
+identical ~20 ms frame averages and warm-up spikes on day-schedule, planner and stats —
+SwiftShader headless cannot resolve what a real compositor resolves, so the plan's
+`gfxinfo` jank-% confirmation is **still owed on a device**. The computed layer counts are
+the surrogate that moved: planner 5→2, stats 9→2, habits 4→2, journey 3→2, shop 3→2,
+day-schedule 25→25 by design (its header also strips under the flag). Painted layers per
+screen counted from `getComputedStyle().backdropFilter` in the browser, light and dark
+identical. Design unchanged: before/after screenshot pairs at 390px across six routes, both
+themes — no visible drift.
+
+Gates: tsc 0 · lint 0 errors, 95 warnings (unchanged) · 31 suites / **469 tests** (7 new)
+· build clean · port 3100 started/killed by owning PID four times during measurement,
+verified closed each time. The `before` build for the probe was produced by stashing the
+working tree — stash pop restored it byte-identical.
+
+**Transferable lesson: every "how can one CSS property carry this" comment deserves the
+same respect as a test.** The one blur class that was load-bearing hid inside a file of
+otherwise-safe deletes — and it was the *comment above it*, the one that documented a
+measured 725×62px scrim failure, that warned about it. Comments that record measured
+behaviour are specs, and the disposition table was written *from* them.
+
 ### 2026-10-19 (j) - `PERF-5` remainder: the dependency trim and the hygiene win, and the "next win" that measurement killed
 
 `PERF-5` is now `SHIPPED` (`5f` declined per its own gate). And **the item's
@@ -4215,6 +4263,36 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
+- HEAD at last update: **this commit** — **`PERF-7` (`SHIPPED`)**: 36 of 45 live
+  `backdrop-blur` applications removed (per 7d, every animated blurred surface lost its
+  blur: 12 modal scrims, 3 planner toasts, 2 FABs, the drag delete-target, the inbox
+  drawer's scrim and panel, the dialog backdrop, both date strips, the 6 stats cards,
+  the planner's rail/group/hour cards, and the wallpaper wrapper's fade) or capped to
+  `md` (header, bottom nav, onboarding header); the day-schedule's 24 picker cards kept
+  and marked `data-blur-essential` (load-bearing stacking mechanism); a 7e fallback —
+  `isLowEndDevice()` (7 tests) + a `globals.css` strip clause — verified in-browser
+  (planner 5→**0** layers, day-schedule keeps its 24 essential) and under
+  `prefers-reduced-transparency`. Layer counts and the remaining surface table live in
+  `PERFORMANCE.md` Rule 4; the flat headless scroll probe and the still-owed device
+  `gfxinfo` check are named there too. Committed on `main`; **the agent does not push**.
+  Before it: **`1b9cb28`** (`PERF-5` 5d + 5e, `SHIPPED`), **`77b55a1`** (`B25` review
+  pass), `d0c8dc8`, `fe8202d`, `9b19f96`, `abbc6ac` (`B25`), `2dc684e` (`S9`),
+  `8700852` (`PERF-5` 5a+b), `b4d9eff`, `e67dc01`, and earlier C2 rounds.
+  **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
+  `8700852` onward are **not**.
+- **Working tree (2026-10-19, `PERF-7`):** clean after that commit. It touched 19
+  surface files (blur dispositions), `src/lib/utils/low-end.ts` + its test (new),
+  `globals.css` (strip clause, end of file), `app-shell.tsx` (flag effect),
+  `main_plan.md` (PERF-7 → `SHIPPED`), `PERFORMANCE.md` (Rule 4 update), `context.md`
+  (entry `(k)`, §10). Measurement artifacts live outside the repo:
+  `%TEMP%\opencode\verify\perf7-{before,after}.json` (layer counts),
+  `perf7-shots-{before,after}\` (12 screenshot pairs),
+  `perf7-scroll-{before,after}.json` (frame-delta probe), plus the three
+  `perf7-*.js` drivers. The `before` build for the probe came from stashing the tree;
+  `git stash pop` restored it byte-identical.
+- **Next feature queued (owner pre-approved): `PERF-8`** render efficiency, then
+  `PERF-16` dead-weight deletion (16c holds the 9 remaining orphan `ui/` components:
+  avatar/badge/card/dropdown-menu/input/progress/select/tabs/textarea). One commit each.
 - HEAD at last update: **this commit** — **`PERF-5` remainder (`SHIPPED`)**: five zero-import
   dependencies deleted + `ui/calendar.tsx`; `compiler.removeConsole` (`error`/`warn` excluded)
   verified on a Turbopack build by a marker-string build+scan; source maps confirmed

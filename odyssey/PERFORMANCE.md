@@ -76,6 +76,32 @@ GPU pass over a live surface.
 
 `backdrop-blur` is not a free substitute for anything. Removing it changes what the user sees.
 
+**Shipped under this rule (`PERF-7`, 2026-10-19): the repo is now at 9 applications** (45 at
+audit, three of the 48 text hits were comments) — 36 removed or capped:
+
+- **Removed (36):** every *animated* blurred surface — a surface was either frozen or
+  animated, never both. That is twelve modal scrims whose entrance animations paired with
+  the blur, the three planner toasts, the journey to-today FAB, the feedback FAB, the drag
+  delete-target (it scales while armed), the inbox drawer's scrim and its 95%-opaque panel,
+  the `xs` dialog backdrop, both date strips, the stats page's six cards (/80 + blur →
+  /95 flat — the backdrop behind them is the page's own solid colour, where blur was
+  visually a no-op), the planner's rail card, group containers and hour rows, and the
+  wallpaper wrapper's one-shot fade (its card keeps the frost — the backdrop there is a
+  photo, and blur is visible). Opacity rose one notch on every scrim and card so dimming
+  and tint are preserved; verified by before/after screenshot pairs at 390px, light and
+  dark, six routes.
+- **Capped to `md`:** the app header, the bottom nav, the onboarding header.
+- **Kept, marked `data-blur-essential`:** the day-schedule's 24 hour cards — the blur there
+  *is* the stacking context and containing block the category picker's measured z-order fix
+  depends on; stripping it is a correctness regression, not a saving.
+- **Low-end fallback, verified in-browser:** `isLowEndDevice()` (deviceMemory ≤ 2 GB, else
+  cores ≤ 2) sets `<html data-lowend>`; one CSS clause strips every non-essential backdrop
+  pass (planner → **0 layers**), and `prefers-reduced-transparency` drives the same clause.
+  Day-schedule keeps exactly its 24 essential passes under the flag.
+- **The honest gap:** the headless scroll probe (frame deltas, before and after builds) is
+  flat — SwiftShader headless cannot resolve what a real compositor would. Layer counts are
+  the measured surrogate; the `gfxinfo` jank-% confirmation on a device is still owed.
+
 ---
 
 ## 2. Web baseline — MEASURED

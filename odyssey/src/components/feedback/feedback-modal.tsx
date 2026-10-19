@@ -50,7 +50,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 animate-in fade-in duration-200">
       <div
         className="relative w-full max-w-md rounded-3xl bg-surface-container-high border border-outline/10 shadow-2xl p-5 sm:p-6 space-y-4 overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
@@ -211,7 +211,7 @@ export function FloatingFeedbackButton() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-[var(--app-fab-offset)] right-3.5 sm:right-6 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high/95 hover:bg-surface-bright text-on-surface border border-emerald-500/30 shadow-lg backdrop-blur-md text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 hover:border-emerald-500/60 hover:shadow-emerald-500/10 group"
+        className="fixed bottom-[var(--app-fab-offset)] right-3.5 sm:right-6 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high/95 hover:bg-surface-bright text-on-surface border border-emerald-500/30 shadow-lg text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 hover:border-emerald-500/60 hover:shadow-emerald-500/10 group"
         title="Give Feedback or Reviews on WhatsApp"
         aria-label="Feedback"
       >

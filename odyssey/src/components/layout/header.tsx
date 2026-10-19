@@ -52,7 +52,7 @@ export function Header() {
           part of every screen's first paint. The rank is now earned in days done
           (ADR 0005), not in consecutive days. */}
       {user && <RankUpDialog daysDone={daysComplied} />}
-      <header className="fixed top-0 w-full z-40 pt-safe bg-surface/85 backdrop-blur-xl border-b border-outline/10">
+      <header className="fixed top-0 w-full z-40 pt-safe bg-surface/85 backdrop-blur-md border-b border-outline/10">
         <div className="h-14 px-3 sm:px-4 max-w-xl sm:max-w-2xl mx-auto flex items-center justify-between gap-2">
           {/* Logo Title */}
           <div className="flex items-center">

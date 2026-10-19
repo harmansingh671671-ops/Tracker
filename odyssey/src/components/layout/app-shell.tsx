@@ -7,6 +7,7 @@ import { BottomNav } from "./bottom-nav";
 import { FloatingFeedbackButton } from "@/components/feedback/feedback-modal";
 import { usePathname } from "next/navigation";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
+import { isLowEndDevice } from "@/lib/utils/low-end";
 
 // PERF-5 -- two modals whose job is to appear while the user is already in the
 // app: the evening reminder (which waits for the clock to reach 20:00) and the
@@ -34,6 +35,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const id = requestAnimationFrame(() => setAfterPaint(true));
     return () => cancelAnimationFrame(id);
+  }, []);
+
+  // PERF-7e: one flag, once per document. On devices the plan's heuristics
+  // call low-end, CSS (see globals.css) swaps every live backdrop-filter pass
+  // for the element's flat translucent background. Never loads anything, never
+  // runs a timer, and a failure to detect costs only the blur the device
+  // already paid.
+  useEffect(() => {
+    try {
+      if (isLowEndDevice(navigator as Navigator & { deviceMemory?: number })) {
+        document.documentElement.dataset.lowend = "1";
+      }
+    } catch {
+      // detection must never block paint
+    }
   }, []);
 
   // Keep native Android widgets & notifications always up-to-date with live schedule

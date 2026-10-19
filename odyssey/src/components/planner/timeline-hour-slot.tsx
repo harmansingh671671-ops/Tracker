@@ -313,7 +313,7 @@ export function TimelineHourSlot({
           options?.isInsideGroup
             ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
             : cat.cardBg
-        } backdrop-blur-xl my-1 shadow-sm ${
+        } my-1 shadow-sm ${
           isRecentlySaved
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
             : isCurrent
@@ -459,7 +459,7 @@ export function TimelineHourSlot({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onContextMenu={(e) => e.preventDefault()}
-      className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} backdrop-blur-md my-0.5 ${
+      className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
         isRecentlySaved
           ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
           : isCurrent
