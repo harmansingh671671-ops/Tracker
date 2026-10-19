@@ -199,20 +199,11 @@ export function DistributionModal({
           </div>
         </div>
 
-        {/* Overview Banner Card — count + colour strip only. The "Planned
-            Total" label, "% Planned" pill and "Hours planned / free" row were
-            removed on owner instruction; the strip below says the same thing
-            the labels repeated. */}
-        <div className="relative overflow-hidden rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-sm">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div className="text-base font-bold text-on-surface">
-              {categoryStats.plannedTotal} <span className="text-xs font-normal text-on-surface-variant">/ 24 Hours</span>
-            </div>
-          </div>
-
+        {/* Overview Banner Card — colour strip only. Everything else around
+            it (labels, "% Planned" pill, planned/free row, and now the clock
+            icon + count) was removed on owner instruction — the strip is the
+            information; every other element restated it. */}
+        <div className="relative overflow-hidden rounded-2xl bg-surface-container-low p-4 border border-outline/10">
           {/* Color Breakdown Strip */}
           <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
             {categoryStats.plannedTotal > 0 ? (
