@@ -1001,64 +1001,44 @@ function DayScheduleContent() {
             Above the day-title input: the allocation is the read-at-a-glance
             summary of the day, while the title is a note the user writes about
             it. Reading order now leads with the day's shape. */}
-        <section className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5 shadow-sm">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-on-surface flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-primary" />
-              <span>Daily Allocation</span>
-            </span>
-            <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span className="text-on-surface-variant">Scheduled: {categoryStats.plannedTotal}h</span>
-              <button
-                type="button"
-                onClick={handleAutoFillSleep}
-                className="px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-semibold flex items-center gap-1 hover:bg-indigo-500/25 active:scale-95 transition-all cursor-pointer"
-              >
-                <Moon size={12} className="text-indigo-400" />
-                <span>Auto-fill Sleep</span>
-              </button>
-            </div>
-          </div>
+                 <section className="p-3.5 rounded-2xl bg-surface-container-low border border-outline/10 space-y-2.5 shadow-sm">
+           {/* Daily Allocation bar — 24 one-hour slices, left to right = 00:00 →
+               23:00, so the strip reads as the day instead of five buckets with
+               the order thrown away. `rounded-full overflow-hidden` is what makes
+               the bar a capsule and, because slice 0 starts at 0% and slice 23
+               ends at 100%, what makes both rounded ends fully covered rather
+               than notched. Slices are absolutely positioned (not flex children)
+               so they tile the width exactly — a flex row of 24 would also need
+               gaps, and those gaps eat into every slice. `aria-hidden` because
+               the legend directly below says the same thing in words. */}
+           <div
+             aria-hidden="true"
+             className="relative h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden"
+           >
+             {allocationSlices.map((slice) => {
+               if (!slice.filled) return null;
+               const cat = allocationCategory(full24Hours[slice.hour].category);
+               return (
+                 <div
+                   key={slice.hour}
+                   style={slice.style}
+                   title={`${slice.label} · ${cat.label}`}
+                   className={`absolute inset-y-0 ${cat.fill}`}
+                 />
+               );
+             })}
+           </div>
 
-          {/* Daily Allocation bar — 24 one-hour slices, left to right = 00:00 →
-              23:00, so the strip reads as the day instead of five buckets with
-              the order thrown away. `rounded-full overflow-hidden` is what makes
-              the bar a capsule and, because slice 0 starts at 0% and slice 23
-              ends at 100%, what makes both rounded ends fully covered rather
-              than notched. Slices are absolutely positioned (not flex children)
-              so they tile the width exactly — a flex row of 24 would also need
-              gaps, and those gaps eat into every slice. `aria-hidden` because
-              the legend directly below says the same thing in words. */}
-          <div
-            aria-hidden="true"
-            className="relative h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden"
-          >
-            {allocationSlices.map((slice) => {
-              if (!slice.filled) return null;
-              const cat = allocationCategory(full24Hours[slice.hour].category);
-              return (
-                <div
-                  key={slice.hour}
-                  style={slice.style}
-                  title={`${slice.label} · ${cat.label}`}
-                  className={`absolute inset-y-0 ${cat.fill}`}
-                />
-              );
-            })}
-          </div>
-
-          {/* Category Hours Legend */}
-          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant pt-0.5">
-            {categoryStats.focusH > 0 && <span className="text-primary font-semibold">Focus: {categoryStats.focusH}h</span>}
-            {categoryStats.vitalityH > 0 && <span className="text-emerald-400 font-semibold">Vitality: {categoryStats.vitalityH}h</span>}
-            {categoryStats.syncH > 0 && <span className="text-sky-400 font-semibold">Sync: {categoryStats.syncH}h</span>}
-            {categoryStats.renewalH > 0 && <span className="text-amber-400 font-semibold">Renewal: {categoryStats.renewalH}h</span>}
-            {categoryStats.restH > 0 && <span className="text-indigo-400 font-semibold">Sleep: {categoryStats.restH}h</span>}
-            {categoryStats.remaining > 0 && <span className="text-outline font-semibold">{categoryStats.remaining}h Open</span>}
-          </div>
-        </section>
-
-        {/* The "Day N Focus & Title" card was removed here on owner instruction.
+           {/* Category Hours Legend */}
+           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant pt-0.5">
+             {categoryStats.focusH > 0 && <span className="text-primary font-semibold">Focus: {categoryStats.focusH}h</span>}
+             {categoryStats.vitalityH > 0 && <span className="text-emerald-400 font-semibold">Vitality: {categoryStats.vitalityH}h</span>}
+             {categoryStats.syncH > 0 && <span className="text-sky-400 font-semibold">Sync: {categoryStats.syncH}h</span>}
+             {categoryStats.renewalH > 0 && <span className="text-amber-400 font-semibold">Renewal: {categoryStats.renewalH}h</span>}
+             {categoryStats.restH > 0 && <span className="text-indigo-400 font-semibold">Sleep: {categoryStats.restH}h</span>}
+             {categoryStats.remaining > 0 && <span className="text-outline font-semibold">{categoryStats.remaining}h Open</span>}
+           </div>
+         </section>    {/* The "Day N Focus & Title" card was removed here on owner instruction.
             It had been the app's only WRITER of `odyssey_day_name_*` — `/journey`
             reads that key — so removing it appeared to retire the ability to name
             a day entirely.
