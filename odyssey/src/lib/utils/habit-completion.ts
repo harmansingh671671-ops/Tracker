@@ -111,6 +111,23 @@ export function completionRatio(
 }
 
 /**
+ * The "water in the bucket" fill for a counted day partway to its target, as a
+ * two-digit hex alpha suffix — so `${habitColor}${partialFillAlpha(ratio)}` is a
+ * valid 8-digit colour and the cell fills in proportion to progress.
+ *
+ * Returns `""` at ratio 0 (nothing to fill). The alpha is floored at ~15% so a
+ * 1-of-20 day is still visible rather than indistinguishable from an empty day,
+ * and it never reaches full opacity — reaching the target is a *different* state
+ * (`isHabitComplete`), drawn solid. See `B17`.
+ */
+export function partialFillAlpha(ratio: number): string {
+  if (!Number.isFinite(ratio) || ratio <= 0) return "";
+  const clamped = Math.min(1, ratio);
+  const alpha = Math.round((0.15 + 0.85 * clamped) * 255);
+  return alpha.toString(16).padStart(2, "0");
+}
+
+/**
  * Next value after `current`, given a step.
  *
  * Never goes below zero, and never returns a negative-step trap: decrementing at zero stays

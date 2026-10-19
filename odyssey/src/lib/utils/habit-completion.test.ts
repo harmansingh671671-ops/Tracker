@@ -3,6 +3,7 @@ import {
   isHabitComplete,
   hasLoggedValue,
   completionRatio,
+  partialFillAlpha,
   nextValue,
   isHabitSlipped,
 } from "./habit-completion";
@@ -112,6 +113,34 @@ describe("completionRatio", () => {
   it("is 0 rather than Infinity or NaN when the target is unusable", () => {
     expect(completionRatio({ type: "counted" }, { value: 10 })).toBe(0);
     expect(completionRatio(counted(0), { value: 10 })).toBe(0);
+  });
+});
+
+// =========================================================================
+describe("partialFillAlpha - the water-in-the-bucket fill (B17)", () => {
+  it("is empty at or below zero, so an untouched day is not drawn", () => {
+    expect(partialFillAlpha(0)).toBe("");
+    expect(partialFillAlpha(-0.5)).toBe("");
+    expect(partialFillAlpha(Number.NaN)).toBe("");
+  });
+
+  it("grows with progress and stays a 2-digit hex byte", () => {
+    const quarter = partialFillAlpha(0.25);
+    const half = partialFillAlpha(0.5);
+    const full = partialFillAlpha(1);
+    expect(quarter).toMatch(/^[0-9a-f]{2}$/);
+    expect(parseInt(quarter, 16)).toBeLessThan(parseInt(half, 16));
+    expect(parseInt(half, 16)).toBeLessThan(parseInt(full, 16));
+    expect(full).toBe("ff");
+  });
+
+  it("floors the alpha so a tiny amount of progress is still visible", () => {
+    // 1 of 100 is 0.01 -- invisible at true opacity, so it gets a floor.
+    expect(parseInt(partialFillAlpha(0.01), 16)).toBeGreaterThan(0x20);
+  });
+
+  it("clamps above 1 rather than overflowing the byte", () => {
+    expect(partialFillAlpha(5)).toBe("ff");
   });
 });
 

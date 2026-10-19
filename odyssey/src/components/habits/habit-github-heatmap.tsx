@@ -5,6 +5,8 @@ import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
+import { completionRatio, partialFillAlpha } from "@/lib/utils/habit-completion";
+import type { Habit } from "@/lib/db";
 
 export interface HabitGitHubHeatmapProps {
   habitId: string;
@@ -12,6 +14,12 @@ export interface HabitGitHubHeatmapProps {
   targetDays?: number[]; // [1..7] where 1=Mon, ..., 7=Sun
   targetDaysPerWeek?: number;
   category?: string;
+  /**
+   * Habit type + target, so a counted day partway to its target can fill in
+   * proportion to progress instead of reading as an empty day (`B17`).
+   */
+  type?: Habit["type"];
+  targetValue?: number;
   selectedDate?: string;
   weeksCount?: number; // default 52 (full year)
   todayStr?: string;
@@ -54,6 +62,8 @@ export function HabitGitHubHeatmap({
   targetDays,
   targetDaysPerWeek,
   category,
+  type,
+  targetValue,
   selectedDate,
   weeksCount = 52,
   todayStr: propTodayStr,
@@ -64,13 +74,17 @@ export function HabitGitHubHeatmap({
   className = "",
 }: HabitGitHubHeatmapProps) {
   const { user } = useUserStore();
-  const { historyLogs, toggleHabitLog } = useHabitStore();
+  const { historyLogs, historyValues, toggleHabitLog } = useHabitStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const habitColor = useMemo(
     () => getHabitColor({ category, name, id: habitId }),
     [category, name, habitId]
   );
+
+  // Counted progress per date, for the water-in-the-bucket fill (`B17`). Read
+  // here rather than in the matrix memo because only the render needs it.
+  const valuesMap = historyValues[habitId] ?? {};
 
   const today = propTodayStr || getLocalTodayStr();
   const activeSelectedDate = selectedDate || today;
@@ -318,6 +332,15 @@ export function HabitGitHubHeatmap({
                   {colDays.map((day) => {
                     const isNotScheduled = !day.isScheduled;
 
+                    // A counted habit partway to its target fills in proportion
+                    // ("water in the bucket", `B17`). 0 for every other type, 0
+                    // once the day is complete (that renders solid), and 0 on a
+                    // rest day so the dashed rest-day styling still reads.
+                    const partial =
+                      type === "counted" && !day.isCompleted && day.isScheduled
+                        ? completionRatio({ type, targetValue }, { value: valuesMap[day.dateStr] })
+                        : 0;
+
                     let backgroundColor: string | undefined = undefined;
                     let borderColor: string | undefined = undefined;
                     let borderWidth: string | undefined = undefined;
@@ -357,6 +380,15 @@ export function HabitGitHubHeatmap({
                         backgroundColor = undefined;
                         borderColor = undefined;
                       }
+                    } else if (partial > 0) {
+                      // Scheduled, logged, not yet at target: the faded fill.
+                      backgroundColor = `${habitColor}${partialFillAlpha(partial)}`;
+                      borderColor = habitColor;
+                      borderWidth = "1px";
+                      borderStyle = "solid";
+                      boxShadow = day.isOpened
+                        ? `0 0 0 1.5px ${habitColor}, 0 0 6px ${habitColor}80`
+                        : undefined;
                     } else if (day.isOpened) {
                       backgroundColor = `${habitColor}22`;
                       borderColor = habitColor;
@@ -390,6 +422,8 @@ export function HabitGitHubHeatmap({
                             ? day.isScheduled
                               ? "Completed ✓"
                               : "Unscheduled Completed (!)"
+                            : partial > 0
+                            ? `In progress — ${valuesMap[day.dateStr] ?? 0} of ${targetValue ?? "?"}`
                             : isNotScheduled
                             ? "Rest Day (Click to open / register)"
                             : day.isFuture

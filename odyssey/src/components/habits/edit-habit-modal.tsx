@@ -326,6 +326,8 @@ export function EditHabitModal({
                 targetDays={habit.targetDays}
                 targetDaysPerWeek={habit.targetDaysPerWeek}
                 category={habit.category}
+                type={habit.type}
+                targetValue={habit.targetValue}
                 selectedDate={selectedHistoryDate}
                 todayStr={today}
                 showLegend={false}

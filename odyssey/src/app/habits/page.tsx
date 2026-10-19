@@ -960,6 +960,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     targetDays={h.targetDays}
                     targetDaysPerWeek={h.targetDaysPerWeek}
                     category={h.category}
+                    type={h.type}
+                    targetValue={h.targetValue}
                     selectedDate={selectedDate}
                     compact={true}
                     todayStr={todayStr}
