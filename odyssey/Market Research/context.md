@@ -662,9 +662,18 @@ no warning) · **30 suites / 462 tests** · production build clean. **No visual 
 automation is installed on this machine, so it was verified by reading the mount sites and all 9
 sibling guards, not by tapping the sheet.
 
-### 2026-10-19 (g) - `B25` fixes: autofill sleep counts, rank consistency, perf, cleanup
+### 2026-10-19 (h) - `B25` fixes: autofill sleep counts, rank consistency, perf, cleanup
 
-Follow-ups to `B25` found in review, committed as `a9f58ed`. No new feature.
+Follow-ups to `B25` found in review, committed as **`9b19f96`**. No new feature. *(The hash first
+written here was `a9f58ed`, which is an amend and is therefore not in history; `9b19f96` is what
+this entry means. It sits below `(g)` because `(g)`'s fix was authored first — both landed in the
+same commit.)*
+
+**`9b19f96` also carries `BUG-16`.** Its fix (the edit-sheet sentinel, entry `(g)` above) was still
+uncommitted in the shared working tree when this commit was made, so it went in with these
+follow-ups and the commit message does not mention it. Recorded so the next reader does not hunt
+for a `BUG-16` commit that does not exist — and as the caution that **this checkout is shared**: a
+`git commit` here sweeps up whatever another session left uncommitted. Stage explicit paths.
 
 - **Auto-fill sleep blocks are now `completed`, not `pending`**, so those 8 hours count toward
   both planned and reviewed. This unblocks the common path (waking hours + autofill sleep)
@@ -4104,16 +4113,26 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`a9f58ed` (`B25` fixes)**: autofill sleep blocks are now
-  completed (so they count toward planned and reviewed), the wallpaper page rank reads days done,
-  the days-done map rebuilds per habit on writes, the avoid chip no longer dangles " clean", and
-  `daysComplied` is scoped by user. Committed on `main`; **the agent does not push**. Before it:
+- HEAD at last update: **this commit** — **`9b19f96` (`B25` fixes, and `BUG-16`)**: autofill sleep
+  blocks are now completed (so they count toward planned and reviewed), the wallpaper page rank reads
+  days done, the days-done map rebuilds per habit on writes, the avoid chip no longer dangles
+  " clean", and `daysComplied` is scoped by user — **and the habit edit sheet no longer resets every
+  field to its default (`BUG-16`, §9 `(g)`), which was an uncommitted fix in the shared tree when
+  this commit was made.** Committed on `main`; **the agent does not push**. Before it:
   **`abbc6ac`** (`B25` — the streak becomes two cumulative counters), **`2dc684e`** (`S9` the
   violation state), **`8700852`** (`PERF-5` 5a + 5b), **`b4d9eff`** (habit types), **`e67dc01`**
   (C2 polish round two), `239c833` (C2 round one), `8a3a4a0` (C2 hold-not-swap), `6f53dbd`,
   `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`.
   **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
   `b4d9eff`, `8700852`, `2dc684e`, `abbc6ac` and this commit are **not**.
+- **Working tree (2026-10-19, `9b19f96`):** clean after that commit. It changed
+  `src/lib/stores/schedule-store.ts` (autofill sleep → `completed` + `completedAt`),
+  `src/lib/stores/user-store.ts` (`countDaysDone(userId)`), `src/lib/stores/habit-store.ts`
+  (days-done recomputed for the one habit that changed), `src/app/wallpaper/page.tsx` (rank from
+  `daysComplied`), `src/app/habits/page.tsx` + `src/components/habits/grid-habit-card.tsx` (avoid
+  chip `|| "0d"`), `src/components/habits/edit-habit-modal.tsx` (**`BUG-16`** — the sentinel seed),
+  `main_plan.md` and `context.md`. No schema change and **no new test**: there is no
+  component-test harness on this machine, so the `BUG-16` fix is not locked by one.
 - **Working tree (2026-10-19, `B25`):** clean after this commit. `B25` touched
   `src/lib/utils/compliance.ts` + `.test.ts` (**new**, the pure counters),
   `src/lib/utils/day-status.ts` + test (strict `fully_completed`),
@@ -4132,8 +4151,9 @@ to know where things stand.
   blank. Migrating them to days done is a Kotlin change plus a payload rename; it cannot be
   compiled on this machine (no `gradlew`, JBR 25 vs Kotlin 1.9.22), so it is deliberately unstarted.
   **`BUG-15` is therefore fixed on the web and still live on the phone.**
-- **Pending, named: the wallpaper studio web preview** shows the streak for the same reason — it
-  renders the object that becomes the native payload.
+- **The wallpaper studio web preview's *rank* now reads days done** (`9b19f96`), matching
+  Profile/Journey/Stats. What is still streak-shaped there is the **payload itself** — the value the
+  phone renders — which is the same deliberate hold as the bullet above.
 - **`src/lib/db.ts` is free again** — the habit-types work is committed, so ADR 0004's
   `OdysseyFloatingBlocks` can be folded into `OdysseyDB` as an additive store + version bump (AGENTS.md
   rule 2 calls `db.ts` the canonical schema). **Not done here**: a schema change belongs in its own change
