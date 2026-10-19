@@ -24,7 +24,7 @@ import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
-import { useSharedClock, localTimeStr } from "@/lib/utils/shared-clock";
+import { useSharedClock, localDateStr } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
@@ -97,7 +97,7 @@ export function PlannerContent() {
   // schedule immediately instead of an empty timeline that fills in later.
   const now = useSharedClock();
   const currentHour = now.getHours();
-  const todayStr = localTimeStr(now);
+  const todayStr = localDateStr(now);
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
 
