@@ -22,7 +22,7 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
       .where('[userId+date]')
       .equals([userId, date])
       .toArray();
-    
+
     // Sort by startTime
     blocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
     set({ blocks, loading: false });
@@ -91,8 +91,8 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
           description: '',
           category: 'sleep',
           tag: 'Rest',
-          status: 'completed',
-           completedAt: new Date().toISOString(),
+          status: 'pending',
+
           isCommitted: true,
           createdAt: new Date().toISOString(),
         };

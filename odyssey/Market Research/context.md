@@ -675,9 +675,12 @@ follow-ups and the commit message does not mention it. Recorded so the next read
 for a `BUG-16` commit that does not exist — and as the caution that **this checkout is shared**: a
 `git commit` here sweeps up whatever another session left uncommitted. Stage explicit paths.
 
-- **Auto-fill sleep blocks are now `completed`, not `pending`**, so those 8 hours count toward
-  both planned and reviewed. This unblocks the common path (waking hours + autofill sleep)
-  to the 18-hour "day done" bar — the decision point the owner flagged.
+- **Auto-fill sleep blocks stay `pending`** (reverted from the earlier `completed` shortcut). They
+  count toward the **planned** 18-hour bar, but are NOT auto-reviewed — they only count as
+  reviewed when the user explicitly ticks or crosses the hour. This is the owner's call: integrity
+  over reachability. Sleep hours are already in the planned count (`plannedHours = blocks.length`),
+  so a user who plans 10 waking + 8 autofill sleep = 18 planned, and gets a day-done by reviewing
+  all of them.
 - **Wallpaper page rank now reads days done**, matching Profile/Journey/Stats instead of the
   legacy streak rank. The streak value sent to the phone is unchanged.
 - **`habit-store` rebuilds the days-done map for the one habit that changed** on each log
