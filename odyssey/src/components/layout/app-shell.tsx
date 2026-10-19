@@ -1,16 +1,40 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
-import { EveningReminderModal } from "@/components/notifications/evening-reminder-modal";
 import { FloatingFeedbackButton } from "@/components/feedback/feedback-modal";
-import { AppUpdateModal } from "@/components/common/app-update-modal";
 import { usePathname } from "next/navigation";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 
+// PERF-5 -- two modals whose job is to appear while the user is already in the
+// app: the evening reminder (which waits for the clock to reach 20:00) and the
+// app-update notice (which waits for a version check). Both were statically
+// imported by the shell, so their code -- and the database and journey helpers
+// they pull in -- was part of every screen's first paint in order to render
+// nothing. They are loaded after the first paint now: nothing about when they are
+// allowed to appear changes, only whether the screen had to wait for them.
+const EveningReminderModal = dynamic(
+  () => import("@/components/notifications/evening-reminder-modal").then((m) => m.EveningReminderModal),
+  { ssr: false }
+);
+const AppUpdateModal = dynamic(
+  () => import("@/components/common/app-update-modal").then((m) => m.AppUpdateModal),
+  { ssr: false }
+);
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // "Has the first frame been painted" -- see the import block above. A frame
+  // rather than the effect body, because an effect can run before the paint this
+  // exists to get out of the way of.
+  const [afterPaint, setAfterPaint] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setAfterPaint(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   // Keep native Android widgets & notifications always up-to-date with live schedule
   useEffect(() => {
@@ -36,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <>
         {children}
-        <AppUpdateModal />
+        {afterPaint && <AppUpdateModal />}
       </>
     );
   }
@@ -50,8 +74,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </main>
       <FloatingFeedbackButton />
-      <EveningReminderModal />
-      <AppUpdateModal />
+      {afterPaint && (
+        <>
+          <EveningReminderModal />
+          <AppUpdateModal />
+        </>
+      )}
       <BottomNav />
     </>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
 import { BatteryMedium, BellRing, Moon } from "lucide-react";
 
 /**
@@ -41,32 +40,23 @@ interface PermissionEducationProps {
 }
 
 export function PermissionEducation({ onProceed, onDismiss }: PermissionEducationProps) {
-  // framer-motion does NOT honour `prefers-reduced-motion` on its own -- measured,
-  // the entrance was still running under `reduce`. `useReducedMotion` is the same
-  // pattern `step-basics.tsx` already uses, and it makes the panel appear without
-  // moving rather than removing it: the sheet still has to be seen to be answered.
-  const reduced = useReducedMotion();
-
+  // PERF-5 -- the entrance is CSS now (`permissionPanelIn` /
+  // `permissionBackdropIn` in `globals.css`). It was framer-motion, plus a
+  // `useReducedMotion` hook to undo what the library does not honour on its own;
+  // the keyframes are inside the `no-preference` query, so reduced motion is the
+  // stylesheet's job again and the hook, the library and the 38 KB it cost every
+  // screen are all gone. Same 0.25s ease-out entrance; nothing else changed.
   return (
     <div
-      // `animate-in fade-in` comes from tailwindcss-animate, which does NOT honour
-      // `prefers-reduced-motion` on its own either — measured, this backdrop was
-      // still animating under `reduce` after the framer-motion side was fixed. Both
-      // are gated on the same hook so neither can be missed.
-      className={`fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md ${
-        reduced ? "" : "animate-in fade-in duration-200"
-      }`}
+      className="permission-backdrop-in fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md"
       onClick={onDismiss}
       role="dialog"
       aria-modal="true"
       aria-labelledby="permission-education-title"
     >
-      <motion.div
+      <div
         onClick={(e) => e.stopPropagation()}
-        initial={reduced ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="w-full max-w-md rounded-3xl border border-outline/15 bg-surface-container p-5 space-y-4 shadow-2xl"
+        className="permission-panel-in w-full max-w-md rounded-3xl border border-outline/15 bg-surface-container p-5 space-y-4 shadow-2xl"
       >
         <div className="flex items-start gap-3">
           <span className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/35 text-primary flex items-center justify-center shrink-0">
@@ -130,7 +120,7 @@ export function PermissionEducation({ onProceed, onDismiss }: PermissionEducatio
         <p className="text-[10px] font-mono text-on-surface-variant/70 text-center">
           Nothing else on your phone is asked for.
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

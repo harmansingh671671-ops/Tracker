@@ -515,6 +515,51 @@ button, a, input, select {
   box-shadow: 0 0 0 2px var(--primary);
 }
 
+/* PERF-5 -- the notification permission panel's entrance. It used to be
+   framer-motion, and that single panel is what put the whole animation library
+   in the shared bundle: the panel is reached from the profile sheet, the sheet
+   is mounted by the header, and the header is on every screen -- so every screen
+   downloaded and parsed the library to animate one dialog most screens never
+   open. Two keyframes do the same job for none of that cost, and unlike the
+   library they honour `prefers-reduced-motion` through the query itself rather
+   than through a hook the caller has to remember to use. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes permissionPanelIn {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes permissionBackdropIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+.permission-panel-in {
+  animation: permissionPanelIn 0.25s ease-out;
+}
+
+.permission-backdrop-in {
+  animation: permissionBackdropIn 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .permission-panel-in,
+  .permission-backdrop-in {
+    animation: none;
+  }
+}
+
 /* M2 -- the (+) on the habits keystone empty state. Keyframes live inside a
    `no-preference` query so reduced motion gets a still ring rather than an
    animation that has to be cancelled after first paint. */

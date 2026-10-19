@@ -617,6 +617,64 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (d) - `PERF-5`: the shared bundle was the cost, and the plan was pointing at the wrong files
+
+The owner chose "make the app load faster" — the first part of the performance phase that can be
+**verified on this machine**, since the rest of it is Android battery, cold start and release
+builds with no device here.
+
+**Measured before changing anything**, because `5a` is measurement. New in the repo:
+`npm run measure-routes` (`scripts/measure-routes.js`) builds, runs Next's own Turbopack
+analyzer, and prints **what each route loads at first paint**, split into the set every route
+pays and the part that route adds. **`next experimental-analyze` does not build anything** —
+its own help says so — and reading the last build's output, it reported the *previous* code's
+numbers on the first run, which looked exactly like a fix that did nothing. The script builds
+first for that reason.
+
+**What that measurement showed, and it invalidated `5c`.** Every route paid **261.4 KB gzip of
+shared code**; the screens' own first-load code was **0.4-1.6 KB** (`/planner` 1.6). So
+extracting hooks and sub-components out of five large *screen* files (`planner/page.tsx`
+48.3 KB of source, `habits/page.tsx` 45.4 KB, …) could not have moved the number a phone pays —
+those screens are already separate routes. **Source size is not transfer size.** `5c` is struck
+in `main_plan.md`.
+
+**The cause was traced through the shell's imports, not guessed.** The header is on every
+screen, so anything it imports statically is downloaded by every screen before use:
+`header → profile-settings-sheet → heads-up-alerts-card → permission-education → framer-motion`
+(**38 KB gzip on every route to animate one dialog reachable only from the profile sheet**), and
+`header → rank-up-dialog → ui/dialog → @base-ui` (**41.6 KB**). Two libraries, one of them the
+app's only consumer, both in the critical path of nine screens that never touch them.
+
+**The fixes.** The permission panel now animates with two house keyframes — and that is
+*better*, not merely cheaper: the CSS sits inside the `no-preference` query, so reduced motion
+is the stylesheet's job again instead of a `useReducedMotion()` hook the caller has to remember.
+The profile sheet loads on its **first open** and then stays mounted, so its tab state still
+survives closing and reopening exactly as before. The rank-up dialog mounts when the **profile
+loads** — it compares against its own stored baseline, so mounting late cannot miss a promotion.
+The evening reminder and the update notice mount **after the first painted frame**.
+
+**Result, measured the same way:** shared set **261.4 → 178.4 KB gzip**; `/planner` first visit
+**263.0 → 178.8 KB (−32 %)**. `/` and `/habits` stay ~255 KB **because they genuinely animate**:
+the library is now in *their* code, where it is used, instead of everyone's.
+
+**The build total went UP, 431.9 → 476.7 KB gzip, and that is not a mistake.** Deferring code
+copies a shared dependency into each chunk that uses it — the total counts every copy, a screen
+downloads one. **Per-route first load is the number to watch**; `PERFORMANCE.md` §2.1 records
+both, and `18a`'s future budget must be per-route or it would fail the change that fixed this.
+
+**Verified:** new `verify-perf5.js` — **39 checks, all pass**: the sheet's own copy is provably
+absent from every downloaded script until the profile button is pressed and present after; the
+panel's entrance is the house keyframe and settles at opacity 1 / no offset; **under reduced
+motion nothing animates and the panel is still fully visible**; all nine routes render with no
+page error. C2 regression suites re-run clean (22 + 44 checks). `tsc` exit 0, 29 suites /
+**440 tests**, build clean, `npx eslint` **0 errors**.
+
+**What the owner will notice on this machine: nothing.** The gain is on the phone and on slow
+connections. That was stated before the work started, not after.
+
+Gates: `tsc --noEmit` exit 0; `eslint` 0 errors / 95 warnings; 29 suites, 440 tests green; build
+clean; light + dark screenshots of the permission panel and the sheet.
+
 ### 2026-10-19 (c) - habit types: the counted stepper and the quit surface, finally committed
 
 Branch `main`. Two bodies of work had been sitting **uncommitted** in the tree: a counted-habit
@@ -3887,12 +3945,45 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — C2 polish, round two: the held block shows its title and category icon and no hour, the block it displaces is seen flying to the corner (and the block that won the hour gets the landing highlight), and the delete cross is smaller and unlabelled** (committed on `main`, **not pushed**). Before it: **`239c833`** (C2 polish, round one — the displaced icon drops the word "Floating", springs in, rings the hour it would land on, scrolls the page at the top/bottom edge, and can be dropped on a cross to remove it with a 5s Undo), `8a3a4a0` (C2 rework — a displaced block is held in its own store, so the hour a block is dragged from stays empty across a refresh), `6f53dbd` (C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable), `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
-- **Working tree (2026-10-19, round two):** this commit touched only `src/components/planner/floating-block.tsx` (title + category badge, no hour), `src/components/planner/flying-to-corner.tsx` (**new** — the hand-off flight), `src/components/planner/delete-target.tsx` (smaller, label removed), `src/components/planner/planner-content.tsx` (flight capture/render, landing highlight, the corner container is always rendered), `src/app/globals.css` (`displacedFlyToCorner`, `.flying-to-corner`), `main_plan.md` and `context.md`. **Another agent still has uncommitted work in `src/app/habits/page.tsx`, `src/components/habits/**` (incl. untracked `grid-habit-card.tsx`), `src/lib/db.ts`, `src/lib/habit-cache.ts`, `src/lib/stores/habit-store.ts`, `src/lib/utils/habit-colors.ts`, `src/lib/utils/habit-completion.ts`** — do not commit it, and it is the reason `npx eslint src` reports 2 `react-hooks/rules-of-hooks` errors (`habits/page.tsx:1055`, a `useRef` inside a callback) that are **not** from this commit. Because `db.ts` is still dirty, **ADR 0004's `OdysseyFloatingBlocks` store is still its own IndexedDB database** — AGENTS.md rule 2 calls `db.ts` the canonical schema, so **fold it into `OdysseyDB` once that file is free**, as a new store + version bump (additive, no field change).
+- HEAD at last update: **this commit** — **`PERF-5` (5a + 5b)**: per-route first-load measurement
+  (`npm run measure-routes`) and the shell diet — the animation library is out of the shared set (the
+  permission panel animates with two keyframes) and the profile sheet, rank-up dialog, evening
+  reminder and update notice load on demand. Shared set **261.4 → 178.4 KB gzip**, `/planner` first
+  visit **263.0 → 178.8 KB**; the **build total rose** 431.9 → 476.7 KB gzip, deliberately and
+  explained in `PERFORMANCE.md` §2.1. Committed on `main`; **the agent does not push**. Before it:
+  **`b4d9eff`** (the other agent's habit types — counted stepper + quit surface, `S13` part 2 / `S9`),
+  **`e67dc01`** (C2 polish round two), `239c833` (C2 round one), `8a3a4a0` (C2 hold-not-swap),
+  `6f53dbd`, `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`,
+  `7cdf7c8`. **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed.
+- **Working tree (2026-10-19, `PERF-5`):** this commit touched `scripts/measure-routes.js` (**new** —
+  per-route first-load measurement), `package.json` (`analyze` + `measure-routes` scripts),
+  `eslint.config.mjs` (a scoped `scripts/**/*.js` block — `no-require-imports` and `no-console` off,
+  because a measurement CLI's job is printing to stdout; it also retires the 3 `require()` errors that
+  had sat in `measure-bundle.js` since it moved into the repo),
+  `src/components/common/permission-education.tsx` (framer-motion → house keyframes),
+  `src/components/layout/header.tsx` (profile sheet + rank-up dialog on demand),
+  `src/components/layout/app-shell.tsx` (evening reminder + update notice after the first painted
+  frame), `src/app/globals.css` (`permissionPanelIn` / `permissionBackdropIn` + their `reduce` rule),
+  `PERFORMANCE.md` (§2 refreshed, **§2.1 added**, §3 rows, §6 re-measure, §7 `18a` budget),
+  `main_plan.md` and `context.md`. **The other agent's habits work is committed now (`b4d9eff`), so
+  the tree no longer carries it** — which means `src/lib/db.ts` is **free**, and ADR 0004's
+  `OdysseyFloatingBlocks` can be folded into `OdysseyDB` as an additive store + version bump
+  (AGENTS.md rule 2 calls `db.ts` the canonical schema). **Not done here**: a schema change belongs in
+  its own change with its own verification.
+- **`PERF-5` measurement traps (2026-10-19).** (1) **`next experimental-analyze` does not build
+  anything** — its own help says so — so it reports the *previous* build's numbers, which looks
+  exactly like a change that did nothing. `npm run measure-routes` builds first for that reason.
+  (2) **What a screen loads and what the build totals are different numbers that move in opposite
+  directions:** deferring a component *raises* the build total (its dependencies are copied into each
+  chunk that uses them) while *cutting* the per-route first load. `PERF-5` moved them 431.9 → 476.7 KB
+  and 263.0 → 178.8 KB respectively. (3) **Source size is not transfer size** — the five "huge" screen
+  files the plan targeted contribute 0.4–1.6 KB gzipped each, because they are already routes.
 - **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
-- Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
-- Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13). `tsc --noEmit` exit 0. Production build clean.
-- Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live `next dev`** (pid 2412) and was **deliberately left running** — this session's planner verification drove that server over `localhost`, so it compiled and served the session's code.
+- Lint: `npx eslint src` exits 0 — **0 errors, 95 warnings** (all pre-existing `no-unused-vars`), and
+  the **repo-wide run now reports the same** (`scripts/**/*.js` gained a scoped exemption in
+  `eslint.config.mjs` with `PERF-5`, instead of the measurement scripts sitting as 3 errors).
+- Tests: **29 suites, 440 tests green**. `tsc --noEmit` exit 0. Production build clean.
+- Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live `next dev`** (pid 2412) and was **deliberately left running** — this session's `PERF-5` verification drove that server over `localhost` (the `127.0.0.1` trap below applies), and an earlier session's planner verification did the same.
 - **Lint: `npx eslint src` exits 0 — 0 errors, 96 warnings.** This is the **first clean project-wide
   lint in the repo's recorded history (2026-10-17)**. Three
   `react-hooks/preserve-manual-memoization` errors had sat in `planner-content.tsx` since `3970e90` and

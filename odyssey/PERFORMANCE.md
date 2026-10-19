@@ -94,11 +94,14 @@ directory is not an instruction, it is a rumour.
 
 | | raw | gzip | ratio |
 |---|---:|---:|---:|
-| Client JS (30 chunks) | 1,402.6 KB | **436.5 KB** | 31.1% |
-| CSS (2 files) | 177.5 KB | **24.7 KB** | 13.9% |
-| **Combined** | | **461.2 KB** | |
+| Client JS (33 chunks) | 1,515.7 KB | **476.7 KB** | 31.5% |
+| CSS (2 files) | 182.5 KB | **25.2 KB** | 13.8% |
+| **Combined** | | **501.9 KB** | |
 | Build media (`.next/static/media`) | 326.6 KB | 310.5 KB | 95.1% |
-| Public images | 98.6 KB | 90.4 KB | 91.7% |
+| Public images | 98.3 KB | 90.4 KB | 91.9% |
+
+**The combined total went UP by 45 KB in the `PERF-5` commit while what a screen loads went
+DOWN by 84 KB.** Neither figure is wrong — see §2.1, which is the number to watch.
 
 **Not counted in any total above:** `public/downloads/odyssey-latest.apk`, **11,587 KB**. It is
 the **in-app updater payload** — downloaded deliberately by the updater, never on page load.
@@ -110,7 +113,7 @@ release costs", so the script reports it separately and judges it neither way.
 | gzip | raw | chunk |
 |---:|---:|---|
 | 69.8 KB | 223.8 KB | `27t_qfc-3_lzs.js` |
-| 43.1 KB | 130.3 KB | `3b4xr8rk6gswf.js` |
+| 48.3 KB | 154.7 KB | `33qo-76wa_gir.js` |
 | 41.6 KB | 151.8 KB | `3jg84jwj6s1uj.js` |
 | 38.6 KB | 110.0 KB | `0cz1d0mv5g_q7.js` |
 
@@ -119,6 +122,48 @@ both ways. `public/` images and build media are ~91–95% incompressible, so 3 M
 contributes 3 MB of transfer; JS compresses 3:1, so 1.4 MB of source contributes 436 KB.
 **Adding those together gives 461 KB and tells you the images are free. They are not.**
 That mistake is exactly how a 1.8 MB logo survived in a directory no item was looking at.
+
+### 2.1 Per-route first load — the number that matters
+
+**Added 2026-10-19 by `PERF-5`.** `measure-bundle.js` totals the build; it cannot see that a
+screen pays for code it never runs. Next's own Turbopack analyzer can, and `npm run
+measure-routes` reports it per route.
+
+**What the `PERF-5` commit did:**
+
+| | before | after |
+|---|---:|---:|
+| Shared set — loaded by **every** route | 261.4 KB gzip (11 chunks) | **178.4 KB gzip** (9 chunks) |
+| `/planner` first visit | 263.0 KB | **178.8 KB** (−32%) |
+| Whole build, every chunk, every route | 431.9 KB gzip (30 files) | 476.7 KB gzip (33 files) |
+
+**The third row went up while the first two went down, and both are true.** Deferring a
+component moves its code into its own file, so a library used by several deferred pieces is
+copied into each — the build total counts every copy, a screen downloads one. **The row to
+watch is the per-route one; the build total is now the misleading number** in exactly the way
+the split-by-compressibility warning above describes.
+
+| route | before | after | | route | before | after |
+|---|---:|---:|---|---|---:|---:|
+| `/habits` | 300.8 | 256.0 | | `/journey` | 266.6 | 184.3 |
+| `/` | 289.3 | 254.6 | | `/shop` | 265.3 | 182.4 |
+| `/profile` | 268.4 | 201.2 | | `/planner` | 263.0 | 178.8 |
+| `/wallpaper` | 274.8 | 192.9 | | `/_not-found` | 261.4 | 178.4 |
+| `/day-schedule` | 269.3 | 186.8 | | `/stats` | 268.1 | 186.1 |
+
+`/` and `/habits` stay ~255 KB because they genuinely animate: the animation library is now in
+*their* code, where it is used, instead of in everyone's.
+
+**What is left in the 178.4 KB**, and what it is: ~127 KB is the React/Next runtime (69.8 +
+41.6 + 8.3 + 3.8 + 3.5), 30.7 KB is the local database, 9.8 KB is the shell's native schedule
+sync, 7.3 KB is the icon set. **Two of those are still paid by screens that may not need
+them** — `/` and `/day-schedule` hide the header and still download the database and the sync
+because the shell imports them statically. That is the next win, and it is not this commit's.
+
+**The premise this corrected.** `main_plan.md` expected the win in `PERF-5c` — extracting
+hooks and sub-components out of five large *screen* files (planner 48.3 KB of source, habits
+45.4 KB, …). Measured, those screens' own first-load code is **0.4–1.6 KB gzipped**: they are
+already routes. Source size is not what a phone pays for. The shared set was the whole problem.
 
 ---
 
@@ -131,6 +176,8 @@ That mistake is exactly how a 1.8 MB logo survived in a directory no item was lo
 | `PERF-19` | `logo.png` 1,808 KB → 88 KB | Public images are now **98.6 KB raw / 90.4 KB gzip** (3 files), measured today. `PERF-19` recorded 93 KB on a slightly different tree — the two figures were taken a few commits apart, and today's is the one to compare against |
 | `PERF-9` | Deleted dead `@keyframes` | CSS 25.7 KB → **24.7 KB** gzip; 17 Tailwind animations gained a reduced-motion rule |
 | `BUG-13` | Deleted 1,806 lines of orphaned components | −2 blur sites; removed a 7th `setInterval` that was dead |
+| `PERF-5` | Animation library out of the shared set (the permission panel animates with two keyframes now), and the profile sheet, rank-up dialog, evening reminder and update notice load on demand instead of being imported by the shell | Shared set **261.4 → 178.4 KB** gzip; `/planner` first visit **263.0 → 178.8 KB**. Build total **rose** 431.9 → 476.7 KB — deferred code is duplicated per chunk. See §2.1 |
+| `PERF-5a` | `npm run measure-routes` — per-route first load, from Next's own analyzer | The baseline above; it is what showed `PERF-5c`'s premise was wrong |
 
 ### The `PERF-4b` number, stated precisely
 
@@ -199,8 +246,13 @@ Plus Perfetto, and `chrome://inspect` against the WebView for the web half insid
 
 ```bash
 npm run build                              # ALWAYS first - next start serves the previous build
-node scripts/measure-bundle.js
+node scripts/measure-bundle.js             # every chunk in the build
+npm run measure-routes                     # what each screen loads at first paint
 ```
+
+`npm run measure-routes` builds, runs Next's Turbopack analyzer, and prints §2.1's table.
+It needs a **build** first: the analyzer reads the last build's output and reports the
+*previous* code's numbers if there isn't one (its `--no-analyze` flag reuses an existing run).
 
 Re-measure after any of these, and expect the combined figure to move:
 
@@ -208,6 +260,8 @@ Re-measure after any of these, and expect the combined figure to move:
 - adding a `@keyframes`, a Tailwind animation, or a `backdrop-blur` (changes CSS)
 - touching `next.config` (changes chunking)
 - touching anything under `public/` (see the split-table warning in §2)
+- **making something load on demand, or adding an import to the shell** — the first moves the
+  build total *up* and the per-route numbers *down*; the second does the reverse
 
 ### Rules for anyone measuring
 
@@ -225,9 +279,12 @@ Re-measure after any of these, and expect the combined figure to move:
 
 `PERF-18` is `PARTIAL`. This file is **18d**. The other three are not built:
 
-- **18a** — bundle-size budget that fails CI. The number to enforce is `461.2 KB` gzipped
-  combined. **There is no `.github/workflows` in this repo**, so this needs the CI to exist
-  first — which is a decision about where this project builds, not a perf task.
+- **18a** — bundle-size budget that fails CI. **The number to enforce is the per-route first
+  load (§2.1), not the build total** — `PERF-5` raised the total by 45 KB while cutting what a
+  screen loads by 84 KB, so a total-based budget would have failed the change that fixed it.
+  Start from `/planner` at **178.8 KB gzip**. **There is no `.github/workflows` in this repo**,
+  so this needs the CI to exist first — which is a decision about where this project builds,
+  not a perf task.
 - **18b** — Lighthouse CI on the production build.
 - **18c** — the Macrobenchmark startup test. Blocked on 13a (`minifyEnabled false`) and on
   hardware.

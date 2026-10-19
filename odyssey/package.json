@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "measure-bundle": "node scripts/measure-bundle.js",
+    "analyze": "next experimental-analyze --output",
+    "measure-routes": "node scripts/measure-routes.js",
     "test:watch": "vitest"
   },
   "dependencies": {

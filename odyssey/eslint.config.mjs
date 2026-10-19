@@ -104,6 +104,20 @@ const eslintConfig = defineConfig([
     },
   },
 
+  {
+    // PERF-5 -- the measurement scripts are Node CLIs, not app code: they
+    // `require()` their modules and printing to stdout IS the feature. The
+    // exemption is scoped to the directory rather than per file, and it retires
+    // the `require()` errors that have sat in `measure-bundle.js` since it moved
+    // out of a temp directory into the repo.
+    name: "odyssey/node-scripts",
+    files: ["scripts/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "no-console": "off",
+    },
+  },
+
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
