@@ -615,6 +615,74 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 ## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
+opinions.
+
+### 2026-10-19 - C2 polish: the displaced icon's creation, landing ring, edge auto-scroll, and drop-to-delete
+
+Owner-reported follow-up on the displaced-block icon: drop the word "Floating" from it,
+animate its creation, ring the hour it would settle on, scroll the page when the finger
+reaches the top or bottom edge, and show a cross that deletes the block if released on it.
+
+**An entrance animation cannot live on the element the drag writes `transform` to.** An
+animation's values outrank inline styles, so a pop-in on the dragged element would have
+overridden `style.transform` for its 300ms and frozen the icon mid-screen. The keyframe
+(`displacedIconIn`, gated on reduced motion like every house animation) is on the icon's
+**inner** box; the outer box keeps the drag's inline transform. Any future animation on a
+dragged element has to repeat that split.
+
+**The landing ring got its own class, and that fixed a real bug the test found.**
+`setHourHighlight` first reused `ring-2 ring-primary` — the classes C2's rail drag had always
+written — but those same two classes are how **the current hour** and **a just-saved block**
+are marked, so a drag ending on the current hour would have cleared the "now" ring on its way
+out. It is now `.planner-drop-ring` (its own `box-shadow`, in `globals.css`). The four test
+failures that surfaced it were all mine: with shared classes the test counted the current
+hour's legitimate ring as a leftover drag ring. **A drag marker that shares a class with a
+persistent state cannot be asserted on — and can clear it.**
+
+**One hit test, not two.** The rail drag had a private `elementFromPoint(...).closest("[data-hour]")`;
+the icon needs `elementsFromPoint` (the icon itself is under the finger, and the rail's clone
+ghost is not the only follower any more). Both now call `src/lib/utils/planner-hour-hit.ts`
+(`hourSlotFromPoint`, `hourFromSlot`, `setHourHighlight`), so the two drags cannot disagree
+about the hour under the same pixel.
+
+**Edge auto-scroll is a `requestAnimationFrame` loop keyed on the drag state itself** — it
+exists only while `dragging` is true, and the cleanup cancels it, so it cannot outlive the
+drag or the component. The planner page scrolls the **document** (`window.scrollBy`); there
+is no inner scroller despite the app shell. Because the page moves under a still finger, each
+frame **re-runs the hit test**, or the ring would point at the hour the finger used to be over.
+
+**Drop-to-delete follows the same write order as every other move of a held block.** Only the
+held copy exists, so it is dropped from `OdysseyFloatingBlocks` first and the icon is removed
+from the screen only after that write succeeds — a failed write leaves the icon up, because the
+held copy is the only copy left. The 5s **Undo** re-holds the same object, so a delete that is
+taken back has altered nothing; the timer is cleared on unmount. Not covered: the undo window
+does not survive a reload (the row is genuinely gone by then) — accepted, and stated to the owner.
+
+**The cross is `pointer-events: none` and is measured, not asked.** The release must still see
+the hour underneath, so the parent tests the finger point against the circle's live
+`getBoundingClientRect()`; state is deliberately not trusted because a release can arrive in the
+same frame as the move that arms it. Confirmed both ways in the harness (armed → delete, not
+armed → the block lands on the hour).
+
+**A screenshot caught what the checks could not: on a touch screen the finger AND the dragged
+block both sit on the target.** With the icon following the finger, the cross's X was hidden
+under the block exactly when it mattered. The cross is now 64px (70 when armed), keeps its
+"DELETE" label below, and the block itself dims and tints red when armed, so the armed state
+reads around the obstruction. Both themes re-shot to confirm.
+
+Verified with `verify-floating.js` (**33 checks**, all pass): the creation animation measured
+from sampled frames rather than a class name, exactly one ringed hour, the ring cleared on
+release and on unmount, auto-scroll actually reaching an hour that was off-screen before
+(`top=-241` → `474`) and landing the block on it, the scroll proving **stopped** after the drop,
+delete → held store empty and `scheduleBlocks` untouched → Undo restores it held and off the
+timeline → second delete expires the window → refresh keeps it gone. Both themes live-drove the
+armed state. `tsc` 0, production build clean, `eslint` 0 errors on the five touched files.
+
+**Deliberately skipped:** the internals are still named `floating` (`FloatingBlock`,
+the `floatingBlocks` state, the `OdysseyFloatingBlocks` store). The owner asked for the word off the
+**icon**; renaming the module, the state and the IndexedDB database would change a store name for
+no user-visible gain.
+
 ### 2026-10-18 - C2 reworked: the displaced block is now held, not swapped (ADR 0004)
 
 **Supersedes the entry below.** The swap was wrong in exactly the way the owner then reported:
@@ -3740,8 +3808,8 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **C2 rework — a displaced block is held in its own store, so the hour a block is dragged from stays empty across a refresh** (committed on `main`, **not pushed**). Before it: `6f53dbd` (C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable), `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
-- **Working tree (2026-10-18):** this commit touched only `src/components/planner/**`, `src/lib/utils/floating-blocks.ts` (new), `docs/adr/0004-floating-blocks.md` (new), the two schedule-wipe call sites (`src/lib/seed.ts`, `src/components/layout/profile-settings-sheet.tsx`), `main_plan.md` and `context.md`. **Another agent has uncommitted work in `src/app/habits/page.tsx`, `src/components/habits/**`, `src/lib/db.ts`, `src/lib/habit-cache.ts`, `src/lib/stores/habit-store.ts`, `src/lib/utils/habit-colors.ts`, `src/lib/utils/habit-completion.ts`** — do not commit it, and it is the reason `npx eslint src` currently reports 2 `react-hooks/rules-of-hooks` errors (`habits/page.tsx:1055`, another `useRef` inside a callback) that are **not** from this commit. Because `db.ts` is dirty, **ADR 0004's `OdysseyFloatingBlocks` store lives in its own IndexedDB database rather than in `OdysseyDB`** — AGENTS.md rule 2 calls `db.ts` the canonical schema, so **fold it into `OdysseyDB` once that file is free**, as a new store + version bump (additive, no field change).
+- HEAD at last update: **C2 polish — the displaced block's icon drops the word "Floating", springs in, rings the hour it would land on, scrolls the page at the top/bottom edge, and can be dropped on a cross to remove it (with a 5s Undo)** (committed on `main`, **not pushed**). Before it: `8a3a4a0` (C2 rework — a displaced block is held in its own store, so the hour a block is dragged from stays empty across a refresh), `6f53dbd` (C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable), `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
+- **Working tree (2026-10-19):** this commit touched only `src/components/planner/floating-block.tsx` (reworked), `src/components/planner/delete-target.tsx` (new), `src/lib/utils/planner-hour-hit.ts` (new), `src/components/planner/timeline-hour-slot.tsx` (now uses the shared hit test), `src/components/planner/planner-content.tsx` (delete + Undo), `src/app/globals.css` (`displacedIconIn`, `.planner-drop-ring`), `main_plan.md` and `context.md`. **Another agent still has uncommitted work in `src/app/habits/page.tsx`, `src/components/habits/**`, `src/lib/db.ts`, `src/lib/habit-cache.ts`, `src/lib/stores/habit-store.ts`, `src/lib/utils/habit-colors.ts`, `src/lib/utils/habit-completion.ts`** — do not commit it, and it is the reason `npx eslint src` reports 2 `react-hooks/rules-of-hooks` errors (`habits/page.tsx:1055`, a `useRef` inside a callback) that are **not** from this commit. Because `db.ts` is still dirty, **ADR 0004's `OdysseyFloatingBlocks` store is still its own IndexedDB database** — AGENTS.md rule 2 calls `db.ts` the canonical schema, so **fold it into `OdysseyDB` once that file is free**, as a new store + version bump (additive, no field change).
 - **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13). `tsc --noEmit` exit 0. Production build clean.

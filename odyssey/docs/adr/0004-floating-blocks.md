@@ -6,6 +6,7 @@
 > **Supersedes:** the "swap" introduced in `6f53dbd`. **Refines:** nothing.
 > **Schema:** additive - a new store, `OdysseyFloatingBlocks/blocks: 'id, date'`. No field
 > added, removed or retyped on `ScheduleBlock`, and no Dexie version bump on `OdysseyDB`.
+> **Revised 2026-10-19:** §2.1 - dropping a held block on the planner's cross deletes it.
 
 Required by `AGENTS.md` non-negotiable 2: schema changes are additive by default and need an ADR.
 
@@ -45,6 +46,27 @@ OdysseyFloatingBlocks.blocks : 'id, date'   // the full ScheduleBlock row
   path de-duplicates - never a block that exists nowhere.
 - **Load:** held rows for the open date become draggable icons again, so leaving the app
   mid-drop and coming back shows the same state.
+- **Delete:** a held block can also be dropped on the cross at the bottom of the planner,
+  which **removes it**. See §2.1.
+
+### 2.1 Deleting a held block (added 2026-10-19)
+
+The same store makes "delete" unambiguous: a held block exists **only** in
+`OdysseyFloatingBlocks`, so removing that row is the whole delete - there is no second copy
+to forget. Same write order as every other move, in the only direction that can fail safely:
+**drop the held row first, then take the icon off the screen.** If the write throws, the icon
+stays up, because the held copy is the only copy left.
+
+- **Undo:** the removed row is kept in component state for 5s and re-held on Undo, so a delete
+  that is taken back has altered nothing (the block is back off-timeline, holding its own start
+  and end time). The timer is cleared on unmount.
+- **Not covered:** the undo window is in memory, so it does not survive a reload - by then the
+  row is genuinely gone. Accepted, and stated to the owner.
+- **Rejected:** a soft-delete flag or a trash store. Both keep data the user asked to remove,
+  which is the retention failure this repo's privacy stance avoids, for a 5-second window.
+- The cross is `pointer-events: none` and the release is measured against its live
+  `getBoundingClientRect()`. It must not take the release itself, or the hour underneath would
+  stop being the hour the hit test sees.
 
 ### Why its own store, not a flag on the block
 
@@ -77,10 +99,13 @@ and the only code that knows about held blocks is the drag that creates them.
 | Add `isFloating` to `ScheduleBlock` | Every reader of the day must remember to filter it. See §2 |
 | Derive the floating set by detecting two blocks on one hour | Which of the two floats is not recoverable from the data, so a reload could float the block the user just placed |
 | Reuse `status: 'pivoted'` as the marker | `pivoted` already means something to the user. Reusing it is the silent-alteration failure, on the field that names it |
+| Soft-delete a block dropped on the cross (flag or trash store) | Keeps data the user asked to remove, for a 5s window. See §2.1 |
 
 ## 5. Rollback
 
 Delete `src/lib/utils/floating-blocks.ts`, the two call sites in `handleMoveBlock` /
-`handleDropFloating`, and restore the parked-slot write. Rows in `OdysseyFloatingBlocks` are
+`handleDropFloating` and the delete path (`handleDeleteFloating` / `handleUndoDelete` in
+`planner-content.tsx`, plus `delete-target.tsx`), and restore the parked-slot write. Rows in
+`OdysseyFloatingBlocks` are
 then unreachable - recover them by copying them back into `scheduleBlocks` before rollback
 if any are held, then drop the store. Nothing in `OdysseyDB` is touched either way.

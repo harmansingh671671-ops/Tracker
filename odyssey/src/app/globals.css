@@ -507,6 +507,14 @@ button, a, input, select {
   animation-name: twZoomIn;
 }
 
+/* C2 -- the ring around the hour a drag would land a block on. It carries its
+   own box-shadow instead of Tailwind's `ring-2 ring-primary`, because those two
+   classes are also how the current hour and a just-saved block are marked: a
+   drag ending on the current hour would otherwise clear the "now" ring. */
+.planner-drop-ring {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
 /* M2 -- the (+) on the habits keystone empty state. Keyframes live inside a
    `no-preference` query so reduced motion gets a still ring rather than an
    animation that has to be cancelled after first paint. */
@@ -608,6 +616,41 @@ button, a, input, select {
 
 @media (prefers-reduced-motion: reduce) {
   .perfect-day-glow {
+    animation: none;
+  }
+}
+
+/* C2 -- the displaced block's icon. When a drag pushes a block off its hour the
+   icon takes its place, and this makes that read as the block arriving rather
+   than as an element that was always there. Keyframes sit inside a
+   `no-preference` query for the same reason `keystonePulse` (M2) does.
+
+   On the icon's inner box, not the box the drag writes `transform` to: an
+   animation's values win over inline styles, so an entrance animation on the
+   dragged element would hold the icon still under a moving finger. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes displacedIconIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.55) translateY(10px);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.06) translateY(0);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}
+
+.displaced-icon-in {
+  animation: displacedIconIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .displaced-icon-in {
     animation: none;
   }
 }

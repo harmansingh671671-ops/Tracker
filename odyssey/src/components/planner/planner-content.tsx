@@ -119,9 +119,12 @@ export function PlannerContent() {
   const [floatingBlocks, setFloatingBlocks] = useState<ScheduleBlock[]>([]);
   const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
   const [hintToast, setHintToast] = useState<string | null>(null);
+  // The block dropped on the cross, kept only for as long as its Undo is offered.
+  const [removedToast, setRemovedToast] = useState<ScheduleBlock | null>(null);
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggeredRef = useRef(false);
+  const removedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const showHint = (msg: string) => {
     setHintToast(msg);
@@ -610,6 +613,50 @@ export function PlannerContent() {
     syncCurrentScheduleToNative(selectedDate);
   }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
 
+  const handleDeleteFloating = useCallback(
+    async (block: ScheduleBlock) => {
+      // A displaced block is already off the day; dropping it on the cross is what
+      // makes it gone. The held copy goes first -- if that write fails the icon
+      // stays on screen, because the held copy is the only copy left.
+      try {
+        await releaseFloatingBlock(block.id);
+      } catch (e) {
+        logWarn("planner", "could not drop the deleted block", e);
+        return;
+      }
+      setFloatingBlocks((prev) => prev.filter((f) => f.id !== block.id));
+      setRemovedToast(block);
+      if (removedTimerRef.current) clearTimeout(removedTimerRef.current);
+      removedTimerRef.current = setTimeout(() => setRemovedToast(null), 5000);
+    },
+    [setFloatingBlocks, setRemovedToast]
+  );
+
+  // Undo puts it back exactly as it was: still off the timeline, still holding its
+  // own start and end time. A delete that gets taken back must not have altered
+  // anything on the way out.
+  const handleUndoDelete = useCallback(async () => {
+    const block = removedToast;
+    if (!block) return;
+    if (removedTimerRef.current) clearTimeout(removedTimerRef.current);
+    removedTimerRef.current = null;
+    setRemovedToast(null);
+    try {
+      await holdFloatingBlock(block);
+      setFloatingBlocks((prev) =>
+        prev.some((f) => f.id === block.id) ? prev : [...prev, block]
+      );
+    } catch (e) {
+      logWarn("planner", "could not restore the deleted block", e);
+    }
+  }, [removedToast, setRemovedToast, setFloatingBlocks]);
+
+  // The Undo window is a timer, so it is cleared when the screen goes away.
+  useEffect(() => {
+    return () => {
+      if (removedTimerRef.current) clearTimeout(removedTimerRef.current);
+    };
+  }, []);
   const handleSaveBlock = async (data: {
     id?: string;
     title: string;
@@ -753,7 +800,7 @@ export function PlannerContent() {
 
   // Render floating displaced blocks as draggable icons.
   const floatingElements = floatingBlocks.map((b) => (
-    <FloatingBlock key={b.id} block={b} onDrop={handleDropFloating} />
+    <FloatingBlock key={b.id} block={b} onDrop={handleDropFloating} onDelete={handleDeleteFloating} />
   ));
 
   return (
@@ -981,6 +1028,27 @@ export function PlannerContent() {
           <div className="px-4 py-2 rounded-full bg-surface-container-highest/95 border border-outline/25 text-on-surface text-xs font-mono font-medium shadow-xl backdrop-blur-md flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span>{hintToast}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Dropped-on-the-cross confirmation. The only toast that takes pointer
+          events, because it is the only one with something to press. It sits
+          above the cross so a drag started while it is up cannot cover it. */}
+      {removedToast && (
+        <div className="fixed bottom-44 left-1/2 -translate-x-1/2 z-[60] transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-3 rounded-2xl border border-error/40 bg-surface-container-low/95 px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md">
+            <span className="text-xs font-mono">
+              <span className="font-semibold text-on-surface">{removedToast.title}</span>
+              <span className="ml-1.5 text-[11px] text-on-surface-variant/80">removed</span>
+            </span>
+            <button
+              type="button"
+              onClick={handleUndoDelete}
+              className="rounded-full bg-error/15 px-3 py-1 text-[11px] font-mono font-bold text-error transition-colors hover:bg-error/25"
+            >
+              Undo
+            </button>
           </div>
         </div>
       )}

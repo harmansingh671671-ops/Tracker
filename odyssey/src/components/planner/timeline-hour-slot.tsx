@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { logWarn } from "@/lib/utils/logger";
 import { type ScheduleBlock } from "@/lib/db";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
+import { hourFromSlot, hourSlotFromPoint, setHourHighlight } from "@/lib/utils/planner-hour-hit";
 import {
   CheckCircle2,
   XCircle,
@@ -114,11 +115,13 @@ export function TimelineHourSlot({
   };
 
   // A drag can also end by this slot unmounting (a re-read repaints the rail),
-  // which never reaches `onPointerUp`.
+  // which never reaches `onPointerUp`: the ghost and the landing ring would both
+  // be left behind.
   useEffect(() => {
     return () => {
       ghostRef.current?.remove();
       ghostRef.current = null;
+      setHourHighlight(dragStateRef.current?.prevTargetEl ?? null, false);
     };
   }, []);
 
@@ -254,25 +257,22 @@ export function TimelineHourSlot({
           }
           e.preventDefault();
           if (ds.isDrag && onMoveBlock) {
-            const targetEl = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-hour]") as HTMLElement | null;
-            const hourAttr = targetEl?.getAttribute("data-hour");
-            const h = hourAttr ? parseInt(hourAttr, 10) : null;
-            if (h !== null && !Number.isNaN(h)) {
-              if (ds.prevTargetEl && ds.prevTargetEl !== targetEl) {
-                ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
-              }
-              if (targetEl && targetEl !== ds.prevTargetEl) {
-                targetEl.classList.add("ring-2", "ring-primary");
-                ds.prevTargetEl = targetEl;
-              }
-              if (h !== dragTarget) setDragTarget(h);
+            const targetEl = hourSlotFromPoint(e.clientX, e.clientY);
+            const h = hourFromSlot(targetEl);
+            if (targetEl !== ds.prevTargetEl) {
+              // Off the rail entirely: the ring comes off rather than staying on an
+              // hour the release would not use.
+              setHourHighlight(ds.prevTargetEl, false);
+              setHourHighlight(targetEl, true);
+              ds.prevTargetEl = targetEl;
             }
+            if (h !== null && h !== dragTarget) setDragTarget(h);
           }
         }}
         onPointerUp={() => {
           const ds = dragStateRef.current;
           hideGhost();
-          if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+          if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
           const wasMoved = !!ds?.moved;
           if (wasMoved) {
             justDraggedRef.current = true;
@@ -304,7 +304,7 @@ export function TimelineHourSlot({
         onPointerCancel={() => {
           const ds = dragStateRef.current;
           hideGhost();
-          if (ds?.prevTargetEl) ds.prevTargetEl.classList.remove("ring-2", "ring-primary");
+          if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
           dragStateRef.current = null;
           setIsDragging(false);
           setDragTarget(null);
