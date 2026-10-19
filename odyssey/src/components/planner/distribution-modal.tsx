@@ -204,8 +204,10 @@ export function DistributionModal({
             icon + count) was removed on owner instruction — the strip is the
             information; every other element restated it. */}
         <div className="relative overflow-hidden rounded-2xl bg-surface-container-low p-4 border border-outline/10">
-          {/* Color Breakdown Strip */}
-          <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
+          {/* Color Breakdown Strip — segments abut with no gap: the day is a
+              continuous run of hours, and the gaps used to read as unscheduled
+              time ON the day rather than as separation between segments. */}
+          <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex">
             {categoryStats.plannedTotal > 0 ? (
               <>
                 <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full transition-all duration-300" title="Focus" />
