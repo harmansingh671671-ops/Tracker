@@ -593,16 +593,22 @@ export function EditHabitModal({
                   />
                 </div>
 
-                {/* Emergency version - only for counted habits */}
+                {/* Emergency version - only for counted habits; the floor a day
+                    must reach to still count as done (see compliance.ts). */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY MINIMUM</label>
                   <input
-                    type="text"
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
                     value={emergencyVersion}
                     onChange={(e) => setEmergencyVersion(e.target.value)}
-                    placeholder="Read 1 page instead of 30 mins"
+                    placeholder="1"
                     className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
                   />
+                  <p className="text-[10px] text-on-surface-variant/70">
+                    Do at least this many and the day still counts.
+                  </p>
                 </div>
               </>
             )}

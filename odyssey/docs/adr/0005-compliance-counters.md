@@ -47,6 +47,28 @@ the app uses (ADR 0003).
 
 For a quit (`avoid`) habit, a **clean** day counts and a **slip** day does not.
 
+#### 2.1.1 The counted-habit emergency floor (`B16`, added 2026-10-19)
+
+The owner extended §2.1 for **counted** habits only: the habit's emergency version
+is a **floor**, and a scheduled day that reached it counts even though it fell
+short of `targetValue`. Doing only the two-minute version earns the day instead of
+forfeiting it.
+
+This makes the per-habit counter **deliberately more lenient than
+`isHabitComplete`**:
+
+- the counter counts a floor day;
+- the heatmap, the date strip, the confetti and the reward vault do **not** — they
+  still read `isHabitComplete`, so a floor day is counted but renders unfilled.
+
+**That disagreement is the owner's explicit choice, not an oversight.** If it is
+ever reversed, the fix is to widen `isHabitComplete` and delete this special case —
+never to add a third predicate.
+
+The floor is read from the existing free-text `Habit.emergencyVersion`, now entered
+as a number for counted habits. A value that does not parse as a positive number
+means **no floor**, so a legacy `"Read 1 page"` changes nothing. **No schema change.**
+
 ### 2.2 App-wide — schedule compliance
 
 A day counts only when the user **wrote all the hours and reviewed all of them**:
@@ -159,9 +181,10 @@ That is a **visible** change: the brightest green now means a genuine full day.
 
 ## 6. Verification
 
-- `src/lib/utils/compliance.test.ts` — 15 tests: the 18-hour bar, a pending hour,
+- `src/lib/utils/compliance.test.ts` — 24 tests: the 18-hour bar, a pending hour,
   a missed hour as reviewed, date grouping, unscheduled days, counted targets,
-  quit slips, and the derived "un-tick lowers the count" case.
+  the counted-habit emergency floor (`B16`), quit slips, and the derived
+  "un-tick lowers the count" case.
 - `day-status.test.ts` — pins the stricter `fully_completed`.
 - `warm-copy.test.ts`, `achievements.test.ts` — label and milestone wording.
 - Full suite green; `tsc --noEmit` and `next lint` clean.

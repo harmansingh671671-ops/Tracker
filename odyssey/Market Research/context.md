@@ -624,6 +624,8 @@ section below; today's entries are kept in full.
 
 ### 2026-10-19 — today's entries (condensed)
 
+**`B16` (SHIPPED):** a counted habit's **emergency minimum** now counts toward its days-done total (owner rule). The emergency version is the *floor* — only doing the two-minute version still earns the day. **Counter-only on purpose:** `isHabitComplete` is untouched, so the heatmap/date strip/confetti/reward vault still render a floor day as unfilled; the counter and those surfaces disagree by design and were accepted as such. **No schema change** — the existing `Habit.emergencyVersion` is reused and is now a **number** input for counted habits; unparsable text means *no floor*, so a legacy `"Read 1 page"` behaves exactly as before. New `emergencyMinimum()` export in `compliance.ts`; ADR 0005 §2.1.1 records the rule and the tolerance for the disagreement; 9 new tests.
+
 **`PERF-16` (SHIPPED):** 13 dead files deleted (9 orphan `ui/` components +
 `planner/inbox-drawer`, `habits/perfect-day-card`, `lib/stores/wallpaper-store`,
 `lib/utils.ts` barrel); `tw-animate-css` removed from `package.json`; Android
@@ -776,19 +778,26 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`PERF-7` (`SHIPPED`)**: 36 of 45 live
-  `backdrop-blur` applications removed or capped; 7e low-end fallback verified.
-  Committed on `main`; **the agent does not push**. Before it: **`1b9cb28`**
-  (`PERF-5` 5d+5e), **`77b55a1`** (`B25` review pass), `d0c8dc8`, `fe8202d`,
-  `9b19f96`, `abbc6ac` (`B25`), `2dc684e` (`S9`), `8700852` (`PERF-5` 5a+b),
+- HEAD at last update: **this commit** — **`B16` (`SHIPPED`)**: a counted habit's
+  emergency minimum counts toward its days-done total (counter-only; **ADR 0005
+  §2.1.1**). Committed on `main`; **the agent does not push**. Before it: **`8bef3ce`**
+  (context.md compaction), `1c158e2` (`PERF-16`), `4476fcb` (`PERF-8`), `47ce1fd`
+  (`PERF-7`), `1b9cb28` (`PERF-5` 5d+5e), `77b55a1` (`B25` review pass), `d0c8dc8`,
+  `fe8202d`, `9b19f96`, `abbc6ac` (`B25`), `2dc684e` (`S9`), `8700852` (`PERF-5` 5a+b),
   `b4d9eff`, `e67dc01`, and earlier C2 rounds. **Everything up to and including
   `e67dc01` is on `origin/main`** — the owner pushed; `8700852` onward are **not**.
-- **Working tree (2026-10-19, `PERF-7`):** clean after that commit.
-- **Next: the pre-approved queue is complete** (PERF-5 remainder, PERF-7, PERF-8,
-  PERF-16 all `SHIPPED`) — **pause for the owner.** Remaining perf-phase items are not
-  queued: PERF-17 is ⚪ optional skip-unless-measured, PERF-18's open halves are blocked
-  on CI, and the native verification items (PERF-1/2/3/11/13/14) are gated by §6.5.4's
-  honest measurement boundary.
+- **Working tree (2026-10-19, `B16`):** clean after that commit.
+- **Owner-approved queue (2026-10-19), in this order:** (1) **`B16`** — SHIPPED this
+  commit; (2) **counted-habit heatmap partial fill** (“water in the bucket”) — new
+  line still to add; (3) **`B6`** — heatmap as the default Habits view, full-width and
+  scrollable, plus “remember the last-opened view”; (4) **`S10`** — **deferred to
+  last**: the proportional-border redesign was **declined by the owner**, so the
+  current per-habit dots/`done÷total` stay until `S10` is genuinely re-scoped.
+- The perf-phase queue is complete (PERF-5 remainder, PERF-7, PERF-8, PERF-16 all
+  `SHIPPED`). Remaining perf items are not queued: PERF-17 is ⚪ optional
+  skip-unless-measured, PERF-18's open halves are blocked on CI, and the native
+  verification items (PERF-1/2/3/11/13/14) are gated by §6.5.4's honest measurement
+  boundary.
 - **Pending, named: the native/Kotlin label.** The phone still renders a *streak* from
   `profiles.streak` / `habits.currentStreak`. Migrating them to days done is a Kotlin
   change; it cannot be compiled on this machine (no `gradlew`, JBR 25 vs Kotlin 1.9.22).
@@ -801,7 +810,7 @@ to know where things stand.
 - **`S9`'s violation state does not reach the history-only surfaces.** The date strip,
   month calendar and heatmaps read `completed`, not `isHabitSlipped`. Named, not hidden.
 - **Lint:** `npx eslint src` exits 0 — **0 errors, 84 warnings** (after PERF-16).
-- **Tests:** **31 suites, 469 tests green**. `tsc --noEmit` exit 0. Production build
+- **Tests:** **31 suites, 478 tests green**. `tsc --noEmit` exit 0. Production build
   clean, 13 static routes.
 - Ports 3001/3100 clear; **no background server of mine is running**. Port **3000
   carries the owner's live `next dev`** (pid 2412) and was **deliberately left

@@ -4,6 +4,7 @@ import {
   buildDaysDoneMap,
   countDaysDoneForHabit,
   countScheduleCompliedDays,
+  emergencyMinimum,
   isScheduleCompliedDay,
 } from "./compliance";
 import type { Habit, ScheduleBlock } from "@/lib/db";
@@ -92,6 +93,24 @@ describe("countScheduleCompliedDays — the app-wide counter", () => {
   });
 });
 
+describe("emergencyMinimum — the counted-habit floor", () => {
+  it("reads a positive number out of the emergency version", () => {
+    expect(emergencyMinimum(habit({ type: "counted", emergencyVersion: " 3 " }))).toBe(3);
+  });
+
+  it("is 0 when unset, zero, or not a number", () => {
+    expect(emergencyMinimum(habit({ type: "counted" }))).toBe(0);
+    expect(emergencyMinimum(habit({ type: "counted", emergencyVersion: "0" }))).toBe(0);
+    expect(emergencyMinimum(habit({ type: "counted", emergencyVersion: "-2" }))).toBe(0);
+    expect(emergencyMinimum(habit({ type: "counted", emergencyVersion: "nope" }))).toBe(0);
+  });
+
+  it("is 0 for a non-counted habit even when the field is set", () => {
+    expect(emergencyMinimum(habit({ type: "avoid", emergencyVersion: "1" }))).toBe(0);
+    expect(emergencyMinimum(habit({ emergencyVersion: "1" }))).toBe(0);
+  });
+});
+
 describe("countDaysDoneForHabit — the per-habit counter", () => {
   it("counts a completed scheduled day", () => {
     expect(countDaysDoneForHabit(habit(), { "2026-10-05": true })).toBe(1);
@@ -110,6 +129,46 @@ describe("countDaysDoneForHabit — the per-habit counter", () => {
   it("counts a counted habit at or above its target", () => {
     const counted = habit({ type: "counted", targetValue: 20 });
     expect(countDaysDoneForHabit(counted, { "2026-10-05": true }, { "2026-10-05": 20 })).toBe(1);
+  });
+
+  it("counts a counted day that only reached the emergency minimum", () => {
+    // Owner rule 2026-10-19: doing only the two-minute version still earns the
+    // day. Target 20, emergency floor 1.
+    const counted = habit({ type: "counted", targetValue: 20, emergencyVersion: "1" });
+    expect(countDaysDoneForHabit(counted, { "2026-10-05": true }, { "2026-10-05": 1 })).toBe(1);
+  });
+
+  it("still does not count a counted day below the emergency minimum", () => {
+    const counted = habit({ type: "counted", targetValue: 20, emergencyVersion: "5" });
+    expect(countDaysDoneForHabit(counted, { "2026-10-05": true }, { "2026-10-05": 4 })).toBe(0);
+  });
+
+  it("does not count an emergency day with no logged value", () => {
+    // A floor must never invent a day the user never logged.
+    const counted = habit({ type: "counted", targetValue: 20, emergencyVersion: "1" });
+    expect(countDaysDoneForHabit(counted, { "2026-10-05": false }, {})).toBe(0);
+  });
+
+  it("does not count an emergency-minimum day the habit was not scheduled for", () => {
+    // 2026-10-06 is a Tuesday; the habit is Monday-only.
+    const counted = habit({
+      type: "counted",
+      targetValue: 20,
+      targetDays: [1],
+      emergencyVersion: "1",
+    });
+    expect(countDaysDoneForHabit(counted, { "2026-10-06": true }, { "2026-10-06": 1 })).toBe(0);
+  });
+
+  it("ignores an emergency version that is not a positive number", () => {
+    // Legacy free text for a counted habit — no floor, so the strict rule holds.
+    const counted = habit({ type: "counted", targetValue: 20, emergencyVersion: "Read 1 page" });
+    expect(countDaysDoneForHabit(counted, { "2026-10-05": true }, { "2026-10-05": 1 })).toBe(0);
+  });
+
+  it("never applies the emergency minimum to a simple habit", () => {
+    const simple = habit({ type: "simple", emergencyVersion: "1" });
+    expect(countDaysDoneForHabit(simple, { "2026-10-05": false })).toBe(0);
   });
 
   it("does not count a slip for a quit habit, but does count a clean day", () => {
