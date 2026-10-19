@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, type ScheduleBlock } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { blockHourSpan } from "@/lib/utils/day-status";
 
 interface ScheduleState {
   blocks: ScheduleBlock[];
@@ -77,7 +78,18 @@ export const useScheduleStore = create<ScheduleState>((set, get) => ({
     ];
 
     for (const slot of sleepSlots) {
-      const alreadyHas = existing.some(b => b.startTime === slot.startTime);
+      const slotStart = parseInt(slot.startTime.split(":")[0], 10);
+      const slotEndRaw = parseInt(slot.endTime.split(":")[0], 10);
+      const slotEnd = slotEndRaw === 0 ? 24 : slotEndRaw;
+      // BUG-17: the old guard only compared start times, so a sleep slot
+      // got added on top of any multi-hour block that happened to start at
+      // a different hour (e.g. 00:00-03:00). Counting those extra records
+      // is what made "Planned" climb past 24. A slot now lands only where
+      // no existing block covers any of its hours.
+      const alreadyHas = existing.some((b) => {
+        const [bs, be] = blockHourSpan(b);
+        return slotStart < be && bs < slotEnd;
+      });
       if (!alreadyHas) {
         const endHourNum = parseInt(slot.endTime.split(':')[0], 10);
         const normEndH = endHourNum === 0 ? 24 : endHourNum;

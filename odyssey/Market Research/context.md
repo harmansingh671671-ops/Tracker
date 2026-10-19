@@ -634,6 +634,19 @@ scan, **not compiled**). Bundle unchanged (orphans were never in it); lint 95 �
 84 warnings. 16b delivered as audit only (no upgrade; pinned Next 16.3.5 is an
 owner decision).
 
+**`BUG-17` (SHIPPED):** day-review chips said "24/33h" on a 24-hour day. `plannedHours`
+counted schedule *records*, not clock hours, so overlapping duplicate blocks (autofill-sleep
+stacking under a multi-hour user block) inflated planned hours past 24, hiding pending hours
+the heatmap could not show. `evaluateDayCompletion` now counts distinct covered clock hours
+via a shared `resolveHourOwners` helper (reviewed block wins an hour over a hidden pending
+duplicate; ties by list order); the stats popup's per-hour grid uses the same helper so
+pixels and numbers agree; `autoFillSleep` now skips a slot when any existing block overlaps
+it (full range, not just matching start times). Compliance counter re-derives from the same
+per-hour semantics. **No data deleted** — hidden pending records stay in IndexedDB and simply
+no longer inflate the count. Wallpaper's `plannedHours` left as-is (capped to 100%, fallback
+only). Tests: 17 new tests in `day-status.test.ts`, all green. src: `lib/utils/day-status.ts`,
+`app/stats/page.tsx`, `lib/stores/schedule-store.ts`.
+
 **`PERF-8` (SHIPPED):** habits list row extracted into `habit-list-card.tsx` +
 `React.memo` on habit-scoped log slices; `handleToggle` reads pre-toggle state
 from store snapshot; handlers stabilised (`useCallback`, `userId` scalar).
@@ -787,6 +800,10 @@ to know where things stand.
   `b4d9eff`, `e67dc01`, and earlier C2 rounds. **Everything up to and including
   `e67dc01` is on `origin/main`** — the owner pushed; `8700852` onward are **not**.
 - **Working tree (2026-10-19, `B16`):** clean after that commit.
+- **Working tree (2026-10-19, `BUG-17`):** in progress / about to commit — touches
+  `lib/utils/day-status.ts`, `app/stats/page.tsx`, `lib/stores/schedule-store.ts`,
+  `lib/utils/day-status.test.ts`, `main_plan.md` (BUG-17 line), `context.md` (this
+  entry). Agent does not push.
 - **Owner-approved queue (2026-10-19), in this order:** (1) **`B16`** — SHIPPED this
   commit; (2) **counted-habit heatmap partial fill** (“water in the bucket”) — new
   line still to add; (3) **`B6`** — heatmap as the default Habits view, full-width and

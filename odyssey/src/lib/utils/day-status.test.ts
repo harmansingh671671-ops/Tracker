@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluateDayCompletion, getHeatmapCellStyles } from "./day-status";
+import { evaluateDayCompletion, getHeatmapCellStyles, blockHourSpan, resolveHourOwners } from "./day-status";
 import type { ScheduleBlock } from "@/lib/db";
 
 type Status = ScheduleBlock["status"];
@@ -107,17 +107,54 @@ describe("evaluateDayCompletion - status transitions", () => {
 
   it("only sets isCompletelyDone once 18+ hours are planned", () => {
     // 18 is the documented "full day" bar (24h minus sleep/wake blocks).
-    const under = evalDay(Array.from({ length: 17 }, () => block("completed", 0)));
+    const under = evalDay(Array.from({ length: 17 }, (_, i) => block("completed", i)));
     expect(under.isFullyFilled).toBe(false);
     expect(under.isFullyReviewed).toBe(true);
     expect(under.isCompletelyDone).toBe(false);
 
-    const at = evalDay(Array.from({ length: 18 }, () => block("completed", 0)));
+    const at = evalDay(Array.from({ length: 18 }, (_, i) => block("completed", i)));
     expect(at.isFullyFilled).toBe(true);
     expect(at.isCompletelyDone).toBe(true);
     expect(at.status).toBe("fully_completed");
   });
 });
+
+  it("BUG-17: a hidden pending duplicate does not inflate planned hours", () => {
+    // 24 reviewed hours plus 9 pending blocks hiding under them -- the old
+    // code reported 33 planned and 9 unreviewed, freezing progress below
+    // 100% with every grid cell already colored.
+    const reviewed = Array.from({ length: 24 }, (_, i) => block("completed", i));
+    const hidden = Array.from({ length: 9 }, (_, i) => block("pending", i));
+    const s = evalDay([...reviewed, ...hidden]);
+    expect(s.plannedHours).toBe(24);
+    expect(s.reviewedHours).toBe(24);
+    expect(s.pendingHours).toBe(0);
+    expect(s.isFullyReviewed).toBe(true);
+    expect(s.isCompletelyDone).toBe(true);
+  });
+
+  it("BUG-17: a reviewed block wins an hour over a hidden pending duplicate", () => {
+    const s = evalDay([block("pending", 0), block("completed", 0)]);
+    expect(s.plannedHours).toBe(1);
+    expect(s.completedHours).toBe(1);
+    expect(s.pendingHours).toBe(0);
+  });
+
+  it("BUG-17: blockHourSpan parses end and clamps to 24", () => {
+    const b = block("pending", 23);
+    expect(blockHourSpan(b)).toEqual([23, 24]);
+    const wrap = { ...b, endTime: "00:00" };
+    expect(blockHourSpan(wrap)).toEqual([23, 24]);
+    const wide = { ...b, endTime: "25:00" };
+    expect(blockHourSpan(wide)).toEqual([23, 24]);
+  });
+
+  it("BUG-17: resolveHourOwners returns one winner per hour", () => {
+    const owners = resolveHourOwners([block("completed", 0), block("pending", 0)]);
+    expect(owners).toHaveLength(24);
+    expect(owners[0]?.status).toBe("completed");
+    expect(owners[1]).toBeNull();
+  });
 
 describe("getHeatmapCellStyles", () => {
   it("gives an unscheduled day a neutral label", () => {

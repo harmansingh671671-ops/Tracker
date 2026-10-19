@@ -32,6 +32,49 @@ export interface DayCompletionStats {
 }
 
 /**
+ * The clock-hour span [start, end) one block covers, in 0..24 semantics.
+ * One definition — the stats popup grid and the day-review counters must
+ * parse spans identically or the pixels and the numbers disagree.
+ *
+ * End parsing matches every writer in this app:
+ * - "24:00" means the block covers hour 23 too;
+ * - an end equal to or before the start ("00:00" written by the day-schedule
+ *   editor for an hour-23 block) is treated as one hour;
+ * - an unparseable start is anchored at hour 0 rather than left invisible —
+ *   a mis-parsed block a user typed must stay reviewable, not vanish.
+ * The end is clamped to 24 so a stray "25:00" cannot exceed the day.
+ */
+export function blockHourSpan(b: ScheduleBlock): [number, number] {
+  const startHour = parseInt(b.startTime.split(":")[0] ?? "", 10);
+  const start = Number.isNaN(startHour) ? 0 : startHour;
+  let endHour = parseInt(b.endTime.split(":")[0] ?? "", 10);
+  if (b.endTime === "24:00") endHour = 24;
+  if (Number.isNaN(endHour) || endHour <= start) endHour = start + 1;
+  return [start, Math.min(24, endHour)];
+}
+
+/**
+ * Which block "shows" in each of the 24 clock hours, honouring overlaps:
+ * a reviewed block (completed/missed) beats a pending one for the same hour,
+ * ties order by list position. BUG-17: a heatmap that renders only this
+ * winner must count the winner too — that is the "24/33h" bug's other half.
+ */
+export function resolveHourOwners(blocks: ScheduleBlock[]): (ScheduleBlock | null)[] {
+  const owners: (ScheduleBlock | null)[] = Array(24).fill(null);
+  for (const b of blocks) {
+    const [start, end] = blockHourSpan(b);
+    const reviewed = b.status === "completed" || b.status === "missed";
+    for (let h = start; h < end; h++) {
+      const current = owners[h];
+      const currentReviewed =
+        current !== null && (current.status === "completed" || current.status === "missed");
+      if (!current || (reviewed && !currentReviewed)) owners[h] = b;
+    }
+  }
+  return owners;
+}
+
+/**
  * Evaluates the schedule planning & review status for a given calendar day.
  * - If 0 blocks planned -> 'empty'
  * - If blocks planned but 0 reviewed (all pending) -> 'planned_unreviewed' (Orange)
@@ -39,6 +82,12 @@ export interface DayCompletionStats {
  *    * 'fully_completed' (>=18h planned and 100% reviewed) -> Brightest Emerald
  *    * 'mostly_reviewed' (>=50% reviewed) -> Medium Green
  *    * 'partially_reviewed' (1h to <50% reviewed) -> Dim Green
+ *
+ * BUG-17 (2026-10-19): hours are counted on the clock, not per record. An
+ * overlapping duplicate block (e.g. a sleep slot autofilled under a
+ * multi-hour user block) used to inflate plannedHours past 24 — the stats
+ * popup then said "24/33h" on a 24-hour day, with unreviewed hours that the
+ * heatmap could not show because a rendering block already covered them.
  */
 export function evaluateDayCompletion(
   blocksForDay: ScheduleBlock[] | undefined | null,
@@ -46,11 +95,14 @@ export function evaluateDayCompletion(
   dayNumber: number
 ): DayCompletionStats {
   const blocks = blocksForDay || [];
-  const plannedHours = blocks.length;
-  const completedHours = blocks.filter((b) => b.status === "completed").length;
-  const missedHours = blocks.filter((b) => b.status === "missed").length;
+  const owners = resolveHourOwners(blocks);
+  const owned = owners.filter((b): b is ScheduleBlock => b !== null);
+  const plannedHours = owned.length;
+  const completedHours = owned.filter((b) => b.status === "completed").length;
+  const missedHours = owned.filter((b) => b.status === "missed").length;
+  // A winner with no status field is pending, same as before.
+  const pendingHours = plannedHours - completedHours - missedHours;
   const reviewedHours = completedHours + missedHours;
-  const pendingHours = blocks.filter((b) => b.status === "pending" || !b.status).length;
 
   const hasSchedule = plannedHours > 0;
   const reviewRatio = hasSchedule ? reviewedHours / plannedHours : 0;

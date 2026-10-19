@@ -12,6 +12,7 @@ import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import {
   evaluateDayCompletion,
   getHeatmapCellStyles,
+  resolveHourOwners,
   type DayCompletionStats,
 } from "@/lib/utils/day-status";
 import {
@@ -282,20 +283,19 @@ export default function StatsPage() {
     );
   }, [popupDate, dayStatsByDate, allBlocks, user?.createdAt]);
 
-  // 24-Hour hourly breakdown (0..23) for popup date in a 4x6 grid
+  // 24-Hour hourly breakdown (0..23) for popup date in a 4x6 grid.
+  // BUG-17: this used to be its own "first block that covers the hour" scan,
+  // which disagreed with the day-review counters whenever blocks overlapped —
+  // the grid hid a pending duplicate while the chip demanded its review,
+  // freezing progress below 100% with every cell already colored. Both sides
+  // now share resolveHourOwners, so one hour has exactly one winner here and
+  // in the numbers.
   const popupHourlyBlocks = useMemo(() => {
     if (!popupDate) return [];
     const dayBlocks = allBlocks.filter((b) => b.date === popupDate);
+    const owners = resolveHourOwners(dayBlocks);
 
-    return Array.from({ length: 24 }, (_, hour) => {
-      const block = dayBlocks.find((b) => {
-        const sH = parseInt(b.startTime.split(":")[0], 10);
-        let eH = parseInt(b.endTime.split(":")[0], 10);
-        if (eH === 0 && b.endTime === "24:00") eH = 24;
-        if (isNaN(eH) || eH <= sH) eH = sH + 1;
-        return hour >= sH && hour < eH;
-      });
-
+    return owners.map((block, hour) => {
       if (!block) {
         return {
           hour,
