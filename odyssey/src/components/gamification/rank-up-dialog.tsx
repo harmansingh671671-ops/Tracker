@@ -11,34 +11,32 @@
  *
  * ## Why the previous rank lives in localStorage
  *
- * The rank is derived from the streak, which the app recomputes in a store the
- * component never sees. So the *previous* rank has to be remembered from last
- * time this component ran. Three consequences, all deliberate:
+ * The rank is derived from the days-done count, which the app recomputes in a
+ * store the component never sees. So the *previous* rank has to be remembered
+ * from last time this component ran. Three consequences, all deliberate:
  *
  * - **First run stores the current rank without a dialog.** A new user has not
  *   earned anything by opening the app; showing "Welcome, Novice!" for the rank
  *   they were born into would be a fabricated achievement.
- * - **A demotion updates the stored value silently.** Losing days should not
- *   leave a stale high-water mark that fires a false promotion later.
+ * - **A drop updates the stored value silently.** Losing days should not leave a
+ *   stale high-water mark that fires a false promotion later.
  * - **Dismissing is permanent for that promotion.** The rank is written back
  *   immediately, so a refresh cannot replay the dialog.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
+import { calculateRank } from "@/lib/utils/gamification";
 import { getRankUpCelebration, type RankUpCelebration } from "@/lib/utils/rank-lore";
 import { readString, writeString } from "@/lib/utils/logger";
 
 const STORAGE_KEY = "odyssey_last_seen_rank";
 
 interface RankUpDialogProps {
-  /** The user's profile streak. */
-  streak: number | undefined;
-  /** The stored rank name, if the profile carries one. Falls back to `calculateRank`. */
-  militaryRank: string | undefined;
+  /** The user's app-wide days-done count. Ranks are earned in days done (ADR 0005). */
+  daysDone: number | undefined;
 }
 
-export function RankUpDialog({ streak, militaryRank }: RankUpDialogProps) {
+export function RankUpDialog({ daysDone }: RankUpDialogProps) {
   const [celebration, setCelebration] = useState<RankUpCelebration | null>(null);
   const seenRef = useRef<string | null>(null);
   // The deferred promotion can outlive an unmount if the user navigates in the
@@ -51,7 +49,7 @@ export function RankUpDialog({ streak, militaryRank }: RankUpDialogProps) {
     };
   }, []);
 
-  const currentRankName = getRankInfo(militaryRank || calculateRank(streak ?? 0)).name;
+  const currentRankName = calculateRank(daysDone ?? 0);
 
   const record = useCallback((rankName: string) => {
     seenRef.current = rankName;
@@ -59,10 +57,10 @@ export function RankUpDialog({ streak, militaryRank }: RankUpDialogProps) {
   }, []);
 
   useEffect(() => {
-    // Nothing to compare against before the profile has loaded; an absent
-    // streak would otherwise read as rank zero and fire a false promotion.
+    // Nothing to compare against before the profile has loaded; an absent count
+    // would otherwise read as rank zero and fire a false promotion.
     if (!currentRankName) return;
-    if (streak === undefined || streak === null) return;
+    if (daysDone === undefined || daysDone === null) return;
 
     // `setState` is deferred out of the effect body: calling it synchronously
     // here cascades a second render pass, which the react-hooks lint rule
@@ -96,10 +94,10 @@ export function RankUpDialog({ streak, militaryRank }: RankUpDialogProps) {
       const promo = getRankUpCelebration(seenRef.current, currentRankName);
       record(currentRankName);
       // A demotion yields no promo, so the stored value is updated without a
-      // dialog -- the high-water mark must not survive a broken streak.
+      // dialog -- the high-water mark must not survive a drop.
       if (promo) show(promo);
     }
-  }, [currentRankName, streak, record]);
+  }, [currentRankName, daysDone, record]);
 
   return (
     <Dialog open={celebration !== null} onOpenChange={(open) => !open && setCelebration(null)}>

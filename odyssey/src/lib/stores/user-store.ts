@@ -1,10 +1,18 @@
 import { create } from 'zustand';
 import { getOrCreateUser, updateUserProfile, resetAllDataToZero, type Profile } from '../user';
+import { db } from '../db';
 import { levelFromXp, quotePurchase, snapshotOf } from '../utils/economy';
+import { countScheduleCompliedDays } from '../utils/compliance';
 
 interface UserState {
   user: Profile | null;
   loading: boolean;
+  /**
+   * The app-wide **days done** counter: days whose schedule was fully written
+   * (>=18h) and fully reviewed (ADR 0005). Derived from `scheduleBlocks` on every
+   * `fetchUser` and never stored, so it cannot drift or need a migration.
+   */
+  daysComplied: number;
   fetchUser: () => Promise<Profile>;
   updateUser: (updates: Partial<Profile>) => Promise<void>;
   addXp: (amount: number) => Promise<void>;
@@ -13,12 +21,27 @@ interface UserState {
   resetToZero: () => Promise<void>;
 }
 
+/**
+ * Counts the complied schedule days from the blocks on disk.
+ *
+ * This is a full read of `scheduleBlocks`, which is why it lives in `fetchUser`
+ * (once per screen mount) and not in a render path. A complied day is a *past*
+ * day, so the number is stable within a session except when the user reviews the
+ * last pending hour, which calls `fetchUser` again.
+ */
+async function countDaysDone(): Promise<number> {
+  const blocks = await db.scheduleBlocks.toArray();
+  return countScheduleCompliedDays(blocks);
+}
+
 export const useUserStore = create<UserState>((set, get) => ({
   user: null,
   loading: true,
+  daysComplied: 0,
   fetchUser: async () => {
     const user = await getOrCreateUser();
-    set({ user, loading: false });
+    const daysComplied = await countDaysDone();
+    set({ user, loading: false, daysComplied });
     return user;
   },
   updateUser: async (updates) => {
@@ -57,6 +80,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
   resetToZero: async () => {
     const user = await resetAllDataToZero();
-    set({ user });
+    // The reset clears `scheduleBlocks`, so the app-wide count really is zero.
+    set({ user, daysComplied: 0 });
   }
 }));

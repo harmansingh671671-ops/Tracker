@@ -8,7 +8,8 @@ import { HabitIcon } from "@/components/habits/habit-icon";
 import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
 import { getHabitColor, isHabitScheduledOnDate, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getCompletionRecord, isHabitComplete, isHabitSlipped } from "@/lib/utils/habit-completion";
-import { getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
+import { getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
+import { useHabitStore } from "@/lib/stores/habit-store";
 
 interface GridHabitCardProps {
   habit: Habit;
@@ -63,6 +64,9 @@ export function GridHabitCard({
   const isSlipped = isHabitSlipped(habit, log);
   const currentValue = typeof log?.value === "number" ? log.value : 0;
   const targetValue = habit.targetValue ?? 1;
+  // Days done is derived in the store (ADR 0005) and read here rather than
+  // threaded through the page's already-long prop list.
+  const daysDone = useHabitStore((s) => s.daysDoneByHabit[habit.id] ?? 0);
 
   // Long press refs for + button on counted habits
   const plusPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -298,9 +302,9 @@ export function GridHabitCard({
       <div>
         <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
           <span className="truncate font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(habit)}</span>
-          <span className={`font-bold shrink-0 flex items-center gap-0.5 ${habit.type === "avoid" ? "text-error" : isStreakActive(habit.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+          <span className={`font-bold shrink-0 flex items-center gap-0.5 ${habit.type === "avoid" ? "text-error" : isDaysDoneActive(daysDone) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
             {habit.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
-            {habit.type === "avoid" ? `${getStreakLabel(habit.currentStreak)} clean` : getStreakLabel(habit.currentStreak)}
+            {habit.type === "avoid" ? `${getDaysDoneLabel(daysDone)} clean` : getDaysDoneLabel(daysDone)}
           </span>
           {habit.type === "avoid" && (
             <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">

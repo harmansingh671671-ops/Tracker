@@ -56,7 +56,7 @@ export function evaluateDayCompletion(
     status = "empty";
   } else if (reviewedHours === 0) {
     status = "planned_unreviewed";
-  } else if (isCompletelyDone || isFullyReviewed) {
+  } else if (isCompletelyDone) {
     status = "fully_completed";
   } else if (reviewRatio >= 0.5) {
     status = "mostly_reviewed";

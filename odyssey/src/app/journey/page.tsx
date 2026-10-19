@@ -7,7 +7,7 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
-import { getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
+import { getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
 import { evaluateDayCompletion, type DayCompletionStats } from "@/lib/utils/day-status";
 import {
   Check,
@@ -25,7 +25,7 @@ import {
 
 export default function JourneyPage() {
   const router = useRouter();
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, daysComplied } = useUserStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
   const [isTodayInView, setIsTodayInView] = useState(true);
@@ -53,8 +53,8 @@ export default function JourneyPage() {
   }, [user?.createdAt]);
 
   const rankInfo = useMemo(() => {
-    return getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0));
-  }, [user?.militaryRank, user?.streak]);
+    return getRankInfo(calculateRank(daysComplied));
+  }, [daysComplied]);
 
   const currentLevel = user?.level || (Math.floor((user?.xp ?? 0) / 500) + 1);
   const currentXp = user?.xp ?? 0;
@@ -258,9 +258,9 @@ export default function JourneyPage() {
             <span className="text-xs font-mono font-bold text-primary px-3 py-1 rounded-full bg-primary/15 border border-primary/30">
               Day {activeDay} Active
             </span>
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold ${isStreakActive(user?.streak ?? 0) ? "bg-surface-container-high text-amber-400" : "bg-surface-container text-on-surface-variant/70"}`}>
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold ${isDaysDoneActive(daysComplied) ? "bg-surface-container-high text-amber-400" : "bg-surface-container text-on-surface-variant/70"}`}>
               <Flame className="w-3.5 h-3.5" />
-              <span>{getStreakLabel(user?.streak ?? 0, "long")}</span>
+              <span>{getDaysDoneLabel(daysComplied, "long") || "No days done yet"}</span>
             </div>
           </div>
 

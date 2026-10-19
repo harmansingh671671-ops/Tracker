@@ -19,7 +19,7 @@ import {
 interface ShopItem {
   id: string;
   name: string;
-  category: "protection" | "boost" | "custom";
+  category: "boost" | "custom";
   price: number;
   icon: string;
   desc: string;
@@ -63,15 +63,6 @@ export default function ShopPage() {
   const shopItems: ShopItem[] = useMemo(
     () => [
       {
-        id: "streak-freeze",
-        name: "Streak Freeze Shield",
-        category: "protection",
-        price: 15,
-        icon: "🛡️",
-        desc: "Protects your streak for 24h if you miss a day.",
-        badge: (user?.streakFreezeCount ?? 0) > 0 ? `${user?.streakFreezeCount} Active` : undefined,
-      },
-      {
         id: "xp-boost",
         name: "2x XP Chrono Boost (24h)",
         category: "boost",
@@ -96,7 +87,7 @@ export default function ShopPage() {
         desc: "Golden crest for your journey and rank cards.",
       },
     ],
-    [user?.streakFreezeCount]
+    []
   );
 
   const filteredItems = useMemo(() => {
@@ -208,7 +199,6 @@ export default function ShopPage() {
       <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
         {[
           { id: "all", label: "All Items" },
-          { id: "protection", label: "Protection" },
           { id: "boost", label: "XP Boosts" },
           { id: "custom", label: "Crests" },
         ].map((cat) => (
@@ -239,7 +229,7 @@ export default function ShopPage() {
               <div className="flex flex-col min-w-0">
                 {/* No `truncate`: the badge used to sit INSIDE this title row and
                     took its width, so a 21-character name was cut to
-                    "Streak Freeze Sh...". The badge now sits below the copy
+                    "Titan Mindset Golden...". The badge now sits below the copy
                     (owner instruction), which gives the name the full column, and
                     the name wraps rather than being hidden if it ever runs out of
                     room. `min-w-0` above is what lets a flex child shrink enough
@@ -291,7 +281,7 @@ export default function ShopPage() {
         onClose={() => setIsCelebrationOpen(false)}
         diamondsWon={25}
         xpWon={50}
-        itemWon="Streak Freeze Shield"
+        itemWon="2x XP Chrono Boost (24h)"
       />
     </div>
   );

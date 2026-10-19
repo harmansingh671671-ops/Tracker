@@ -90,10 +90,19 @@ describe("evaluateDayCompletion - status transitions", () => {
     expect(s.status).toBe("mostly_reviewed");
   });
 
-  it("is 'fully_completed' when everything is reviewed", () => {
-    const s = evalDay(blocks("completed", "completed", "missed"));
-    expect(s.isFullyReviewed).toBe(true);
-    expect(s.status).toBe("fully_completed");
+  it("is 'fully_completed' only for a full day reviewed end to end", () => {
+    // The type doc has always said `fully_completed` = ">=18h AND 100%
+    // reviewed"; the code used to accept `isFullyReviewed` alone, so a 3-hour
+    // day reviewed end to end claimed the brightest cell. It no longer does
+    // (ADR 0005) -- that is what makes the day count as a "day done".
+    const full = evalDay(Array.from({ length: 18 }, (_, i) => block("completed", i)));
+    expect(full.isFullyReviewed).toBe(true);
+    expect(full.status).toBe("fully_completed");
+
+    const short = evalDay(blocks("completed", "completed", "missed"));
+    expect(short.isFullyReviewed).toBe(true);
+    expect(short.isCompletelyDone).toBe(false);
+    expect(short.status).toBe("mostly_reviewed");
   });
 
   it("only sets isCompletelyDone once 18+ hours are planned", () => {
@@ -131,6 +140,15 @@ describe("getHeatmapCellStyles", () => {
   });
 
   it("shows hour totals when fully reviewed", () => {
+    const styles = getHeatmapCellStyles(
+      evalDay(Array.from({ length: 18 }, (_, i) => block("completed", i)))
+    );
+    expect(styles.label).toBe("100% Reviewed (18h/18h)");
+  });
+
+  it("still reports the real percentage for a short day that is fully reviewed", () => {
+    // Under the full-day bar the cell is not the brightest green, but it must
+    // not lie about the review percentage either.
     const styles = getHeatmapCellStyles(evalDay(blocks("completed", "completed", "missed")));
     expect(styles.label).toBe("100% Reviewed (3h/3h)");
   });

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db } from "@/lib/db";
 import { clearFloatingBlocks } from "@/lib/utils/floating-blocks";
-import { getStreakLabel } from "@/lib/utils/warm-copy";
+import { getDaysDoneLabel } from "@/lib/utils/warm-copy";
 import { checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
 import { HeadsUpAlertsCard } from "@/components/settings/heads-up-alerts-card";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
@@ -20,7 +20,7 @@ interface ProfileSettingsSheetProps {
 }
 
 export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetProps) {
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, daysComplied } = useUserStore();
     const [totalBlocks, setTotalBlocks] = useState(0);
   const [totalHabits, setTotalHabits] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -169,7 +169,8 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
                 <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
               </div>
               <p className="text-xs text-on-surface-variant font-mono mt-0.5">
-                Scholar · Division II · {getStreakLabel(user?.streak ?? 0, "long")}
+                Scholar · Division II
+                {getDaysDoneLabel(daysComplied, "long") && ` · ${getDaysDoneLabel(daysComplied, "long")}`}
               </p>
             </div>
           </div>

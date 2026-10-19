@@ -21,7 +21,7 @@ const PILLARS = [
   {
     Icon: ListChecks,
     title: "Habits",
-    body: "Tick off what you meant to do. Streaks build themselves.",
+    body: "Tick off what you meant to do. The days add up.",
   },
   {
     Icon: CalendarClock,

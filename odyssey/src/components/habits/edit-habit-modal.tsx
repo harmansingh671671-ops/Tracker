@@ -14,7 +14,6 @@ import {
   History,
   Sliders,
   Flame,
-  Trophy,
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
@@ -94,7 +93,7 @@ export function EditHabitModal({
   onDelete,
 }: EditHabitModalProps) {
   const { user } = useUserStore();
-  const { historyLogs, toggleHabitLog } = useHabitStore();
+  const { historyLogs, toggleHabitLog, daysDoneByHabit } = useHabitStore();
 
   const [activeTab, setActiveTab] = useState<"history" | "edit">(initialTab);
 
@@ -289,24 +288,14 @@ export function EditHabitModal({
         {activeTab === "history" && (
           <div className="space-y-4 animate-in fade-in duration-200">
             {/* Quick Metrics Grid */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 flex flex-col items-center justify-center text-center">
                 <span className="text-amber-400 font-bold font-mono text-base flex items-center gap-1">
                   <Flame className="w-4 h-4" />
-                  {habit.currentStreak || 0}d
+                  {daysDoneByHabit[habit.id] ?? 0}d
                 </span>
                 <span className="text-[10px] font-mono text-on-surface-variant uppercase mt-0.5">
-                  Current
-                </span>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-surface-container-low border border-outline/10 flex flex-col items-center justify-center text-center">
-                <span className="text-secondary font-bold font-mono text-base flex items-center gap-1">
-                  <Trophy className="w-4 h-4" />
-                  {habit.longestStreak || 0}d
-                </span>
-                <span className="text-[10px] font-mono text-on-surface-variant uppercase mt-0.5">
-                  Best Streak
+                  Days Done
                 </span>
               </div>
 
@@ -348,7 +337,7 @@ export function EditHabitModal({
 
               {completedLogDates.length === 0 ? (
                 <p className="text-xs text-on-surface-variant font-mono py-2">
-                  No completions recorded yet. Complete today to start your streak!
+                  No completions recorded yet. Complete today to bank your first day.
                 </p>
               ) : (
                 <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   User,
-  Shield,
   Flame,
   Gem,
   Award,
@@ -30,7 +29,7 @@ import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, fetchUser, updateUser, resetToZero } = useUserStore();
+  const { user, fetchUser, updateUser, resetToZero, daysComplied } = useUserStore();
 
   // Form states
   const [displayName, setDisplayName] = useState("");
@@ -66,8 +65,8 @@ export default function ProfilePage() {
   }
 
   const rankInfo = useMemo(() => {
-    return getRankInfo(user?.militaryRank || calculateRank(user?.streak ?? 0));
-  }, [user?.militaryRank, user?.streak]);
+    return getRankInfo(calculateRank(daysComplied));
+  }, [daysComplied]);
 
   const xpCurrent = (user?.xp ?? 0) % 500;
   const xpPercent = Math.min(100, Math.round((xpCurrent / 500) * 100));
@@ -96,7 +95,7 @@ export default function ProfilePage() {
   const handleResetProgress = async () => {
     if (
       window.confirm(
-        "Are you sure you want to reset all progress to zero? (Level 1, 0 XP, 0 Diamonds, 0 Streak)"
+        "Are you sure you want to reset all progress to zero? (Level 1, 0 XP, 0 Diamonds, 0 Days Done)"
       )
     ) {
       await resetToZero();
@@ -298,22 +297,13 @@ export default function ProfilePage() {
             <span>Journey Performance</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {/* Streak */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Days done */}
             <div className="p-3 rounded-2xl bg-surface-container-high/70 border border-outline/10 text-center space-y-0.5">
-              <span className="text-[10.5px] font-mono text-on-surface-variant block">Current Streak</span>
+              <span className="text-[10.5px] font-mono text-on-surface-variant block">Days Done</span>
               <div className="flex items-center justify-center gap-1 text-amber-400 font-mono font-bold text-lg">
                 <Flame className="w-4 h-4" />
-                <span>{user?.streak ?? 0}d</span>
-              </div>
-            </div>
-
-            {/* Highest Streak */}
-            <div className="p-3 rounded-2xl bg-surface-container-high/70 border border-outline/10 text-center space-y-0.5">
-              <span className="text-[10.5px] font-mono text-on-surface-variant block">Best Streak</span>
-              <div className="flex items-center justify-center gap-1 text-secondary font-mono font-bold text-lg">
-                <Award className="w-4 h-4" />
-                <span>{user?.highestStreak ?? user?.streak ?? 0}d</span>
+                <span>{daysComplied}d</span>
               </div>
             </div>
 
@@ -323,15 +313,6 @@ export default function ProfilePage() {
               <div className="flex items-center justify-center gap-1 text-primary font-mono font-bold text-lg">
                 <Gem className="w-4 h-4" />
                 <span>{user?.diamonds ?? 0}</span>
-              </div>
-            </div>
-
-            {/* Streak Freezes */}
-            <div className="p-3 rounded-2xl bg-surface-container-high/70 border border-outline/10 text-center space-y-0.5">
-              <span className="text-[10.5px] font-mono text-on-surface-variant block">Streak Freezes</span>
-              <div className="flex items-center justify-center gap-1 text-cyan-400 font-mono font-bold text-lg">
-                <Shield className="w-4 h-4" />
-                <span>{user?.streakFreezeCount ?? 0}</span>
               </div>
             </div>
           </div>
@@ -368,7 +349,7 @@ export default function ProfilePage() {
             </span>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 text-center">
               {RANKS.slice(0, 5).map((r) => {
-                const isReached = (user?.streak ?? 0) >= r.streak;
+                const isReached = daysComplied >= r.streak;
                 return (
                   <div
                     key={r.name}
@@ -448,7 +429,7 @@ export default function ProfilePage() {
             <div className="flex flex-col">
               <span className="text-xs font-bold text-on-surface">Data &amp; Progress Reset</span>
               <span className="text-[11px] text-on-surface-variant">
-                Clear streaks and gamification back to Level 1
+                Clear days done and gamification back to Level 1
               </span>
             </div>
 

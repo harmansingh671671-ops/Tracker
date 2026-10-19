@@ -61,32 +61,29 @@ export function getCompletionToast(
 }
 
 /**
- * The streak counter's label.
+ * The days-done counter's label.
  *
  * **`compact`** is for the habit card rows and grid tiles, where a bare `3d`
- * sits beside the category and a Rest chip. **`long`** is for the profile sheet,
- * where there is room for a phrase.
+ * sits beside the category and a Rest chip. **`long`** is for the profile sheet
+ * and the journey banner, where there is room for a phrase.
  *
- * The zero case is the whole point. The habit cards used to render
+ * This replaced a streak label (ADR 0005). The habit cards used to render
  * `{h.currentStreak || 1}d`, which printed **1d** for a habit with no streak at
  * all -- a fabricated day, on the app's own habit card, next to a completion
- * count. `edit-habit-modal.tsx` and `wallpaper-preview.tsx` already read the
- * value honestly with `|| 0`, so the two idioms were live in one codebase and
- * the warm one was the liar. A real zero now says **"No streak yet"**, which is
- * both true and the more encouraging thing to read.
+ * count. A real zero now renders nothing rather than a made-up one.
  */
-export function getStreakLabel(days: number, variant: "compact" | "long" = "compact"): string {
+export function getDaysDoneLabel(days: number, variant: "compact" | "long" = "compact"): string {
   const safe = Number.isFinite(days) ? Math.max(0, Math.floor(days)) : 0;
   if (safe === 0) return "";
-  if (variant === "long") return `${safe}-day streak`;
+  if (variant === "long") return `${safe} ${safe === 1 ? "day" : "days"} done`;
   return `${safe}d`;
 }
 
 /**
- * Whether a streak label should be drawn in the flame colour. A zero streak is
+ * Whether a days-done label should be drawn in the achievement amber. Zero is
  * not a failure state, so it stays in the ordinary muted colour rather than
- * being dressed in the achievement amber.
+ * being dressed up as an achievement.
  */
-export function isStreakActive(days: number): boolean {
+export function isDaysDoneActive(days: number): boolean {
   return Number.isFinite(days) && Math.floor(days) > 0;
 }

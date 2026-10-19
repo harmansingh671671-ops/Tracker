@@ -125,13 +125,15 @@ export default function StatsPage() {
     return map;
   }, [allBlocks, user?.createdAt]);
 
-  // Only count days that are genuinely completed (fully filled & reviewed)
-  const completedDaysCount = useMemo(() => {
-    return Object.values(dayStatsByDate).filter((s) => s.status === "fully_completed").length;
+  // Days done: a day counts only when its schedule was fully written (>=18h) and
+  // fully reviewed (ADR 0005). `isCompletelyDone` is exactly that rule; the old
+  // `status === "fully_completed"` check was looser before `day-status.ts` was
+  // aligned with its own documented contract.
+  const daysDoneCount = useMemo(() => {
+    return Object.values(dayStatsByDate).filter((s) => s.isCompletelyDone).length;
   }, [dayStatsByDate]);
 
-  const userStreak = user?.streak ?? 0;
-  const currentRankName = user?.militaryRank || calculateRank(completedDaysCount || userStreak);
+  const currentRankName = calculateRank(daysDoneCount);
   const rankInfo = useMemo(() => {
     return getRankInfo(currentRankName);
   }, [currentRankName]);
@@ -143,14 +145,14 @@ export default function StatsPage() {
   const divisionProgress = useMemo(() => {
     if (!nextRank) {
       return {
-        current: completedDaysCount || userStreak,
+        current: daysDoneCount,
         target: rankInfo.streak,
         pct: 100,
         label: "Max Division Reached",
       };
     }
     const target = nextRank.streak;
-    const current = completedDaysCount;
+    const current = daysDoneCount;
     const pct = Math.min(100, Math.max(0, Math.round((current / target) * 100)));
     return {
       current,
@@ -158,7 +160,7 @@ export default function StatsPage() {
       pct,
       label: `Next: ${nextRank.name} (${nextRank.division})`,
     };
-  }, [completedDaysCount, userStreak, rankInfo.streak, nextRank]);
+  }, [daysDoneCount, rankInfo.streak, nextRank]);
 
   const currentXp = user?.xp ?? 0;
   const currentLevel = user?.level || (Math.floor(currentXp / 500) + 1);
@@ -398,7 +400,7 @@ export default function StatsPage() {
                 <span className="text-outline/40">•</span>
                 <span className="inline-flex items-center gap-1 text-amber-400 whitespace-nowrap font-semibold">
                   <Flame className="w-3.5 h-3.5 shrink-0" />
-                  <span>{completedDaysCount} Done</span>
+                  <span>{daysDoneCount} Done</span>
                 </span>
               </div>
             </div>
@@ -570,19 +572,19 @@ export default function StatsPage() {
 
       {/* 2x2 KPI Matrix (Akiflow Obsidian Glass) */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Completed Days */}
+        {/* Days Done */}
         <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low/80 backdrop-blur-xl border border-outline/[0.08] space-y-1.5 overflow-hidden">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
             <Flame className="w-4 h-4 shrink-0" />
-            <span>Streak</span>
+            <span>Days Done</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-on-surface">{completedDaysCount}</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">{daysDoneCount}</span>
               <span className="text-xs text-on-surface-variant font-mono">days</span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
-              Completed
+              Fully written &amp; reviewed
             </p>
           </div>
         </div>

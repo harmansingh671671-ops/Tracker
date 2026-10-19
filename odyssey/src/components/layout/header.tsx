@@ -32,7 +32,7 @@ const RankUpDialog = dynamic(
 );
 
 export function Header() {
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, daysComplied } = useUserStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   // Set once, never unset: after the first open the sheet stays mounted so its
   // state behaves as it always has. See the import block above.
@@ -47,10 +47,11 @@ export function Header() {
       {/* M14 -- mounted here because the header is the one component present on
           every screen, so a promotion earned while completing a habit is shown
           wherever the user happens to be. PERF-5: gated on the profile, because
-          with no streak there is nothing to compare and the dialog itself returns
-          early until one arrives -- the gate only stops its code being part of
-          every screen's first paint. */}
-      {user && <RankUpDialog streak={user.streak} militaryRank={user.militaryRank} />}
+          with no profile there is nothing to compare and the dialog itself
+          returns early until one arrives -- the gate only stops its code being
+          part of every screen's first paint. The rank is now earned in days done
+          (ADR 0005), not in consecutive days. */}
+      {user && <RankUpDialog daysDone={daysComplied} />}
       <header className="fixed top-0 w-full z-40 pt-safe bg-surface/85 backdrop-blur-xl border-b border-outline/10">
         <div className="h-14 px-3 sm:px-4 max-w-xl sm:max-w-2xl mx-auto flex items-center justify-between gap-2">
           {/* Logo Title */}
@@ -81,14 +82,14 @@ export function Header() {
               </span>
             </div>
 
-            {/* 2. Fire / Streak */}
+            {/* 2. Fire / Days done */}
             <div
               className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high border border-outline/10 text-amber-400"
-              title={`Streak: ${user?.streak ?? 0} days`}
+              title={`Days done: ${daysComplied}`}
             >
               <Flame className="w-3 h-3 text-amber-400 shrink-0" />
               <span className="text-[11px] font-bold font-mono leading-none">
-                {user?.streak ?? 0}d
+                {daysComplied}d
               </span>
             </div>
 

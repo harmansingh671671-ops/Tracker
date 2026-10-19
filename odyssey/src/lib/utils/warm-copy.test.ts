@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   getCompletionToast,
-  getStreakLabel,
-  isStreakActive,
+  getDaysDoneLabel,
+  isDaysDoneActive,
 } from "./warm-copy";
 
 const OPTS = { xpPerCompletion: 15, perfectDayBonus: 50 };
@@ -61,60 +61,60 @@ describe("getCompletionToast", () => {
   });
 });
 
-describe("getStreakLabel", () => {
-  it("says 'No streak yet' for a real zero -- never a fabricated 1d", () => {
+describe("getDaysDoneLabel", () => {
+  it("renders nothing for a real zero -- never a fabricated 1d", () => {
     // The bug this replaces: `{h.currentStreak || 1}d` printed "1d" for a habit
-    // with no streak, on the habit card, next to a completion count.
-    expect(getStreakLabel(0)).toBe("");
-    expect(getStreakLabel(0)).not.toContain("1");
+    // with no days done, on the habit card, next to a completion count.
+    expect(getDaysDoneLabel(0)).toBe("");
+    expect(getDaysDoneLabel(0)).not.toContain("1");
   });
 
-  it("renders a positive streak compactly", () => {
-    expect(getStreakLabel(1)).toBe("1d");
-    expect(getStreakLabel(3)).toBe("3d");
-    expect(getStreakLabel(365)).toBe("365d");
+  it("renders a positive count compactly", () => {
+    expect(getDaysDoneLabel(1)).toBe("1d");
+    expect(getDaysDoneLabel(3)).toBe("3d");
+    expect(getDaysDoneLabel(365)).toBe("365d");
   });
 
-  it("renders a positive streak as a phrase for the profile sheet", () => {
-    expect(getStreakLabel(1, "long")).toBe("1-day streak");
-    expect(getStreakLabel(12, "long")).toBe("12-day streak");
+  it("renders a positive count as a phrase for the profile sheet", () => {
+    expect(getDaysDoneLabel(1, "long")).toBe("1 day done");
+    expect(getDaysDoneLabel(12, "long")).toBe("12 days done");
   });
 
   it("uses the same honest zero phrase in both variants", () => {
-    expect(getStreakLabel(0, "long")).toBe("");
+    expect(getDaysDoneLabel(0, "long")).toBe("");
   });
 
   it("treats a missing or nonsense value as zero rather than inventing one", () => {
-    expect(getStreakLabel(Number.NaN)).toBe("");
-    expect(getStreakLabel(-4)).toBe("");
-    expect(getStreakLabel(undefined as unknown as number)).toBe("");
+    expect(getDaysDoneLabel(Number.NaN)).toBe("");
+    expect(getDaysDoneLabel(-4)).toBe("");
+    expect(getDaysDoneLabel(undefined as unknown as number)).toBe("");
   });
 
   it("never renders a fractional day count", () => {
-    expect(getStreakLabel(3.7)).toBe("3d");
+    expect(getDaysDoneLabel(3.7)).toBe("3d");
   });
 
   it("is never the same string for zero and one", () => {
-    expect(getStreakLabel(0)).not.toBe(getStreakLabel(1));
-    expect(getStreakLabel(0, "long")).not.toBe(getStreakLabel(1, "long"));
+    expect(getDaysDoneLabel(0)).not.toBe(getDaysDoneLabel(1));
+    expect(getDaysDoneLabel(0, "long")).not.toBe(getDaysDoneLabel(1, "long"));
   });
 });
 
-describe("isStreakActive", () => {
-  it("is false for a zero or missing streak", () => {
-    expect(isStreakActive(0)).toBe(false);
-    expect(isStreakActive(Number.NaN)).toBe(false);
-    expect(isStreakActive(-1)).toBe(false);
+describe("isDaysDoneActive", () => {
+  it("is false for a zero or missing count", () => {
+    expect(isDaysDoneActive(0)).toBe(false);
+    expect(isDaysDoneActive(Number.NaN)).toBe(false);
+    expect(isDaysDoneActive(-1)).toBe(false);
   });
 
-  it("is true only for a real streak", () => {
-    expect(isStreakActive(1)).toBe(true);
+  it("is true only for a real count", () => {
+    expect(isDaysDoneActive(1)).toBe(true);
   });
 
-  it("agrees with the label: every active streak shows a number", () => {
+  it("agrees with the label: every active count shows a number", () => {
     for (const days of [0, 1, 2, 30]) {
-      const label = getStreakLabel(days);
-      if (isStreakActive(days)) expect(label).toMatch(/\d+d$/);
+      const label = getDaysDoneLabel(days);
+      if (isDaysDoneActive(days)) expect(label).toMatch(/\d+d$/);
       else expect(label).toBe("");
     }
   });

@@ -617,6 +617,68 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (f) - `B25`: the streak becomes two cumulative counters, derived from history
+
+Owner's brief: replace the consecutive streak with **cumulative "days done"**, at two
+levels — a per-habit lifetime count and an app-wide schedule-compliance count — recomputed
+from existing history, permanent once earned, driving rank and the 3/7/14/30 milestones.
+ADR 0005; supersedes ADR 0001 §5 and §7.4/§7.5 on the web.
+
+**Two counters, both derived, neither incremented.**
+
+| Counter | Counts a day when | Source | Held in |
+|---|---|---|---|
+| per habit | the habit was **scheduled** for it and `isHabitComplete` | `store.historyLogs` / `historyValues` | `habit-store.daysDoneByHabit` |
+| app-wide | **≥18 planned hours and 100% of blocks reviewed** (`isCompletelyDone`) | `scheduleBlocks` | `user-store.daysComplied` |
+
+Because both are recomputed from rows, `BUG-15` is closed **on the web by construction**:
+un-ticking an old day lowers a total instead of moving a "current" number. The stored
+`profiles.streak` / `habits.currentStreak` fields are **still written** — the native wallpaper
+payload reads them — so `BUG-15` survives on the phone until Kotlin is migrated. That is the
+one deliberate hole, named in the ADR.
+
+**The brief's `profiles.daysComplied` was NOT added.** It was proposed as a self-healing
+cache; a cached count can only go stale (it would need a recompute at every schedule write),
+which is the exact failure class this change removes. Derived on read instead: `fetchUser`
+reads `scheduleBlocks` (once per screen mount) and the three web paths that can change a
+day's compliance — review an hour, save an hour, delete an hour — call `fetchUser()` again.
+**No schema change, no Dexie bump.**
+
+**A doc-vs-code contradiction, found while wiring it.** `day-status.ts`'s type union said
+`fully_completed` = ">=18h AND 100% reviewed", but the branch accepted `isFullyReviewed`
+alone, so a 3-hour day reviewed end to end claimed the brightest cell. It now requires
+`isCompletelyDone`, which makes the stats KPI and the heatmap agree. **Visible change:** a
+fully-reviewed day under 18h downgrades from brightest green to `mostly_reviewed` (its label
+still reads "100% Reviewed (3h/3h)" — the label is about review, the colour is about the
+day).
+
+**Retired:** the Streak Freeze Shield (shop item, the now-empty "Protection" filter, and the
+profile card). `economy.ts`'s freeze branch stays and stays tested — a restored backup can
+still carry a freeze count. The profile grid is now **Days Done + Vault Gems** (the "Best
+Streak" card was redundant with a cumulative count).
+
+**Left alone, deliberately:** `android-bridge/**`, the wallpaper studio preview and the
+wallpaper generator still show the streak; `WeeklyReport.streakAtWeekEnd` remains a declared
+but never-written field (commented, not repurposed).
+
+**Gates:** `tsc --noEmit` exit 0 · `npm run lint` **0 errors, 96 warnings** (one new warning
+fixed: an unused helper in `habit-store`) · **30 suites / 462 tests** (15 new in
+`compliance.test.ts`, plus one new case each in `day-status` and `warm-copy`) · production
+build clean (13 static routes). **No visual pass:** no Puppeteer/Playwright is installed on
+this machine, so the light/dark check at 390/360/430 was not run. Mitigation: every colour
+used is an existing token class (`text-amber-400`, `text-primary`, `text-on-surface*`), no raw
+hex was added.
+
+**Transferable lessons:**
+- **A "cache" of a derived number is a staleness bug with extra steps.** If a value can be
+  recomputed from rows, recompute it at the read boundary and keep no field.
+- **Changing a metric means auditing every *reader*, not every *writer*.** 187 matches for
+  `streak` across `src`; the decision per surface (web → days done, native → leave) is the
+  actual design work, and it is what keeps the phone from going blank.
+- **A type doc that states the rule the code does not implement is a defect in the code.**
+  `day-status.ts` documented the 18-hour bar while accepting full review alone; the KPI built
+  on it was confidently wrong for every short day.
+
 ### 2026-10-19 (e) - S9: the violation state, so a quit habit's slip ends the run
 
 Branch `main`. `S9`'s first half landed in `b4d9eff` (the `avoid` type and the quit surface).
@@ -3981,26 +4043,39 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`S9` (quit mode, the violation state)**: a slip is a day
-  state now, not a missing tick — clean/slip controls on the list and grid cards, a slip stored as
-  `HabitLog.value = 1`, `isHabitSlipped`, and `HabitStore.markHabitSlip`. Committed on `main`;
-  **the agent does not push**. Before it: **`8700852`** (`PERF-5` 5a + 5b — per-route first-load
+- HEAD at last update: **this commit** — **`B25` (days done)**: the streak is replaced by two
+  cumulative, derived counters — per habit (`habit-store.daysDoneByHabit`) and app-wide schedule
+  compliance (`user-store.daysComplied`) — which drive rank and the 3/7/14/30 milestones; the
+  Streak Freeze Shield is retired; `day-status.ts`'s `fully_completed` now actually requires 18h
+  (ADR 0005). Committed on `main`; **the agent does not push**. Before it: **`2dc684e`** (`S9` the
+  violation state — clean/slip controls, `HabitLog.value = 1`, `isHabitSlipped`,
+  `markHabitSlip`), **`8700852`** (`PERF-5` 5a + 5b — per-route first-load
   measurement and the shell diet; shared set 261.4 → 178.4 KB gzip, `/planner` 263.0 → 178.8 KB, build
   total 431.9 → 476.7, see `PERFORMANCE.md` §2.1), **`b4d9eff`** (habit types — counted stepper + quit
   surface, `S13` part 2 / `S9`), **`e67dc01`** (C2 polish round two), `239c833` (C2 round one),
   `8a3a4a0` (C2 hold-not-swap), `6f53dbd`, `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`,
   `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`. **Everything up to and including `e67dc01` is on
-  `origin/main`** — the owner pushed; `b4d9eff`, `8700852` and this commit are **not**.
-- **Working tree (2026-10-19, `S9`):** commits `b4d9eff` + this one. `b4d9eff` landed the habit-types
-  body of work that had been sitting uncommitted (counted steppers, the quit surface, a habit colour
-  override, completion confetti, the `BUG-15` streak fix); it also finished a half-done grid-card
-  extraction, which fixed a rules-of-hooks violation (`useRef` inside `.map`) and a duplicated "Quit"
-  pill. This commit — `S9`'s violation state — touched `src/lib/db.ts` (a `value` doc line only; **no new
-  field**), `src/lib/utils/habit-completion.ts` (`isHabitSlipped` + docstring), its test file (6 tests),
-  `src/lib/stores/habit-store.ts` (`markHabitSlip`; `toggleHabitLog` learns `avoid`),
-  `src/components/habits/avoid-habit-control.tsx` (**new**), `src/components/habits/grid-habit-card.tsx`,
-  `src/app/habits/page.tsx`, `docs/adr/0003` (an update note), `main_plan.md` and `context.md`.
-  **The tree is otherwise clean.**
+  `origin/main`** — the owner pushed; `b4d9eff`, `8700852`, `2dc684e` and this commit are **not**.
+- **Working tree (2026-10-19, `B25`):** clean after this commit. `B25` touched
+  `src/lib/utils/compliance.ts` + `.test.ts` (**new**, the pure counters),
+  `src/lib/utils/day-status.ts` + test (strict `fully_completed`),
+  `src/lib/utils/warm-copy.ts` + test (`getDaysDoneLabel` / `isDaysDoneActive`),
+  `src/lib/utils/achievements.ts` + test (`DAYS_MILESTONES`, ids left as `streak-*`),
+  `src/lib/utils/gamification.ts` (param rename only),
+  `src/lib/stores/habit-store.ts` (`daysDoneByHabit`, recomputed on every fetch + log write),
+  `src/lib/stores/user-store.ts` (`daysComplied`, derived from `scheduleBlocks` in `fetchUser`),
+  `src/lib/db.ts` (**comments only — no new field**), the header, journey, profile, stats, shop,
+  habits page, grid card, edit-habit modal, profile sheet, rank-up dialog, planner (three
+  `fetchUser()` refreshes), onboarding copy, `docs/adr/0001` (superseded-in-part note),
+  `docs/adr/0005` (**new**), `main_plan.md` and `context.md`. `src/app/wallpaper*`,
+  `src/components/wallpaper*` and `src/lib/utils/android-bridge/**` were **not** touched.
+- **Pending, named: the native/Kotlin label.** The phone still renders a *streak* from
+  `profiles.streak` / `habits.currentStreak`, and those fields are still written so it does not go
+  blank. Migrating them to days done is a Kotlin change plus a payload rename; it cannot be
+  compiled on this machine (no `gradlew`, JBR 25 vs Kotlin 1.9.22), so it is deliberately unstarted.
+  **`BUG-15` is therefore fixed on the web and still live on the phone.**
+- **Pending, named: the wallpaper studio web preview** shows the streak for the same reason — it
+  renders the object that becomes the native payload.
 - **`src/lib/db.ts` is free again** — the habit-types work is committed, so ADR 0004's
   `OdysseyFloatingBlocks` can be folded into `OdysseyDB` as an additive store + version bump (AGENTS.md
   rule 2 calls `db.ts` the canonical schema). **Not done here**: a schema change belongs in its own change
@@ -4017,16 +4092,22 @@ to know where things stand.
   and 263.0 → 178.8 KB respectively. (3) **Source size is not transfer size** — the five "huge" screen
   files the plan targeted contribute 0.4–1.6 KB gzipped each, because they are already routes.
 - **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
-- Lint: `npx eslint src` exits 0 — **0 errors, 95 warnings**, all pre-existing `no-unused-vars`, none
-  introduced by `S9`. The repo-wide run reports the same (`scripts/**/*.js` gained a scoped exemption in
-  `eslint.config.mjs` with `PERF-5`). *(Historical, kept because the lesson is durable: the first clean
-  project-wide lint was 2026-10-17 at 96 warnings. Three `react-hooks/preserve-manual-memoization` errors
-  had sat in `planner-content.tsx` since `3970e90` and **nothing blocked on them** — `tsc`, the build and
-  the tests were green over a red count. React Compiler skips optimising an ENTIRE component when it cannot
-  preserve manual memoisation, so the cost was the whole planner screen. **Run the whole project, not the
-  files you touched.**)*
-- Tests: **29 suites, 446 tests green** (440 after `b4d9eff`; +6 with `S9`'s predicate tests). `tsc --noEmit`
-  exit 0. Production build clean.
+- Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings**, all `no-unused-vars` or the
+  pre-existing hooks warnings, none introduced by `B25` (one warning *removed*: an unused
+  `daysDoneFrom` helper I had added to `habit-store` and then inlined). The repo-wide run reports
+  the same (`scripts/**/*.js` gained a scoped exemption in `eslint.config.mjs` with `PERF-5`).
+  *(Historical, kept because the lesson is durable: the first clean project-wide lint was 2026-10-17
+  at 96 warnings. Three `react-hooks/preserve-manual-memoization` errors had sat in
+  `planner-content.tsx` since `3970e90` and **nothing blocked on them** — `tsc`, the build and the
+  tests were green over a red count. React Compiler skips optimising an ENTIRE component when it
+  cannot preserve manual memoisation, so the cost was the whole planner screen. **Run the whole
+  project, not the files you touched.**)*
+- Tests: **30 suites, 462 tests green** (446 after `S9`; +15 `compliance.test.ts`, +1 in
+  `day-status.test.ts`, +1 in `warm-copy.test.ts`, and `achievements.test.ts` renamed but unchanged
+  in count). `tsc --noEmit` exit 0. Production build clean, 13 static routes.
+- **No visual verification for `B25`.** Puppeteer / Playwright / `playwright-core` are all absent
+  from this machine, so the light/dark pass at 390/360/430 was not run. What *was* checked: every
+  colour added is an existing CSS-var token class, and no raw hex was introduced.
 - Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live
   `next dev`** (pid 2412) and was **deliberately left running** — a dev server recompiles on request, so it
   cannot serve the stale build that the rule guards against.

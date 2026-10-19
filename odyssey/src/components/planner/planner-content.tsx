@@ -219,6 +219,10 @@ export function PlannerContent() {
 
     await loadBlocks(selectedDate);
     syncCurrentScheduleToNative(selectedDate);
+    // Reviewing hours can complete the day, which is what the app-wide "days
+    // done" counter is derived from (ADR 0005). Re-read it here so the header and
+    // the journey banner move on the same tick as the review.
+    await fetchUser();
   };
 
   const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
@@ -783,12 +787,18 @@ export function PlannerContent() {
 
     await loadBlocks(selectedDate);
     syncCurrentScheduleToNative();
+    // An hour can be added, retitled, or re-statused here -- all three can change
+    // whether the day is fully written and reviewed, i.e. whether it is a "day
+    // done" (ADR 0005).
+    await fetchUser();
   };
 
   const handleDeleteBlock = async (id: string) => {
     await db.scheduleBlocks.delete(id);
     await loadBlocks(selectedDate);
     syncCurrentScheduleToNative();
+    // Removing an hour can break a complied day: recompute the app-wide counter.
+    await fetchUser();
   };
 
   const renderHourSlot = (

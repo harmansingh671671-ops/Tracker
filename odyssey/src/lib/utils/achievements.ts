@@ -9,27 +9,37 @@ export interface Achievement {
   threshold: number;
 }
 
-export const STREAK_MILESTONES: Achievement[] = [
-  { id: "streak-3", title: "3-day streak", narrative: "Three days in a row. Momentum is real.", threshold: 3 },
-  { id: "streak-7", title: "7-day streak", narrative: "A whole week of showing up. That's a habit forming.", threshold: 7 },
-  { id: "streak-14", title: "14-day streak", narrative: "Two weeks steady. The routine is yours now.", threshold: 14 },
-  { id: "streak-30", title: "30-day streak", narrative: "A month of consistency. Quietly remarkable.", threshold: 30 },
+/**
+ * Per-habit milestones, now counted in **days done** rather than consecutive
+ * days (ADR 0005). The thresholds are unchanged; what changed is that reaching
+ * them is permanent -- undoing an old day no longer walks a user back below a
+ * milestone they already crossed.
+ *
+ * The `id`s keep their `streak-` prefix on purpose: they are the keys in the
+ * celebrated-log (`odyssey_achievements_celebrated`), so renaming them would
+ * orphan every already-celebrated flag and replay a toast. They are internal.
+ */
+export const DAYS_MILESTONES: Achievement[] = [
+  { id: "streak-3", title: "3 days done", narrative: "Three days in the bank. Momentum is real.", threshold: 3 },
+  { id: "streak-7", title: "7 days done", narrative: "A whole week of showing up. That's a habit forming.", threshold: 7 },
+  { id: "streak-14", title: "14 days done", narrative: "Fourteen days done. The routine is yours now.", threshold: 14 },
+  { id: "streak-30", title: "30 days done", narrative: "Thirty days done. Quietly remarkable.", threshold: 30 },
 ];
 
 export function getAchievement(id: string): Achievement | undefined {
-  return STREAK_MILESTONES.find((a) => a.id === id);
+  return DAYS_MILESTONES.find((a) => a.id === id);
 }
 
 /**
- * Returns the ids of streak milestones crossed when moving from `prev` to `next`.
- * Only counts upward crossings (prev < threshold <= next). A demotion or no-change
+ * Returns the ids of day milestones crossed when moving from `prev` to `next`.
+ * Only counts upward crossings (prev < threshold <= next). A decrease or no-change
  * yields nothing -- the same refusal logic as M14's rank dialog.
  */
-export function newlyCrossedStreakMilestones(prev: number, next: number): string[] {
+export function newlyCrossedDayMilestones(prev: number, next: number): string[] {
   const safePrev = Number.isFinite(prev) ? Math.max(0, Math.floor(prev)) : 0;
   const safeNext = Number.isFinite(next) ? Math.max(0, Math.floor(next)) : 0;
   if (safeNext <= safePrev) return [];
-  return STREAK_MILESTONES.filter(
+  return DAYS_MILESTONES.filter(
     (a) => safePrev < a.threshold && safeNext >= a.threshold
   ).map((a) => a.id);
 }
@@ -66,7 +76,7 @@ export function markCelebrated(habitId: string, achievementId: string): void {
  * cannot re-fire them.
  */
 export function consumeNewAchievements(habitId: string, prev: number, next: number): Achievement[] {
-  const ids = newlyCrossedStreakMilestones(prev, next);
+  const ids = newlyCrossedDayMilestones(prev, next);
   const result: Achievement[] = [];
   for (const id of ids) {
     if (hasCelebrated(habitId, id)) continue;

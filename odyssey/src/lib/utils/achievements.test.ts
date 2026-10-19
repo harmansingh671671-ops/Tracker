@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  newlyCrossedStreakMilestones,
+  newlyCrossedDayMilestones,
   consumeNewAchievements,
   hasCelebrated,
   markCelebrated,
   getAchievement,
-  STREAK_MILESTONES,
+  DAYS_MILESTONES,
   ACHIEVEMENT_STORAGE_KEY,
 } from "./achievements";
 import { remove } from "./logger";
@@ -29,18 +29,18 @@ beforeEach(() => {
   remove(ACHIEVEMENT_STORAGE_KEY);
 });
 
-describe("newlyCrossedStreakMilestones", () => {
+describe("newlyCrossedDayMilestones", () => {
   it("fires on upward crossing", () => {
-    expect(newlyCrossedStreakMilestones(2, 3)).toEqual(["streak-3"]);
-    expect(newlyCrossedStreakMilestones(2, 7)).toEqual(["streak-3", "streak-7"]);
+    expect(newlyCrossedDayMilestones(2, 3)).toEqual(["streak-3"]);
+    expect(newlyCrossedDayMilestones(2, 7)).toEqual(["streak-3", "streak-7"]);
   });
-  it("does not fire on no-change or demotion", () => {
-    expect(newlyCrossedStreakMilestones(3, 3)).toEqual([]);
-    expect(newlyCrossedStreakMilestones(5, 2)).toEqual([]);
+  it("does not fire on no-change or a decrease", () => {
+    expect(newlyCrossedDayMilestones(3, 3)).toEqual([]);
+    expect(newlyCrossedDayMilestones(5, 2)).toEqual([]);
   });
   it("handles non-finite safely", () => {
-    expect(newlyCrossedStreakMilestones(NaN, 3)).toEqual(["streak-3"]);
-    expect(newlyCrossedStreakMilestones(2, NaN)).toEqual([]);
+    expect(newlyCrossedDayMilestones(NaN, 3)).toEqual(["streak-3"]);
+    expect(newlyCrossedDayMilestones(2, NaN)).toEqual([]);
   });
 });
 
@@ -62,6 +62,6 @@ describe("consumeNewAchievements", () => {
     expect(getAchievement("nope")).toBeUndefined();
   });
   it("catalogue has 4 milestones", () => {
-    expect(STREAK_MILESTONES.length).toBe(4);
+    expect(DAYS_MILESTONES.length).toBe(4);
   });
 });

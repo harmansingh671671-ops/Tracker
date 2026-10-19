@@ -14,12 +14,23 @@ export interface Profile {
   xp: number;
   level: number;
   diamonds: number;
+  /**
+   * Native-only since ADR 0005. The web no longer reads these three: the
+   * app-wide counter is the derived "days done" (`user-store.daysComplied`), and
+   * the Kotlin wallpaper payload still consumes `streak`. They are kept and still
+   * written so the phone does not go blank while its side is migrated.
+   */
   streak: number;
   highestStreak: number;
   militaryRank: string;
   integrityScore: number;
   lastReviewDate: string;
   lastPlanDate: string;
+  /**
+   * Retired with the streak (ADR 0005): the shop no longer sells a freeze and
+   * the profile no longer shows one. The fields stay so existing rows keep their
+   * shape and `economy.ts` remains tested; nothing reads them on the web.
+   */
   streakFreezeActive: boolean;
   streakFreezeCount?: number;
   unlockedBadges: string[];
@@ -340,8 +351,18 @@ export interface Habit {
   frequency: 'daily' | 'weekly';
   targetDaysPerWeek?: number;
   targetDays?: number[]; // [1..7] where 1=Mon, 2=Tue, ..., 7=Sun
+  /**
+   * Native-only since ADR 0005, like `Profile.streak`: the web reads the derived
+   * `habit-store.daysDoneByHabit` instead, while the Kotlin wallpaper payload
+   * still takes `currentStreak`. Kept and still written for the phone.
+   */
   currentStreak: number;
   longestStreak: number;
+  /**
+   * Cumulative completions, including days the habit was not scheduled for -- so
+   * it is deliberately NOT the same number as "days done" (ADR 0005). Shown in
+   * the habit history tab as "Completed".
+   */
   totalCompletions: number;
   createdAt: string;
   archivedAt?: string;
@@ -382,6 +403,7 @@ export interface WeeklyReport {
   completionRate: number;
   topCategory: string;
   mostProductiveHour: number;
+  /** Declared but never written anywhere (dead field). Left in place, not relied on. */
   streakAtWeekEnd: number;
   diamondsEarned: number;
   xpEarned: number;

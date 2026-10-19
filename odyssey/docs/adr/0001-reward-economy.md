@@ -6,6 +6,12 @@
 > **Feature:** P0-T4
 > **Scope:** Describes existing behaviour and decides the open questions. **No code is
 > changed by this document.** Implementation is a separate, later feature.
+>
+> **Superseded in part, 2026-10-19:** §5 (the streak rule) and §7.4/§7.5 are
+> superseded on the web by **ADR 0005** (`B25`). The app now counts cumulative
+> **days done**; no web surface reads `profiles.streak` or `habits.currentStreak`.
+> §6 (rewards on the day earned, schedule-aware) still binds, and §4/§5's warnings
+> about bulk claims remain the reason settlement is ledger-keyed.
 
 ---
 
@@ -79,6 +85,11 @@ most once even under retry.
 ---
 
 ## 5. Decision 2 — Streak must not jump on bulk claim
+
+> **Superseded on the web by ADR 0005 (2026-10-19).** The web no longer reads a
+> streak; it counts cumulative days done. This section still documents why a bulk
+> claim must never be summed into a running number, which is the same reason
+> settlement stayed ledger-keyed.
 
 **Decided: no.**
 

@@ -3,6 +3,7 @@ import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate, getHabitColor } from '../utils/habit-colors';
 import { isHabitComplete } from '../utils/habit-completion';
+import { buildDaysDoneMap } from '../utils/compliance';
 import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
 import { triggerStreaksConfetti } from '../utils/confetti';
 import {
@@ -72,6 +73,13 @@ interface HabitState {
    * rather than recomputing it on every date change.
    */
   lastCompletedAt: Record<string, string>;
+  /**
+   * `habitId` -> **days done**: the number of days the habit was scheduled for
+   * and was completed on. Derived from `historyLogs`/`historyValues` on every
+   * write, never incremented (ADR 0005), so it replaces `currentStreak` for
+   * every web surface and cannot drift the way `BUG-15` did.
+   */
+  daysDoneByHabit: Record<string, number>;
   /** Date that `todayLogs` was captured for; '' when unknown. */
   todayLogsDate: string;
   /** User whose data the store currently holds; '' until first successful load. */
@@ -118,6 +126,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   historyLogs: {},
   historyValues: {},
   lastCompletedAt: {},
+  daysDoneByHabit: {},
   todayLogsDate: "",
   loadedUserId: "",
   // Starts LOADING, not idle. Before the first fetch resolves there are no
@@ -144,10 +153,13 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     // reused when it is the day actually being asked for, otherwise reusing it
     // would attribute yesterday's completions to today.
     const todayLogsUsable = cached.capturedDate === date;
+    const historyValues =
+      cached.historyValues && typeof cached.historyValues === "object" ? cached.historyValues : {};
     set({
       habits: cached.habits,
       historyLogs: cached.historyLogs,
-      historyValues: cached.historyValues && typeof cached.historyValues === "object" ? cached.historyValues : {},
+      historyValues,
+      daysDoneByHabit: buildDaysDoneMap(cached.habits, cached.historyLogs, historyValues),
       todayLogs: todayLogsUsable ? cached.todayLogs : {},
       todayLogsDate: todayLogsUsable ? cached.capturedDate : "",
     });
@@ -255,7 +267,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       }
     });
 
-    set({ habits, todayLogs: logsMap, historyLogs: historyMap, historyValues: valuesMap, lastCompletedAt: lastCompleted, todayLogsDate: date, loadedUserId: userId, loading: false });
+    set({ habits, todayLogs: logsMap, historyLogs: historyMap, historyValues: valuesMap, daysDoneByHabit: buildDaysDoneMap(habits, historyMap, valuesMap), lastCompletedAt: lastCompleted, todayLogsDate: date, loadedUserId: userId, loading: false });
 
     // Mirror the authoritative read so the next cold load can paint instantly.
     // `logsMap` is by construction the logs for `date`, and it is stored under
@@ -427,6 +439,11 @@ const valuesMap: Record<string, Record<string, number>> = {};
 
         // ADR 0001 section 5: streak advances by an explicit consecutive-day
         // rule, never by the number of days settled.
+        //
+        // Retained for the native wallpaper payload only (ADR 0005). No web
+        // surface reads this any more -- the app-wide "days done" counter is
+        // derived from `scheduleBlocks` in the user store. Removing the streak
+        // from settlement belongs to the pending native move.
         const newStreak = advanceStreakForSettlement(settledDates, profile.streak || 0);
 
         await db.profiles.update(userId, {
@@ -575,14 +592,20 @@ const valuesMap: Record<string, Record<string, number>> = {};
         todayLogs: updatedToday,
         historyLogs: updatedHistory,
         historyValues: updatedValues,
+        daysDoneByHabit: buildDaysDoneMap(state.habits, updatedHistory, updatedValues),
       };
     });
 
-    // Update streak for this habit. A day counts toward the streak only when it
-    // is genuinely complete (value >= target for counted), so a counted habit at
-    // 3 of 20 never inflates the streak -- that is the BUG-5 class of defect.
-    // Streaks only move on TODAY's toggle: completing or un-completing a past
-    // day must not bump or drop the streak (BUG-15).
+    // Retained for the native wallpaper payload only (ADR 0005): every web
+    // surface reads the derived `daysDoneByHabit` instead. The arithmetic is kept
+    // because the Kotlin side still consumes `currentStreak`; removing it is part
+    // of the pending native move, not this change.
+    //
+    // A day counts toward the streak only when it is genuinely complete (value
+    // >= target for counted), so a counted habit at 3 of 20 never inflates the
+    // streak -- that is the BUG-5 class of defect. Streaks only move on TODAY's
+    // toggle: completing or un-completing a past day must not bump or drop the
+    // streak (BUG-15). That rule still matters while the phone reads this field.
     if (habit) {
       const becameCompleted = isCompleted && !wasCompleted;
       const becameIncomplete = !isCompleted && wasCompleted;
@@ -691,6 +714,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
         todayLogs: updatedToday,
         historyLogs: updatedHistory,
         historyValues: updatedValues,
+        daysDoneByHabit: buildDaysDoneMap(state.habits, updatedHistory, updatedValues),
       };
     });
 
@@ -773,7 +797,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       if (!updatedValues[habitId]) updatedValues[habitId] = {};
       updatedValues[habitId] = { ...updatedValues[habitId], [date]: value };
 
-      return { todayLogs: updatedToday, historyLogs: updatedHistory, historyValues: updatedValues };
+      return { todayLogs: updatedToday, historyLogs: updatedHistory, historyValues: updatedValues, daysDoneByHabit: buildDaysDoneMap(state.habits, updatedHistory, updatedValues) };
     });
 
     // Only today moves the clean-day run, the rule the rest of the store follows
@@ -818,6 +842,6 @@ const valuesMap: Record<string, Record<string, number>> = {};
     // The mirror must go too, otherwise the next cold load restores the habits
     // that were just archived.
     clearHabitCache(userId);
-    set({ habits: [], historyLogs: {}, historyValues: {}, todayLogs: {}, todayLogsDate: "", loadedUserId: "" });
+    set({ habits: [], historyLogs: {}, historyValues: {}, daysDoneByHabit: {}, todayLogs: {}, todayLogsDate: "", loadedUserId: "" });
   }
 }));

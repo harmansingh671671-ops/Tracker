@@ -19,10 +19,18 @@ export const RANKS: RankInfo[] = [
   { name: 'Legend', streak: 365, efficiency: 90, badge: '👑', division: 'Diamond', description: '1 full year of continuous dedication' }
 ];
 
-export function calculateRank(streak: number = 0, _legacyEfficiency?: number): string {
+/**
+ * The rank a user has earned after `daysDone` days done (ADR 0005 — the field
+ * `RankInfo.streak` is the threshold in days, kept under its old name because it
+ * is read as `rank.streak` in several places).
+ *
+ * The web passes the derived app-wide counter; the native settlement still passes
+ * the legacy streak until the phone is migrated.
+ */
+export function calculateRank(daysDone: number = 0, _legacyEfficiency?: number): string {
   let eligibleRank = RANKS[0].name;
   for (const rank of RANKS) {
-    if (streak >= rank.streak) {
+    if (daysDone >= rank.streak) {
       eligibleRank = rank.name;
     }
   }

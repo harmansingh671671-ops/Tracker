@@ -20,7 +20,7 @@ import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord, isHabitSlipped } from "@/lib/utils/habit-completion";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
-import { getCompletionToast, getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
+import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
 import { consumeNewAchievements } from "@/lib/utils/achievements";
 import {
   XP_CREATION_DIAMONDS,
@@ -51,6 +51,7 @@ export default function HabitsPage() {
     historyLogs,
     historyValues,
     lastCompletedAt,
+    daysDoneByHabit,
     temporaryWallet,
     fetchHabits,
     fetchTemporaryWallet,
@@ -291,9 +292,11 @@ export default function HabitsPage() {
       return;
     }
 
-    const isNowCompleted = await toggleHabitLog(user.id, habitId, targetDate);
     const habit = habits.find((h) => h.id === habitId);
-    const prevStreak = habit?.currentStreak ?? 0;
+    // Captured before the toggle: after it, the store's counter already includes
+    // this day, so the milestone check would never see the crossing.
+    const prevDaysDone = daysDoneByHabit[habitId] ?? 0;
+    const isNowCompleted = await toggleHabitLog(user.id, habitId, targetDate);
     const habitColor = habit ? getHabitColor(habit) : undefined;
     const isScheduled = habit ? isHabitScheduledOnDate(habit, targetDate) : true;
 
@@ -335,12 +338,9 @@ export default function HabitsPage() {
       ).isAllCompleted;
 
       // M15 -- achievement micro-narratives. Only fires on a genuine upward
-      // crossing of a streak milestone, and only once per habit per milestone.
-      const liveHabit = live.habits.find((h) => h.id === habitId);
-      const newStreak = liveHabit?.currentStreak ?? prevStreak;
-      const unlocked = isNowCompleted
-        ? consumeNewAchievements(habitId, prevStreak, newStreak)
-        : [];
+      // crossing of a days-done milestone, and only once per habit per milestone.
+      const newDaysDone = live.daysDoneByHabit[habitId] ?? prevDaysDone;
+      const unlocked = consumeNewAchievements(habitId, prevDaysDone, newDaysDone);
       if (unlocked.length > 0) {
         unlocked.forEach((a, i) => {
           window.setTimeout(() => showToast(`${a.title} — ${a.narrative}`), i * 4200);
@@ -408,7 +408,7 @@ export default function HabitsPage() {
     await fetchUser();
     await fetchTemporaryWallet(user.id);
     await fetchHabits(user.id, selectedDate, { force: true });
-    showToast(`Your journey with "${data.name}" begins now. First milestone: 3-day streak. +${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
+    showToast(`Your journey with "${data.name}" begins now. First milestone: 3 days done. +${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
   };
 
   const handleUpdateHabit = async (
@@ -918,9 +918,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
                           <span className="font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
                           <span>•</span>
-                          <span className={`flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                          <span className={`flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                             {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
-                            {h.type === "avoid" ? `${getStreakLabel(h.currentStreak)} clean` : getStreakLabel(h.currentStreak)}
+                            {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
                           </span>
                           {h.type === "avoid" && (
                             <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">
@@ -1170,9 +1170,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
-                        <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                        <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                           {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
-                          {h.type === "avoid" ? `${getStreakLabel(h.currentStreak)} clean` : getStreakLabel(h.currentStreak)}
+                          {h.type === "avoid" ? `${getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)} clean` : getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0)}
                         </span>
                         {h.type === "avoid" && (
                           <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">
