@@ -617,6 +617,28 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (c) - habit types: the counted stepper and the quit surface, finally committed
+
+Branch `main`. Two bodies of work had been sitting **uncommitted** in the tree: a counted-habit
+stepper (`S13` part 2) and the quit-mode UI surface (`S9`). `main_plan.md` already claimed `S13`
+and `B3` `SHIPPED` while the code that earned the claim was never committed - the exact defect
+the commit sequence exists to prevent. This commit lands the code.
+
+**What it contains.** `historyValues` in the habit store (so a past date reads its logged number
+rather than a boolean) and `getCompletionRecord` to merge the three stores; a +/- stepper and a
+draggable progress bar on counted rows; the `avoid` type in the union, a "Quit a Habit" flow in
+create/edit, and red "N clean" card styling. Also folded in: a habit colour override, completion
+confetti, and the `BUG-15` streak fix (only today's toggle moves the streak).
+
+**The grid-view refactor was half-finished and had to be completed.** `grid-habit-card.tsx`
+existed and was imported, but nothing rendered it - the old inline `.map()` block was still live,
+so the component was dead code and the inline block carried a rules-of-hooks violation (`useRef`
+inside `.map`). It also rendered the "Quit" pill **twice**. Wiring the component in fixes the
+violation by construction and removes the duplicate; the component needed the `avoid` branch
+added, which it was missing.
+
+Gates: `tsc` exit 0; `eslint src` 0 errors; 29 suites / 440 tests green; build clean.
+
 ### 2026-10-19 (b) - C2 round two: the icon's category badge, the hand-off flight, a smaller unlabelled cross
 
 Four owner asks in one sitting, on top of the entry below: the held icon should show **no hour**,

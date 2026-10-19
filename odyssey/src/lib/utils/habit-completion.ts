@@ -18,6 +18,7 @@ import type { Habit, HabitLog } from "@/lib/db";
  * caller with a partial record cannot be silently given the wrong answer.
  */
 export interface CompletionSubject {
+  id?: string;
   type?: Habit["type"];
   targetValue?: number;
 }
@@ -99,4 +100,51 @@ export function nextValue(current: number, step: number, direction: 1 | -1): num
   const base = Number.isFinite(current) && current > 0 ? current : 0;
   const magnitude = Number.isFinite(step) && step > 0 ? step : 1;
   return Math.max(0, base + magnitude * direction);
+}
+
+/**
+ * One completion record for `habit` on `date`, merged from the three stores the
+ * habits page keeps: the today log (carries a counted `value`), the history map
+ * (booleans), and the values map (counted numbers for non-today dates).
+ *
+ * Without this, a counted habit on a past date read its `value` from a boolean
+ * history map, so the fill and step count never moved until a second click.
+ */
+export interface StoreSnapshot {
+  todayLogs: Record<string, HabitLog>;
+  historyLogs: Record<string, Record<string, boolean>>;
+  historyValues: Record<string, Record<string, number>>;
+}
+
+export function getCompletionRecord(
+  habit: CompletionSubject,
+  date: string,
+  todayStr: string,
+  stores: StoreSnapshot
+): CompletionRecord | undefined {
+  const { todayLogs, historyLogs, historyValues } = stores;
+  const isToday = date === todayStr;
+
+  const todayLog = todayLogs[habit.id ?? ""];
+  const histBool = historyLogs[habit.id ?? ""]?.[date];
+  const histValue = historyValues[habit.id ?? ""]?.[date];
+
+  let completed: boolean | undefined;
+  let value: number | undefined;
+
+  if (isToday) {
+    if (todayLog) {
+      completed = todayLog.completed;
+      value = typeof todayLog.value === "number" ? todayLog.value : histValue;
+    } else {
+      completed = histBool;
+      value = histValue;
+    }
+  } else {
+    completed = histBool ?? todayLog?.completed;
+    value = typeof histValue === "number" ? histValue : todayLog?.value;
+  }
+
+  if (completed === undefined && value === undefined) return undefined;
+  return { completed, value };
 }

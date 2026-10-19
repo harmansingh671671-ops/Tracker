@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { type Habit, type HabitCategory, type HabitType } from "@/lib/db";
+import { type HabitCategory, type HabitType } from "@/lib/db";
 import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/habit-template-library";
-import { X, Check, Sparkles, Plus, ArrowLeft } from "lucide-react";
+import { X, Check, Sparkles, ArrowLeft } from "lucide-react";
 
 interface CreateHabitModalProps {
   isOpen: boolean;
@@ -22,6 +22,7 @@ interface CreateHabitModalProps {
     type?: HabitType;
     unit?: string;
     targetValue?: number;
+    color?: string;
   }) => void;
   existingHabitNames?: string[];
   /**
@@ -85,7 +86,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   // M16 -- a `defaults.category` the picker does not offer would select nothing,
   // so it is checked against DOMAINS rather than trusted. An unknown value falls
   // back to the existing default rather than leaving the form in no state.
-  const [domain, setDomain] = useState(
+  const [domain, setDomain] = useState<HabitCategory>(
     defaults?.category && DOMAINS.some((d) => d.id === defaults.category)
       ? defaults.category
       : "Vitality & Fitness"
@@ -99,7 +100,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   const [type, setType] = useState<HabitType>("simple");
   const [unit, setUnit] = useState("");
   const [targetValue, setTargetValue] = useState("");
-
+  const [color, setColor] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   if (!isOpen) return null;
 
@@ -111,6 +113,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
     // changes), so clearing here is what stops a dismissed tag from lingering.
     setName(defaults?.name ?? "");
     setIcon(defaults?.icon ?? "🧘");
+    setType("simple");
     onClose();
   };
 
@@ -154,6 +157,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       type: type === "simple" ? undefined : type,
       unit: type === "counted" ? unit.trim() || undefined : undefined,
       targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
+      color: color.trim() || undefined,
     });
   };
 
@@ -174,6 +178,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       type: type === "simple" ? undefined : type,
       unit: type === "counted" ? unit.trim() || undefined : undefined,
       targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
+      color: color.trim() || undefined,
     });
     handleClose();
   };
@@ -183,7 +188,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       onClick={handleClose}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-container-lowest/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
     >
-      <div
+      <form
+        onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         className={`w-full max-w-lg flex flex-col bg-surface-container rounded-t-[32px] sm:rounded-[32px] border border-outline/15 shadow-2xl p-4 sm:p-5 pt-2 sm:pt-3 space-y-2.5 animate-in slide-in-from-bottom-6 duration-300 cursor-default transition-all duration-300 ease-out overflow-hidden ${
           view === "custom" || isExpanded
@@ -215,9 +221,9 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <div>
-                <h2 className="text-base sm:text-lg font-bold tracking-tight text-on-surface">Customize Habit</h2>
-              </div>
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-on-surface">
+                {type === "avoid" ? "Quit a Habit" : "Customize Habit"}
+              </h2>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -245,6 +251,16 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 setDomain("Vitality & Fitness");
                 setSelectedDays([1, 2, 3, 4, 5]);
                 setTimeOfDay("morning");
+                setType("simple");
+                setView("custom");
+              }}
+              onCreateQuit={() => {
+                setName("");
+                setIcon("🚫");
+                setDomain("Vitality & Fitness");
+                setSelectedDays([1, 2, 3, 4, 5, 6, 7]);
+                setTimeOfDay("anytime");
+                setType("avoid");
                 setView("custom");
               }}
               isExpanded={isExpanded}
@@ -254,7 +270,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
             />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 pt-1 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-4 pt-1 pr-1">
             {/* Habit Name Input */}
             <div className="space-y-1.5">
               <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT NAME</label>
@@ -262,7 +278,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Morning Cold Hydration & Mobility"
+                 placeholder={type === "avoid" ? "e.g. Quit Doom Scrolling" : "e.g. Morning Cold Hydration & Mobility"}
                 className="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline-variant rounded-2xl py-3.5 px-4 border border-outline/15 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm text-sm font-semibold transition-all"
                 autoFocus
               />
@@ -277,7 +293,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                     key={item.emoji}
                     type="button"
                     onClick={() => setIcon(item.emoji)}
-                    className={`h-11 flex items-center justify-center rounded-xl text-xl transition-all active:scale-90 cursor-pointer ${
+                    className={`h-11 flex items-center justify-center rounded-xl text-xl transition-all active:scale-90 ${
                       icon === item.emoji
                         ? "bg-primary/20 border border-primary/50 shadow-md scale-105"
                         : "bg-surface-container hover:bg-surface-bright"
@@ -299,7 +315,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                     key={d.id}
                     type="button"
                     onClick={() => setDomain(d.id)}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                    className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 ${
                       domain === d.id
                         ? `${d.bg} shadow-md`
                         : "bg-surface-container hover:bg-surface-bright text-on-surface border border-outline/10"
@@ -324,7 +340,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 <button
                   type="button"
                   onClick={() => applyPreset("everyday")}
-                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors ${
                     selectedDays.length === 7 ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
                   }`}
                 >
@@ -333,7 +349,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 <button
                   type="button"
                   onClick={() => applyPreset("weekdays")}
-                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors ${
                     selectedDays.length === 5 && !selectedDays.includes(6) ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
                   }`}
                 >
@@ -342,7 +358,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 <button
                   type="button"
                   onClick={() => applyPreset("3x")}
-                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 text-center rounded-lg text-xs font-medium transition-colors ${
                     selectedDays.length === 3 ? "bg-surface-container-high text-primary font-bold" : "text-on-surface-variant"
                   }`}
                 >
@@ -360,7 +376,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                       key={dName}
                       type="button"
                       onClick={() => toggleDay(dayNum)}
-                      className={`w-9 h-9 rounded-full text-xs font-mono font-bold flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${
+                      className={`w-9 h-9 rounded-full text-xs font-mono font-bold flex items-center justify-center transition-transform active:scale-90 ${
                         isSelected
                           ? "bg-primary text-on-primary shadow-sm shadow-primary/30"
                           : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
@@ -402,57 +418,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
               </div>
             </div>
 
-            {/* Priority */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>
-              <div className="flex gap-2">
-                {[
-                  { id: "critical", label: "Critical", emoji: "🔴" },
-                  { id: "focus", label: "Focus", emoji: "🟡" },
-                  { id: "optional", label: "Optional", emoji: "🟢" },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPriority(p.id as "critical" | "focus" | "optional")}
-                    className={`flex-1 p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
-                      priority === p.id
-                        ? "bg-primary/15 border-primary/40 text-primary"
-                        : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
-                    }`}
-                  >
-                    <span className="mr-1">{p.emoji}</span>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Cue / trigger */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">CUE / TRIGGER</label>
-              <input
-                type="text"
-                value={cue}
-                onChange={(e) => setCue(e.target.value)}
-                placeholder="After I pour my morning coffee"
-                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-              />
-            </div>
-
-            {/* Reward */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">REWARD</label>
-              <input
-                type="text"
-                value={reward}
-                onChange={(e) => setReward(e.target.value)}
-                placeholder="5 minutes of music"
-                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-              />
-            </div>
-
-            {/* Emergency version */}
+            {/* Habit Type */}
+            {type !== "avoid" && (
             <div className="space-y-1.5">
               <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT TYPE</label>
               <div className="flex gap-2">
@@ -476,6 +443,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                 ))}
               </div>
             </div>
+            )}
 
             {type === "counted" && (
               <>
@@ -501,19 +469,109 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
                     className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
                   />
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
+                  <input
+                    type="text"
+                    value={emergencyVersion}
+                    onChange={(e) => setEmergencyVersion(e.target.value)}
+                    placeholder="Read 1 page instead of 30 mins"
+                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                  />
+                </div>
               </>
             )}
 
-            {/* Emergency version */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY VERSION</label>
-              <input
-                type="text"
-                value={emergencyVersion}
-                onChange={(e) => setEmergencyVersion(e.target.value)}
-                placeholder="Read 1 page instead of 30 mins"
-                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-              />
+            {/* Advanced Settings */}
+            <div className="rounded-2xl border border-outline/10 bg-surface-container-low overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-on-surface cursor-pointer"
+              >
+                <span>Advanced Settings</span>
+                <span className="text-on-surface-variant text-xs">{showAdvanced ? "Hide" : "Show"}</span>
+              </button>
+              {showAdvanced && (
+                <div className="px-4 pb-4 space-y-3">
+                  {/* Priority */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>
+                    <div className="flex gap-2">
+                      {[
+                        { id: "critical", label: "Critical", emoji: "🔴" },
+                        { id: "focus", label: "Focus", emoji: "🟡" },
+                        { id: "optional", label: "Optional", emoji: "🟢" },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setPriority(p.id as "critical" | "focus" | "optional")}
+                          className={`flex-1 p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                            priority === p.id
+                              ? "bg-primary/15 border-primary/40 text-primary"
+                              : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
+                          }`}
+                        >
+                          <span className="mr-1">{p.emoji}</span>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cue / trigger */}
+                  {type !== "avoid" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">CUE / TRIGGER</label>
+                    <input
+                      type="text"
+                      value={cue}
+                      onChange={(e) => setCue(e.target.value)}
+                      placeholder="After I pour my morning coffee"
+                      className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                    />
+                  </div>
+                  )}
+
+                  {/* Reward */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">REWARD</label>
+                    <input
+                      type="text"
+                      value={reward}
+                      onChange={(e) => setReward(e.target.value)}
+                      placeholder="5 minutes of music"
+                      className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                    />
+                  </div>
+
+                  {/* Color */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">COLOR</label>
+                    <div className="flex flex-wrap gap-2">
+                      {["#10B981", "#2563EB", "#8B5CF6", "#F59E0B", "#06B6D4", "#EC4899", "#9333EA", "#EF4444", "#84CC16", "#F97316"].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setColor(color === c ? "" : c)}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${color === c ? "border-on-surface scale-110" : "border-transparent"}`}
+                          style={{ backgroundColor: c }}
+                          title={c}
+                        />
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setColor("")}
+                        className={`px-3 py-1 rounded-full text-xs border ${color === "" ? "bg-primary/15 border-primary/40 text-primary" : "bg-surface-container border-outline/10 text-on-surface-variant"}`}
+                      >
+                        Auto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Gamification Reward Hint */}
@@ -528,14 +586,18 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-bold text-sm shadow-lg shadow-primary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className={`w-full py-4 px-6 rounded-2xl font-bold text-sm shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                type === "avoid"
+                  ? "bg-error text-on-error shadow-error/25 hover:opacity-95"
+                  : "bg-primary text-on-primary shadow-primary/25 hover:opacity-95"
+              }`}
             >
               <Check className="w-4 h-4" />
-              <span>Save &amp; Start Habit</span>
+              <span>{type === "avoid" ? "Save & Start Quitting" : "Save & Start Habit"}</span>
             </button>
-          </form>
+          </div>
         )}
-      </div>
+      </form>
     </div>
   );
 }

@@ -26,10 +26,197 @@ interface HabitDateStripProps {
    * prints a "0/0" that snaps to the truth a moment later.
    */
   loading?: boolean;
+  onDateClick?: (date: string) => void;
+  onDateLongPress?: (date: string) => void;
 }
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+interface DatePillProps {
+  item: {
+    dateStr: string;
+    dayName: string;
+    dayNum: number;
+    isToday: boolean;
+  };
+  selectedDate: string;
+  todayStr: string;
+  isLoading: boolean;
+  habits: Habit[];
+  todayLogs: Record<string, HabitLog>;
+  logsByDate: Record<string, Record<string, HabitLog>>;
+  historyLogs: Record<string, Record<string, boolean>>;
+  onSelectDate: (date: string) => void;
+  onDateClick?: (date: string) => void;
+  onDateLongPress?: (date: string) => void;
+  centerDate: (targetDateStr: string, smooth: boolean) => boolean;
+  isToday: boolean;
+  todayPillRef: React.RefObject<HTMLButtonElement | null> | undefined;
+}
+
+function DatePill({
+  item,
+  selectedDate,
+  todayStr,
+  isLoading,
+  habits,
+  todayLogs,
+  logsByDate,
+  historyLogs,
+  onSelectDate,
+  onDateClick,
+  onDateLongPress,
+  centerDate,
+  isToday,
+  todayPillRef,
+}: DatePillProps) {
+  const isSelected = selectedDate === item.dateStr;
+
+  // Calculate habit completions and scheduled habits for this date
+  const dateLogs = item.dateStr === todayStr ? todayLogs : logsByDate[item.dateStr] || {};
+
+  // Filter habits relevant to this date: scheduled or already completed
+  const eligibleHabits = habits.filter((h) => {
+    const isScheduled = isHabitScheduledOnDate(h, item.dateStr);
+    const isDone = Boolean(dateLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
+    return isScheduled || isDone;
+  });
+
+  const scheduledHabits = habits.filter((h) => isHabitScheduledOnDate(h, item.dateStr));
+  const completedCount = habits.filter((h) => {
+    return Boolean(dateLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
+  }).length;
+  const isAllCompleted = scheduledHabits.length > 0 && completedCount >= scheduledHabits.length;
+
+  // Long press timer for date pill
+  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef(false);
+
+  const startLongPress = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    isLongPressRef.current = false;
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      onDateLongPress?.(item.dateStr);
+    }, 400);
+  };
+
+  const endLongPress = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  return (
+    <button
+      key={item.dateStr}
+      ref={isToday ? todayPillRef : undefined}
+      data-date-pill={item.dateStr}
+      type="button"
+      onClick={() => {
+        if (!isLongPressRef.current) {
+          onSelectDate(item.dateStr);
+          centerDate(item.dateStr, true);
+          onDateClick?.(item.dateStr);
+        }
+        isLongPressRef.current = false;
+      }}
+      onMouseDown={startLongPress}
+      onMouseUp={endLongPress}
+      onMouseLeave={endLongPress}
+      onTouchStart={startLongPress}
+      onTouchEnd={endLongPress}
+      onTouchCancel={endLongPress}
+      onContextMenu={(e) => { e.preventDefault(); onDateLongPress?.(item.dateStr); }}
+      className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center justify-between transition-all shrink-0 cursor-pointer select-none ${
+        isSelected
+          ? `date-ring date-ring-fade-in date-ring-glow date-ring-pulse text-primary font-bold bg-transparent ${
+              isToday ? "date-ring-today-wash-strong" : ""
+            } ${isToday ? "scale-[1.03]" : "scale-105"} z-10`
+          : isToday
+          ? "date-ring date-ring-fade-in date-ring-today-wash font-bold text-primary"
+          : "bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline/10"
+      }`}
+    >
+      {/* Day name (M, T, W...) */}
+      <span
+        className={`text-[10px] font-mono uppercase tracking-wider ${
+          isToday || isSelected
+            ? "text-primary font-bold"
+            : "text-on-surface-variant/70"
+        }`}
+      >
+        {item.dayName}
+      </span>
+
+      {/* Date Number */}
+      <span
+        className={`text-sm sm:text-base font-mono my-0.5 leading-tight ${
+          isToday || isSelected
+            ? "text-primary font-bold"
+            : "text-on-surface font-semibold"
+        }`}
+      >
+        {item.dayNum}
+      </span>
+
+      {/* HabitDriven Segmented Rings & Solid Circles (only for eligible/completed habits) */}
+      <div className="flex items-center justify-center gap-1 mt-1 min-h-[10px] flex-wrap max-w-full">
+        {isLoading ? (
+          <span className="w-8 h-[14px] rounded-full bg-surface-container-highest animate-pulse" />
+        ) : eligibleHabits.length === 0 ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-outline/20" title="Rest Day (No habits scheduled)" />
+        ) : eligibleHabits.length <= 5 ? (
+          eligibleHabits.map((h) => {
+            const isDone = Boolean(dateLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
+            const isScheduled = isHabitScheduledOnDate(h, item.dateStr);
+            const color = getHabitColor(h);
+
+            return (
+              <span
+                key={h.id}
+                title={`${h.name}: ${
+                  isDone
+                    ? isScheduled
+                      ? "Completed ✓"
+                      : "Unscheduled Completed (!)"
+                    : "Pending"
+                }`}
+                className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-200 shrink-0 ${
+                  isDone
+                    ? "scale-105"
+                    : "bg-transparent"
+                }`}
+                style={{
+                  backgroundColor: isDone ? (isScheduled ? color : `${color}85`) : "transparent",
+                  borderColor: color,
+                  borderWidth: isDone ? "0px" : "2px",
+                  borderStyle: "solid",
+                  boxShadow: isDone ? `0 0 6px ${color}80` : undefined,
+                }}
+              />
+            );
+          })
+        ) : (
+          <div
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-mono font-bold ${
+              isSelected
+                ? "bg-primary/15 text-primary border border-primary/30"
+                : isAllCompleted
+                ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30"
+                : "bg-surface-container-highest text-on-surface-variant"
+            }`}
+          >
+            <span>{completedCount}/{scheduledHabits.length || eligibleHabits.length}</span>
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
 
 export function HabitDateStrip({
   selectedDate,
@@ -39,6 +226,8 @@ export function HabitDateStrip({
   todayLogs = {},
   todayStr: propTodayStr,
   loading = false,
+  onDateClick,
+  onDateLongPress,
 }: HabitDateStripProps) {
   const { historyLogs = {}, loading: storeLoading } = useHabitStore();
   // An explicit prop wins, otherwise follow the store's own first-fetch state.
@@ -430,138 +619,25 @@ export function HabitDateStrip({
           onScroll={handleScroll}
           className="flex items-center gap-1.5 overflow-x-auto py-5 px-0.5 my-[-16px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
-          {dateItems.map((item) => {
-            const isSelected = selectedDate === item.dateStr;
-            const isToday = item.isToday;
-
-            // Calculate habit completions and scheduled habits for this date
-            const dateLogs = item.dateStr === todayStr ? todayLogs : logsByDate[item.dateStr] || {};
-            
-            // Filter habits relevant to this date: scheduled or already completed
-            const eligibleHabits = habits.filter((h) => {
-              const isScheduled = isHabitScheduledOnDate(h, item.dateStr);
-              const isDone = Boolean(dateLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
-              return isScheduled || isDone;
-            });
-
-            const scheduledHabits = habits.filter((h) => isHabitScheduledOnDate(h, item.dateStr));
-            const completedCount = habits.filter((h) => {
-              return Boolean(dateLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
-            }).length;
-            const isAllCompleted = scheduledHabits.length > 0 && completedCount >= scheduledHabits.length;
-
-            return (
-              <button
-                key={item.dateStr}
-                ref={isToday ? todayPillRef : undefined}
-                data-date-pill={item.dateStr}
-                type="button"
-                onClick={() => {
-                  onSelectDate(item.dateStr);
-                  centerDate(item.dateStr, true);
-                }}
-                className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center justify-between transition-all shrink-0 cursor-pointer select-none ${
-                  // Nothing is filled solid. The ring carries the state, and today
-                  // additionally gets a faint wash of the theme colour.
-                  //   unselected, not today -> no ring
-                  //   today, unselected     -> ring + faint wash
-                  //   opened (any day)      -> ring + glow (+ stronger wash if today)
-                  //
-                  // An opened day must have NO background of its own. A body colour
-                  // reads as a hard-edged rectangle against the strip behind it
-                  // (measured contrast 1.45:1), which looked like a stray border
-                  // sitting inside the glow. The ring and glow are unaffected.
-                  isSelected
-                    ? `date-ring date-ring-fade-in date-ring-glow date-ring-pulse text-primary font-bold bg-transparent ${
-                        isToday ? "date-ring-today-wash-strong" : ""
-                      } ${isToday ? "scale-[1.03]" : "scale-105"} z-10`
-                    : isToday
-                    ? "date-ring date-ring-fade-in date-ring-today-wash font-bold text-primary"
-                    : "bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline/10"
-                }`}
-              >
-                {/* Day name (M, T, W...) */}
-                <span
-                  className={`text-[10px] font-mono uppercase tracking-wider ${
-                    // Ringed days are never filled, so their text stays primary
-                    // coloured rather than flipping to on-primary.
-                    isToday || isSelected
-                      ? "text-primary font-bold"
-                      : "text-on-surface-variant/70"
-                  }`}
-                >
-                  {item.dayName}
-                </span>
-
-                {/* Date Number */}
-                <span
-                  className={`text-sm sm:text-base font-mono my-0.5 leading-tight ${
-                    isToday || isSelected
-                      ? "text-primary font-bold"
-                      : "text-on-surface font-semibold"
-                  }`}
-                >
-                  {item.dayNum}
-                </span>
-
-                {/* HabitDriven Segmented Rings & Solid Circles (only for eligible/completed habits) */}
-                <div className="flex items-center justify-center gap-1 mt-1 min-h-[10px] flex-wrap max-w-full">
-                  {isLoading ? (
-                    // Unknown yet. A neutral bar of the same height as the
-                    // counter pill keeps the row from collapsing and shifting
-                    // the strip when the real numbers arrive.
-                    <span className="w-8 h-[14px] rounded-full bg-surface-container-highest animate-pulse" />
-                  ) : eligibleHabits.length === 0 ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-outline/20" title="Rest Day (No habits scheduled)" />
-                  ) : eligibleHabits.length <= 5 ? (
-                    eligibleHabits.map((h) => {
-                      const isDone = Boolean(dateLogs[h.id]?.completed || historyLogs[h.id]?.[item.dateStr]);
-                      const isScheduled = isHabitScheduledOnDate(h, item.dateStr);
-                      const color = getHabitColor(h);
-
-                      return (
-                        <span
-                          key={h.id}
-                          title={`${h.name}: ${
-                            isDone
-                              ? isScheduled
-                                ? "Completed ✓"
-                                : "Unscheduled Completed (!)"
-                              : "Pending"
-                          }`}
-                          className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-200 shrink-0 ${
-                            isDone
-                              ? "scale-105"
-                              : "bg-transparent"
-                          }`}
-                          style={{
-                            backgroundColor: isDone ? (isScheduled ? color : `${color}85`) : "transparent",
-                            borderColor: color,
-                            borderWidth: isDone ? "0px" : "2px",
-                            borderStyle: "solid",
-                            boxShadow: isDone ? `0 0 6px ${color}80` : undefined,
-                          }}
-                        />
-                      );
-                    })
-                  ) : (
-                    // Compact progress pill when > 5 habits
-                    <div
-                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-mono font-bold ${
-                        isSelected
-                          ? "bg-primary/15 text-primary border border-primary/30"
-                          : isAllCompleted
-                          ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30"
-                          : "bg-surface-container-highest text-on-surface-variant"
-                      }`}
-                    >
-                      <span>{completedCount}/{scheduledHabits.length || eligibleHabits.length}</span>
-                    </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+          {dateItems.map((item) => (
+            <DatePill
+              key={item.dateStr}
+              item={item}
+              selectedDate={selectedDate}
+              todayStr={todayStr}
+              isLoading={isLoading}
+              habits={habits}
+              todayLogs={todayLogs}
+              logsByDate={logsByDate}
+              historyLogs={historyLogs}
+              onSelectDate={onSelectDate}
+              onDateClick={onDateClick}
+              onDateLongPress={onDateLongPress}
+              centerDate={centerDate}
+              isToday={item.isToday}
+              todayPillRef={item.isToday ? todayPillRef : undefined}
+            />
+          ))}
         </div>
 
         {/* Sticky Today Pill - Stuck on Left Side when user scrolls into future */}

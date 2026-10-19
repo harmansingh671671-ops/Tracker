@@ -7,6 +7,7 @@ import {
   Plus,
   Check,
   ArrowRight,
+  X,
 } from "lucide-react";
 import { type HabitCategory } from "@/lib/db";
 import {
@@ -258,6 +259,7 @@ interface HabitTemplateLibraryProps {
   onSelectTemplate: (template: HabitTemplate) => void;
   onQuickAdd: (template: HabitTemplate) => Promise<void>;
   onCreateCustom: () => void;
+  onCreateQuit?: () => void;
   isExpanded?: boolean;
   onExpand?: () => void;
   onCollapse?: () => void;
@@ -268,6 +270,7 @@ export function HabitTemplateLibrary({
   onSelectTemplate,
   onQuickAdd,
   onCreateCustom,
+  onCreateQuit,
   isExpanded = false,
   onExpand,
   onCollapse,
@@ -422,6 +425,37 @@ export function HabitTemplateLibrary({
         </button>
       </div>
 
+      {/* Quit a Habit */}
+      {onCreateQuit && (
+        <div
+          className="pb-2.5 transition-opacity duration-200"
+          style={{
+            opacity: customBarOpacity,
+            pointerEvents: customBarOpacity > 0.2 ? "auto" : "none",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onCreateQuit}
+            className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-error/15 via-error/10 to-surface-container-high border border-error/25 hover:border-error/50 text-left flex items-center justify-between group transition-all duration-200 shadow-xs active:scale-[0.99] cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-error text-on-error flex items-center justify-center shadow-sm shadow-error/30 group-hover:scale-105 transition-transform">
+                <X className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-on-surface group-hover:text-error transition-colors">
+                  Quit a Habit
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center text-error">
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* 2. Sticky Header: Full-width Search Bar + Dynamically Expanding '+' Button + Category Chips */}
       <div
         className={`sticky top-0 z-20 bg-surface-container/95 backdrop-blur-md pt-0.5 pb-2 space-y-2 transition-all duration-300 ${
@@ -475,9 +509,11 @@ export function HabitTemplateLibrary({
               title="Create Custom Habit"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
-            </button>
-          </div>
+          </button>
         </div>
+      </div>
+
+      {/* 1b. Full Horizontal Bar for Quit Habit */}
 
         {/* Horizontal Goal Pack Filter Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -17,6 +17,7 @@ export interface HabitMonthCalendarProps {
   todayStr?: string;
   onSelectDate?: (dateStr: string) => void;
   onToggleDate?: (dateStr: string, e: React.MouseEvent) => void;
+  onOpenValueInput?: (dateStr: string) => void;
   className?: string;
 }
 
@@ -30,10 +31,11 @@ export function HabitMonthCalendar({
   todayStr: propTodayStr,
   onSelectDate,
   onToggleDate,
+  onOpenValueInput,
   className = "",
 }: HabitMonthCalendarProps) {
   const { user } = useUserStore();
-  const { historyLogs, toggleHabitLog } = useHabitStore();
+  const { habits: storeHabits, historyLogs, historyValues, toggleHabitLog, setHabitLogValue } = useHabitStore();
 
   const habitColor = useMemo(
     () => getHabitColor({ category, name, id: habitId }),
@@ -121,6 +123,7 @@ export function HabitMonthCalendar({
       const elapsedDays = isCurrentMonth ? td : isPastMonth ? totalDays : 0;
 
       const habitLogsMap = historyLogs[habitId] || {};
+      const habitValuesMap = historyValues[habitId] || {};
       const list = [];
 
       let completedInMonth = 0;
@@ -134,6 +137,16 @@ export function HabitMonthCalendar({
         const isOpened = dateStr === activeSelectedDate;
         const isFuture = dateStr > today;
         const isCompleted = Boolean(habitLogsMap[dateStr]);
+        const habit = storeHabits.find((h) => h.id === habitId);
+        const isCounted = (habit?.type ?? "simple") === "counted";
+        const target = habit?.targetValue;
+        const dayValue = habitValuesMap[dateStr];
+        const ratio =
+          isCounted && typeof target === "number" && target > 0
+            ? Math.min(1, Math.max(0, (typeof dayValue === "number" ? dayValue : 0) / target))
+            : isCompleted
+            ? 1
+            : 0;
 
         const dateObj = new Date(viewYear, viewMonth, d);
         const jsDay = dateObj.getDay();
@@ -143,18 +156,20 @@ export function HabitMonthCalendar({
         if (isCompleted) completedInMonth++;
         if (isScheduled && !isFuture) scheduledElapsed++;
 
-        list.push({
-          dateStr,
-          dayNumber: d,
-          monthShort: dateObj.toLocaleDateString("en-US", { month: "short" }),
-          weekday: dateObj.toLocaleDateString("en-US", { weekday: "short" }),
-          dayOfWeek,
-          isScheduled,
-          isToday,
-          isOpened,
-          isFuture,
-          isCompleted,
-        });
+         list.push({
+           dateStr,
+           dayNumber: d,
+           monthShort: dateObj.toLocaleDateString("en-US", { month: "short" }),
+           weekday: dateObj.toLocaleDateString("en-US", { weekday: "short" }),
+           dayOfWeek,
+           isScheduled,
+           isToday,
+           isOpened,
+           isFuture,
+           isCompleted,
+           isCounted,
+           ratio,
+         });
       }
 
       const denominator = scheduledElapsed > 0 ? scheduledElapsed : Math.max(1, elapsedDays);
@@ -173,6 +188,8 @@ export function HabitMonthCalendar({
       viewMonth,
       today,
       historyLogs,
+      historyValues,
+      storeHabits,
       habitId,
       activeSelectedDate,
       effectiveScheduledDays,
@@ -204,6 +221,35 @@ export function HabitMonthCalendar({
       if (isNowCompleted) {
         triggerStreaksConfetti(e.clientX, e.clientY, habitColor);
       }
+    }
+  };
+
+  // Long-press on an opened day fills a counted habit to its target.
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressRef = useRef(false);
+
+  const startPress = (
+    dateStr: string,
+    isFuture: boolean,
+    isCounted: boolean
+  ) => {
+    if (dateStr !== activeSelectedDate) return;
+    isLongPressRef.current = false;
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (isFuture || !isCounted || !user?.id) return;
+      const habit = storeHabits.find((h) => h.id === habitId);
+      const target = habit?.targetValue;
+      if (typeof target !== "number" || target <= 0) return;
+      void setHabitLogValue(user.id, habitId, dateStr, target);
+    }, 400);
+  };
+
+  const endPress = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
     }
   };
 
@@ -318,16 +364,26 @@ export function HabitMonthCalendar({
             <button
               key={day.dateStr}
               type="button"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onClick={(e) =>
-                handleDayClick(
-                  e,
-                  day.dateStr,
-                  day.isFuture,
-                  day.isScheduled
-                )
-              }
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                startPress(day.dateStr, day.isFuture, day.isCounted);
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                startPress(day.dateStr, day.isFuture, day.isCounted);
+              }}
+              onMouseUp={() => endPress()}
+              onTouchEnd={() => endPress()}
+              onMouseLeave={endPress}
+              onTouchCancel={endPress}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isLongPressRef.current) {
+                  isLongPressRef.current = false;
+                  return;
+                }
+                void handleDayClick(e, day.dateStr, day.isFuture, day.isScheduled);
+              }}
               title={`${day.monthShort} ${day.dayNumber} (${day.weekday}): ${
                 day.isCompleted
                   ? day.isScheduled
@@ -345,7 +401,7 @@ export function HabitMonthCalendar({
                   ? " • Today"
                   : " • Click to open day"
               }`}
-              className={`aspect-square rounded-[4px] sm:rounded-md flex items-center justify-center font-mono transition-all select-none cursor-pointer ${
+              className={`aspect-square rounded-[4px] sm:rounded-md flex items-center justify-center font-mono transition-all select-none cursor-pointer relative overflow-hidden ${
                 day.isCompleted
                   ? `font-bold hover:brightness-110 active:scale-90 ${
                       day.isOpened ? "scale-105 z-10 font-black" : "shadow-xs"
@@ -358,7 +414,7 @@ export function HabitMonthCalendar({
                   ? "font-black scale-105 hover:brightness-110 active:scale-90 z-10 text-[8.5px] sm:text-[9.5px]"
                   : day.isToday
                   ? "font-bold hover:bg-surface-bright active:scale-90 text-[8.5px] sm:text-[9.5px]"
-                  : "bg-surface-container-highest/80 text-on-surface font-semibold border border-outline/30 hover:border-outline/50 hover:bg-surface-bright active:scale-90 text-[8.5px] sm:text-[9px]"
+                  : "bg-surface-container-high/80 text-on-surface font-semibold border border-outline/30 hover:border-outline/50 hover:bg-surface-bright active:scale-90 text-[8.5px] sm:text-[9px]"
               }`}
               style={{
                 backgroundColor,
@@ -368,20 +424,26 @@ export function HabitMonthCalendar({
                 borderStyle,
                 boxShadow,
               }}
-            >
-              <span
+             >
+               {day.isCounted && day.ratio !== undefined && day.ratio > 0 && day.ratio < 1 && (
+                 <span
+                   className="absolute inset-x-0 bottom-0 transition-all duration-300 ease-out pointer-events-none"
+                   style={{ height: `${day.ratio * 100}%`, backgroundColor: habitColor, opacity: 0.55 }}
+                 />
+               )}
+               <span
                 className={`leading-none ${
                   !day.isScheduled && day.isCompleted
                     ? "font-black text-[9px] sm:text-[9.5px]"
                     : "text-[8.5px] sm:text-[9px]"
                 }`}
-              >
-                {!day.isScheduled && day.isCompleted ? "!" : day.dayNumber}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+               >
+                 {!day.isScheduled && day.isCompleted ? "!" : day.dayNumber}
+               </span>
+             </button>
+           );
+         })}
+       </div>
     </div>
   );
 }

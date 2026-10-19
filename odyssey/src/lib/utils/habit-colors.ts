@@ -50,9 +50,10 @@ export const BOLD_HABIT_PALETTE = [
  * reasons nobody can explain.
  */
 export function getHabitColor(
-  habit: { category?: string; name?: string; id?: string },
+  habit: { category?: string; name?: string; id?: string; color?: string },
   _unusedLegacyIndex?: number
 ): string {
+  if (habit.color) return habit.color;
   // 1. Canonical domain.
   if (habit.category) {
     const domain = normalizeHabitCategory(habit.category) as keyof typeof BOLD_CATEGORY_COLORS;

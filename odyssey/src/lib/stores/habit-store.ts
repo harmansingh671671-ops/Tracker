@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import { getLocalTodayStr, isHabitScheduledOnDate } from '../utils/habit-colors';
+import { getLocalTodayStr, isHabitScheduledOnDate, getHabitColor } from '../utils/habit-colors';
 import { isHabitComplete } from '../utils/habit-completion';
 import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
+import { triggerStreaksConfetti } from '../utils/confetti';
 import {
   DIAMONDS_PER_COMPLETION,
   XP_PER_COMPLETION,
@@ -56,6 +57,7 @@ interface HabitState {
   habits: Habit[];
   todayLogs: Record<string, HabitLog>; // habitId -> HabitLog
   historyLogs: Record<string, Record<string, boolean>>; // habitId -> date -> completed boolean
+  historyValues: Record<string, Record<string, number>>; // habitId -> date -> logged value (counted habits)
   /**
    * `habitId` -> ISO timestamp of that habit's most recent COMPLETED log.
    *
@@ -112,6 +114,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
   todayLogs: {},
   historyLogs: {},
+  historyValues: {},
   lastCompletedAt: {},
   todayLogsDate: "",
   loadedUserId: "",
@@ -142,6 +145,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     set({
       habits: cached.habits,
       historyLogs: cached.historyLogs,
+      historyValues: cached.historyValues && typeof cached.historyValues === "object" ? cached.historyValues : {},
       todayLogs: todayLogsUsable ? cached.todayLogs : {},
       todayLogsDate: todayLogsUsable ? cached.capturedDate : "",
     });
@@ -199,26 +203,24 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     // though IndexedDB reads are async. IndexedDB below remains authoritative.
     get().hydrateFromCache(userId, date);
     set({ loading: true });
-    let habits = await db.habits
+    const habits = await db.habits
       .where('userId')
       .equals(userId)
       .filter(h => !h.archivedAt)
       .toArray();
 
-    // Fallback: If no habits found for specific userId, load all unarchived habits
-    if (habits.length === 0) {
-      habits = await db.habits
-        .filter(h => !h.archivedAt)
-        .toArray();
-    }
+    // No fallback: a user with no habits should see an empty list, not another
+    // user's (or stale) habits. The previous fallback leaked habits across
+    // profiles whenever the current user's list was empty.
 
     const allUserLogs = await db.habitLogs
       .where('userId')
       .equals(userId)
       .toArray();
 
-    const logsMap: Record<string, HabitLog> = {};
-    const historyMap: Record<string, Record<string, boolean>> = {};
+const logsMap: Record<string, HabitLog> = {};
+const historyMap: Record<string, Record<string, boolean>> = {};
+const valuesMap: Record<string, Record<string, number>> = {};
 
     // M7: the most recent real completion per habit, folded in here because
     // `allUserLogs` is already in hand -- this costs no extra query.
@@ -245,9 +247,13 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         historyMap[l.habitId] = {};
       }
       historyMap[l.habitId][l.date] = l.completed;
+      if (typeof l.value === "number") {
+        if (!valuesMap[l.habitId]) valuesMap[l.habitId] = {};
+        valuesMap[l.habitId][l.date] = l.value;
+      }
     });
 
-    set({ habits, todayLogs: logsMap, historyLogs: historyMap, lastCompletedAt: lastCompleted, todayLogsDate: date, loadedUserId: userId, loading: false });
+    set({ habits, todayLogs: logsMap, historyLogs: historyMap, historyValues: valuesMap, lastCompletedAt: lastCompleted, todayLogsDate: date, loadedUserId: userId, loading: false });
 
     // Mirror the authoritative read so the next cold load can paint instantly.
     // `logsMap` is by construction the logs for `date`, and it is stored under
@@ -257,6 +263,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       habits,
       todayLogs: logsMap,
       historyLogs: historyMap,
+      historyValues: valuesMap,
     });
 
     await get().fetchTemporaryWallet(userId);
@@ -551,20 +558,32 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         [date]: isCompleted,
       };
 
+      const updatedValues = { ...state.historyValues };
+      if (counted) {
+        if (!updatedValues[habitId]) updatedValues[habitId] = {};
+        updatedValues[habitId] = { ...updatedValues[habitId], [date]: value ?? 0 };
+      }
+
       return {
         todayLogs: updatedToday,
         historyLogs: updatedHistory,
+        historyValues: updatedValues,
       };
     });
 
     // Update streak for this habit. A day counts toward the streak only when it
     // is genuinely complete (value >= target for counted), so a counted habit at
     // 3 of 20 never inflates the streak -- that is the BUG-5 class of defect.
+    // Streaks only move on TODAY's toggle: completing or un-completing a past
+    // day must not bump or drop the streak (BUG-15).
     if (habit) {
       const becameCompleted = isCompleted && !wasCompleted;
       const becameIncomplete = !isCompleted && wasCompleted;
       const newTotal = becameCompleted ? habit.totalCompletions + 1 : becameIncomplete ? Math.max(0, habit.totalCompletions - 1) : habit.totalCompletions;
-      const newStreak = isCompleted ? habit.currentStreak + 1 : Math.max(0, habit.currentStreak - 1);
+      const isToday = date === getLocalTodayStr();
+      const newStreak = isToday
+        ? (becameCompleted ? habit.currentStreak + 1 : becameIncomplete ? Math.max(0, habit.currentStreak - 1) : habit.currentStreak)
+        : habit.currentStreak;
       const newLongest = Math.max(habit.longestStreak, newStreak);
       
       await db.habits.update(habitId, {
@@ -655,18 +674,29 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         [date]: isCompleted,
       };
 
+      const updatedValues = { ...state.historyValues };
+      if (counted) {
+        if (!updatedValues[habitId]) updatedValues[habitId] = {};
+        updatedValues[habitId] = { ...updatedValues[habitId], [date]: value ?? 0 };
+      }
+
       return {
         todayLogs: updatedToday,
         historyLogs: updatedHistory,
+        historyValues: updatedValues,
       };
     });
 
-    // Update streak based on isCompleted transition
+    // Update streak based on isCompleted transition. Only TODAY's transition
+    // moves the streak; past-day changes leave it alone (BUG-15).
     if (habit) {
       const becameCompleted = isCompleted && !wasCompleted;
       const becameIncomplete = !isCompleted && wasCompleted;
       const newTotal = becameCompleted ? habit.totalCompletions + 1 : becameIncomplete ? Math.max(0, habit.totalCompletions - 1) : habit.totalCompletions;
-      const newStreak = isCompleted ? habit.currentStreak + 1 : Math.max(0, habit.currentStreak - 1);
+      const isToday = date === todayStr;
+      const newStreak = isToday
+        ? (becameCompleted ? habit.currentStreak + 1 : becameIncomplete ? Math.max(0, habit.currentStreak - 1) : habit.currentStreak)
+        : habit.currentStreak;
       const newLongest = Math.max(habit.longestStreak, newStreak);
       
       await db.habits.update(habitId, {
@@ -674,6 +704,10 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         currentStreak: newStreak,
         longestStreak: newLongest
       });
+
+      if (becameCompleted) {
+        triggerStreaksConfetti(undefined, undefined, getHabitColor(habit));
+      }
 
       set((state) => ({
         habits: state.habits.map(h => h.id === habitId ? {
@@ -703,6 +737,6 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     // The mirror must go too, otherwise the next cold load restores the habits
     // that were just archived.
     clearHabitCache(userId);
-    set({ habits: [], historyLogs: {}, todayLogs: {}, todayLogsDate: "", loadedUserId: "" });
+    set({ habits: [], historyLogs: {}, historyValues: {}, todayLogs: {}, todayLogsDate: "", loadedUserId: "" });
   }
 }));

@@ -301,15 +301,13 @@ export interface ScheduleBlock {
  * What kind of habit this is. A closed union on purpose - see ADR 0003.
  *
  * `simple` (or absent) means today's behaviour: a check. `counted` means there is a target
- * and a number gets logged against it. `avoid` and `timelimit` are NOT built yet; they were
- * deliberately deferred because a violation state changes what a completed day means for
- * streaks, and a per-habit running timer is a separate feature (`D2` records there is no
- * focus timer at all).
+ * and a number gets logged against it. `avoid` is a quit/anti-habit: a day is "complete" when
+ * you stayed clean, and a slip is a violation (red state). `timelimit` is NOT built yet.
  *
  * This is deliberately NOT `HabitType | (string & {})`. `BUG-12` exists because that
  * escape hatch accepted any string and therefore constrained nothing.
  */
-export type HabitType = 'simple' | 'counted';
+export type HabitType = 'simple' | 'counted' | 'avoid';
 
 export interface Habit {
   id: string;
@@ -336,6 +334,7 @@ export interface Habit {
   priority?: 'critical' | 'focus' | 'optional';
   cue?: string; // e.g. "After I pour my morning coffee"
   reward?: string; // e.g. "5 minutes of music"
+  color?: string; // optional override for habit color
   emergencyVersion?: string; // minimal fall-back, e.g. "Read 1 page"
   timeOfDay?: string; // e.g. "06:30 AM"
   frequency: 'daily' | 'weekly';

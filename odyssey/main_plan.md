@@ -367,7 +367,7 @@ src: `MASTER_TODO_REVISED.md §19 L979–1006`
 
 
 - [x] **S8** — 2-minute emergency version. `SHIPPED` — minimal fall-back version input ("Read 1 page instead of 30 mins") added to create/edit habit modals, saved as optional `Habit.emergencyVersion`; the "streak endangered" trigger rule is not specified, so no card/rendering logic added · → **Phase 2** · also: `B12`
-- [ ] **S9** — Break bad habits / Quit mode. `NOT BUILT` · → **Phase 2** · also: `B3`
+- [ ] **S9** — Break bad habits / Quit mode. **`PARTIAL` — the quit surface landed 2026-10-19: `avoid` is a member of the habit-type union, create/edit offer "Quit a Habit", and cards render a red X with "N clean" instead of a flame. The violation state is not built yet — a slip is not recorded as its own state, and the completion predicate still treats `avoid` as a plain tick.** · → **Phase 2** · also: `B3`
 - [ ] **S10** — Multi-colour date completion rings. `PARTIAL` — rings exist, not segmented · also: `B5`
 - [ ] **S11** — Swipe-right to complete gesture. `NOT BUILT` · → **Phase 2** · also: `B4`
 - [ ] **S12** — Swipe-left action drawer. `NOT BUILT` · → **Phase 2**

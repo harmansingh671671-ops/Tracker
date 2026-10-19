@@ -36,6 +36,7 @@ export interface HabitCache {
   habits: Habit[];
   todayLogs: Record<string, HabitLog>;
   historyLogs: Record<string, Record<string, boolean>>;
+  historyValues?: Record<string, Record<string, number>>;
 }
 
 /**
@@ -61,6 +62,7 @@ export function readHabitCache(userId: string): HabitCache | null {
       habits: parsed.habits,
       todayLogs: parsed.todayLogs && typeof parsed.todayLogs === "object" ? parsed.todayLogs : {},
       historyLogs: parsed.historyLogs,
+      historyValues: parsed.historyValues && typeof parsed.historyValues === "object" ? parsed.historyValues : {},
     };
   } catch {
     return null;

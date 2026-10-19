@@ -7,16 +7,16 @@ import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitHeatmap } from "@/components/habits/habit-heatmap";
+import { GridHabitCard } from "@/components/habits/grid-habit-card";
 import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
-import { PerfectDayCard } from "@/components/habits/perfect-day-card";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
-import { isHabitComplete } from "@/lib/utils/habit-completion";
+import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
 import { getCompletionToast, getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
@@ -36,7 +36,7 @@ import {
   LayoutList,
   LayoutGrid,
   CalendarDays,
-  Coffee,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -48,6 +48,7 @@ export default function HabitsPage() {
     habits,
     todayLogs,
     historyLogs,
+    historyValues,
     lastCompletedAt,
     temporaryWallet,
     fetchHabits,
@@ -90,8 +91,13 @@ export default function HabitsPage() {
     date: string
   ) => {
     if (isFutureSelectedDate) return;
-    setValueInputHabit({ habit, log, date });
-    setValueInputAmount(String(typeof log?.value === "number" ? log.value : 0));
+    const storeValue = useHabitStore.getState().historyValues?.[habit.id]?.[date];
+    const mergedLog = {
+      ...log,
+      value: typeof log?.value === "number" ? log.value : (typeof storeValue === "number" ? storeValue : log?.value),
+    };
+    setValueInputHabit({ habit, log: mergedLog, date });
+    setValueInputAmount(String(typeof mergedLog?.value === "number" ? mergedLog.value : 0));
   }, [isFutureSelectedDate]);
 
   const closeValueInput = useCallback(() => {
@@ -118,6 +124,13 @@ export default function HabitsPage() {
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef<boolean>(false);
   const pressStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Drag gesture refs for counted habits progress bar
+  const isDraggingRef = useRef<boolean>(false);
+  const dragStartYRef = useRef<number>(0);
+  const dragStartValueRef = useRef<number>(0);
+  const dragHabitIdRef = useRef<string | null>(null);
+  const dragTargetValueRef = useRef<number | null>(null);
 
   // Detect midnight / day change and automatically advance today and selectedDate
   const prevTodayRef = useRef(todayStr);
@@ -237,22 +250,7 @@ export default function HabitsPage() {
       ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
       : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
   }).length;
-  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-  // M4 -- the perfect-day state for the day being viewed. Derived from the same
-  // helper the M9 header uses, so the two can never disagree about what counts
-  // as complete. `isAllCompleted` already requires a non-empty day, so a rest day
-  // cannot satisfy it.
-  const selectedDayProgress = useMemo(
-    () => getDayHabitProgress(habits, selectedDate, todayStr, todayLogs, historyLogs),
-    [habits, selectedDate, todayStr, todayLogs, historyLogs]
-  );
-
-  const showPerfectDay =
-    selectedDayProgress.isAllCompleted &&
-    !isFutureSelectedDate &&
-    !habitsLoading &&
-    habits.length > 0;
+   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   /**
    * M7 -- the "last done" line for a habit, or null when there is nothing true to
@@ -372,6 +370,13 @@ export default function HabitsPage() {
     targetDays: number[];
     timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
     priority?: "critical" | "focus" | "optional";
+    cue?: string;
+    reward?: string;
+    emergencyVersion?: string;
+    type?: "simple" | "counted" | "avoid";
+    unit?: string;
+    targetValue?: number;
+    color?: string;
   }) => {
     if (!user) return;
     await addHabit({
@@ -384,6 +389,13 @@ export default function HabitsPage() {
       icon: data.icon,
       period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
       priority: data.priority,
+      cue: data.cue,
+      reward: data.reward,
+      emergencyVersion: data.emergencyVersion,
+      type: data.type,
+      unit: data.unit,
+      targetValue: data.targetValue,
+      color: data.color,
       archivedAt: undefined,
     });
     // One-off rewards for creating a habit. Deliberately NOT routed through the
@@ -408,12 +420,32 @@ export default function HabitsPage() {
       targetDays?: number[];
       period?: "morning" | "afternoon" | "evening";
       priority?: "critical" | "focus" | "optional";
-    }
+       cue?: string;
+       reward?: string;
+       emergencyVersion?: string;
+    type?: "simple" | "counted" | "avoid";
+       unit?: string;
+       targetValue?: number;
+       color?: string;
+     }
   ) => {
-    await updateHabit(habitId, updates);
-    // force: the habit list itself just changed in the database.
-    if (user) await fetchHabits(user.id, selectedDate, { force: true });
-    // force: the habit list itself just changed in the database.
+    await updateHabit(habitId, {
+      name: updates.name,
+      icon: updates.icon,
+      category: updates.category,
+      frequency: updates.frequency,
+      targetDaysPerWeek: updates.targetDaysPerWeek,
+      targetDays: updates.targetDays,
+      period: updates.period,
+      priority: updates.priority,
+       cue: updates.cue,
+       reward: updates.reward,
+       emergencyVersion: updates.emergencyVersion,
+       type: updates.type,
+       unit: updates.unit,
+       targetValue: updates.targetValue,
+       color: updates.color,
+     });
     if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit updated.");
   };
@@ -464,17 +496,97 @@ export default function HabitsPage() {
     }
   };
 
-  const handleCardClick = (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
-    if (isLongPressRef.current) {
-      isLongPressRef.current = false;
-      return;
+  // Drag gesture handlers for counted habits progress bar
+  const handleDragStart = useCallback((habit: Habit, e: React.MouseEvent | React.TouchEvent, currentValue: number) => {
+    if (isFutureSelectedDate) return;
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    dragHabitIdRef.current = habit.id;
+    dragStartValueRef.current = currentValue;
+    dragTargetValueRef.current = habit.targetValue ?? null;
+    dragStartYRef.current = "touches" in e ? e.touches[0].clientY : e.clientY;
+  }, [isFutureSelectedDate]);
+
+const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDraggingRef.current || dragHabitIdRef.current === null) return;
+    e.preventDefault();
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const deltaY = dragStartYRef.current - clientY; // positive = dragged up
+    const step = Math.round(deltaY / 8); // 8px per step
+    const newValue = Math.max(0, Math.min(dragTargetValueRef.current ?? 100, dragStartValueRef.current + step));
+
+    if (user?.id && dragHabitIdRef.current) {
+      setHabitLogValue(user.id, dragHabitIdRef.current, selectedDate, newValue);
     }
-    if (isFutureSelectedDate) {
-      showToast("Cannot complete habits for future dates.");
-      return;
-    }
-    handleToggle(habit.id, selectedDate, e);
-  };
+  }, [user, selectedDate, setHabitLogValue]);
+
+  const handleDragEnd = useCallback(() => {
+    isDraggingRef.current = false;
+    dragHabitIdRef.current = null;
+    dragStartValueRef.current = 0;
+    dragTargetValueRef.current = null;
+  }, []);
+
+  // Attach global drag listeners
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => handleDragMove(e);
+    const onEnd = () => handleDragEnd();
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("mouseup", onEnd);
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("mouseup", onEnd);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [handleDragMove, handleDragEnd]);
+
+  // Handle click on date pill - increment counted habits by 1
+  const handleDateClick = useCallback((date: string) => {
+    if (isFutureSelectedDate) return;
+    if (!user?.id) return;
+    habits.forEach((h) => {
+      if ((h.type ?? "simple") === "counted" && isHabitScheduledOnDate(h, date)) {
+        const storeValue = useHabitStore.getState().historyValues?.[h.id]?.[date];
+        const current = typeof storeValue === "number" ? storeValue : 0;
+        setHabitLogValue(user.id, h.id, date, current + 1);
+      }
+    });
+  }, [habits, isFutureSelectedDate, user, setHabitLogValue]);
+
+  // Handle long press on date pill - fill to target for counted habits
+  const handleDateLongPress = useCallback((date: string) => {
+    if (isFutureSelectedDate) return;
+    if (!user?.id) return;
+    habits.forEach((h) => {
+      if ((h.type ?? "simple") === "counted" && h.targetValue && isHabitScheduledOnDate(h, date)) {
+        setHabitLogValue(user.id, h.id, date, h.targetValue);
+      }
+    });
+    showToast("Target completed for all counted habits");
+  }, [habits, isFutureSelectedDate, user, setHabitLogValue, showToast]);
+
+const handleCardClick = async (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
+      if (isLongPressRef.current) {
+        isLongPressRef.current = false;
+        return;
+      }
+      if (isFutureSelectedDate) {
+        showToast("Cannot complete habits for future dates.");
+        return;
+      }
+      if ((habit.type ?? "simple") === "counted") {
+        const storeValue = useHabitStore.getState().historyValues?.[habit.id]?.[selectedDate];
+        const log = { completed: true, value: typeof storeValue === "number" ? storeValue : 0 };
+        openValueInput(habit, log, selectedDate);
+        return;
+      }
+      handleToggle(habit.id, selectedDate, e);
+    };
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
@@ -501,11 +613,12 @@ export default function HabitsPage() {
         todayLogs={todayLogs}
         todayStr={todayStr}
         loading={habitsLoading || !user?.id}
+        onDateClick={handleDateClick}
+        onDateLongPress={handleDateLongPress}
       />
 
-      {/* M4 -- perfect-day celebration. Sits above the vault banner because it is
-          the reason the vault figure just went up. */}
-      <PerfectDayCard show={showPerfectDay} isToday={selectedDate === todayStr} />
+
+
 
       {/* Reward Vault Banner
 
@@ -625,14 +738,10 @@ export default function HabitsPage() {
 AnimatePresence, which suppresses the enter transition and leaves the
             cards stuck at the initial opacity of 0. */
          <div className="space-y-2.5">
-           <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence mode="popLayout" initial={false}>
 {habits.map((h) => {
                 const isScheduled = isHabitScheduledOnDate(h, selectedDate);
-                const rawLog = selectedDate === todayStr
-                  ? (todayLogs[h.id] ?? historyLogs[h.id]?.[selectedDate])
-                  : (historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]);
-                // Normalize to CompletionRecord: historyLogs stores booleans, todayLogs stores HabitLog
-                const log: { completed?: boolean; value?: number } | undefined = rawLog && typeof rawLog === "object" ? rawLog : rawLog ? { completed: true } : undefined;
+                const log = getCompletionRecord(h, selectedDate, todayStr, { todayLogs, historyLogs, historyValues });
                 const isCompleted = isHabitComplete(h, log);
                 const habitColor = getHabitColor(h);
               // M7 -- computed once per card rather than twice in the JSX. Null for
@@ -734,14 +843,75 @@ AnimatePresence, which suppresses the enter transition and leaves the
                             </span>
                           )}
                         </div>
+                        {(h.type ?? "simple") === "counted" && (
+                          <div className="mt-1.5 w-1/2 max-w-[180px]">
+                            {/* Water-fill progress bar */}
+                            <div
+                              className="relative w-full h-3 rounded-full bg-surface-container-high overflow-hidden cursor-pointer select-none"
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                if (isFutureSelectedDate) return;
+                                const currentValue = typeof log?.value === "number" ? log.value : 0;
+                                handleDragStart(h, e, currentValue);
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (isFutureSelectedDate) return;
+                                const currentValue = typeof log?.value === "number" ? log.value : 0;
+                                handleDragStart(h, e, currentValue);
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isFutureSelectedDate) {
+                                  showToast("Cannot complete habits for future dates.");
+                                  return;
+                                }
+                                // Single click: increment by 1
+                                const currentValue = typeof log?.value === "number" ? log.value : 0;
+                                if (user?.id) {
+                                  setHabitLogValue(user.id, h.id, selectedDate, currentValue + 1);
+                                }
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (isFutureSelectedDate) return;
+                                // Long press / right click: fill to target
+                                if (user?.id && h.targetValue) {
+                                  setHabitLogValue(user.id, h.id, selectedDate, h.targetValue);
+                                  showToast(`Filled to ${h.targetValue} ${h.unit ?? "units"}`);
+                                }
+                              }}
+                            >
+                              <div
+                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-150 ease-out"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, (typeof log?.value === "number" ? log.value : 0) / (h.targetValue ?? 1) * 100))}%`,
+                                  backgroundColor: habitColor,
+                                  boxShadow: `0 0 8px ${habitColor}80`,
+                                }}
+                              />
+                            </div>
+                            <div className="mt-0.5 flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
+                              <span>{typeof log?.value === "number" ? log.value : 0}</span>
+                              <span>/ {h.targetValue ?? "-"}</span>
+                              <span>{h.unit ?? "units"}</span>
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
                           <span className="font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
                           <span>•</span>
-                            <span className={`flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                              <Flame className="w-3 h-3" />
-                              {getStreakLabel(h.currentStreak)}
+                          <span className={`flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                            {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
+                            {h.type === "avoid" ? `${getStreakLabel(h.currentStreak)} clean` : getStreakLabel(h.currentStreak)}
+                          </span>
+                          {h.type === "avoid" && (
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">
+                              Quit
                             </span>
-                            {h.priority && (
+                          )}
+                        {h.priority && (
                               <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
                                 h.priority === "critical" ? "border-red-500/40 text-red-500" :
                                 h.priority === "focus" ? "border-amber-500/40 text-amber-500" :
@@ -766,49 +936,6 @@ AnimatePresence, which suppresses the enter transition and leaves the
                           <p className="mt-0.5 text-[11px] font-mono text-on-surface-variant/80 truncate">
                             {lastDone}
                           </p>
-                        )}
-
-                        {/* Counted habit progress bar + stepper */}
-                        {(h.type ?? "simple") === "counted" && (
-                          <div className="mt-2 w-full">
-                            {/* Water-fill progress bar */}
-                            <div className="relative w-full h-3 rounded-full bg-surface-container-high overflow-hidden" style={{ borderColor: habitColor }}>
-                              <div
-                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-300 ease-out"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, (typeof log?.value === "number" ? log.value : 0) / (h.targetValue ?? 1) * 100))}%`,
-                                  backgroundColor: habitColor,
-                                  boxShadow: `0 0 8px ${habitColor}80`,
-                                }}
-                              />
-                            </div>
-                            {/* Stepper controls - click to open value input popup */}
-                            <div className="mt-1.5 flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openValueInput(h, log, selectedDate)}
-                                disabled={isFutureSelectedDate}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
-                              >
-                                <span className="font-mono text-xs">-</span>
-                              </button>
-                              <div className="flex-1 flex items-center justify-between text-xs font-mono text-on-surface-variant">
-                                <span>{typeof log?.value === "number" ? log.value : 0}</span>
-                                <span>/ {h.targetValue ?? "-"}</span>
-                                <span>{h.unit ?? "units"}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => openValueInput(h, log, selectedDate)}
-                                disabled={isFutureSelectedDate}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
-                              >
-                                <span className="font-mono text-xs">+</span>
-                              </button>
-                            </div>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -900,241 +1027,49 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     selectedDate={selectedDate}
                     todayStr={todayStr}
                     onSelectDate={(newDate) => setSelectedDate(newDate)}
-                    onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
+                    onToggleDate={(dateStr, e) => {
+                      if ((h.type ?? "simple") === "counted") {
+                        const log = getCompletionRecord(h, dateStr, todayStr, { todayLogs, historyLogs, historyValues });
+                        const current = typeof log?.value === "number" ? log.value : 0;
+                        if (user?.id) {
+                          setHabitLogValue(user.id, h.id, dateStr, current + 1);
+                        }
+                      } else {
+                        handleToggle(h.id, dateStr, e);
+                      }
+                    }}
                   />
                 </motion.div>
               );
             })}
           </AnimatePresence>
         </div>
-      ) : viewMode === "grid" ? (
+) : viewMode === "grid" ? (
         /* 2. GRID VIEW: 2-Column Compact mobile cards for selected date */
         <div className="grid grid-cols-2 gap-2.5">
           <AnimatePresence mode="popLayout" initial={false}>
-            {habits.map((h) => {
-              const isScheduled = isHabitScheduledOnDate(h, selectedDate);
-              const rawLog = selectedDate === todayStr
-                ? (todayLogs[h.id] ?? historyLogs[h.id]?.[selectedDate])
-                : (historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]);
-              // Normalize to CompletionRecord: historyLogs stores booleans, todayLogs stores HabitLog
-              const log = rawLog && typeof rawLog === "object" ? rawLog as { completed?: boolean; value?: number } : rawLog ? { completed: true } : undefined;
-              const isCompleted = isHabitComplete(h, log);
-              const habitColor = getHabitColor(h);
-
-              return (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0.85, y: 6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{
-                    layout: { type: "spring", stiffness: 350, damping: 28 },
-                    opacity: { duration: 0.2 },
-                    scale: { duration: 0.2 },
-                  }}
-                  key={h.id}
-                  onTouchStart={(e) => startPress(h, e)}
-                  onTouchMove={movePress}
-                  onTouchEnd={endPress}
-                  onTouchCancel={endPress}
-                  onMouseDown={(e) => startPress(h, e)}
-                  onMouseMove={movePress}
-                  onMouseUp={endPress}
-                  onMouseLeave={endPress}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setEditingHabit(h);
-                  }}
-                  onClick={(e) => handleCardClick(h, e)}
-                  className={`p-3 rounded-2xl flex flex-col justify-between gap-2.5 border transition-colors duration-200 cursor-pointer active:scale-95 select-none ${
-                    isCompleted
-                      ? "bg-surface-container-low shadow-sm"
-                      : isFutureSelectedDate
-                      ? "bg-surface-container opacity-85 border-outline/15"
-                      : !isScheduled
-                      ? "bg-surface-container/60 hover:bg-surface-container opacity-80 border-dashed border-outline/20"
-                      : "bg-surface-container hover:bg-surface-container-high border-outline/15"
-                  }`}
-                  style={{
-                    borderColor: isCompleted
-                      ? isScheduled
-                        ? `${habitColor}50`
-                        : `${habitColor}35`
-                      : undefined,
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-1.5">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                        isCompleted ? "border" : "bg-surface-container-high"
-                      }`}
-                      style={{
-                        backgroundColor: isCompleted
-                          ? isScheduled
-                            ? `${habitColor}20`
-                            : `${habitColor}14`
-                          : undefined,
-                        borderColor: isCompleted
-                          ? `${habitColor}${isScheduled ? "40" : "25"}`
-                          : undefined,
-                      }}
-                    >
-                      <HabitIcon icon={h.icon} name={h.name} className="w-4 h-4" style={{ color: habitColor }} />
-                    </div>
-
-                    {/* Completion Action: Ring for simple habits only (counted uses inline stepper below metadata) */}
-                    {(h.type ?? "simple") === "simple" ? (
-                      <div
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isFutureSelectedDate) {
-                            showToast("Cannot complete habits for future dates.");
-                            return;
-                          }
-                          handleToggle(h.id, selectedDate, e);
-                        }}
-                        title={
-                          isFutureSelectedDate
-                            ? "Cannot complete habits for future dates"
-                            : isCompleted
-                            ? isScheduled
-                              ? "Completed (tap to undo)"
-                              : "Unscheduled Completed (!) • Tap to undo"
-                            : !isScheduled
-                            ? "Rest Day (tap to register)"
-                            : "Tap to complete"
-                        }
-                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ${
-                          isFutureSelectedDate ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-                        } ${
-                          isCompleted
-                            ? "text-white shadow-xs scale-105"
-                            : isFutureSelectedDate
-                            ? "bg-transparent"
-                            : !isScheduled
-                            ? "bg-transparent hover:scale-105 opacity-75"
-                            : "bg-transparent hover:scale-105"
-                        }`}
-                        style={{
-                          backgroundColor: isCompleted
-                            ? isScheduled
-                              ? habitColor
-                              : `${habitColor}70`
-                            : "transparent",
-                          borderColor: isFutureSelectedDate && !isCompleted
-                            ? `${habitColor}60`
-                            : !isScheduled && !isCompleted
-                            ? `${habitColor}70`
-                            : habitColor,
-                          borderWidth: isCompleted ? "0px" : !isScheduled ? "1.5px" : "2px",
-                          borderStyle: !isScheduled && !isCompleted ? "dashed" : "solid",
-                          boxShadow: isCompleted
-                            ? `0 0 8px ${habitColor}${isScheduled ? "66" : "35"}`
-                            : undefined,
-                        }}
-                      >
-                        <AnimatePresence mode="wait">
-                          {isCompleted ? (
-                            <motion.div
-                              key={isScheduled ? "check" : "excl"}
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              transition={{ duration: 0.15 }}
-                              className="flex items-center justify-center"
-                            >
-                              {isScheduled ? (
-                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                              ) : (
-                                <span className="font-black text-[11px] leading-none">!</span>
-                              )}
-                            </motion.div>
-                          ) : null}
-                        </AnimatePresence>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-1.5 justify-between">
-                      <h4
-                        className={`text-xs font-semibold truncate ${
-                          isCompleted ? "line-through text-on-surface-variant" : "text-on-surface"
-                        }`}
-                      >
-                        {h.name}
-                      </h4>
-                      {!isScheduled && (
-                        <span className="px-1 py-0.2 rounded bg-surface-container-highest text-on-surface-variant text-[8.5px] font-mono font-bold shrink-0">
-                          Rest
-                        </span>
-                      )}
-</div>
-                    <div className="flex items-center justify-between text-[11px] font-mono mt-1 text-on-surface-variant">
-                      <span className="truncate font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(h)}</span>
-                        <span className={`font-bold shrink-0 flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                          <Flame className="w-3 h-3" />
-                          {getStreakLabel(h.currentStreak)}
-                        </span>
-                        {h.priority && (
-                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
-                            h.priority === "critical" ? "border-red-500/40 text-red-500" :
-                            h.priority === "focus" ? "border-amber-500/40 text-amber-500" :
-                            "border-emerald-500/40 text-emerald-500"
-                          }`}>
-                            {h.priority === "critical" ? "🔴 Critical" : h.priority === "focus" ? "🟡 Focus" : "🟢 Optional"}
-                          </span>
-                        )}
-                    </div>
-
-                    {/* Counted habit progress bar + stepper */}
-                    {(h.type ?? "simple") === "counted" && (
-                      <div className="mt-2 w-full">
-                        {/* Water-fill progress bar */}
-                        <div className="relative w-full h-2 rounded-full bg-surface-container-high overflow-hidden" style={{ borderColor: habitColor }}>
-                          <div
-                            className="absolute inset-y-0 left-0 rounded-full transition-all duration-300 ease-out"
-                            style={{
-                              width: `${Math.min(100, Math.max(0, (typeof log?.value === "number" ? log.value : 0) / (h.targetValue ?? 1) * 100))}%`,
-                              backgroundColor: habitColor,
-                              boxShadow: `0 0 6px ${habitColor}80`,
-                            }}
-                          />
-                        </div>
-                        {/* Stepper controls - click to open value input popup */}
-                        <div className="mt-1 flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => openValueInput(h, log, selectedDate)}
-                            disabled={isFutureSelectedDate}
-                            className="w-6 h-6 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
-                          >
-                            <span className="font-mono text-[10px]">-</span>
-                          </button>
-                          <div className="flex-1 flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
-                            <span>{typeof log?.value === "number" ? log.value : 0}</span>
-                            <span>/ {h.targetValue ?? "-"}</span>
-                            <span>{h.unit ?? "units"}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => openValueInput(h, log, selectedDate)}
-                            disabled={isFutureSelectedDate}
-                            className="w-6 h-6 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={isFutureSelectedDate ? "Cannot log for future dates" : "Tap to set amount"}
-                          >
-                            <span className="font-mono text-[10px]">+</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
+            {habits.map((h) => (
+              <GridHabitCard
+                key={h.id}
+                habit={h}
+                selectedDate={selectedDate}
+                todayStr={todayStr}
+                isFutureSelectedDate={isFutureSelectedDate}
+                todayLogs={todayLogs}
+                historyLogs={historyLogs}
+                historyValues={historyValues}
+                userId={user?.id ?? null}
+                setHabitLogValue={setHabitLogValue}
+                showToast={showToast}
+                handleCardClick={handleCardClick}
+                handleToggle={handleToggle}
+                handleDragStart={handleDragStart}
+                startPress={startPress}
+                movePress={movePress}
+                endPress={endPress}
+                setEditingHabit={setEditingHabit}
+              />
+            ))}
           </AnimatePresence>
         </div>
       ) : (
@@ -1208,10 +1143,15 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
-                        <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
-                          <Flame className="w-3 h-3" />
-                          {getStreakLabel(h.currentStreak)}
+                        <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isStreakActive(h.currentStreak) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
+                          {h.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
+                          {h.type === "avoid" ? `${getStreakLabel(h.currentStreak)} clean` : getStreakLabel(h.currentStreak)}
                         </span>
+                        {h.type === "avoid" && (
+                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border border-error/40 text-error">
+                            Quit
+                          </span>
+                        )}
                         {h.priority && (
                           <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${
                             h.priority === "critical" ? "border-red-500/40 text-red-500" :

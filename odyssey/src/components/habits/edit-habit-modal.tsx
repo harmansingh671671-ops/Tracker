@@ -41,10 +41,11 @@ interface EditHabitModalProps {
       cue?: string;
       reward?: string;
       emergencyVersion?: string;
-      type?: HabitType;
-      unit?: string;
-      targetValue?: number;
-    }
+       type?: HabitType;
+       unit?: string;
+       targetValue?: number;
+       color?: string;
+     }
   ) => void;
   onDelete: (habitId: string) => void;
 }
@@ -110,6 +111,8 @@ export function EditHabitModal({
   const [type, setType] = useState<HabitType>("simple");
   const [unit, setUnit] = useState("");
   const [targetValue, setTargetValue] = useState("");
+  const [color, setColor] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -150,6 +153,7 @@ export function EditHabitModal({
       setType(habit.type ?? "simple");
       setUnit(habit.unit ?? "");
       setTargetValue(habit.targetValue ? String(habit.targetValue) : "");
+      setColor(habit.color ?? "");
 
       setIsConfirmingDelete(false);
       setSelectedHistoryDate(selectedDate || today);
@@ -199,10 +203,11 @@ export function EditHabitModal({
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
       emergencyVersion: emergencyVersion.trim() || undefined,
-      type: type === "simple" ? undefined : type,
-      unit: type === "counted" ? unit.trim() || undefined : undefined,
-      targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
-    });
+       type: type === "simple" ? undefined : type,
+       unit: type === "counted" ? unit.trim() || undefined : undefined,
+       targetValue: type === "counted" ? (targetValue ? parseInt(targetValue, 10) : undefined) : undefined,
+       color: color.trim() || undefined,
+     });
     onClose();
   };
 
@@ -398,7 +403,7 @@ export function EditHabitModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Morning Cold Hydration & Mobility"
+                 placeholder={type === "avoid" ? "e.g. Quit Doom Scrolling" : "e.g. Morning Cold Hydration & Mobility"}
                 className="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline-variant rounded-2xl py-3.5 px-4 border border-outline/15 focus:border-primary focus:ring-1 focus:ring-primary shadow-sm text-sm font-semibold transition-all"
               />
             </div>
@@ -537,57 +542,10 @@ export function EditHabitModal({
               </div>
             </div>
 
-            {/* Priority */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>
-              <div className="flex gap-2">
-                {[
-                  { id: "critical", label: "Critical", emoji: "🔴" },
-                  { id: "focus", label: "Focus", emoji: "🟡" },
-                  { id: "optional", label: "Optional", emoji: "🟢" },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPriority(p.id as "critical" | "focus" | "optional")}
-                    className={`flex-1 p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
-                      priority === p.id
-                        ? "bg-primary/15 border-primary/40 text-primary"
-                        : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
-                    }`}
-                  >
-                    <span className="mr-1">{p.emoji}</span>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Cue / trigger */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">CUE / TRIGGER</label>
-              <input
-                type="text"
-                value={cue}
-                onChange={(e) => setCue(e.target.value)}
-                placeholder="After I pour my morning coffee"
-                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-              />
-            </div>
-
-            {/* Reward */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-on-surface-variant font-medium">REWARD</label>
-              <input
-                type="text"
-                value={reward}
-                onChange={(e) => setReward(e.target.value)}
-                placeholder="5 minutes of music"
-                className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-              />
-            </div>
+            {/* Advanced settings moved below */}
 
             {/* Emergency version */}
+            {type !== "avoid" && (
             <div className="space-y-1.5">
               <label className="text-xs font-mono text-on-surface-variant font-medium">HABIT TYPE</label>
               <div className="flex gap-2">
@@ -611,6 +569,7 @@ export function EditHabitModal({
                 ))}
               </div>
             </div>
+            )}
 
             {type === "counted" && (
               <>
@@ -650,6 +609,97 @@ export function EditHabitModal({
                 </div>
               </>
             )}
+
+            {/* Advanced settings */}
+            <div className="rounded-2xl border border-outline/10 bg-surface-container-low overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-on-surface cursor-pointer"
+              >
+                <span>Advanced settings</span>
+                <span className="text-on-surface-variant text-xs">{showAdvanced ? "Hide" : "Show"}</span>
+              </button>
+              {showAdvanced && (
+                <div className="px-4 pb-4 space-y-3">
+                  {/* Priority */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>
+                    <div className="flex gap-2">
+                      {[
+                        { id: "critical", label: "Critical", emoji: "🔴" },
+                        { id: "focus", label: "Focus", emoji: "🟡" },
+                        { id: "optional", label: "Optional", emoji: "🟢" },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setPriority(p.id as "critical" | "focus" | "optional")}
+                          className={`flex-1 p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                            priority === p.id
+                              ? "bg-primary/15 border-primary/40 text-primary"
+                              : "bg-surface-container border-outline/10 text-on-surface-variant opacity-70"
+                          }`}
+                        >
+                          <span className="mr-1">{p.emoji}</span>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cue / trigger */}
+                  {type !== "avoid" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">CUE / TRIGGER</label>
+                    <input
+                      type="text"
+                      value={cue}
+                      onChange={(e) => setCue(e.target.value)}
+                      placeholder="After I pour my morning coffee"
+                      className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                    />
+                  </div>
+                  )}
+
+                  {/* Reward */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">REWARD</label>
+                    <input
+                      type="text"
+                      value={reward}
+                      onChange={(e) => setReward(e.target.value)}
+                      placeholder="5 minutes of music"
+                      className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
+                    />
+                  </div>
+
+                  {/* Color */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-on-surface-variant font-medium">COLOR</label>
+                    <div className="flex flex-wrap gap-2">
+                      {["#10B981", "#2563EB", "#8B5CF6", "#F59E0B", "#06B6D4", "#EC4899", "#9333EA", "#EF4444", "#84CC16", "#F97316"].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setColor(color === c ? "" : c)}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${color === c ? "border-on-surface scale-110" : "border-transparent"}`}
+                          style={{ backgroundColor: c }}
+                          title={c}
+                        />
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setColor("")}
+                        className={`px-3 py-1 rounded-full text-xs border ${color === "" ? "bg-primary/15 border-primary/40 text-primary" : "bg-surface-container border-outline/10 text-on-surface-variant"}`}
+                      >
+                        Auto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Action Buttons: Save and Delete */}
             <div className="pt-2 space-y-2">
