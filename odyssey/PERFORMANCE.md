@@ -158,7 +158,42 @@ the split-by-compressibility warning above describes.
 41.6 + 8.3 + 3.8 + 3.5), 30.7 KB is the local database, 9.8 KB is the shell's native schedule
 sync, 7.3 KB is the icon set. **Two of those are still paid by screens that may not need
 them** — `/` and `/day-schedule` hide the header and still download the database and the sync
-because the shell imports them statically. That is the next win, and it is not this commit's.
+because the shell imports them statically.
+
+> **Correction 2026-10-19 (`PERF-5d/5e`, measured): the "next win" above was re-measured and
+> does not survive.** Making the sync load on demand (both from the barrel and from its own
+> module) moved it out of every route's *first paint* but duplicated its graph into per-entry
+> async chunks: the build rose **476 → 500.5 KB gzip**, four routes' first load rose ~3.5 KB,
+> and the database (30.7 KB) stayed shared **through the header's profile chain regardless** —
+> the header mounts its profile store statically, so the two header-less screens were the only
+> routes that could not reach the chain, and both of them open the database within moments of
+> paint anyway (`/` may start onboarding, `/day-schedule` reads its schedule). The sync is
+> therefore back on its static import: it is session-shared code that every real screen touches,
+> the static form builds smaller, and the deferral bought ~3 KB at paint for a +25 KB build.
+> The variant worth having later is a different one: stop the *header* from keeping the profile
+> chain in the shared set (route-group the two shell-less screens), which is layout surgery and
+> has its own pop-in risk to verify visually.
+
+**What `PERF-5d/5e` did ship (same day, measured):**
+
+- **5d — dependency trim.** Five runtime dependencies had **zero imports anywhere** and are
+  gone from `package.json`: `date-fns`, `recharts`, `dexie-react-hooks`, `react-day-picker`
+  (imported only by an already-orphaned calendar component, deleted with it) and `shadcn` (a
+  scaffold CLI, not a runtime library). **Honest effect: none of them ever shipped a byte** —
+  nothing imported them, so no chunk ever held them. What this buys is install time, lockfile
+  weight and one less stale-premise surface for future work, not first-load KB.
+- **5e — production hygiene.** `compiler.removeConsole` with `exclude: ["error", "warn"]` is
+  now in `next.config.ts`. It was **verified empirically, not assumed**: two marker strings
+  (`console.log` / `console.info`) were planted in a client component, built, and scanned for
+  across all 36 shipped client files — 0 hits, while a control string in the same round found
+  11 in the same scan, so the transform strips `log`/`info`/`debug` on **Turbopack builds**
+  (the 2023 forum-era answer that it does not apply to Turbopack is stale). The deliberate
+  `logWarn`/`logError` diagnostics survive, which is the point: they are what a device's
+  logcat is read through. Source maps are already production-off by default (`productionBrowserSourceMaps`,
+  local Next 16 docs), minification is Turbopack default, and Tailwind v4 detects used classes
+  automatically — the v3-era "purge" premise needed no work.
+- **5f — React Compiler: declined for now**, per its own condition — no profiler evidence
+  that it pays, and the plan gate says only then.
 
 **The premise this corrected.** `main_plan.md` expected the win in `PERF-5c` — extracting
 hooks and sub-components out of five large *screen* files (planner 48.3 KB of source, habits
@@ -178,6 +213,8 @@ already routes. Source size is not what a phone pays for. The shared set was the
 | `BUG-13` | Deleted 1,806 lines of orphaned components | −2 blur sites; removed a 7th `setInterval` that was dead |
 | `PERF-5` | Animation library out of the shared set (the permission panel animates with two keyframes now), and the profile sheet, rank-up dialog, evening reminder and update notice load on demand instead of being imported by the shell | Shared set **261.4 → 178.4 KB** gzip; `/planner` first visit **263.0 → 178.8 KB**. Build total **rose** 431.9 → 476.7 KB — deferred code is duplicated per chunk. See §2.1 |
 | `PERF-5a` | `npm run measure-routes` — per-route first load, from Next's own analyzer | The baseline above; it is what showed `PERF-5c`'s premise was wrong |
+| `PERF-5d` | Removed 5 zero-import runtime dependencies (`date-fns`, `recharts`, `dexie-react-hooks`, `react-day-picker`, `shadcn`) + the orphaned calendar component that was `react-day-picker`'s only importer | **0 shipped KB** — nothing ever imported them; install/lockfile hygiene only (recorded in §2.1, correction note) |
+| `PERF-5e` | `compiler.removeConsole` (`error`/`warn` excluded) verified on a Turbopack build by marker-string build+scan: `log`/`info` stripped from all 36 client chunks, diagnostics kept; source maps confirmed production-off via local docs; Tailwind v4 auto-scans | Production bundles carry no stray console output, and device diagnostics survive |
 
 ### The `PERF-4b` number, stated precisely
 

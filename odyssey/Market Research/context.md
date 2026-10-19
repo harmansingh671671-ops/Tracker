@@ -621,6 +621,58 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (j) - `PERF-5` remainder: the dependency trim and the hygiene win, and the "next win" that measurement killed
+
+`PERF-5` is now `SHIPPED` (`5f` declined per its own gate). And **the item's
+named "next win" is struck, like `5c` was.**
+
+**The measured rejection of the db/sync premise.** The plan said `/` and
+`/day-schedule` still pay for the database (30.7 KB) and the shell's sync
+(9.8 KB). Built both lazy variants and measured both:
+
+| Variant | shared set | build total | worst first-load move |
+|---|---|---|---|
+| static (baseline) | 180.3 KB | 475.9 KB | — |
+| lazy, via the barrel | 177.2 KB | **528.1 KB (+52.2)** | 4 routes **worse** ~3.6 KB |
+| lazy, leaf module only | 177.2 KB | 500.5 KB (+24.6) | 4 routes **worse** ~3.5 KB |
+
+Both variants duplicate the sync's graph into per-entry async chunks (Turbopack
+copies a dynamic import's dependencies into every entry that can reach it — same
+mechanism that inflated the 5b totals), and **the 30.7 KB database never left**
+the shared set, because the header — statically imported by the shell — mounts
+the profile store, which needs the database. Neither screen-less route escapes
+that chain, and both of them open the database within moments of paint (`/` can
+start onboarding, `/day-schedule` reads its schedule), so deferring the fetch
+only moves it a beat later in the same session. Reverted to static; the one
+variant that could actually take the db off those two routes is structural:
+route-grouping the shell-less screens so the header stops pinning the chain into
+shared. Deferred — layout surgery with its own pop-in risk, needs visual proof.
+
+**5d shipped: five zero-import dependencies deleted** (`date-fns`,
+`recharts`, `dexie-react-hooks`, `react-day-picker`, `shadcn`) plus
+`ui/calendar.tsx` — the orphan whose import of `react-day-picker` would have
+failed `tsc` the moment the dependency left. **Honest: 0 shipped bytes** — nothing ever
+imported them, so no chunk ever carried them; the value is install/lockfile
+weight and not carrying false premises forward. Audit method: name-by-name
+text search across every `.ts/.tsx/.css/.js` outside `node_modules`.
+
+**5e shipped: `compiler.removeConsole` verified — not assumed.** The plan's
+brief and 2023-era web wisdom say it does not apply to Turbopack. It does on
+16.3.5 builds, proven by planting `console.log("odyssey5eLOG")` /
+`console.info("odyssey5eINFO")` in a client component, building with
+`removeConsole: { exclude: ["error", "warn"] }`, and scanning all 36 shipped
+client files: **0 marker hits; 11 hits for a control string in the same scan**
+— the scan itself proven live. `logWarn`/`logError` survive on purpose (device
+logcat diagnostics, the surface 77 empty catches were fixed into). Source maps
+confirmed production-off via the local 16 docs; Tailwind v4 auto-scans classes,
+so the v3-era "purge" premise needed no work; minification is Turbopack default.
+
+**Verification of the whole remainder:** tsc 0 · lint 0 errors (95 warnings,
+unchanged) · 30 suites / 462 tests · build clean · `verify-perf5` 39/39 +
+`verify-c2` + `verify-floating` all pass against the production server on 3100
+(killed after, port verified closed). No visual change shipped, so no
+screenshot pass beyond the suites' own light/dark checks.
+
 ### 2026-10-19 (i) - `B25` review pass: one 18-hour bar, a hidden flame, and the visual check that was skipped
 
 **The 18-hour bar is now one definition.** `compliance.ts` declared its own
@@ -4163,13 +4215,15 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`B25` review pass**: the 18-hour bar is one definition
-  (`FULL_DAY_HOURS` moved to `day-status.ts`; `compliance.ts` imports it, no cycle),
-  ADR 0005 gained §2.4 (the config-repricing permanence exception), the per-habit chip no longer
-  draws a bare flame/✕ icon when the honest-zero label is empty (three render sites), and the
-  visual pass `B25` skipped was actually run (light + dark, 390px, six surfaces — screenshots in
-  `%TEMP%\opencode\verify\b25-screens`). Committed on `main`; **the agent does not push**. Before it:
-  **`d0c8dc8`** (`B25` follow-up: autofill sleep counts as planned, not auto-reviewed),
+- HEAD at last update: **this commit** — **`PERF-5` remainder (`SHIPPED`)**: five zero-import
+  dependencies deleted + `ui/calendar.tsx`; `compiler.removeConsole` (`error`/`warn` excluded)
+  verified on a Turbopack build by a marker-string build+scan; source maps confirmed
+  production-off; **the "db + sync off header-less screens" win built, measured, and rejected** —
+  the lazy sync duplicated its graph per entry (build +24.6/+52.2 KB gzip across variants), four
+  routes got heavier, and the db stayed shared through the header's profile chain; reverted to
+  static. `PERFORMANCE.md` §2.1 carries the correction and the deferred structural variant.
+  Committed on `main`; **the agent does not push**. Before it:
+  **`77b55a1`** (`B25` review pass), **`d0c8dc8`** (`B25` follow-up: autofill sleep counts as planned, not auto-reviewed),
   **`fe8202d`** (BUG-16 record correction), **`9b19f96`** (`B25` fixes + `BUG-16`),
   **`abbc6ac`** (`B25` — the streak becomes two cumulative counters), **`2dc684e`** (`S9` the
   violation state), **`8700852`** (`PERF-5` 5a + 5b), **`b4d9eff`** (habit types), **`e67dc01`**
@@ -4177,6 +4231,17 @@ to know where things stand.
   `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`.
   **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
   `b4d9eff` through this commit are **not**.
+- **Working tree (2026-10-19, `PERF-5` remainder):** clean after that commit. It touched
+  `package.json` + `package-lock.json` (5 deps removed), `src/components/ui/calendar.tsx`
+  (**deleted** — orphan, sole `react-day-picker` importer), `next.config.ts`
+  (`compiler.removeConsole`, exclude error/warn), `PERFORMANCE.md` (§2.1 correction + §3 rows),
+  `main_plan.md` (PERF-5 → `SHIPPED`), `context.md` (entry `(j)`, §10). **`app-shell.tsx` ended
+  byte-identical to before** — the lazy-sync experiment was fully reverted (the diff you may see
+  in working state was re-measured, judged net-negative, and discarded).
+- **Next feature queued (owner pre-approved): `PERF-7`** blur reduction (7a audit → 7e
+  low-end fallback), then `PERF-8` render efficiency and `PERF-16` dead-weight deletion
+  (its 16c now holds the 9 remaining orphan `ui/` components found in this session:
+  avatar/badge/card/dropdown-menu/input/progress/select/tabs/textarea). One commit each.
 - **Working tree (2026-10-19, `B25` review pass):** clean after that commit. It touched
   `src/lib/utils/day-status.ts` (constant home), `src/lib/utils/compliance.ts` (local constant
   removed), `src/lib/utils/compliance.test.ts` (import source), `src/app/habits/page.tsx` ×2 +

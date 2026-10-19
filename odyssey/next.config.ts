@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // PERF-5e: strip console.log/debug/info from production bundles. The app's
+  // deliberate diagnostics (logWarn/logError -> console.warn/error) are kept:
+  // they are the failure surface a device's logcat is read through.
+  compiler: {
+    removeConsole: { exclude: ["error", "warn"] },
+  },
   async headers() {
     return [
       {
