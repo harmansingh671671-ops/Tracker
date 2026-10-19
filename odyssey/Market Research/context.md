@@ -657,6 +657,8 @@ day. **Rest days are deliberately excluded** so the dashed rest-day styling stil
 **Visual only** — `isHabitComplete` and the days-done counter are untouched, so the fill cannot
 change a count. New pure `partialFillAlpha()` helper; 4 new tests.
 
+**`B6` (SHIPPED):** the Habits view switcher — the plan recorded it `NOT BUILT`, but the switcher already existed, so that line was stale (rule 8). Three gaps closed, plus one deletion. **(1)** The heatmap view was a 2-column grid of the **compact 70-day matrix** (~10 weeks — not the "long history" §15.4 asks for); it is now **one 52-week, horizontally-scrollable matrix per habit, full width**, which is what `B6` and `HD1` both call for. **(2)** The preference was **not saved** — it now writes `odyssey_habits_view` through the typed storage helpers and is restored after hydration with `queueMicrotask` (the `M14` rank-dialog pattern); a brief flash of the default is accepted, since reading storage during render would make the server and client markup disagree. **(3)** The default was **List** — now **Heatmap**, per the owner. **(4)** The compact matrix component is now orphaned (nothing imports it, repo-wide) and is **deleted** — 363 lines, the `PERF-16` pattern, recoverable from `956cb5d`. `HD1` is the same switcher and is marked `SHIPPED` too. **Cost named:** the heatmap view renders **N × 364 cells** for N habits — the heaviest of the three views, and inherent to the spec's "matrix per habit".
+
 **`PERF-8` (SHIPPED):** habits list row extracted into `habit-list-card.tsx` +
 `React.memo` on habit-scoped log slices; `handleToggle` reads pre-toggle state
 from store snapshot; handlers stabilised (`useCallback`, `userId` scalar).
@@ -801,23 +803,20 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`B17` (`SHIPPED`)**: counted habits fill their
-  heatmap in proportion to progress ("water in the bucket") — both heatmaps read the stored
-  value and scale the cell's alpha to `value / target`; **visual only**, `isHabitComplete`
-  and the counter untouched. Committed on `main`; **the agent does not push**. Before it:
-  **`014db2f`** (`BUG-17`, the other session), `993a2c9` (`B16`), `8bef3ce` (context.md
+- HEAD at last update: **this commit** — **`B6` (`SHIPPED`)**: the Habits view switcher is now the heatmap by default, full-width and scrollable, and the choice is saved; the compact 70-day matrix is deleted as an orphan. Committed on `main`; **the agent does not push**. Before it:
+  **`956cb5d`** (`B17`), `014db2f` (`BUG-17`, the other session), `993a2c9` (`B16`), `8bef3ce` (context.md
   compaction), `1c158e2` (`PERF-16`), `4476fcb` (`PERF-8`), `47ce1fd` (`PERF-7`), `1b9cb28`
   (`PERF-5` 5d+5e), `77b55a1` (`B25` review pass), `d0c8dc8`, `fe8202d`, `9b19f96`,
   `abbc6ac` (`B25`), `2dc684e` (`S9`), `8700852` (`PERF-5` 5a+b), `b4d9eff`, `e67dc01`,
   and earlier C2 rounds. **Everything up to and including `e67dc01` is on `origin/main`** —
   the owner pushed; `8700852` onward are **not**.
-- **Working tree (2026-10-19, `B17`):** clean after that commit.
+- **Working tree (2026-10-19, `B6`):** clean after that commit.
 - **Owner-approved queue (2026-10-19), in this order:** (1) **`B16`** — SHIPPED (`993a2c9`);
-  (2) **`B17`** — counted-habit heatmap partial fill ("water in the bucket") — **SHIPPED this
-  commit**; (3) **`B6`** — heatmap as the default Habits view, full-width and scrollable, plus
-  "remember the last-opened view"; (4) **`S10`** — **deferred to last**: the proportional-border
-  redesign was **declined by the owner**, so the current per-habit dots/`done÷total` stay until
-  `S10` is genuinely re-scoped.
+  (2) **`B17`** — counted-habit heatmap partial fill — SHIPPED (`956cb5d`); (3) **`B6`** —
+  heatmap as the default Habits view, full-width and scrollable, plus "remember the
+  last-opened view" — **SHIPPED this commit**; (4) **`S10`** — **deferred to last**: the
+  proportional-border redesign was **declined by the owner**, so the current per-habit
+  dots/`done÷total` stay until `S10` is genuinely re-scoped.
 - The perf-phase queue is complete (PERF-5 remainder, PERF-7, PERF-8, PERF-16 all
   `SHIPPED`). Remaining perf items are not queued: PERF-17 is ⚪ optional
   skip-unless-measured, PERF-18's open halves are blocked on CI, and the native

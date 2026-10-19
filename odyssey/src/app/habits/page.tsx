@@ -1,12 +1,12 @@
 "use client";
 
-import { logWarn } from "@/lib/utils/logger";
+import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
-import { HabitHeatmap } from "@/components/habits/habit-heatmap";
+import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { GridHabitCard } from "@/components/habits/grid-habit-card";
 import { HabitListCard } from "@/components/habits/habit-list-card";
 import { HabitIcon } from "@/components/habits/habit-icon";
@@ -39,6 +39,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 type HabitViewMode = "list" | "grid" | "heatmap";
 
+/** Where the Habits view-mode preference is stored — `B6` requires a "saved preference". */
+const HABITS_VIEW_STORAGE_KEY = "odyssey_habits_view";
+
 export default function HabitsPage() {
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   // PERF-8b: the id as a scalar keeps the memoised rows' handler props stable
@@ -68,7 +71,16 @@ export default function HabitsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<HabitViewMode>("list");
+  // `B6`: the view mode is a *saved preference*, and the heatmap is the default
+  // (the owner's choice — a long-history view on opening the screen). The stored
+  // value is applied once the client has hydrated, because reading
+  // `localStorage` during the first render would make the server and client
+  // markup disagree.
+  const [viewMode, setViewModeState] = useState<HabitViewMode>("heatmap");
+  const setViewMode = useCallback((next: HabitViewMode) => {
+    setViewModeState(next);
+    writeString(HABITS_VIEW_STORAGE_KEY, next);
+  }, []);
   const [valueInputHabit, setValueInputHabit] = useState<{ habit: Habit; log: { completed?: boolean; value?: number } | undefined; date: string } | null>(null);
   const [valueInputAmount, setValueInputAmount] = useState("");
 
@@ -76,6 +88,20 @@ export default function HabitsPage() {
   const [selectedDate, setSelectedDate] = useState<string>(getLocalTodayStr);
 
   const isFutureSelectedDate = selectedDate > todayStr;
+
+  // `B6`: apply the saved view once the client has hydrated. Deferred with
+  // `queueMicrotask` rather than set synchronously — the same fix `M14` used for
+  // the rank dialog — because a synchronous `setState` in an effect cascades a
+  // second render pass. A brief flash of the default heatmap is the accepted
+  // cost of not reading storage during render.
+  useEffect(() => {
+    queueMicrotask(() => {
+      const saved = readString(HABITS_VIEW_STORAGE_KEY, "");
+      if (saved === "list" || saved === "grid" || saved === "heatmap") {
+        setViewModeState(saved);
+      }
+    });
+  }, []);
 
   /**
    * Declared before the effects below that call it, which is what the React
@@ -854,8 +880,10 @@ AnimatePresence, which suppresses the enter transition and leaves the
           </AnimatePresence>
         </div>
       ) : (
-        /* 3. HEATMAP VIEW: 2-Column Quad-like Matrices */
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+        /* 3. HEATMAP VIEW (`B6`): one scrollable long-history matrix per habit,
+           full width. The compact 70-day matrix showed ~10 weeks, which is not
+           "long history"; the 52-week matrix is, and it scrolls. */
+        <div className="space-y-2.5">
           <AnimatePresence mode="popLayout" initial={false}>
             {habits.map((h) => {
               const isScheduled = isHabitScheduledOnDate(h, selectedDate);
@@ -953,8 +981,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
                   </div>
 
-                  {/* Quad Compact Heatmap */}
-                  <HabitHeatmap
+                  {/* Long-history matrix (`B6`): 52 weeks, horizontally scrollable. */}
+                  <HabitGitHubHeatmap
                     habitId={h.id}
                     name={h.name}
                     targetDays={h.targetDays}
@@ -963,8 +991,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     type={h.type}
                     targetValue={h.targetValue}
                     selectedDate={selectedDate}
-                    compact={true}
                     todayStr={todayStr}
+                    showStats={false}
                     onSelectDate={(newDate) => setSelectedDate(newDate)}
                     onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
                   />
