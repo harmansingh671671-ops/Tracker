@@ -22,7 +22,6 @@ import { PlannerEmptyState } from "@/components/planner/planner-empty-state";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
-import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import { useSharedClock, localDateStr } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
@@ -39,7 +38,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
-  ChevronRight,
   Flame,
   Sparkles,
   Check,
@@ -447,14 +445,6 @@ export function PlannerContent() {
 
     return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
   }, [full24Hours, isPlannedHour]);
-
-  // The bar's 24 one-hour slices, left to right = 00:00 → 23:00, so it reads as
-  // the day rather than as five buckets with the order discarded. Same planned
-  // test as `categoryStats` above, by construction.
-  const allocationSlices = useMemo(
-    () => buildAllocationSlices(full24Hours.map(isPlannedHour)),
-    [full24Hours, isPlannedHour]
-  );
 
   // Helper to determine canonical category type for adjacent grouping
   const getCategoryType = useCallback((category?: string, isCustom?: boolean): string => {
@@ -898,10 +888,13 @@ export function PlannerContent() {
           midnight-crossing block is 3h, not minus 21h). Reinstating the line means
           reinstating that module, not writing a countdown inline here. */}
 
-      {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings */}
+      {/* Infinite Horizontal Date Selector Strip with Sticky Today & HabitDriven Colored Rings.
+          Tapping a date opens the Distribution pop-up for that day (the rail bar
+          card this replaces). */}
       <InfiniteDateStrip
         selectedDate={selectedDate}
         onSelectDate={handleSelectDate}
+        onDateSelected={() => setIsDistributionModalOpen(true)}
         todayStr={todayStr}
         habits={habits}
         todayLogs={todayLogs}
@@ -909,67 +902,10 @@ export function PlannerContent() {
         loading={habitsLoading || !user?.id}
       />
 
-      {/* Quick Action Toolbar & 24-Hour Category Distribution Box (Akiflow / Sunsama / Structured) */}
-      <div className="space-y-2">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setIsDistributionModalOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setIsDistributionModalOpen(true);
-            }
-          }}
-          className="p-3.5 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
-        >
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-on-surface flex items-center gap-1.5 group-hover:text-primary transition-colors">
-                <Clock className="w-3.5 h-3.5 text-primary" />
-                <span>Daily Schedule Rail</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
-              <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
-            </div>
-          </div>
-
-          {/* Daily Allocation bar — 24 one-hour slices, left to right = 00:00 →
-              23:00, so the strip reads as the day instead of five buckets with
-              the order thrown away. `rounded-full overflow-hidden` is what makes
-              the bar a capsule and, because slice 0 starts at 0% and slice 23
-              ends at 100%, what makes both rounded ends fully covered rather
-              than notched. Slices are absolutely positioned (not flex children)
-              so they tile the width exactly — a flex row of 24 would also need
-              gaps, and those gaps eat into every slice. `aria-hidden` because
-              the hour rail below it carries the same information in words. */}
-          <div
-            aria-hidden="true"
-            suppressHydrationWarning
-            className="relative h-2 w-full bg-surface-container-highest rounded-full overflow-hidden"
-          >
-            {allocationSlices.map((slice) => {
-              if (!slice.filled) return null;
-              // The planner's hours hold the raw stored category, so it goes
-              // through this page's own resolver first. Same answer either way:
-              // `isCustom` is true for every filled slice by definition.
-              const cat = allocationCategory(
-                getCategoryType(full24Hours[slice.hour].category, true)
-              );
-              return (
-                <div
-                  key={slice.hour}
-                  style={slice.style}
-                  title={`${slice.label} · ${cat.label}`}
-                  className={`absolute inset-y-0 ${cat.fill}`}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        </div>
+      {/* The "Daily Schedule Rail" bar card was removed on owner instruction:
+          the day's shape is now reached by tapping the opened date in the date
+          strip, which opens the Distribution pop-up for that day instead of
+          the bar duplicating it here. */}
 
       {/* M3 - Zero-block state for the selected day. 
           Only shown when there are NO blocks - hides the 24-hour timeline.

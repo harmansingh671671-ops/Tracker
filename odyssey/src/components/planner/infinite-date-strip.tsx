@@ -14,6 +14,12 @@ import { type Habit, type HabitLog } from "@/lib/db";
 interface InfiniteDateStripProps {
   selectedDate: string;
   onSelectDate: (dateStr: string) => void;
+  /**
+   * Fired after a date pill (or the sticky Today pill) commits the selection.
+   * The planner uses this to open the Distribution pop-up for the tapped day.
+   * Optional so other users of the strip keep the old tap-only behaviour.
+   */
+  onDateSelected?: (dateStr: string) => void;
   todayStr: string;
   habits?: Habit[];
   historyLogs?: Record<string, Record<string, boolean>>;
@@ -35,6 +41,7 @@ const useIsomorphicLayoutEffect =
 export function InfiniteDateStrip({
   selectedDate,
   onSelectDate,
+  onDateSelected,
   todayStr,
   habits = [],
   historyLogs = {},
@@ -438,6 +445,7 @@ export function InfiniteDateStrip({
               onClick={() => {
                 onSelectDate(item.dateStr);
                 centerDate(item.dateStr, true);
+                onDateSelected?.(item.dateStr);
               }}
               className={`min-w-[48px] sm:min-w-[52px] py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all shrink-0 cursor-pointer ${
                 // Identical to the habits date strip. The ring carries the state;
@@ -541,6 +549,7 @@ export function InfiniteDateStrip({
             onClick={() => {
               onSelectDate(todayStr);
               centerDate(todayStr, true);
+              onDateSelected?.(todayStr);
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring date-ring-fade-in text-primary font-bold date-ring-today-wash
               ${selectedDate === todayStr ? "date-ring-glow date-ring-pulse date-ring-today-wash-strong" : ""}`}
@@ -565,6 +574,7 @@ export function InfiniteDateStrip({
             onClick={() => {
               onSelectDate(todayStr);
               centerDate(todayStr, true);
+              onDateSelected?.(todayStr);
             }}
             className={`min-w-[48px] py-1.5 px-2 rounded-xl flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer date-ring date-ring-fade-in text-primary font-bold date-ring-today-wash
               ${selectedDate === todayStr ? "date-ring-glow date-ring-pulse date-ring-today-wash-strong" : ""}`}
