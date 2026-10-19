@@ -147,7 +147,7 @@ class OdysseyWallpaperBridge(
                 out.write(decodedBytes)
             }
             val key = if (isHome) "alternate_home_wallpaper" else "alternate_lock_wallpaper"
-            prefs.edit().putString(key, base64Image).commit()
+            prefs.edit().putString(key, base64Image).apply()
             Log.d("OdysseyWallpaper", "Saved alternate wallpaper for $target to ${file.absolutePath}")
             true
         } catch (e: Exception) {
@@ -178,7 +178,7 @@ class OdysseyWallpaperBridge(
             try {
                 val bytes = file.readBytes()
                 val b64 = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-                prefs.edit().putString(key, b64).commit()
+                prefs.edit().putString(key, b64).apply()
                 return b64
             } catch (e: Exception) { Log.w("OdysseyWallpaper", "Could not read alternate wallpaper as base64", e) }
         }
@@ -201,7 +201,7 @@ class OdysseyWallpaperBridge(
             val file = File(context.filesDir, "custom_restoration_wallpaper_${target}.png")
             if (file.exists()) file.delete()
             val key = if (isHome) "alternate_home_wallpaper" else "alternate_lock_wallpaper"
-            prefs.edit().remove(key).commit()
+            prefs.edit().remove(key).apply()
             Log.d("OdysseyWallpaper", "Cleared alternate wallpaper for $target")
             true
         } catch (e: Exception) {
@@ -358,7 +358,7 @@ class OdysseyWallpaperBridge(
             val wallpaperManager = WallpaperManager.getInstance(context)
 
             // Mark wallpaper as disabled in preferences & broadcast to Live Wallpaper Service immediately
-            prefs.edit().putBoolean("wallpaper_enabled", false).commit()
+            prefs.edit().putBoolean("wallpaper_enabled", false).apply()
             try {
                 val intent = Intent("com.odyssey.tracker.ACTION_WALLPAPER_DATA_UPDATED").apply {
                     setPackage(context.packageName)
@@ -440,7 +440,7 @@ class OdysseyWallpaperBridge(
             // The flag is written only where the user actually asks for a
             // wallpaper: setWallpaperMasterEnabled(true), the live-wallpaper
             // picker, and enableHourlyAutoUpdate().
-            val success = editor.commit()
+            val success = editor.apply()
 
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service for instant canvas redraw
@@ -503,7 +503,7 @@ class OdysseyWallpaperBridge(
             // REMOVED 2026-10-15: `editor.putBoolean("wallpaper_enabled", true)`
             // -- same defect and same reasoning as in syncSchedule() above. See
             // that comment; a data sync must not re-arm the master switch.
-            val success = editor.commit()
+            val success = editor.apply()
 
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service
@@ -577,7 +577,7 @@ class OdysseyWallpaperBridge(
     @JavascriptInterface
     fun launchLiveWallpaperPicker() {
         try {
-            prefs.edit().putBoolean("wallpaper_enabled", true).commit()
+            prefs.edit().putBoolean("wallpaper_enabled", true).apply()
             val wallpaperManager = WallpaperManager.getInstance(context)
             backupCurrentWallpaperIfNeeded(wallpaperManager)
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
@@ -608,7 +608,7 @@ class OdysseyWallpaperBridge(
     @JavascriptInterface
     fun enableHourlyAutoUpdate(): Boolean {
         return try {
-            prefs.edit().putBoolean("wallpaper_enabled", true).commit()
+            prefs.edit().putBoolean("wallpaper_enabled", true).apply()
             OdysseyHourlyWallpaperWorker.scheduleNextHourlyUpdate(context)
             Log.d("OdysseyWallpaper", "Hourly auto-update enabled successfully")
             true

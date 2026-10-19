@@ -15,6 +15,7 @@ import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
+import { useSharedClock } from "@/lib/utils/shared-clock";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
@@ -162,6 +163,7 @@ export default function HabitsPage() {
 
   // Detect midnight / day change and automatically advance today and selectedDate
   const prevTodayRef = useRef(todayStr);
+  const now = useSharedClock();
 
   useEffect(() => {
     const checkDateChange = () => {
@@ -180,7 +182,8 @@ export default function HabitsPage() {
       });
     };
 
-    const interval = setInterval(checkDateChange, 3000);
+    // The shared clock ticks once per minute; check on each tick.
+    checkDateChange();
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -191,11 +194,10 @@ export default function HabitsPage() {
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener("focus", checkDateChange);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [user, fetchHabits]);
+  }, [now, user, fetchHabits]);
 
   // Refresh logs for the day that just rolled over. Running fetchHabits here
   // (after render) instead of inside the setTodayStr updater avoids updating

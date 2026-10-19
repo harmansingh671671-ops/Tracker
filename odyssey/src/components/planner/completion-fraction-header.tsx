@@ -66,20 +66,6 @@ export function CompletionFractionHeader({
     }) ?? null;
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setIndex((i) => {
-        const next = (i + 1) % 2;
-        const el = scrollerRef.current;
-        if (el) {
-          el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
-        }
-        return next;
-      });
-    }, 4000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const onScroll = () => {

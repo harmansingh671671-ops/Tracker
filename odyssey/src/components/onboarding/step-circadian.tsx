@@ -81,10 +81,19 @@ export function StepCircadian() {
 
   useEffect(() => {
     if (!isAutoPlaying) return;
+    const handleVisibility = () => {
+      setIsAutoPlaying(document.visibilityState === "visible");
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
     const timer = setInterval(() => {
-      setSelected((prev) => (prev + 1) % TIME_SLICES.length);
+      if (document.visibilityState === "visible") {
+        setSelected((prev) => (prev + 1) % TIME_SLICES.length);
+      }
     }, AUTO_PLAY_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [isAutoPlaying]);
 
   return (

@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
                 val key = if (target == "home") "alternate_home_wallpaper" else "alternate_lock_wallpaper"
                 prefs.edit()
                     .putString(key, base64Str)
-                    .commit()
+                    .apply()
 
                 // Notify WebView JavaScript with target screen info
                 runOnUiThread {

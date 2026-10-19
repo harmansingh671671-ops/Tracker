@@ -24,7 +24,7 @@ import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
-import { useClockTodayStr, useClockHour } from "@/lib/utils/shared-clock";
+import { useSharedClock, localTimeStr } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
@@ -95,10 +95,9 @@ export function PlannerContent() {
   // highlighted midnight before snapping to the real hour. blocks now seeds
   // from the synchronous local cache, so a returning user sees their real
   // schedule immediately instead of an empty timeline that fills in later.
-  const clockToday = useClockTodayStr();
-  const clockHour = useClockHour();
-  const currentHour = clockHour;
-  const todayStr = clockToday;
+  const now = useSharedClock();
+  const currentHour = now.getHours();
+  const todayStr = localTimeStr(now);
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateStr());
   const [blocks, setBlocks] = useState<ScheduleBlock[]>(() => getCachedBlocks(getLocalDateStr()));
 

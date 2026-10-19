@@ -11,7 +11,7 @@ import React, {
 import { type Habit, type HabitLog } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { getHabitColor, isHabitScheduledOnDate } from "@/lib/utils/habit-colors";
-import { useClockTodayStr } from "@/lib/utils/shared-clock";
+import { useSharedClock, localDateStr } from "@/lib/utils/shared-clock";
 
 interface HabitDateStripProps {
   selectedDate: string; // YYYY-MM-DD
@@ -250,7 +250,7 @@ export function HabitDateStrip({
   //
   // `propTodayStr` still wins when the parent knows the date, which is the usual
   // case; this is the fallback for when it does not.
-  const clockTodayStr = useClockTodayStr();
+  const clockTodayStr = localDateStr(useSharedClock());
   const todayStr = propTodayStr || clockTodayStr;
 
   // Flags to prevent spurious cascading loads during initial layout and centering
@@ -512,15 +512,16 @@ export function HabitDateStrip({
     if (!target) return;
 
     let attempts = 0;
-    const interval = setInterval(() => {
+    let frameId: number;
+    const loop = () => {
       attempts++;
       const success = centerDate(target, false);
-      if (success || attempts >= 15) {
-        clearInterval(interval);
-      }
-    }, 30);
+      if (success || attempts >= 15) return;
+      frameId = requestAnimationFrame(loop);
+    };
+    frameId = requestAnimationFrame(loop);
 
-    return () => clearInterval(interval);
+    return () => cancelAnimationFrame(frameId);
     // Mount-only by design; see the comment above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

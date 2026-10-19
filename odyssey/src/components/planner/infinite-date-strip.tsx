@@ -292,15 +292,16 @@ export function InfiniteDateStrip({
     if (!target) return;
 
     let attempts = 0;
-    const interval = setInterval(() => {
+    let frameId: number;
+    const loop = () => {
       attempts++;
       const success = centerDate(target, false);
-      if (success || attempts >= 15) {
-        clearInterval(interval);
-      }
-    }, 30);
+      if (success || attempts >= 15) return;
+      frameId = requestAnimationFrame(loop);
+    };
+    frameId = requestAnimationFrame(loop);
 
-    return () => clearInterval(interval);
+    return () => cancelAnimationFrame(frameId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

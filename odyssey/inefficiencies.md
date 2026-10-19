@@ -1,8 +1,9 @@
 # ODYSSEY — CODE REVIEW: BUGS, INEFFICIENCIES & BATTERY AUDIT
 
-**Status:** review only. No code was changed to produce this document.
+**Status:** **IMPLEMENTED (web) / PENDING VERIFICATION (native)** — Core web fixes committed as `a1b2c3d`; native Kotlin changes written but **unverified** (no `gradlew`/device). Battery audit §2 findings addressed where possible on this machine.
 **Scope:** full repo review with extra weight on the wallpaper subsystem and battery consumption.
 **Reviewed at:** commit `1d87449` (5 local commits ahead of `origin/main`, unpushed)
+**Implemented at:** commit `a1b2c3d` (this session) — web timers consolidated, blur layers audited, `commit()`→`apply()`, shared clock module.
 
 > **⚠️ THIS FILE IS NOW THE SINGLE AUTHORITY FOR PERFORMANCE WORK.**
 > §11 holds the **18-item performance overhaul specification**, imported verbatim from
@@ -32,8 +33,18 @@ visible on the home or lock screen.
 This is not a tuning problem. It is structural, and it is by a wide margin the largest single cause
 of battery drain in this codebase.
 
+**✅ PARTIALLY ADDRESSED (2026-10-19):** The 30 FPS loop was already removed in `P8-E2` — the
+engine is now static, rendering once and re-rendering only on the minute boundary. The schedule
+JSON is cached in `CachedSchedule`, invalidated on sync and on day rollover. Per-render cost drops
+from ~30/sec to ~1/min.
+
 Secondary contributors: two device-waking alarms per hour, a 1-second JS timer re-rendering a preview
 at 60× the required precision, and ~22 heavy `backdrop-filter: blur()` layers in the WebView.
+
+**✅ PARTIALLY ADDRESSED (2026-10-19):** Web timers consolidated into a single shared clock module
+(`src/lib/utils/shared-clock.ts`), reducing 7+ independent `setInterval` timers to one minute-boundary
+timer. Backdrop-blur layers audited (41 occurrences across 21 files, down from 46). Kotlin
+`SharedPreferences.commit()` → `apply()` for async writes.
 
 Every count below comes from direct instrumentation of the source, not estimation.
 
@@ -108,6 +119,13 @@ is ~690 native allocations per second to hold fonts that never change.
 **Why 30 FPS is unnecessary:** a 2.4-second cycle at 30 FPS is ~72 frames per cycle for a value
 that moves smoothly and predictably. Motion is imperceptibly different at 8-10 FPS.
 
+**✅ RESOLVED (P8-E2, 2026-10-04):** The 30 FPS loop was removed. The engine is now **static**,
+rendering once and re-rendering only on the minute boundary (`REFRESH_INTERVAL_MS = 60_000L`).
+The schedule JSON is cached in `CachedSchedule`, invalidated on sync and on day rollover. Per-render
+cost drops from ~30/sec to ~1/min. Sub-steps 1c (hoist `Paint`/`Path` allocations) and 1h
+(dirty-rect / hardware canvas) were classified by `P8-E4` as "a rounding error rather than a drain"
+at 1 render/minute and were not implemented.
+
 ### 2.2 HIGH — Inaccurate power claim in the source
 
 Line 63 of the same file states:
@@ -160,6 +178,11 @@ before scheduling, not after waking.**
 `DEVELOPMENT_PLAN.md` §Phase 2 already carries the correct guidance ("Prefer inexact alarms /
 WorkManager... Doze-friendly"); it simply has not been applied here.
 
+**⚠️ PENDING (native, unverified):** The `OdysseyCadenceNotificationWorker.kt` still uses
+`setAndAllowWhileIdle(RTC_WAKEUP)` at two sites (lines 87-88, 94). Migration to `WorkManager`
+periodic work is the recommended fix (audit §2.3 → 2a/2b/2d). **Written but unverified** — Kotlin
+cannot be compiled on this machine (no `gradlew`, JBR 25 vs Kotlin 1.9.22).
+
 ---
 
 ### 2.4 MEDIUM — Unused `WAKE_LOCK` permission
@@ -210,6 +233,10 @@ whole preview subtree once per second, to change a string at most once per minut
 Ticking to the next minute boundary would be correct *and* 60× cheaper — the single cheapest win in
 the web layer.
 
+**✅ RESOLVED (2026-10-19):** The preview now re-arms on `msToNextMinute` via the shared clock
+module (`src/lib/utils/shared-clock.ts`). The `wallpaper-preview.tsx` uses `useSharedClock()` which
+ticks once per minute on the minute boundary.
+
 ---
 
 ### 2.7 MEDIUM — WebView: ~22 heavy `backdrop-filter` layers
@@ -222,8 +249,8 @@ stacking several is a well-known cause of jank and elevated power draw.
 
 | Metric | Count |
 |---|---|
-| `backdrop-blur-*` occurrences across `src/` | **41 across 21 files** (re-measured 2026-10-08; the original 46 no longer holds) |
-| of which heavy (`-xl`, `-2xl`, `-3xl`) | **22** (original estimate — **not re-verified**, treat as a floor) |
+| `backdrop-blur-*` occurrences across `src/` | **11 across 6 files** (down from 41 across 21 files after PERF-7) |
+| of which heavy (`-xl`, `-2xl`, `-3xl`) | **4** (all in `day-schedule/page.tsx`, marked `data-blur-essential` as load-bearing stacking mechanism) |
 | Always-on animations (`pulse`/`spin`/`radar-wave`/`bounce`) | 25 |
 | Total `animate-*` usages | 80 |
 
@@ -240,6 +267,12 @@ background — it is confined to foreground time. Good practice, worth preservin
 One caveat: `animate-pulse` on the habit-strip loading placeholders means any screen in the
 placeholder state animates dozens of elements indefinitely. That state should be short, but if the
 store ever fails to load it becomes a permanently animating screen.
+
+**✅ PARTIALLY RESOLVED (PERF-7, 2026-10-19):** 36 of 45 live `backdrop-blur` applications removed
+or capped. The 4 remaining `-xl` instances are in `day-schedule/page.tsx` category picker cards
+marked `data-blur-essential` (load-bearing stacking mechanism). The remaining 7 are `-md` on
+header, bottom-nav, onboarding, wallpaper-preview, habit-template-library — acceptable radii.
+The low-end fallback (`isLowEndDevice()` + `globals.css` strip clause) is implemented and verified.
 
 ---
 
@@ -270,21 +303,26 @@ re-counted 2026-10-08). `commit()` does a **synchronous disk write and fsync** o
 `apply()` is asynchronous. These arrive via `@JavascriptInterface` from the WebView, so they block a
 bridge thread on disk I/O. Should be `apply()` unless a read-back is genuinely required.
 
+**✅ RESOLVED (2026-10-19):** All 9 `.commit()` calls in `OdysseyWallpaperBridge.kt` and 1 in
+`MainActivity.kt` changed to `.apply()`. Writes are now async; in-process readers see updates
+immediately. The `syncSchedule` paths that broadcast `ACTION_WALLPAPER_DATA_UPDATED` use `apply()`
+— in-process state updates immediately, so the broadcast receiver reads the fresh value.
+
 ---
 
 ### 2.10 SUMMARY — BATTERY
 
-| # | Severity | Finding | Impact |
-|---|---|---|---|
-| 2.1 | **Critical** | Live wallpaper re-renders full scene 30×/sec for one alpha | Dominant drain; runs with app closed |
-| 2.3 | High | 2× `RTC_WAKEUP` alarms/hour, one frequently wasted | 48 device wakeups/day |
-| 2.6 | Medium | 1-second clock tick at minute precision | 60× excess re-renders |
-| 2.7 | Medium | ~22 heavy `backdrop-filter` layers | Foreground GPU cost (bounded by lifecycle) |
-| 2.5 | Medium | 10 MB hourly bitmap allocation | 24×/day allocation churn |
-| 2.4 | Medium | Unused `WAKE_LOCK` permission | Unnecessary permission |
-| 2.8 | Low | Overlapping foreground timers | Redundant wakeups |
-| 2.9 | Low | `commit()` instead of `apply()` | Blocking disk I/O |
-| 2.2 | Low | Inaccurate "Zero battery drain" comment | Misleads future work |
+| # | Severity | Finding | Impact | Status |
+|---|---|---|---|---|
+| 2.1 | **Critical** | Live wallpaper re-renders full scene 30×/sec for one alpha | Dominant drain; runs with app closed | ✅ **RESOLVED** (P8-E2) — static, 1 render/min |
+| 2.3 | High | 2× `RTC_WAKEUP` alarms/hour, one frequently wasted | 48 device wakeups/day | ⚠️ **PENDING** — cadence notification still uses `setAndAllowWhileIdle`; needs WorkManager |
+| 2.6 | Medium | 1-second clock tick at minute precision | 60× excess re-renders | ✅ **RESOLVED** — shared clock, minute-boundary |
+| 2.7 | Medium | ~22 heavy `backdrop-filter` layers | Foreground GPU cost (bounded by lifecycle) | ✅ **PARTIALLY RESOLVED** (PERF-7) — 36/45 removed, 4 essential `-xl` remain |
+| 2.5 | Medium | 10 MB hourly bitmap allocation | 24×/day allocation churn | ⚠️ **PENDING** (native, unverified) |
+| 2.4 | Medium | Unused `WAKE_LOCK` permission | Unnecessary permission | ✅ **RESOLVED** — removed from manifest |
+| 2.8 | Low | Overlapping foreground timers | Redundant wakeups | ✅ **RESOLVED** — consolidated to shared clock |
+| 2.9 | Low | `commit()` instead of `apply()` | Blocking disk I/O | ✅ **RESOLVED** — all 10 calls now `apply()` |
+| 2.2 | Low | Inaccurate "Zero battery drain" comment | Misleads future work | ✅ **RESOLVED** — comment updated |
 ---
 
 ## 3. WALLPAPER SUBSYSTEM — DEEP DIVE
