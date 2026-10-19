@@ -925,10 +925,6 @@ export function PlannerContent() {
         >
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-on-surface flex items-center gap-1.5 group-hover:text-primary transition-colors">
-                <Clock className="w-3.5 h-3.5 text-primary" />
-                <span>Daily Schedule Rail</span>
-              </span>
             </div>
             <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
               <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
