@@ -49,7 +49,6 @@ export function DistributionModal({
   }, [dateStr]);
 
   const openHours = Math.max(0, 24 - categoryStats.plannedTotal);
-  const plannedPercent = Math.min(100, Math.round((categoryStats.plannedTotal / 24) * 100));
 
   const items = useMemo(() => {
     const filterCatBlocks = (catId: string) => {
@@ -68,66 +67,66 @@ export function DistributionModal({
       {
         id: "focus",
         label: "Focus",
-        subtitle: "Deep Work",
         hours: categoryStats.focusH,
         pct: Math.round((categoryStats.focusH / 24) * 100),
         badge: "bg-primary/15 text-primary border-primary/30",
         cardBg: "bg-primary/5 border-primary/20",
+        bar: "bg-primary",
         Icon: Brain,
         blocks: filterCatBlocks("focus"),
       },
       {
         id: "vitality",
         label: "Vitality",
-        subtitle: "Health & Habits",
         hours: categoryStats.vitalityH,
         pct: Math.round((categoryStats.vitalityH / 24) * 100),
         badge: "bg-emerald-500/15 text-emerald-600 border-emerald-500/35 dark:text-emerald-400 dark:border-emerald-500/30",
         cardBg: "bg-emerald-50/70 border-emerald-500/30 dark:bg-emerald-950/20 dark:border-emerald-500/20",
+        bar: "bg-emerald-500",
         Icon: Zap,
         blocks: filterCatBlocks("vitality"),
       },
       {
         id: "sync",
         label: "Sync",
-        subtitle: "Meetings & Collab",
         hours: categoryStats.syncH,
         pct: Math.round((categoryStats.syncH / 24) * 100),
         badge: "bg-sky-500/15 text-sky-600 border-sky-500/35 dark:text-sky-400 dark:border-sky-500/30",
         cardBg: "bg-sky-50/70 border-sky-500/30 dark:bg-sky-950/20 dark:border-sky-500/20",
+        bar: "bg-sky-500",
         Icon: Users,
         blocks: filterCatBlocks("sync"),
       },
       {
         id: "renewal",
         label: "Renewal",
-        subtitle: "Buffer & Rest",
         hours: categoryStats.renewalH,
         pct: Math.round((categoryStats.renewalH / 24) * 100),
         badge: "bg-amber-500/15 text-amber-700 border-amber-500/40 dark:text-amber-400 dark:border-amber-500/30",
         cardBg: "bg-amber-50/70 border-amber-500/35 dark:bg-amber-950/20 dark:border-amber-500/20",
+        bar: "bg-amber-500",
         Icon: Coffee,
         blocks: filterCatBlocks("renewal"),
       },
       {
         id: "sleep",
         label: "Rest",
-        subtitle: "Sleep & Slumber",
         hours: categoryStats.restH,
         pct: Math.round((categoryStats.restH / 24) * 100),
         badge: "bg-indigo-500/15 text-indigo-600 border-indigo-500/35 dark:text-indigo-400 dark:border-indigo-500/30",
         cardBg: "bg-indigo-50/70 border-indigo-500/30 dark:bg-indigo-950/20 dark:border-indigo-500/20",
+        bar: "bg-indigo-500",
         Icon: Moon,
         blocks: filterCatBlocks("sleep"),
       },
       {
         id: "open",
         label: "Open",
-        subtitle: "Unscheduled",
         hours: openHours,
         pct: Math.round((openHours / 24) * 100),
         badge: "bg-surface-container-high text-on-surface-variant border-outline/20",
         cardBg: "bg-surface-container-lowest/40 border-dashed border-outline/20",
+        bar: "bg-outline/50",
         Icon: Clock,
         blocks: [],
       },
@@ -188,7 +187,6 @@ export function DistributionModal({
                 <span>{formattedDate}</span>
               </div>
               <h2 className="text-xl font-bold tracking-tight text-on-surface">Schedule Distribution</h2>
-              <p className="text-xs text-on-surface-variant">Breakdown of planned hours and activities</p>
             </div>
             <button
               type="button"
@@ -201,46 +199,33 @@ export function DistributionModal({
           </div>
         </div>
 
-        {/* Overview Banner Card (Styled like Profile Level/XP Card) */}
+        {/* Overview Banner Card — count + colour strip only. The "Planned
+            Total" label, "% Planned" pill and "Hours planned / free" row were
+            removed on owner instruction; the strip below says the same thing
+            the labels repeated. */}
         <div className="relative overflow-hidden rounded-2xl bg-surface-container-low p-4 border border-outline/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-sm">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-[11px] font-mono text-on-surface-variant uppercase tracking-wider">Planned Total</span>
-                <div className="text-base font-bold text-on-surface">
-                  {categoryStats.plannedTotal} <span className="text-xs font-normal text-on-surface-variant">/ 24 Hours</span>
-                </div>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-sm">
+              <Clock className="w-5 h-5" />
             </div>
-
-            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-primary/20 text-primary border border-primary/30">
-              {plannedPercent}% Planned
-            </span>
+            <div className="text-base font-bold text-on-surface">
+              {categoryStats.plannedTotal} <span className="text-xs font-normal text-on-surface-variant">/ 24 Hours</span>
+            </div>
           </div>
 
           {/* Color Breakdown Strip */}
-          <div className="space-y-1.5 pt-1">
-            <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
-              {categoryStats.plannedTotal > 0 ? (
-                <>
-                  <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full transition-all duration-300" title="Focus" />
-                  <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-500 h-full transition-all duration-300" title="Vitality" />
-                  <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-500 h-full transition-all duration-300" title="Sync" />
-                  <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-500 h-full transition-all duration-300" title="Renewal" />
-                  <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full transition-all duration-300" title="Rest" />
-                </>
-              ) : (
-                <div className="w-full h-full bg-surface-container-highest/60" />
-              )}
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant">
-              <span>{categoryStats.plannedTotal} Hours planned</span>
-              <span>{openHours} Hours free</span>
-            </div>
+          <div className="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex gap-0.5">
+            {categoryStats.plannedTotal > 0 ? (
+              <>
+                <div style={{ width: `${(categoryStats.focusH / 24) * 100}%` }} className="bg-primary h-full transition-all duration-300" title="Focus" />
+                <div style={{ width: `${(categoryStats.vitalityH / 24) * 100}%` }} className="bg-emerald-500 h-full transition-all duration-300" title="Vitality" />
+                <div style={{ width: `${(categoryStats.syncH / 24) * 100}%` }} className="bg-sky-500 h-full transition-all duration-300" title="Sync" />
+                <div style={{ width: `${(categoryStats.renewalH / 24) * 100}%` }} className="bg-amber-500 h-full transition-all duration-300" title="Renewal" />
+                <div style={{ width: `${(categoryStats.restH / 24) * 100}%` }} className="bg-indigo-500 h-full transition-all duration-300" title="Rest" />
+              </>
+            ) : (
+              <div className="w-full h-full bg-surface-container-highest/60" />
+            )}
           </div>
         </div>
 
@@ -270,10 +255,18 @@ export function DistributionModal({
 
                     <div>
                       <h4 className="text-xs font-bold text-on-surface truncate">{item.label}</h4>
-                      <p className="text-[10px] text-on-surface-variant truncate">{item.subtitle}</p>
                       <span className="text-[10px] font-mono text-on-surface-variant/80 mt-0.5 block">
                         {item.pct}% of day
                       </span>
+                      {/* Share-of-day bar fills the space the removed subtitle
+                          left: one line of numbers, one visual measure of the
+                          same thing. */}
+                      <div className="h-1.5 w-full mt-1.5 rounded-full bg-surface-container-highest/50 overflow-hidden">
+                        <div
+                          style={{ width: `${item.pct}%` }}
+                          className={`h-full rounded-full ${item.bar}`}
+                        />
+                      </div>
                     </div>
                   </div>
 
