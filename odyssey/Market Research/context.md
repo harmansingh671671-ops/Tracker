@@ -621,6 +621,50 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (m) - `PERF-16` shipped: 13 dead files and 3 dead dependency declarations, found by scans that had to dodge their own false positives
+
+**An orphan scan is only as good as its specifier resolution.** The first pass flagged **59**
+candidates — test files (consumed by vitest), the `android-bridge` modules, even the live
+header and bottom-nav. Resolving **relative** imports (`./sibling`) to real paths cut the
+list to **13**, every one hand-verified by direct grep before deletion. The refined scan
+still had to be trusted-but-checked: `lib/seed.ts` fell out of the first candidate list only
+because `lib/user.ts` imports it with `./seed` — an alias-only scan would have deleted a
+live module holding the reset path.
+
+**Subpath imports evade naive package regexes.** `@base-ui/react` first read **0 importers**
+— the importer list only appeared once the pattern allowed `@base-ui/react/<subpath>`
+(dropdown-menu, select, use-render…). Acting on the naive count would have removed a
+dependency ten live files need, and the build would have caught it only after the fact.
+
+**Android without Gradle: text is the evidence, and its limit must be stated.** No
+`gradlew` verification exists on this machine (`PERF-18`'s boundary), so the dependency
+audit was a full-text scan of every Kotlin source, resource XML and the manifest. It found
+`com.google.android.material` dead (the theme is plain `Theme.AppCompat.DayNight…` — the
+dependency is theme-consumed only when a Material theme is used) and `androidx.work`
+dead (zero WorkManager usage; the manifest even documents the WAKE_LOCK precedent of
+removing an unused declaration). Verified by source-scan only — **the next APK build is
+the deleted declarations' first compile**, and that limitation is recorded in
+`main_plan.md`, not smoothed over.
+
+**The spec itself was stale:** PERF-16's line said `seedInitialData()` is "currently an
+empty function" tracked as D8 — D8 was **closed by P0-T7 (2026-10-15)** and zero references
+remain. Rule 8 honoured in-commit: the line now records the closure.
+
+**Honest effect: nothing on screen changed and the bundle did not move** (475.7 KB gzip,
+identical). Un-imported code cannot cost bytes at runtime; the wins are 13 files gone,
+`tw-animate-css` out of `package.json` + lockfile, two Android dependencies that stop
+shipping in the next APK, and lint's warnings down 95 → 84. 16b was delivered as an
+audit by design — registry versions recorded in `main_plan.md`, **no upgrade attempted**
+(pinned Next 16.3.5; that decision is the owner's, package by package).
+
+**Transferable lessons:**
+- An orphan-candidate list is an input to verification, never a deletion list — resolve
+  relative imports, verify each candidate by grep, and keep `git rm` (revertable) instead
+  of filesystem deletes.
+- Package-usage scans must allow subpath imports before a zero-count is believed.
+- For "unused" claims, grep the resource/manifest layer too: Android dependencies can be
+  consumed by XML themes with zero code references.
+
 ### 2026-10-19 (l) - `PERF-8` shipped: the habits row was the hot spot, and the trace proved where NOT to refactor
 
 **Profile-first changed the target.** A CDP `devtools.timeline` trace around scripted
@@ -4338,6 +4382,40 @@ to know where things stand.
   `perf7-scroll-{before,after}.json` (frame-delta probe), plus the three
   `perf7-*.js` drivers. The `before` build for the probe came from stashing the tree;
   `git stash pop` restored it byte-identical.
+- HEAD at last update: **this commit** — **`PERF-16` (`SHIPPED`)**: 13 dead files deleted
+  (9 orphan `ui/` components: avatar/badge/card/dropdown-menu/input/progress/select/
+  tabs/textarea; plus `planner/inbox-drawer`, `habits/perfect-day-card`,
+  `lib/stores/wallpaper-store` — self-ref only, the live one is `wallpaper-toggle-store` —
+  and the un-imported `lib/utils.ts` barrel); `tw-animate-css` removed from
+  `package.json` + lockfile (zero refs incl. CSS); Android Gradle: `material:1.11.0`
+  and `work-runtime-ktx:2.9.0` removed after a zero-reference source scan (**not
+  compiled — the next APK build is the first compile of that change**). 16b delivered as
+  an audit only: registry versions recorded in `main_plan.md`, no upgrade (pinned
+  Next 16.3.5 is a deliberate owner decision). Bundle unchanged at 475.7 KB gzip —
+  orphans were never in it; lint 95 → 84 warnings; the PERF-16 line's stale D8 note
+  corrected in-commit (D8 was closed by P0-T7, 2026-10-15). Committed on `main`; **the
+  agent does not push**. Before it: **`4476fcb`** (`PERF-8`, `SHIPPED`), **`47ce1fd`**
+  (`PERF-7`, `SHIPPED`), **`1b9cb28`** (`PERF-5` 5d + 5e, `SHIPPED`), **`77b55a1`**
+  (`B25` review pass), `d0c8dc8`, `fe8202d`, `9b19f96`, `abbc6ac` (`B25`), `2dc684e`
+  (`S9`), `8700852` (`PERF-5` 5a+b), and earlier C2 rounds.
+  **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
+  `8700852` onward are **not**.
+- **Working tree (2026-10-19, `PERF-16`):** clean after this commit. It deleted
+  `src/components/ui/{avatar,badge,card,dropdown-menu,input,progress,select,tabs,textarea}.tsx`,
+  `src/components/planner/inbox-drawer.tsx`, `src/components/habits/perfect-day-card.tsx`,
+  `src/lib/stores/wallpaper-store.ts`, `src/lib/utils.ts`; edited
+  `android/app/build.gradle` (2 deps out), `package.json` + `package-lock.json`
+  (tw-animate-css out), `main_plan.md` (PERF-16 → `SHIPPED` + D8 note), `PERFORMANCE.md`
+  (§3 row), `context.md` (entry `(m)`, §10). Scan/verify artifacts outside the repo:
+  `%TEMP%\opencode\verify\perf16-{depaudit,orphans,precision,smoke}.js` +
+  `perf16-shots\` (6 routes × light/dark, 0 console/page errors). Gates re-run after
+  deletion: tsc 0, lint 0 errors/84 warnings, 31 suites/469 tests, build clean,
+  39/39 regression checks; both server sessions killed by port PID.
+- **Next: the pre-approved queue is complete** (PERF-5 remainder, PERF-7, PERF-8,
+  PERF-16 all `SHIPPED`) — **pause for the owner.** Remaining perf-phase items are not
+  queued: PERF-17 is ⚪ optional skip-unless-measured, PERF-18's open halves are blocked
+  on CI, and the native verification items (PERF-1/2/3/11/13/14) are gated by §6.5.4's
+  honest measurement boundary.
 - HEAD at last update: **this commit** — **`PERF-8` (`SHIPPED`)**: the habits list row
   extracted from ~320 lines of inline page JSX into `components/habits/habit-list-card.tsx`
   and `React.memo`-wrapped on habit-scoped log slices; `handleToggle` reads pre-toggle

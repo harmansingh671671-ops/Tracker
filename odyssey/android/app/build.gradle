@@ -44,9 +44,10 @@ android {
 }
 
 dependencies {
+    // 16a audit 2026-10-19: 'com.google.android.material' and 'androidx.work'
+    // removed — zero references in every Kotlin source, resource XML and the
+    // manifest (the theme is pure AppCompat). Verify before re-adding.
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.activity:activity-ktx:1.8.2'
-    implementation 'androidx.work:work-runtime-ktx:2.9.0'
 }
