@@ -67,6 +67,28 @@ reviewed hour; a pending hour is not.
   filter, and the profile's freeze card are gone. A cumulative count does not
   need to be protected from a bad day.
 
+### 2.4 The permanence guarantee — and its one exception
+
+"Permanent once earned" holds for **days**: toggling does not move a current
+number (that is the `BUG-15` fix), un-ticking a past day lowers only that day,
+and a celebrated milestone is recorded per habit and never un-fires.
+
+The exception is **habit configuration**. Both counters evaluate history against
+the habit's settings *as they are now*, so editing a habit retroactively re-prices
+its history:
+
+- retarget a habit from 5 → 3 days/week, and past completions on the now-unscheduled
+  days stop counting — the total falls though no day was touched;
+- raise a counted habit's target from 10 → 20, and past days at 15 that used to
+  count stop counting (and lowering a target makes past days count that had not yet).
+
+This is accepted, not overlooked: deriving from current config is the reason the
+counters cannot drift (§3.1), and the fix would be to snapshot each day's
+schedule/target into the log row at write time — a schema change that prices in
+its own ADR and is not wanted while config edits are rare. The one user-facing
+bar that cannot drift this way is the app-wide 18-hour number, which is a
+developer constant (`FULL_DAY_HOURS`), not per-user state.
+
 ## 3. Where the numbers live
 
 Neither number is stored.
@@ -142,4 +164,14 @@ That is a **visible** change: the brightest green now means a genuine full day.
   quit slips, and the derived "un-tick lowers the count" case.
 - `day-status.test.ts` — pins the stricter `fully_completed`.
 - `warm-copy.test.ts`, `achievements.test.ts` — label and milestone wording.
-- Full suite: 462 tests green; `tsc --noEmit` and `next lint` clean.
+- Full suite green; `tsc --noEmit` and `next lint` clean.
+- **Visual pass (2026-10-19, follow-up):** headless Chrome at 390px, light and
+  dark, across `/planner`, `/stats`, `/journey`, `/habits`, `/shop` and a habit
+  card created through the real form. Two findings came out of it, both fixed:
+  the empty-state label surfaces render honestly ("No days done yet", the shop's
+  Protection filter gone), but the per-habit chip drew its **flame icon even when
+  the label rendered nothing at zero** — a bare icon over "Category • 🔥". The
+  chip (and its separator, on the list card) now hides with the label; a quit
+  habit keeps its distinct `0d clean` state in both themes. The heatmap's
+  completed-cell colours were **not** verified visually — the seeded profile has
+  no reviewed days to paint.

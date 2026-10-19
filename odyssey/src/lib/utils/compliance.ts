@@ -27,11 +27,11 @@ import { isHabitComplete } from "./habit-completion";
 import { evaluateDayCompletion } from "./day-status";
 
 /**
- * The "full day" bar, in planned hours — the single number that decides whether
- * a schedule day can ever count. Deliberately the same bar `day-status.ts` uses
- * for `isCompletelyDone`, so the two can never disagree.
+ * The "full day" bar (`compliance.ts` historically exported its own
+ * `FULL_DAY_HOURS = 18`) now lives only in `day-status.ts`, which this module
+ * already depends on for `evaluateDayCompletion`. Import it from there —
+ * one definition, so the counter and the heatmap cannot disagree.
  */
-export const FULL_DAY_HOURS = 18;
 
 /** True when this day's blocks make it a complied schedule day. */
 export function isScheduleCompliedDay(blocks: ScheduleBlock[] | undefined | null): boolean {

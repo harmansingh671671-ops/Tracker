@@ -1,5 +1,13 @@
 import { type ScheduleBlock } from "@/lib/db";
 
+/**
+ * The "full day" bar, in planned hours — the single number that decides whether
+ * a schedule day can ever count anywhere: `isCompletelyDone` here, and the
+ * app-wide days-done counter in `compliance.ts`, which derives from this file.
+ * One definition only, so the counter and the heatmap cannot disagree.
+ */
+export const FULL_DAY_HOURS = 18;
+
 export type DayReviewStatus =
   | "empty" // No schedule planned (0 hours)
   | "planned_unreviewed" // Schedule planned, but 0 hours reviewed (Orange)
@@ -47,7 +55,7 @@ export function evaluateDayCompletion(
   const hasSchedule = plannedHours > 0;
   const reviewRatio = hasSchedule ? reviewedHours / plannedHours : 0;
   // A day is considered fully filled if there are at least 18 planned hours (standard 24h schedule with sleep & wake blocks)
-  const isFullyFilled = plannedHours >= 18;
+  const isFullyFilled = plannedHours >= FULL_DAY_HOURS;
   const isFullyReviewed = hasSchedule && reviewedHours === plannedHours;
   const isCompletelyDone = isFullyFilled && isFullyReviewed;
 

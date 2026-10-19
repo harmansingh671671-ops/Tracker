@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { FULL_DAY_HOURS } from "./day-status";
 import {
-  FULL_DAY_HOURS,
   buildDaysDoneMap,
   countDaysDoneForHabit,
   countScheduleCompliedDays,

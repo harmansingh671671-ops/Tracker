@@ -558,10 +558,14 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
   `getBoundingClientRect()` results into the DOM and `--dump-dom` reads them
   out) over a pixel scan. A scan measured the wrong viewport and reported two
   defects that did not exist; a self-measuring page settles the same question in
-  one run. `puppeteer-core` is **not currently available** — see §10 and §9
-  2026-10-16 for how to drive Chrome without it, and for the two Chrome
+  one run. **`puppeteer-core` IS available** at
+  `%TEMP%\opencode\verify\node_modules` (headless Chrome at
+  `C:\Program Files\Google\Chrome\Application\chrome.exe`) — an earlier "not
+  currently available" note here was wrong and is corrected; see §10 and §9
+  2026-10-16 for the two Chrome
   behaviours (`--window-size` ignored, IndexedDB stalled under virtual time) that
-  will otherwise be rediscovered the hard way.
+  will otherwise be rediscovered the hard way, and §9 `(i)` 2026-10-19 for a
+  worked example.
 
 ---
 
@@ -617,6 +621,46 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (i) - `B25` review pass: one 18-hour bar, a hidden flame, and the visual check that was skipped
+
+**The 18-hour bar is now one definition.** `compliance.ts` declared its own
+`FULL_DAY_HOURS = 18` under a comment claiming it "can never disagree" with
+`day-status.ts`'s separate literal — two copies, one comment saying they cannot
+drift. The constant now lives in **`day-status.ts`** (the deeper module —
+`compliance.ts` already imports `evaluateDayCompletion` from it, so the shared
+value could only move *that* direction without creating a cycle), and
+`compliance.test.ts` imports it from there.
+
+**ADR 0005 gained §2.4**, documenting the one permanence exception: both counters
+evaluate history against a habit's settings *as they are now*, so editing a
+habit retroactively re-prices history — retarget 5 → 3 days/week and past
+weekend completions un-earn; raise a counted target and days between the old and
+new bars stop counting. Accepted as derived-by-design; the fix would be
+snapshotting schedule/target into each log row at write time (schema change,
+its own ADR).
+
+**The visual pass ran.** Headless Chrome + puppeteer-core at 390px, light and
+dark, over `/planner` `/stats` `/journey` `/habits` `/shop` plus a habit created
+through the real form (template sheet → Create Custom Habit → save). The
+days-done surfaces render honestly: the journey banner reads "No days done yet",
+the shop filters have no Protection pill, the header chip reads "0d", the stats
+KPI reads "Days Done / Fully written & reviewed". **One real defect caught:**
+the per-habit card chip drew its flame (or ✕) icon while the label rendered
+*nothing at zero* — a bare icon over "Category • 🔥". The chip, and on the list
+card its separator, now hide with the label at all three render sites (list ×2
+in `habits/page.tsx`, grid-habit-card); a quit habit keeps its distinct
+"`0d clean`". **Not visually verifiable:** the heatmap's completed-cell colours
+— a seeded profile with no reviewed days cannot paint one.
+
+Gates: `tsc --noEmit` 0 · lint 0 errors, 95 warnings (unchanged) · 30 suites /
+462 tests · build clean. Port 3100 started, asserted `Ready`, and killed by
+owning PID twice for the screenshot runs; verified closed both times.
+
+**Transferable lesson: an "honest zero" label hides its number, not its
+neighbours.** M13 taught the label to render nothing at zero, but the icons and
+separators beside it predate that rule and kept drawing. When a value learns to
+be empty, sweep everything decorated *around* it for the empty case.
+
 ### 2026-10-19 (g) - `BUG-16`: the habit edit sheet reset every field, and the lint pass that did it
 
 Owner-reported against a counted habit: opening **Edit Details** showed `Simple` selected with a
@@ -658,9 +702,10 @@ where the difference bites. When converting an effect into a guard, the sentinel
 prop can never hold on frame 0.
 
 **Gates:** `tsc --noEmit` exit 0 · `npm run lint` **0 errors, 95 warnings** (unchanged; the fix adds
-no warning) · **30 suites / 462 tests** · production build clean. **No visual pass** — no browser
-automation is installed on this machine, so it was verified by reading the mount sites and all 9
-sibling guards, not by tapping the sheet.
+no warning) · **30 suites / 462 tests** · production build clean. **Visual pass was skipped at the time** — the comment that
+no browser automation is installed on this machine was **wrong** (headless
+Chrome + puppeteer-core work here and are used throughout §9); the pass was
+actually run the same day in entry (i) below.
 
 ### 2026-10-19 (h) - `B25` fixes: autofill sleep counts, rank consistency, perf, cleanup
 
@@ -737,8 +782,10 @@ but never-written field (commented, not repurposed).
 **Gates:** `tsc --noEmit` exit 0 · `npm run lint` **0 errors, 96 warnings** (one new warning
 fixed: an unused helper in `habit-store`) · **30 suites / 462 tests** (15 new in
 `compliance.test.ts`, plus one new case each in `day-status` and `warm-copy`) · production
-build clean (13 static routes). **No visual pass:** no Puppeteer/Playwright is installed on
-this machine, so the light/dark check at 390/360/430 was not run. Mitigation: every colour
+build clean (13 static routes). **The "no visual pass" note was wrong** — a
+browser driver (headless Chrome + puppeteer-core, see §10) exists on this
+machine; the pass was run later the same day, see entry (i) below, which also
+caught a real defect with it. Noted at the time: every colour
 used is an existing token class (`text-amber-400`, `text-primary`, `text-on-surface*`), no raw
 hex was added.
 
@@ -4116,18 +4163,30 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`9b19f96` (`B25` fixes, and `BUG-16`)**: autofill sleep
-  blocks are now completed (so they count toward planned and reviewed), the wallpaper page rank reads
-  days done, the days-done map rebuilds per habit on writes, the avoid chip no longer dangles
-  " clean", and `daysComplied` is scoped by user — **and the habit edit sheet no longer resets every
-  field to its default (`BUG-16`, §9 `(g)`), which was an uncommitted fix in the shared tree when
-  this commit was made.** Committed on `main`; **the agent does not push**. Before it:
+- HEAD at last update: **this commit** — **`B25` review pass**: the 18-hour bar is one definition
+  (`FULL_DAY_HOURS` moved to `day-status.ts`; `compliance.ts` imports it, no cycle),
+  ADR 0005 gained §2.4 (the config-repricing permanence exception), the per-habit chip no longer
+  draws a bare flame/✕ icon when the honest-zero label is empty (three render sites), and the
+  visual pass `B25` skipped was actually run (light + dark, 390px, six surfaces — screenshots in
+  `%TEMP%\opencode\verify\b25-screens`). Committed on `main`; **the agent does not push**. Before it:
+  **`d0c8dc8`** (`B25` follow-up: autofill sleep counts as planned, not auto-reviewed),
+  **`fe8202d`** (BUG-16 record correction), **`9b19f96`** (`B25` fixes + `BUG-16`),
   **`abbc6ac`** (`B25` — the streak becomes two cumulative counters), **`2dc684e`** (`S9` the
   violation state), **`8700852`** (`PERF-5` 5a + 5b), **`b4d9eff`** (habit types), **`e67dc01`**
   (C2 polish round two), `239c833` (C2 round one), `8a3a4a0` (C2 hold-not-swap), `6f53dbd`,
   `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`.
   **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed;
-  `b4d9eff`, `8700852`, `2dc684e`, `abbc6ac` and this commit are **not**.
+  `b4d9eff` through this commit are **not**.
+- **Working tree (2026-10-19, `B25` review pass):** clean after that commit. It touched
+  `src/lib/utils/day-status.ts` (constant home), `src/lib/utils/compliance.ts` (local constant
+  removed), `src/lib/utils/compliance.test.ts` (import source), `src/app/habits/page.tsx` ×2 +
+  `src/components/habits/grid-habit-card.tsx` (honest-zero chip), `docs/adr/0005`
+  (§2.4 new, §6 visual-pass note), `main_plan.md` (B25 line), `context.md` (entry `(i)`,
+  §10, and three in-place corrections of the false "no browser driver" claim). No schema change.
+- **Next feature queued (owner pre-approved): `PERF-5` remainder** (5d dependency trim, 5e
+  production hygiene, and DB/native-sync off the two header-less screens), then `PERF-7`
+  blur reduction, `PERF-8` render efficiency, `PERF-16` dead-weight deletion — one commit each,
+  re-measuring with `npm run measure-routes` and checking light/dark before every commit.
 - **Working tree (2026-10-19, `9b19f96`):** clean after that commit. It changed
   `src/lib/stores/schedule-store.ts` (autofill sleep → `completed` + `completedAt`),
   `src/lib/stores/user-store.ts` (`countDaysDone(userId)`), `src/lib/stores/habit-store.ts`
@@ -4186,9 +4245,11 @@ to know where things stand.
 - Tests: **30 suites, 462 tests green** (446 after `S9`; +15 `compliance.test.ts`, +1 in
   `day-status.test.ts`, +1 in `warm-copy.test.ts`, and `achievements.test.ts` renamed but unchanged
   in count). `tsc --noEmit` exit 0. Production build clean, 13 static routes.
-- **No visual verification for `B25`.** Puppeteer / Playwright / `playwright-core` are all absent
-  from this machine, so the light/dark pass at 390/360/430 was not run. What *was* checked: every
-  colour added is an existing CSS-var token class, and no raw hex was introduced.
+- ~~**No visual verification for `B25`.** Puppeteer / Playwright / `playwright-core` are all absent~~
+  **CORRECTED 2026-10-19 (`(i)`):** the claim was false — `puppeteer-core` + headless Chrome are
+  available at `%TEMP%\opencode\verify` and the visual pass **was run** the same day (both themes,
+  390px, six surfaces + one habit built through the real form). It caught the bare-flame-at-zero
+  defect, fixed in the same change. See §9 `(i)`.
 - Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live
   `next dev`** (pid 2412) and was **deliberately left running** — a dev server recompiles on request, so it
   cannot serve the stale build that the rule guards against.
