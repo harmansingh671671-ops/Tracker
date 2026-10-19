@@ -27,6 +27,7 @@ import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import { useClockTodayStr, useClockHour } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import { FloatingBlock } from "@/components/planner/floating-block";
+import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
 import {
   Clock,
   CheckCircle2,
@@ -121,10 +122,17 @@ export function PlannerContent() {
   const [hintToast, setHintToast] = useState<string | null>(null);
   // The block dropped on the cross, kept only for as long as its Undo is offered.
   const [removedToast, setRemovedToast] = useState<ScheduleBlock | null>(null);
+  // The hand-off the owner asked to see: the block that just lost its hour,
+  // travelling to the corner. Decoration over the real state, never it.
+  const [cornerFlight, setCornerFlight] = useState<{
+    block: ScheduleBlock;
+    flight: CornerFlight;
+  } | null>(null);
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggeredRef = useRef(false);
   const removedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const flightTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const showHint = (msg: string) => {
     setHintToast(msg);
@@ -527,6 +535,44 @@ export function PlannerContent() {
     setIsEditModalOpen(true);
   };
 
+  // Read the two boxes the hand-off travels between, before the state update that
+  // takes the card off its hour. Nothing here writes data: if either box is
+  // missing, the move still happens and simply does not animate.
+  const startCornerFlight = useCallback(
+    (block: ScheduleBlock, fromHour: number) => {
+      if (typeof window === "undefined") return;
+      // Reduced motion: a travelling element that does not travel is a second
+      // copy of the block sitting on an hour for half a second, so skip it.
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const originEl = document.querySelector(`[data-hour="${fromHour}"]`);
+      const cornerEl = document.querySelector("[data-floating-container]");
+      if (!originEl || !cornerEl) return;
+      const origin = originEl.getBoundingClientRect();
+      const iconEl = cornerEl.querySelector("[data-floating-icon]");
+      const corner = (iconEl ?? cornerEl).getBoundingClientRect();
+      // shortcut: with no held icon yet the corner has no box of its own, so the
+      // target is a nominal 132x40 icon hung off its bottom-right anchor -- the
+      // container grows upwards from a fixed bottom edge. Upgrade if the icon's
+      // size changes.
+      const to = iconEl
+        ? { x: corner.left + corner.width / 2, y: corner.top + corner.height / 2 }
+        : { x: corner.right - 66, y: corner.bottom - 20 };
+      setCornerFlight({
+        block,
+        flight: {
+          from: { x: origin.left, y: origin.top, width: origin.width, height: origin.height },
+          to,
+        },
+      });
+      if (flightTimerRef.current) clearTimeout(flightTimerRef.current);
+      // Cleared by a timer rather than by `animationend`: under reduced motion the
+      // animation does not run, so that event would never arrive and the flying
+      // copy would stay on screen.
+      flightTimerRef.current = setTimeout(() => setCornerFlight(null), 460);
+    },
+    [setCornerFlight]
+  );
+
   const handleMoveBlock = useCallback(async (block: ScheduleBlock, toHour: number) => {
     if (!block?.id) return;
     const fromHour = hourOf(block.startTime);
@@ -562,6 +608,9 @@ export function PlannerContent() {
       } catch (e) {
         logWarn("planner", "could not hold the displaced block", e);
       }
+      // Read the boxes now, while the card is still on its hour, so the block can
+      // be seen leaving it.
+      if (heldOccupant) startCornerFlight(occupant, hourOf(occupant.startTime));
     }
     setBlocks((prev) => {
       const without = heldOccupant && occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
@@ -570,8 +619,11 @@ export function PlannerContent() {
     if (heldOccupant && occupant) {
       setFloatingBlocks((prev) => (prev.some((f) => f.id === occupant.id) ? prev : [...prev, occupant]));
     }
+    // Where the user's block landed, in the same highlight a save gets.
+    setRecentlySavedHour(toHour);
+    setTimeout(() => setRecentlySavedHour((curr) => (curr === toHour ? null : curr)), 2800);
     syncCurrentScheduleToNative(selectedDate);
-  }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
+  }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks, startCornerFlight, setRecentlySavedHour]);
 
   const handleDropFloating = useCallback(async (block: ScheduleBlock, toHour: number) => {
     if (!block?.id) return;
@@ -600,6 +652,7 @@ export function PlannerContent() {
       } catch (e) {
         logWarn("planner", "could not hold the displaced block", e);
       }
+      if (heldOccupant) startCornerFlight(occupant, hourOf(occupant.startTime));
     }
     setBlocks((prev) => {
       const without = heldOccupant && occupant ? prev.filter((b) => b.id !== occupant.id) : prev;
@@ -610,8 +663,10 @@ export function PlannerContent() {
       if (heldOccupant && occupant && !next.some((f) => f.id === occupant.id)) next.push(occupant);
       return next;
     });
+    setRecentlySavedHour(toHour);
+    setTimeout(() => setRecentlySavedHour((curr) => (curr === toHour ? null : curr)), 2800);
     syncCurrentScheduleToNative(selectedDate);
-  }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks]);
+  }, [blocks, floatingBlocks, selectedDate, setBlocks, setFloatingBlocks, startCornerFlight, setRecentlySavedHour]);
 
   const handleDeleteFloating = useCallback(
     async (block: ScheduleBlock) => {
@@ -1053,11 +1108,19 @@ export function PlannerContent() {
         </div>
       )}
 
-      {floatingBlocks.length > 0 && (
-        <div className="fixed bottom-28 right-4 z-50 flex flex-col items-end gap-2">
-          {floatingElements}
-        </div>
+      {/* The hand-off: the block that lost its hour, crossing to the corner. */}
+      {cornerFlight && (
+        <FlyingToCorner block={cornerFlight.block} flight={cornerFlight.flight} />
       )}
+
+      {/* Always rendered, even with nothing held: it is the box the hand-off flies
+          to, so it has to exist before the first held block does. */}
+      <div
+        data-floating-container
+        className="fixed bottom-28 right-4 z-50 flex flex-col items-end gap-2"
+      >
+        {floatingElements}
+      </div>
     </div>
     </>
   );

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { type ScheduleBlock } from "@/lib/db";
 import { DeleteTarget } from "@/components/planner/delete-target";
+import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import {
   hourFromSlot,
   hourSlotFromPoint,
@@ -41,6 +42,10 @@ export function FloatingBlock({ block, onDrop, onDelete }: FloatingBlockProps) {
   const pointerRef = useRef({ x: 0, y: 0 });
   const highlightRef = useRef<HTMLElement | null>(null);
   const crossRef = useRef<HTMLDivElement | null>(null);
+  // A held block is by definition a saved one, so its category styling is the
+  // "custom" variant -- the same call the rail makes for its own cards.
+  const cat = getPlannerCatStyle(block.category, true);
+  const CatIcon = cat.Icon;
 
   const isOverCross = useCallback((clientX: number, clientY: number) => {
     const rect = crossRef.current?.getBoundingClientRect();
@@ -178,18 +183,24 @@ export function FloatingBlock({ block, onDrop, onDelete }: FloatingBlockProps) {
       >
         {/* The pop-in is on this inner box, not the one the drag writes a
             transform to -- a running animation would win over that inline
-            transform and freeze the icon mid-screen. */}
+            transform and freeze the icon mid-screen.
+
+            Title and category badge only, no hour: the icon has to be readable
+            at a glance while it is being dragged, and the hour it was taken from
+            is not the hour it is going to. */}
         <div
-          className={`displaced-icon-in rounded-2xl border px-3 py-2 shadow-lg transition-all duration-150 ${
+          className={`displaced-icon-in flex items-center gap-2 rounded-2xl border px-3 py-2 shadow-lg transition-all duration-150 ${
             crossArmed
               ? "border-error/70 bg-error/15 opacity-60"
               : "border-primary/30 bg-surface-container-low"
           }`}
         >
-          <div className="max-w-[132px] truncate text-xs font-semibold">{block.title}</div>
-          <div className="text-[10px] font-mono text-on-surface-variant/70">
-            {block.startTime}&ndash;{block.endTime}
+          <div
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${cat.badgeBg}`}
+          >
+            <CatIcon className="h-3.5 w-3.5" />
           </div>
+          <div className="max-w-[110px] truncate text-xs font-semibold">{block.title}</div>
         </div>
       </div>
     </>

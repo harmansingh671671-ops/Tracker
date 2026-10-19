@@ -617,6 +617,59 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (b) - C2 round two: the icon's category badge, the hand-off flight, a smaller unlabelled cross
+
+Four owner asks in one sitting, on top of the entry below: the held icon should show **no hour**,
+the displaced block should be seen **being created as a floating icon** rather than appearing,
+the icon should also carry the **category icon**, and the delete cross should be **smaller and
+unlabelled**.
+
+**The hand-off is a flight, and it is decoration over the real state - never the state.** Read as
+part of the push-off, before the update that takes the card off its hour: the box of the hour the
+block is leaving (`[data-hour="N"]`) and the box of the corner the held blocks stack in
+(`[data-floating-container]`). Those two go into CSS variables (`--fly-dx`, `--fly-dy`,
+`--fly-scale`) consumed by one keyframe (`displacedFlyToCorner`), so any pair of positions works
+and nothing is hard-coded; the flying element is a fresh render of the block (badge + title),
+never a clone of the rail card. If either box is missing, **the move still happens and simply does
+not animate** - the animation has no vote on whether data is written. It is cancelled by a
+**timer, not `animationend`**: under reduced motion the animation never runs, so that event would
+never arrive and the flying copy would sit on screen forever. Under reduced motion the planner
+skips the flight entirely, and a `reduce` rule is the belt to that brace.
+
+**The corner container is now always rendered.** The first held block has no corner box to fly
+*to* until it exists, and it is created in the same commit as the flight, so the target is
+measured with a nominal-sized icon hung off the container's fixed bottom-right while empty. That
+fallback assumes a 132px icon; a short title's icon is narrower (measured: 84px), so the flight
+ends right-aligned with the corner but up to 24px off the icon's centre. Sampled from inside the
+page, opacity is already 0.5 by then and 0.01 at the end, so it is invisible - **shortcut: nominal
+132x40 fallback target, upgrade if the held icon's size or the corner's anchoring changes.**
+
+**The block that WON the hour is what gets the landing highlight**, through the existing
+`recentlySavedHour` ring that a fresh save uses - and only when the block actually moved, since
+`handleMoveBlock` returns early on a same-hour drop. The dragged block deliberately does **not**
+slide across the screen: it is already at the finger, and two blocks travelling would read as a
+swap, which is the mechanic ADR 0004 removed.
+
+**A one-line trap the harness itself had:** the cross's "armed" check read the *child* div's
+classes. Removing the label made the labelled root and the circle the same element, so
+`querySelector('div')` returned `null` and the assertion silently compared against `null`. The
+check now reads the cross element's own class. **A test written against a DOM shape, not a
+contract, breaks when the shape changes - and a `null` that is then compared is worse than a
+crash.**
+
+Verified with `verify-floating.js` (**44 checks**, all pass - the suite grew by the flight, the
+landing highlight, the badge, the no-hour assertion and the cross's size/label) and the `verify-c2.js`
+regression (**22 checks**, all pass, with the two icon-text assertions updated to the new contract:
+title only, and explicitly *no* hour). The flight was measured by sampling its live box inside the
+page rather than from screenshots, because screenshot latency in headless hides the first frames:
+start at the hour's own box → corner, opacity 1.00 → 0.01, gone by ~1.7s. Light and dark re-shot.
+`tsc` 0, `eslint` 0 errors on the four touched files, production build clean.
+
+**Deliberately skipped:** the flight keeps the hour card's aspect ratio instead of morphing into
+the icon's pill shape (the width mismatch is faded out before it can be seen); the corner stack
+still overlaps the app's FAB button by ~2px, which predates this round and which the owner has
+seen; and the undo window still does not survive a reload.
+
 ### 2026-10-19 - C2 polish: the displaced icon's creation, landing ring, edge auto-scroll, and drop-to-delete
 
 Owner-reported follow-up on the displaced-block icon: drop the word "Floating" from it,
@@ -666,11 +719,15 @@ armed → the block lands on the hour).
 
 **A screenshot caught what the checks could not: on a touch screen the finger AND the dragged
 block both sit on the target.** With the icon following the finger, the cross's X was hidden
-under the block exactly when it mattered. The cross is now 64px (70 when armed), keeps its
-"DELETE" label below, and the block itself dims and tints red when armed, so the armed state
-reads around the obstruction. Both themes re-shot to confirm.
+under the block exactly when it mattered. The cross was enlarged to 64px (70 when armed) at
+that point, and the block itself dims and tints red when armed, so the armed state reads around
+the obstruction. **Revised the same day, round two:** the owner asked for it smaller and without
+the word under it, so it is now **48px (53 when armed) and carries no label at all** — a written
+label sat exactly where the dragged block covers it, which is the reason the red fill and glow
+carry the meaning. Both themes re-shot.
 
-Verified with `verify-floating.js` (**33 checks**, all pass): the creation animation measured
+Verified with `verify-floating.js` (**33 checks** at the time — **44** after round two, below):
+the creation animation measured
 from sampled frames rather than a class name, exactly one ringed hour, the ring cleared on
 release and on unmount, auto-scroll actually reaching an hour that was off-screen before
 (`top=-241` → `474`) and landing the block on it, the scroll proving **stopped** after the drop,
@@ -3808,8 +3865,8 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **C2 polish — the displaced block's icon drops the word "Floating", springs in, rings the hour it would land on, scrolls the page at the top/bottom edge, and can be dropped on a cross to remove it (with a 5s Undo)** (committed on `main`, **not pushed**). Before it: `8a3a4a0` (C2 rework — a displaced block is held in its own store, so the hour a block is dragged from stays empty across a refresh), `6f53dbd` (C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable), `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
-- **Working tree (2026-10-19):** this commit touched only `src/components/planner/floating-block.tsx` (reworked), `src/components/planner/delete-target.tsx` (new), `src/lib/utils/planner-hour-hit.ts` (new), `src/components/planner/timeline-hour-slot.tsx` (now uses the shared hit test), `src/components/planner/planner-content.tsx` (delete + Undo), `src/app/globals.css` (`displacedIconIn`, `.planner-drop-ring`), `main_plan.md` and `context.md`. **Another agent still has uncommitted work in `src/app/habits/page.tsx`, `src/components/habits/**`, `src/lib/db.ts`, `src/lib/habit-cache.ts`, `src/lib/stores/habit-store.ts`, `src/lib/utils/habit-colors.ts`, `src/lib/utils/habit-completion.ts`** — do not commit it, and it is the reason `npx eslint src` reports 2 `react-hooks/rules-of-hooks` errors (`habits/page.tsx:1055`, a `useRef` inside a callback) that are **not** from this commit. Because `db.ts` is still dirty, **ADR 0004's `OdysseyFloatingBlocks` store is still its own IndexedDB database** — AGENTS.md rule 2 calls `db.ts` the canonical schema, so **fold it into `OdysseyDB` once that file is free**, as a new store + version bump (additive, no field change).
+- HEAD at last update: **this commit** — C2 polish, round two: the held block shows its title and category icon and no hour, the block it displaces is seen flying to the corner (and the block that won the hour gets the landing highlight), and the delete cross is smaller and unlabelled** (committed on `main`, **not pushed**). Before it: **`239c833`** (C2 polish, round one — the displaced icon drops the word "Floating", springs in, rings the hour it would land on, scrolls the page at the top/bottom edge, and can be dropped on a cross to remove it with a 5s Undo), `8a3a4a0` (C2 rework — a displaced block is held in its own store, so the hour a block is dragged from stays empty across a refresh), `6f53dbd` (C2 swap/chain fix — the displaced block is really swapped and the floating icon is droppable), `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f` (C2 swap/chain drag), `bb730b2` (Fix dim colors in distribution modal), `7b24df2` (Merge), `372bb41` (C3 hide next habit when all done), `7cdf7c8` (C2 animate block on right-to-left swipe).
+- **Working tree (2026-10-19, round two):** this commit touched only `src/components/planner/floating-block.tsx` (title + category badge, no hour), `src/components/planner/flying-to-corner.tsx` (**new** — the hand-off flight), `src/components/planner/delete-target.tsx` (smaller, label removed), `src/components/planner/planner-content.tsx` (flight capture/render, landing highlight, the corner container is always rendered), `src/app/globals.css` (`displacedFlyToCorner`, `.flying-to-corner`), `main_plan.md` and `context.md`. **Another agent still has uncommitted work in `src/app/habits/page.tsx`, `src/components/habits/**` (incl. untracked `grid-habit-card.tsx`), `src/lib/db.ts`, `src/lib/habit-cache.ts`, `src/lib/stores/habit-store.ts`, `src/lib/utils/habit-colors.ts`, `src/lib/utils/habit-completion.ts`** — do not commit it, and it is the reason `npx eslint src` reports 2 `react-hooks/rules-of-hooks` errors (`habits/page.tsx:1055`, a `useRef` inside a callback) that are **not** from this commit. Because `db.ts` is still dirty, **ADR 0004's `OdysseyFloatingBlocks` store is still its own IndexedDB database** — AGENTS.md rule 2 calls `db.ts` the canonical schema, so **fold it into `OdysseyDB` once that file is free**, as a new store + version bump (additive, no field change).
 - **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
 - Lint: `npx eslint src` exits 0 — **0 errors, 96 warnings** (all pre-existing `no-unused-vars`), first clean project-wide lint in recorded history.
 - Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13). `tsc --noEmit` exit 0. Production build clean.

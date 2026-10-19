@@ -20,6 +20,11 @@ interface DeleteTargetProps {
  * block. It marks the one place where letting go does not mean "put it on this
  * hour".
  *
+ * Deliberately unlabelled and small: it sits where the dragged block and the
+ * finger both cover it, so its own state has to carry the meaning -- the red
+ * fill and glow are the whole message, and anything written under the circle
+ * would be read through the block hovering over it.
+ *
  * `pointer-events: none` is deliberate and load-bearing: the hour underneath
  * must stay the hour the release hit test sees, so the parent measures this
  * circle's box instead of asking it whether it was hit.
@@ -34,30 +39,15 @@ export function DeleteTarget({ elRef, armed, near }: DeleteTargetProps) {
       ref={elRef}
       data-delete-target
       aria-hidden="true"
-      className="pointer-events-none fixed bottom-28 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-1 animate-in fade-in"
+      className={`pointer-events-none fixed bottom-28 left-1/2 z-[60] flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border-2 backdrop-blur-md transition-all duration-150 animate-in fade-in ${
+        armed
+          ? "scale-110 border-error bg-error/25 text-error shadow-[0_0_24px_rgba(244,63,94,0.45)]"
+          : near
+            ? "scale-105 border-error/60 bg-error/15 text-error"
+            : "border-outline/40 bg-surface-container-highest/85 text-on-surface-variant/60"
+      }`}
     >
-      <div
-        className={`flex h-16 w-16 items-center justify-center rounded-full border-2 backdrop-blur-md transition-all duration-150 ${
-          armed
-            ? "scale-110 border-error bg-error/25 text-error shadow-[0_0_28px_rgba(244,63,94,0.45)]"
-            : near
-              ? "scale-105 border-error/60 bg-error/15 text-error"
-              : "border-outline/40 bg-surface-container-highest/85 text-on-surface-variant/60"
-        }`}
-      >
-        <X className="h-7 w-7" strokeWidth={2.5} />
-      </div>
-      <span
-        className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm transition-colors duration-150 ${
-          armed
-            ? "bg-error/20 text-error"
-            : near
-              ? "bg-error/10 text-error/90"
-              : "bg-surface-container-highest/90 text-on-surface-variant"
-        }`}
-      >
-        Delete
-      </span>
+      <X className="h-5 w-5" strokeWidth={2.5} />
     </div>
   );
 }

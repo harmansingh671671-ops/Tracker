@@ -649,6 +649,43 @@ button, a, input, select {
   animation: displacedIconIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* C2 -- the hand-off when a block takes an occupied hour. The block that lost
+   its hour travels to the corner where held blocks stack, shrinking on the way,
+   so the user sees where it went instead of watching it vanish. `--fly-dx/dy`
+   and `--fly-scale` are set inline from the two measured boxes (the hour it
+   left, the corner it lands in), which is why this is a keyframe over transform
+   with variables rather than a fixed distance. Gated on reduced motion like
+   every other house animation. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes displacedFlyToCorner {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+    55% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate3d(var(--fly-dx), var(--fly-dy), 0) scale(var(--fly-scale));
+      opacity: 0;
+    }
+  }
+}
+
+.flying-to-corner {
+  animation: displacedFlyToCorner 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The planner skips the flight itself under reduced motion; this is the belt
+     to its braces, so a future caller cannot leave a second copy of a block
+     sitting on an hour for half a second. */
+  .flying-to-corner {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .displaced-icon-in {
     animation: none;
