@@ -35,8 +35,13 @@ export interface CompletionRecord {
  * |-----------|-------------------------------------------------|
  * | `simple`  | `log.completed` -- unchanged behaviour           |
  * | `counted` | `value >= targetValue`                          |
+ * | `avoid`   | `log.completed` -- a *clean* day. See below.     |
  *
  * `log` may be absent: no log means no completion, for every type.
+ *
+ * An `avoid` (quit) habit shares the `simple` rule on purpose: `completed` means "stayed
+ * clean today", and a slip is written as `completed: false` with `value: 1`, so it can never
+ * read as complete. The slip state itself is `isHabitSlipped`.
  */
 export function isHabitComplete(
   habit: CompletionSubject,
@@ -58,6 +63,21 @@ export function isHabitComplete(
 
   const value = typeof log.value === "number" && Number.isFinite(log.value) ? log.value : 0;
   return value >= target;
+}
+
+/**
+ * Whether `habit` records a **slip** on the day `log` covers.
+ *
+ * A quit habit is "clean" when it is complete; a slip is the violation state that makes
+ * the day red and ends the clean-day run. Only `avoid` can be slipped -- for every other
+ * type this is false, so a stray `value` can never mark a normal habit as a violation.
+ */
+export function isHabitSlipped(
+  habit: CompletionSubject,
+  log: CompletionRecord | null | undefined
+): boolean {
+  if ((habit.type ?? "simple") !== "avoid") return false;
+  return typeof log?.value === "number" && log.value >= 1;
 }
 
 /**

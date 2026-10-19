@@ -11,12 +11,13 @@ import { GridHabitCard } from "@/components/habits/grid-habit-card";
 import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
+import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
-import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
+import { isHabitComplete, getCompletionRecord, isHabitSlipped } from "@/lib/utils/habit-completion";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
 import { getCompletionToast, getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
@@ -56,6 +57,7 @@ export default function HabitsPage() {
     settleElapsedRewards,
     toggleHabitLog,
     setHabitLogValue,
+    markHabitSlip,
     addHabit,
     updateHabit,
     deleteHabit,
@@ -456,6 +458,20 @@ export default function HabitsPage() {
     if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit deleted.");
   };
+
+  // A quit habit's day is one of three things: clean (the run grows), a slip (the run
+  // ends), or cleared. Tapping the active choice clears the day, which is the only way
+  // back from a mis-tap without opening the edit sheet.
+  const handleAvoidClean = useCallback(async (habit: Habit, date: string, isClean: boolean) => {
+    if (!user?.id || isFutureSelectedDate) return;
+    if (isClean) await toggleHabitLog(user.id, habit.id, date);
+    else await markHabitSlip(user.id, habit.id, date, false);
+  }, [user, isFutureSelectedDate, toggleHabitLog, markHabitSlip]);
+
+  const handleAvoidSlip = useCallback(async (habit: Habit, date: string, isSlipped: boolean) => {
+    if (!user?.id || isFutureSelectedDate) return;
+    await markHabitSlip(user.id, habit.id, date, !isSlipped);
+  }, [user, isFutureSelectedDate, markHabitSlip]);
 
   // Long press gesture listeners to open habit editing modal
   const startPress = (habit: Habit, e: React.TouchEvent | React.MouseEvent) => {
@@ -940,9 +956,18 @@ AnimatePresence, which suppresses the enter transition and leaves the
                       </div>
                     </div>
 
-                    {/* Completion Action: Ring for simple habits only (counted uses inline stepper below name) */}
+                    {/* Completion Action: clean/slip pair for quit habits, ring for simple
+                        habits, inline stepper below the name for counted. */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {(h.type ?? "simple") === "simple" ? (
+                      {h.type === "avoid" ? (
+                        <AvoidHabitControl
+                          isClean={isCompleted}
+                          isSlipped={isHabitSlipped(h, log)}
+                          disabled={isFutureSelectedDate}
+                          onClean={(isClean) => handleAvoidClean(h, selectedDate, isClean)}
+                          onSlip={(isSlipped) => handleAvoidSlip(h, selectedDate, isSlipped)}
+                        />
+                      ) : (h.type ?? "simple") === "simple" ? (
                         <div
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
@@ -1063,6 +1088,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
                 showToast={showToast}
                 handleCardClick={handleCardClick}
                 handleToggle={handleToggle}
+                onAvoidClean={(isClean) => handleAvoidClean(h, selectedDate, isClean)}
+                onAvoidSlip={(isSlipped) => handleAvoidSlip(h, selectedDate, isSlipped)}
                 handleDragStart={handleDragStart}
                 startPress={startPress}
                 movePress={movePress}

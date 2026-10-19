@@ -4,6 +4,7 @@ import {
   hasLoggedValue,
   completionRatio,
   nextValue,
+  isHabitSlipped,
 } from "./habit-completion";
 
 /**
@@ -17,6 +18,7 @@ import {
 
 const simple = { type: "simple" as const };
 const counted = (target: number) => ({ type: "counted" as const, targetValue: target });
+const avoid = { type: "avoid" as const };
 
 // =========================================================================
 describe("isHabitComplete - simple habits must not change", () => {
@@ -110,6 +112,48 @@ describe("completionRatio", () => {
   it("is 0 rather than Infinity or NaN when the target is unusable", () => {
     expect(completionRatio({ type: "counted" }, { value: 10 })).toBe(0);
     expect(completionRatio(counted(0), { value: 10 })).toBe(0);
+  });
+});
+
+// =========================================================================
+describe("isHabitComplete - avoid (quit) habits", () => {
+  it("is complete when the day is clean", () => {
+    expect(isHabitComplete(avoid, { completed: true, value: 0 })).toBe(true);
+    expect(isHabitComplete(avoid, { completed: true })).toBe(true);
+  });
+
+  it("⚠️ is NOT complete when the user slipped - the day that ends the run", () => {
+    // If this returns true, a quit streak counts the day the user most needs counted
+    // against them. This is `BUG-5`'s shape for the one habit type that has a violation.
+    expect(isHabitComplete(avoid, { completed: false, value: 1 })).toBe(false);
+  });
+
+  it("is not complete for a day with no log", () => {
+    expect(isHabitComplete(avoid, undefined)).toBe(false);
+    expect(isHabitComplete(avoid, null)).toBe(false);
+  });
+});
+
+// =========================================================================
+describe("isHabitSlipped - the avoid violation state", () => {
+  it("is true for an avoid habit carrying a slip value", () => {
+    expect(isHabitSlipped(avoid, { completed: false, value: 1 })).toBe(true);
+    expect(isHabitSlipped(avoid, { value: 2 })).toBe(true);
+  });
+
+  it("is false for a clean, unlogged, or value-less avoid day", () => {
+    expect(isHabitSlipped(avoid, { completed: true, value: 0 })).toBe(false);
+    expect(isHabitSlipped(avoid, { completed: true })).toBe(false);
+    expect(isHabitSlipped(avoid, undefined)).toBe(false);
+    expect(isHabitSlipped(avoid, null)).toBe(false);
+  });
+
+  it("never marks a non-avoid habit as slipped, whatever its value", () => {
+    // `value` means "progress" on a counted habit; reading it as a slip there would turn
+    // every logged counted day into a violation.
+    expect(isHabitSlipped(counted(20), { value: 20 })).toBe(false);
+    expect(isHabitSlipped(simple, { completed: true, value: 1 })).toBe(false);
+    expect(isHabitSlipped({}, { value: 5 })).toBe(false);
   });
 });
 

@@ -617,6 +617,42 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
 opinions.
 
+### 2026-10-19 (e) - S9: the violation state, so a quit habit's slip ends the run
+
+Branch `main`. `S9`'s first half landed in `b4d9eff` (the `avoid` type and the quit surface).
+This is the half the ADR said was the *reason* to defer `avoid`: a completed day for a quit
+habit needs a violation to mean anything, and none existed.
+
+**The model.** A quit day is one of three things, and only one is new:
+
+| State | Stored as | Reads as |
+|---|---|---|
+| clean | `completed: true`, `value: 0` | complete, run +1 |
+| slipped | `completed: false`, `value: 1` | **not** complete, run ends |
+| cleared | `completed: false`, `value: 0` | not complete, no state |
+
+**A slip rides `value` rather than a new boolean field, deliberately.** `historyValues` is
+already the per-date map every reader consults, so putting the slip there means the violation
+survives a cold load and reads correctly on a *past* date with no second history map, no cache
+field, and no `StoreSnapshot` change. A parallel `historyViolations` map would have been three
+files of plumbing for the same answer. The meaning is type-scoped: `value` is progress toward a
+target on `counted`, and slips on `avoid`. `isHabitSlipped` refuses to read a non-`avoid` value
+as a slip, because a counted habit's `value: 20` is the opposite of a violation.
+
+**Where it reaches.** New `AvoidHabitControl` (a clean button and a slip button) replaces the
+completion ring for `avoid` on both the list and grid cards — the two surfaces a day is actually
+logged from. This closed a real gap: the list view only rendered a ring for `type === "simple"`,
+so before this commit a quit habit could not be logged in list view **at all**. `HabitStore`
+gains one action, `markHabitSlip`, and only today's slip moves the clean run (the `BUG-15`
+rule). A slipped day paints red and the card takes an error border.
+
+Gates: `tsc` exit 0; `eslint src` 0 errors; 29 suites / **446** tests (6 new, all in the
+predicate suite); build clean.
+
+**Not reached, and named:** the history-only surfaces (date strip, month calendar, heatmaps)
+show a slipped day as simply "not complete" — they read `completed`, not `isHabitSlipped`. The
+violation is colour-distinct only on the list and grid cards.
+
 ### 2026-10-19 (d) - `PERF-5`: the shared bundle was the cost, and the plan was pointing at the wrong files
 
 The owner chose "make the app load faster" — the first part of the performance phase that can be
@@ -3945,31 +3981,33 @@ to know where things stand.
 
 - Remote `origin`: `https://github.com/harmansingh671671-ops/Tracker.git`,
   branch `main`.
-- HEAD at last update: **this commit** — **`PERF-5` (5a + 5b)**: per-route first-load measurement
-  (`npm run measure-routes`) and the shell diet — the animation library is out of the shared set (the
-  permission panel animates with two keyframes) and the profile sheet, rank-up dialog, evening
-  reminder and update notice load on demand. Shared set **261.4 → 178.4 KB gzip**, `/planner` first
-  visit **263.0 → 178.8 KB**; the **build total rose** 431.9 → 476.7 KB gzip, deliberately and
-  explained in `PERFORMANCE.md` §2.1. Committed on `main`; **the agent does not push**. Before it:
-  **`b4d9eff`** (the other agent's habit types — counted stepper + quit surface, `S13` part 2 / `S9`),
-  **`e67dc01`** (C2 polish round two), `239c833` (C2 round one), `8a3a4a0` (C2 hold-not-swap),
-  `6f53dbd`, `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`, `bb730b2`, `7b24df2`, `372bb41`,
-  `7cdf7c8`. **Everything up to and including `e67dc01` is on `origin/main`** — the owner pushed.
-- **Working tree (2026-10-19, `PERF-5`):** this commit touched `scripts/measure-routes.js` (**new** —
-  per-route first-load measurement), `package.json` (`analyze` + `measure-routes` scripts),
-  `eslint.config.mjs` (a scoped `scripts/**/*.js` block — `no-require-imports` and `no-console` off,
-  because a measurement CLI's job is printing to stdout; it also retires the 3 `require()` errors that
-  had sat in `measure-bundle.js` since it moved into the repo),
-  `src/components/common/permission-education.tsx` (framer-motion → house keyframes),
-  `src/components/layout/header.tsx` (profile sheet + rank-up dialog on demand),
-  `src/components/layout/app-shell.tsx` (evening reminder + update notice after the first painted
-  frame), `src/app/globals.css` (`permissionPanelIn` / `permissionBackdropIn` + their `reduce` rule),
-  `PERFORMANCE.md` (§2 refreshed, **§2.1 added**, §3 rows, §6 re-measure, §7 `18a` budget),
-  `main_plan.md` and `context.md`. **The other agent's habits work is committed now (`b4d9eff`), so
-  the tree no longer carries it** — which means `src/lib/db.ts` is **free**, and ADR 0004's
-  `OdysseyFloatingBlocks` can be folded into `OdysseyDB` as an additive store + version bump
-  (AGENTS.md rule 2 calls `db.ts` the canonical schema). **Not done here**: a schema change belongs in
-  its own change with its own verification.
+- HEAD at last update: **this commit** — **`S9` (quit mode, the violation state)**: a slip is a day
+  state now, not a missing tick — clean/slip controls on the list and grid cards, a slip stored as
+  `HabitLog.value = 1`, `isHabitSlipped`, and `HabitStore.markHabitSlip`. Committed on `main`;
+  **the agent does not push**. Before it: **`8700852`** (`PERF-5` 5a + 5b — per-route first-load
+  measurement and the shell diet; shared set 261.4 → 178.4 KB gzip, `/planner` 263.0 → 178.8 KB, build
+  total 431.9 → 476.7, see `PERFORMANCE.md` §2.1), **`b4d9eff`** (habit types — counted stepper + quit
+  surface, `S13` part 2 / `S9`), **`e67dc01`** (C2 polish round two), `239c833` (C2 round one),
+  `8a3a4a0` (C2 hold-not-swap), `6f53dbd`, `3d31d2a` (Merge branch 'agent/mainline'), `5ac6a3f`,
+  `bb730b2`, `7b24df2`, `372bb41`, `7cdf7c8`. **Everything up to and including `e67dc01` is on
+  `origin/main`** — the owner pushed; `b4d9eff`, `8700852` and this commit are **not**.
+- **Working tree (2026-10-19, `S9`):** commits `b4d9eff` + this one. `b4d9eff` landed the habit-types
+  body of work that had been sitting uncommitted (counted steppers, the quit surface, a habit colour
+  override, completion confetti, the `BUG-15` streak fix); it also finished a half-done grid-card
+  extraction, which fixed a rules-of-hooks violation (`useRef` inside `.map`) and a duplicated "Quit"
+  pill. This commit — `S9`'s violation state — touched `src/lib/db.ts` (a `value` doc line only; **no new
+  field**), `src/lib/utils/habit-completion.ts` (`isHabitSlipped` + docstring), its test file (6 tests),
+  `src/lib/stores/habit-store.ts` (`markHabitSlip`; `toggleHabitLog` learns `avoid`),
+  `src/components/habits/avoid-habit-control.tsx` (**new**), `src/components/habits/grid-habit-card.tsx`,
+  `src/app/habits/page.tsx`, `docs/adr/0003` (an update note), `main_plan.md` and `context.md`.
+  **The tree is otherwise clean.**
+- **`src/lib/db.ts` is free again** — the habit-types work is committed, so ADR 0004's
+  `OdysseyFloatingBlocks` can be folded into `OdysseyDB` as an additive store + version bump (AGENTS.md
+  rule 2 calls `db.ts` the canonical schema). **Not done here**: a schema change belongs in its own change
+  with its own verification.
+- **`S9`'s violation state does not reach the history-only surfaces.** The date strip, month calendar and
+  heatmaps read `completed`, not `isHabitSlipped`, so a slipped day shows there as simply "not complete"
+  rather than red. Named, not hidden.
 - **`PERF-5` measurement traps (2026-10-19).** (1) **`next experimental-analyze` does not build
   anything** — its own help says so — so it reports the *previous* build's numbers, which looks
   exactly like a change that did nothing. `npm run measure-routes` builds first for that reason.
@@ -3979,20 +4017,19 @@ to know where things stand.
   and 263.0 → 178.8 KB respectively. (3) **Source size is not transfer size** — the five "huge" screen
   files the plan targeted contribute 0.4–1.6 KB gzipped each, because they are already routes.
 - **Planner verification trap (2026-10-18):** a headless browser must load the dev server over **`localhost`**, not `127.0.0.1`. Next 16 blocks "cross-origin" dev resources, and the only visible symptom is a failing `/_next/hmr` WebSocket plus the `dynamic(..., { ssr: false })` planner chunk never mounting — the page renders the app shell and nothing else, with **no console error**. If `/planner` shows just "Schedule Habits Journey Stats Armory", that is this, not a code bug.
-- Lint: `npx eslint src` exits 0 — **0 errors, 95 warnings** (all pre-existing `no-unused-vars`), and
-  the **repo-wide run now reports the same** (`scripts/**/*.js` gained a scoped exemption in
-  `eslint.config.mjs` with `PERF-5`, instead of the measurement scripts sitting as 3 errors).
-- Tests: **29 suites, 440 tests green**. `tsc --noEmit` exit 0. Production build clean.
-- Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live `next dev`** (pid 2412) and was **deliberately left running** — this session's `PERF-5` verification drove that server over `localhost` (the `127.0.0.1` trap below applies), and an earlier session's planner verification did the same.
-- **Lint: `npx eslint src` exits 0 — 0 errors, 96 warnings.** This is the **first clean project-wide
-  lint in the repo's recorded history (2026-10-17)**. Three
-  `react-hooks/preserve-manual-memoization` errors had sat in `planner-content.tsx` since `3970e90` and
-  **nothing blocked on them**: `tsc`, the build and the test suite were all green over a red count, and the
-  Phase 1 exit gate line read *"gates clean ✓"*. React Compiler skips optimising an ENTIRE component when it
-  cannot preserve manual memoisation, so the real cost was the whole planner screen, not the two flagged
-  functions. The 96 warnings are all `no-unused-vars` and all pre-existing; none introduced this session.
-  **Run the whole project, not the files you touched** — that gap is why two commits shipped with a red count.
-- Tests: **29 suites, 440 tests green** (was 27/407 before B3/S13; 24/361 at `79ff34e`). `tsc --noEmit` exit 0. Production build clean.
+- Lint: `npx eslint src` exits 0 — **0 errors, 95 warnings**, all pre-existing `no-unused-vars`, none
+  introduced by `S9`. The repo-wide run reports the same (`scripts/**/*.js` gained a scoped exemption in
+  `eslint.config.mjs` with `PERF-5`). *(Historical, kept because the lesson is durable: the first clean
+  project-wide lint was 2026-10-17 at 96 warnings. Three `react-hooks/preserve-manual-memoization` errors
+  had sat in `planner-content.tsx` since `3970e90` and **nothing blocked on them** — `tsc`, the build and
+  the tests were green over a red count. React Compiler skips optimising an ENTIRE component when it cannot
+  preserve manual memoisation, so the cost was the whole planner screen. **Run the whole project, not the
+  files you touched.**)*
+- Tests: **29 suites, 446 tests green** (440 after `b4d9eff`; +6 with `S9`'s predicate tests). `tsc --noEmit`
+  exit 0. Production build clean.
+- Ports 3001/3100 clear; **no background server of mine is running**. Port **3000 carries the owner's live
+  `next dev`** (pid 2412) and was **deliberately left running** — a dev server recompiles on request, so it
+  cannot serve the stale build that the rule guards against.
 - **Server hygiene:** port 3000 has carried a **live `next dev`** (started 22:20:23 on 2026-10-16) for
   most of this session — **deliberately left running**, because a dev server recompiles on request and so
   cannot serve the stale build that rule exists to prevent. A *stale* `next start` from 18:03 was found on

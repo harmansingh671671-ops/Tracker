@@ -359,7 +359,14 @@ export interface HabitLog {
    * `completed: true` with `value: 0`, and that day is NOT complete.
    */
   completed: boolean;
-  /** What was actually logged, for a `counted` habit. Absent means zero. */
+  /**
+   * What was actually logged. For a `counted` habit it is the number toward the target.
+   * For an `avoid` (quit) habit it is the number of slips that day: `0` (or absent) means
+   * the day is clean, `>= 1` means the user slipped. Unused by `simple`.
+   *
+   * A slip is stored as `value: 1` rather than a separate boolean so it rides the
+   * existing `historyValues` map and every per-date reader already carries it.
+   */
   value?: number;
   notes?: string;
   loggedAt: string;

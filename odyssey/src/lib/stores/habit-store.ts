@@ -96,6 +96,8 @@ interface HabitState {
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitLog: (userId: string, habitId: string, date: string) => Promise<boolean>;
   setHabitLogValue: (userId: string, habitId: string, date: string, value: number) => Promise<void>;
+  /** Record (or clear) a slip for an `avoid` habit on `date`. No-op for other types. */
+  markHabitSlip: (userId: string, habitId: string, date: string, slipped: boolean) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   clearAllHabits: (userId: string) => Promise<void>;
 }
@@ -493,7 +495,9 @@ const valuesMap: Record<string, Record<string, number>> = {};
 
     // A counted habit logs a number toward its target; completed is derived
     // from value >= target via isHabitComplete, never toggled directly.
-    const counted = (habit?.type ?? "simple") === "counted";
+    const type = habit?.type ?? "simple";
+    const counted = type === "counted";
+    const isAvoid = type === "avoid";
     const target = counted ? habit?.targetValue : undefined;
     const currentValue = counted ? (typeof existingLog?.value === "number" ? existingLog.value : 0) : 0;
     const subject = counted && habit ? { type: "counted" as const, targetValue: target } : { type: "simple" as const };
@@ -508,12 +512,15 @@ const valuesMap: Record<string, Record<string, number>> = {};
       isCompleted = typeof target === "number" && Number.isFinite(target) && target > 0 ? next >= target : false;
     } else {
       isCompleted = !wasCompleted;
+      // A hand-toggled `avoid` day is CLEAN (value 0), never a slip: a slip is only
+      // ever recorded through `markHabitSlip`, so the ring can always undo one.
+      if (isAvoid) value = 0;
     }
 
     if (existingLog) {
       await db.habitLogs.update(existingLog.id, {
         completed: isCompleted,
-        ...(counted ? { value } : {}),
+        ...(counted || isAvoid ? { value } : {}),
         loggedAt: new Date().toISOString()
       });
     } else {
@@ -523,7 +530,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
         userId,
         date,
         completed: isCompleted,
-        ...(counted ? { value } : {}),
+        ...(counted || isAvoid ? { value } : {}),
         loggedAt: new Date().toISOString()
       };
       await db.habitLogs.add(newLog);
@@ -535,7 +542,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       const updatedToday = { ...state.todayLogs };
       if (date === todayStr) {
         if (existingLog) {
-          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted ? { value } : {}) };
+          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted || isAvoid ? { value } : {}) };
         } else {
           updatedToday[habitId] = {
             id: uuidv4(),
@@ -543,7 +550,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
             userId,
             date,
             completed: isCompleted,
-            ...(counted ? { value } : {}),
+            ...(counted || isAvoid ? { value } : {}),
             loggedAt: new Date().toISOString()
           };
         }
@@ -559,7 +566,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       };
 
       const updatedValues = { ...state.historyValues };
-      if (counted) {
+      if (counted || isAvoid) {
         if (!updatedValues[habitId]) updatedValues[habitId] = {};
         updatedValues[habitId] = { ...updatedValues[habitId], [date]: value ?? 0 };
       }
@@ -720,6 +727,80 @@ const valuesMap: Record<string, Record<string, number>> = {};
     }
 
     await get().fetchTemporaryWallet(userId);
+  },
+
+  markHabitSlip: async (userId, habitId, date, slipped) => {
+    const habit = await db.habits.get(habitId);
+    // Only a quit habit has a slip state. Anything else is a caller bug, not a write.
+    if (!habit || (habit.type ?? "simple") !== "avoid") return;
+
+    const existingLogs = await db.habitLogs
+      .where('[habitId+date]')
+      .equals([habitId, date])
+      .toArray();
+    const existingLog = existingLogs[0];
+
+    // A slip is `completed: false` with `value: 1`; clean is `completed: true`,
+    // `value: 0`. Keeping the slip in `value` puts it on the same `historyValues`
+    // map every per-date reader already uses -- see `HabitLog.value` in db.ts.
+    const wasSlipped = typeof existingLog?.value === "number" && existingLog.value >= 1;
+    const wasClean = Boolean(existingLog?.completed) && !wasSlipped;
+    const completed = !slipped;
+    const value = slipped ? 1 : 0;
+    const loggedAt = new Date().toISOString();
+
+    if (existingLog) {
+      await db.habitLogs.update(existingLog.id, { completed, value, loggedAt });
+    } else {
+      await db.habitLogs.add({ id: uuidv4(), habitId, userId, date, completed, value, loggedAt });
+    }
+
+    const todayStr = getLocalTodayStr();
+
+    set((state) => {
+      const updatedToday = { ...state.todayLogs };
+      if (date === todayStr) {
+        updatedToday[habitId] = existingLog
+          ? { ...existingLog, completed, value, loggedAt }
+          : { id: uuidv4(), habitId, userId, date, completed, value, loggedAt };
+      }
+
+      const updatedHistory = { ...state.historyLogs };
+      if (!updatedHistory[habitId]) updatedHistory[habitId] = {};
+      updatedHistory[habitId] = { ...updatedHistory[habitId], [date]: completed };
+
+      const updatedValues = { ...state.historyValues };
+      if (!updatedValues[habitId]) updatedValues[habitId] = {};
+      updatedValues[habitId] = { ...updatedValues[habitId], [date]: value };
+
+      return { todayLogs: updatedToday, historyLogs: updatedHistory, historyValues: updatedValues };
+    });
+
+    // Only today moves the clean-day run, the rule the rest of the store follows
+    // (BUG-15). A slip ends the run; clearing one starts a fresh single clean day.
+    if (date === todayStr) {
+      const becameClean = !slipped && !wasClean;
+      const becameSlipped = slipped && wasClean;
+      const totalCompletions = becameClean
+        ? habit.totalCompletions + 1
+        : becameSlipped
+        ? Math.max(0, habit.totalCompletions - 1)
+        : habit.totalCompletions;
+      const currentStreak = becameClean
+        ? habit.currentStreak + 1
+        : becameSlipped
+        ? 0
+        : habit.currentStreak;
+      if (totalCompletions !== habit.totalCompletions || currentStreak !== habit.currentStreak) {
+        const longestStreak = Math.max(habit.longestStreak, currentStreak);
+        await db.habits.update(habitId, { totalCompletions, currentStreak, longestStreak });
+        set((state) => ({
+          habits: state.habits.map((h) =>
+            h.id === habitId ? { ...h, totalCompletions, currentStreak, longestStreak } : h
+          ),
+        }));
+      }
+    }
   },
 
   deleteHabit: async (id) => {

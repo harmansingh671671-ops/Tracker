@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, Flame, X } from "lucide-react";
 import { type Habit, type HabitLog } from "@/lib/db";
 import { HabitIcon } from "@/components/habits/habit-icon";
+import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
 import { getHabitColor, isHabitScheduledOnDate, habitCategoryLabel } from "@/lib/utils/habit-colors";
-import { getCompletionRecord, isHabitComplete } from "@/lib/utils/habit-completion";
+import { getCompletionRecord, isHabitComplete, isHabitSlipped } from "@/lib/utils/habit-completion";
 import { getStreakLabel, isStreakActive } from "@/lib/utils/warm-copy";
 
 interface GridHabitCardProps {
@@ -22,6 +23,9 @@ interface GridHabitCardProps {
   showToast: (msg: string) => void;
   handleCardClick: (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => Promise<void>;
   handleToggle: (habitId: string, targetDate: string, e?: React.MouseEvent | React.TouchEvent) => Promise<void>;
+  /** Quit-habit day actions. Only rendered when the habit's type is `avoid`. */
+  onAvoidClean: (isClean: boolean) => void;
+  onAvoidSlip: (isSlipped: boolean) => void;
   handleDragStart: (habit: Habit, e: React.MouseEvent | React.TouchEvent, currentValue: number) => void;
   startPress: (habit: Habit, e: React.TouchEvent | React.MouseEvent) => void;
   movePress: (e: React.TouchEvent | React.MouseEvent) => void;
@@ -42,6 +46,8 @@ export function GridHabitCard({
   showToast,
   handleCardClick,
   handleToggle,
+  onAvoidClean,
+  onAvoidSlip,
   handleDragStart,
   startPress,
   movePress,
@@ -53,6 +59,8 @@ export function GridHabitCard({
   const isCompleted = isHabitComplete(habit, log);
   const habitColor = getHabitColor(habit);
   const isCounted = (habit.type ?? "simple") === "counted";
+  const isAvoid = habit.type === "avoid";
+  const isSlipped = isHabitSlipped(habit, log);
   const currentValue = typeof log?.value === "number" ? log.value : 0;
   const targetValue = habit.targetValue ?? 1;
 
@@ -121,7 +129,9 @@ export function GridHabitCard({
       }}
       onClick={(e) => handleCardClick(habit, e)}
       className={`p-3 rounded-2xl flex flex-col justify-between gap-2.5 border transition-colors duration-200 cursor-pointer active:scale-95 select-none ${
-        isCompleted
+        isSlipped
+          ? "bg-error/5 border-error/40"
+          : isCompleted
           ? "bg-surface-container-low shadow-sm"
           : isFutureSelectedDate
           ? "bg-surface-container opacity-85 border-outline/15"
@@ -130,7 +140,10 @@ export function GridHabitCard({
           : "bg-surface-container hover:bg-surface-container-high border-outline/15"
       }`}
       style={{
-        borderColor: isCompleted
+        // A slipped day overrides the habit colour with the error border from the class.
+        borderColor: isSlipped
+          ? undefined
+          : isCompleted
           ? isScheduled
             ? `${habitColor}50`
             : `${habitColor}35`
@@ -199,6 +212,14 @@ export function GridHabitCard({
             >
               <span className="font-mono text-[12px] font-bold">+</span>
             </button>
+          ) : isAvoid ? (
+            <AvoidHabitControl
+              isClean={isCompleted}
+              isSlipped={isSlipped}
+              disabled={isFutureSelectedDate}
+              onClean={onAvoidClean}
+              onSlip={onAvoidSlip}
+            />
           ) : (
             <div
               onMouseDown={(e) => e.stopPropagation()}

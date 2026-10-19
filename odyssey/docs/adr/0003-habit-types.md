@@ -5,6 +5,11 @@
 > **Feature:** B3 (habit types) + S13 (numeric stepper), **scoped to two of four types**
 > **Supersedes:** nothing. **Refines:** nothing.
 > **Schema:** additive - `Habit.type`, `Habit.unit`, `Habit.targetValue`, `HabitLog.value`. No Dexie version bump.
+>
+> **Update 2026-10-19:** `avoid` is **no longer deferred** — its violation state shipped as
+> `S9` (clean/slip controls, a slip written as `HabitLog.value = 1`, `isHabitSlipped`,
+> `HabitStore.markHabitSlip`). Section 2's deferral of `avoid` records the decision at
+> 2026-10-17, not the current state; `timelimit` remains deferred. See `main_plan.md` `S9`.
 
 Required by `AGENTS.md` non-negotiable 2: schema changes are additive by default and need an ADR.
 
