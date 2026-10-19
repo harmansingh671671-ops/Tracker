@@ -921,12 +921,15 @@ export function PlannerContent() {
               setIsDistributionModalOpen(true);
             }
           }}
-          className="p-2.5 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer group shadow-sm relative"
+          className="p-3.5 rounded-2xl bg-surface-container-low/95 border border-outline/[0.08] hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer space-y-2.5 group shadow-sm"
         >
-          {/* The Clock icon + label header was removed on owner instruction;
-              the arrow is all that identifies this as tappable now, so it
-              overlays the card's right edge instead of owning a row. */}
-          <ChevronRight className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-1 font-mono text-on-surface-variant text-[11px]">
+              <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant/60 group-hover:text-primary transition-colors" />
+            </div>
+          </div>
 
           {/* Daily Allocation bar — 24 one-hour slices, left to right = 00:00 →
               23:00, so the strip reads as the day instead of five buckets with
