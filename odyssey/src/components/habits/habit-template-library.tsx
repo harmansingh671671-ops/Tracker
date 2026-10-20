@@ -458,7 +458,7 @@ export function HabitTemplateLibrary({
 
       {/* 2. Sticky Header: Full-width Search Bar + Dynamically Expanding '+' Button + Category Chips */}
       <div
-        className={`sticky top-0 z-20 bg-surface-container/95 backdrop-blur-md pt-0.5 pb-2 space-y-2 transition-all duration-300 ${
+        className={`sticky top-0 z-20 bg-surface-container/97 pt-0.5 pb-2 space-y-2 transition-all duration-300 ${
           isScrolled
             ? "border-b border-outline/15 shadow-sm shadow-black/10"
             : "border-b border-transparent"

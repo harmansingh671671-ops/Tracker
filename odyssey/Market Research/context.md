@@ -706,6 +706,23 @@ tsc 0, eslint 0 errors (touched files), 31 suites / 482 tests, build clean,
 the round-3 "nothing ever overflows" claim is now obsolete by design.
 
 
+**PERF-7 round 2 - scroll-jank sources deleted on owner request (SHIPPED):**
+owner report: scrolling/lag feels janky. Biggest contributors hunted by
+surface: (1) the fixed app header and bottom nav each ran a live
+`backdrop-blur-md` pass that re-sample the scrolling content underneath every
+frame - both are near-opaque tints now with NO blur; same treatment for the
+day-schedule, template-library and onboarding sticky headers. (2) The
+heatmap painted a multi-layer `boxShadow` on EVERY completed cell of its
+~365-cell matrix - the always-on faint glow is gone, emphasis stays on the
+opened-day ring and today. (3) `background-attachment: fixed` on the body
+(its paint couples to every scroll frame on desktop engines). The
+day-schedule category picker's 24 `data-blur-essential` cards are untouched -
+the picker z-order fix depends on that blur as the containing block. Gates:
+eslint 0 errors (touched files), tsc 0, 31 suites / 482 tests, `next build`
+compiled clean. Not visually verified per-pixel (headless only) and no
+device FPS measurement (the PERF-7 gfxinfo clause remains owed).
+
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -730,10 +747,11 @@ the round-3 "nothing ever overflows" claim is now obsolete by design.
 
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** B4 round 4 (translate, options flush outside the card) committed on top of B4 round 3 (counted locked options panel), `d9e396f` (BUG-18 shared-clock getServerSnapshot fix), `68e0b73` (other session, C2 drag/swipe reliability) and `187c57f` (B4 round 2): features + docs in one commit per the commit sequence. On `main`; **the agent never pushes — the owner pushes.** Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **HEAD:** PERF-7 round 2 (scroll-jank deletes) on top of `9093647` (B4 round 4), `aa66b7a` (B4 round 3), `d9e396f` (BUG-18), `68e0b73` (other session, C2), `187c57f` (B4 round 2). On `main`; **the agent never pushes - the owner pushes.** Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **Working tree (2026-10-20):** clean after this commit; the heatmap render-isolation refactor (React.memo grid, per-habit store selectors, delegated cell clicks) is NEXT, in flight on top of this commit.
 - **Working tree (2026-10-20):** clean after the round-4 commit; explicit paths only, other session's files never touched.
 - **Working tree (2026-10-20):** clean after the round-3 commit. The other session's previously-uncommitted file (`timeline-hour-slot.tsx`) landed in their `68e0b73` — no foreign files left. Expect more commits from them mid-feature; re-check `git status --short` and log before every commit and stage explicit paths only.
-- **Gates (B4 round 4):** tsc 0; eslint 0 errors (touched files); 31 suites / 482 tests; production build clean, 13 routes.
+- **Gates (PERF-7 round 2):** tsc 0; eslint 0 errors (touched files); 31 suites / 482 tests; `next build` compiled clean.
 - **Next:** no pre-approved queue. Candidates in plan order when the owner picks:
   `B13` (pause/archive + the 14-day inactive prompt), `B1` (searchable template
   library), finishing `B2`'s missing form fields. Wallpaper / `B5` stays on

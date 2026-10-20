@@ -887,7 +887,9 @@ function DayScheduleContent() {
   return (
     <div className="min-h-screen bg-background text-on-surface pb-16">
       {/* HEADER — back to journey, title, progress ring */}
-      <header className="sticky top-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md px-4 py-2.5 transition-all duration-200 border-b border-outline/10">
+      {/* No backdrop-blur: sticky bar re-samplings were live scroll jank on
+          Android; near-opaque tint keeps the separation. */}
+      <header className="sticky top-0 z-40 bg-surface-container-lowest/97 px-4 py-2.5 transition-all duration-200 border-b border-outline/10">
         <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
           {/* Back Button */}
           <button

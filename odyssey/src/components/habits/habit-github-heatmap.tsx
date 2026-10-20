@@ -354,9 +354,10 @@ export function HabitGitHubHeatmap({
                           boxShadow = `0 0 0 1.5px rgba(255,255,255,0.9), 0 0 0 2.5px ${habitColor}, 0 0 6px ${habitColor}`;
                         } else if (day.isToday) {
                           boxShadow = `0 0 0 1px rgba(255,255,255,0.8), 0 0 4px ${habitColor}80`;
-                        } else {
-                          boxShadow = `0 0 3px ${habitColor}50`;
                         }
+                        /* No glow on other completed cells: painting a shadow
+                           on ~360 cells of every matrix is live scroll-jank;
+                           the opened / today rings carry the emphasis. */
                       } else {
                         // Unscheduled / rest-day completed
                         backgroundColor = `${habitColor}80`;
@@ -365,8 +366,6 @@ export function HabitGitHubHeatmap({
                         borderStyle = "solid";
                         if (day.isOpened) {
                           boxShadow = `0 0 0 1.5px rgba(255,255,255,0.85), 0 0 0 2.5px ${habitColor}, 0 0 6px ${habitColor}75`;
-                        } else {
-                          boxShadow = `0 0 3px ${habitColor}45`;
                         }
                       }
                     } else if (isNotScheduled) {

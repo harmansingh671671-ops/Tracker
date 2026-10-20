@@ -316,7 +316,8 @@
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
     background: var(--body-bg);
-    background-attachment: fixed;
+    /* No background-attachment: fixed -- on desktop engines it couples the
+       body's paint to every scroll frame (a scroll-jank classic). */
     color: var(--on-surface);
   }
 

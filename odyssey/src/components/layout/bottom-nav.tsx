@@ -16,7 +16,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 w-full z-40 pb-safe bg-surface-container-lowest/90 backdrop-blur-md border-t border-outline/10">
+    /* No backdrop-blur -- same scroll-jank reason as the fixed header. */
+    <nav className="fixed bottom-0 w-full z-40 pb-safe bg-surface-container-lowest/97 border-t border-outline/10">
       <div className="h-[var(--app-nav-h)] px-1 flex items-center justify-around max-w-xl sm:max-w-2xl mx-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.path;
