@@ -53,6 +53,13 @@ export interface HeatmapGridProps {
   /** colIndex -> month label (built by the wrapper's data memo). */
   monthHeaderByCol: Record<number, string>;
   habitColor: string;
+  /**
+   * M26: optional pager controls rendered flanking the month-label band.
+   * Nodes are built in the wrapper (memoised), so the grid's React.memo
+   * stays valid; the grid only positions them.
+   */
+  headerLeftSlot?: React.ReactNode;
+  headerRightSlot?: React.ReactNode;
 }
 
 const CELL = "w-[11.5px] h-[11.5px] sm:w-[12.5px] sm:h-[12.5px] rounded-[2.5px]";
@@ -187,11 +194,16 @@ export const HeatmapGrid = memo(function HeatmapGrid({
   columns,
   monthHeaderByCol,
   habitColor,
+  headerLeftSlot,
+  headerRightSlot,
 }: HeatmapGridProps) {
   return (
-    <div className="inline-flex flex-col min-w-max">
-      {/* Top month labels aligned with week columns */}
-      <div className={`flex items-end mb-1 ${GAP} h-[12px] sm:h-[13px]`}>
+    <div className="flex flex-col w-full">
+      {/* Top month labels aligned with week columns. M26: this band spans the
+          CARD row (not just the matrix) so the pager arrows can flank it at
+          the card's edges and spend the dead space the windowing freed. */}
+      <div className={`flex items-center mb-1 ${GAP} h-6`}>
+        <div className="shrink-0">{headerLeftSlot ?? null}</div>
         {columns.map((_, colIdx) => {
           const header = monthHeaderByCol[colIdx];
           return (
@@ -213,13 +225,16 @@ export const HeatmapGrid = memo(function HeatmapGrid({
           className="w-[11.5px] sm:w-[12.5px] shrink-0 select-none"
           aria-hidden="true"
         />
+        {/* Dead space between the matrix and the right arrow. */}
+        <div className="flex-1" />
+        <div className="shrink-0">{headerRightSlot ?? null}</div>
       </div>
 
       {/* The window's week columns, 7 square dots each (Mon top, Sun bottom);
           the wrapper slices them out of the full year. One delegated click
           handler on the wrapper resolves the day from data-* attrs —
           no per-cell handler props. */}
-      <div className={`flex ${GAP}`}>
+      <div className={`flex ${GAP} self-start`}>
         {columns.map((colDays, colIdx) => (
           <div key={colIdx} className={`flex flex-col ${GAP} shrink-0`}>
             {colDays.map((day) => cellFragment(day, habitColor))}

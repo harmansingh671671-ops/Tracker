@@ -270,6 +270,45 @@ export function HabitGitHubHeatmap({
   const atOldest = windowStart === 0;
   const atNewest = windowStart === windowMaxStart;
 
+  // M26: the pager buttons flank the month-label band inside the grid.
+  // Memoised so the grid's React.memo never sees a fresh node identity.
+  const pagerLeft = useMemo(() => {
+    if (windowMaxStart === 0) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => pageWindow(-1)}
+        disabled={atOldest}
+        aria-label="4 weeks earlier"
+        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+          atOldest
+            ? "text-on-surface-variant/25"
+            : "text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface cursor-pointer"
+        }`}
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+    );
+  }, [windowMaxStart, atOldest, pageWindow]);
+  const pagerRight = useMemo(() => {
+    if (windowMaxStart === 0) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => pageWindow(1)}
+        disabled={atNewest}
+        aria-label="4 weeks later"
+        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+          atNewest
+            ? "text-on-surface-variant/25"
+            : "text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface cursor-pointer"
+        }`}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    );
+  }, [windowMaxStart, atNewest, pageWindow]);
+
   // The delegated handlers: one `mousedown`/`touchstart` stop so the card's
   // gesture shell never arms from a touch inside the matrix (its spacer in
   // the habits page does this too — belt and braces for the other callers),
@@ -331,47 +370,15 @@ export function HabitGitHubHeatmap({
         </div>
       )}
 
-      {/* M25 week pager: hidden entirely when everything fits the window.
-          Sits on its own row so it can never fight the matrix for width. */}
-      {windowMaxStart > 0 && (
-        <div className="flex items-center justify-end gap-0.5 pr-0.5">
-          <button
-            type="button"
-            onClick={() => pageWindow(-1)}
-            disabled={atOldest}
-            aria-label="4 weeks earlier"
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-              atOldest
-                ? "text-on-surface-variant/25"
-                : "text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface cursor-pointer"
-            }`}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => pageWindow(1)}
-            disabled={atNewest}
-            aria-label="4 weeks later"
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-              atNewest
-                ? "text-on-surface-variant/25"
-                : "text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface cursor-pointer"
-            }`}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {/* Main Heatmap Container with Fixed Left Day Labels & Windowed Grid.
-          NO inner scroller (M25): the 16-week window fits the card, so a
+          The pager flanks the month-label band inside the grid (M26); there
+          is NO inner scroller (M25): the 16-week window fits the card, so a
           vertical touch anywhere here is page scroll. */}
       <div className="flex items-start w-full relative">
         {/* FIXED LEFT DAY-OF-WEEK LABELS (M, W, F, S) */}
-        <div className="flex flex-col shrink-0 pr-1.5 select-none z-10">
-          {/* Header Spacer matching Month Headers row height */}
-          <div className="h-[12px] sm:h-[13px] mb-1 shrink-0" />
+        <div className="flex flex-col shrink-0 pr-1 select-none z-10">
+          {/* Header Spacer matching the month band height */}
+          <div className="h-6 mb-1 shrink-0" />
 
           {/* Fixed 7-Row Day-of-Week Labels */}
           <div className={`flex flex-col gap-[2.5px] sm:gap-[3px] shrink-0`}>
@@ -402,6 +409,8 @@ export function HabitGitHubHeatmap({
             columns={windowedColumns}
             monthHeaderByCol={windowedHeaderByCol}
             habitColor={habitColor}
+            headerLeftSlot={pagerLeft}
+            headerRightSlot={pagerRight}
           />
         </div>
       </div>
