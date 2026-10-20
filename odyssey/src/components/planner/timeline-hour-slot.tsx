@@ -52,10 +52,13 @@ interface TimelineHourSlotProps {
  * How long a finger has to rest on a block before it owns the gesture. Below
  * this, a moving finger is scrolling the day and must not move anything.
  */
-const HOLD_TO_DRAG_MS = 250;
+const HOLD_TO_DRAG_MS = 150;
 
 /** The movement that turns a press into a page scroll rather than a grab. */
 const DRAG_SLOP_PX = 10;
+
+/** Drift threshold while waiting for the hold: covers browser scroll slop (~10px). */
+const HOLD_DRIFT_PX = 12;
 
 export function TimelineHourSlot({
   slot,
@@ -167,19 +170,19 @@ export function TimelineHourSlot({
       const ds = dragStateRef.current;
       if (!ds) return;
       if (ds.armed) { e.preventDefault(); return; }
-      // Still waiting for the grab: let a passing finger scroll, but stop tiny
-      // drift from starting one -- on a real phone that drift is what fires
-      // pointercancel and kills the hold before it can arm.
+      // Still waiting for the grab: veto drift up to the browser's scroll slop
+      // so the hold can arm. Once drift exceeds HOLD_DRIFT_PX the browser will
+      // start scrolling and pointercancel will clean up.
       const t = e.touches && e.touches[0];
       if (t) {
         const dx = t.clientX - ds.startX;
         const dy = t.clientY - ds.startY;
-        if (Math.hypot(dx, dy) < 8) e.preventDefault();
+        if (Math.hypot(dx, dy) < HOLD_DRIFT_PX) e.preventDefault();
       }
     };
     el.addEventListener("touchmove", vetoScroll, { passive: false });
     return () => el.removeEventListener("touchmove", vetoScroll);
-  }, []);
+  }, [slot.isCustom]);
 
   const cat = getPlannerCatStyle(slot.category, slot.isCustom);
   const CatIcon = cat.Icon;
@@ -190,8 +193,8 @@ export function TimelineHourSlot({
       return;
     }
     // Edit is opened by a right-to-left swipe, not a tap. A swipe needs no hold
-    // (it never fought the page's scroll); only a vertical drag waits for the grab.
-    // See onPointerMove.
+    // (it never fought the page's scroll); only a vertical drag waits for the
+    // 150 ms grab. See onPointerMove.
     return;
     if (isPastHour) {
       if (isLongPressTriggeredRef.current) {
@@ -308,8 +311,8 @@ export function TimelineHourSlot({
             // scroll, so it needs no hold. A vertical drag is the one that
             // competes with scrolling, so it still waits for the grab.
             if (ds.isDrag && !ds.armed) {
-              cancelGrab();
-              dragStateRef.current = null;
+              // Don't cancel the hold -- the veto will suppress scroll drift
+              // up to HOLD_DRIFT_PX. Let the hold timer finish arming.
               return;
             }
             ds.moved = true;
@@ -527,8 +530,9 @@ export function TimelineHourSlot({
   // Open / Unscheduled Slot
   return (
     <div
+      ref={rootRef}
       key={`slot-${slot.hour}`}
-        data-hour={slot.hour}
+      data-hour={slot.hour}
       onClick={handleSlotClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -538,7 +542,73 @@ export function TimelineHourSlot({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onContextMenu={(e) => e.preventDefault()}
-      className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
+      onPointerDown={(e) => {
+        const isMouse = e.pointerType === "mouse";
+        cancelGrab();
+        dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, armed: isMouse, prevTargetEl: null, isSwipe: false, isDrag: false, dx: 0 };
+        if (!isMouse) grabTimerRef.current = setTimeout(armGrab, HOLD_TO_DRAG_MS);
+      }}
+      onPointerMove={(e) => {
+        const ds = dragStateRef.current;
+        if (!ds) return;
+        const dx = e.clientX - ds.startX;
+        const dy = e.clientY - ds.startY;
+        if (!ds.moved && Math.hypot(dx, dy) < DRAG_SLOP_PX) return;
+        if (!ds.moved) {
+          ds.isSwipe = Math.abs(dx) > Math.abs(dy);
+          ds.isDrag = !ds.isSwipe;
+          if (ds.isDrag && !ds.armed) {
+            return;
+          }
+          ds.moved = true;
+          justDraggedRef.current = true;
+          cancelGrab();
+          setIsDragging(true);
+          ds.dx = dx;
+          try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
+        }
+        ds.dx = e.clientX - ds.startX;
+        if (ds.isSwipe && rootRef.current) {
+          rootRef.current.style.transition = "none";
+          rootRef.current.style.transform = `translateX(${ds.dx}px)`;
+        }
+        e.preventDefault();
+      }}
+      onPointerUp={() => {
+        const ds = dragStateRef.current;
+        cancelGrab();
+        if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
+        const wasMoved = !!ds?.moved;
+        if (wasMoved) {
+          justDraggedRef.current = true;
+          setTimeout(() => { justDraggedRef.current = false; }, 100);
+          if (ds?.isSwipe && rootRef.current) {
+            rootRef.current.style.transition = "transform 0.18s ease";
+            rootRef.current.style.transform = ds.dx < 0 ? "translateX(-18px)" : "translateX(0)";
+            setTimeout(() => {
+              if (rootRef.current) {
+                rootRef.current.style.transition = "";
+                rootRef.current.style.transform = "";
+              }
+            }, 180);
+            if (ds.dx < 0) {
+              setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
+            }
+          }
+        }
+        dragStateRef.current = null;
+        setIsDragging(false);
+        setDragTarget(null);
+      }}
+      onPointerCancel={() => {
+        const ds = dragStateRef.current;
+        cancelGrab();
+        if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
+        dragStateRef.current = null;
+        setIsDragging(false);
+        setDragTarget(null);
+      }}
+      className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y [-webkit-touch-callout:none] transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
         isRecentlySaved
           ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
           : isCurrent
