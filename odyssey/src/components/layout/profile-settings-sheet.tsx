@@ -10,6 +10,7 @@ import { getDaysDoneLabel } from "@/lib/utils/warm-copy";
 import { checkForAppUpdate, downloadAndInstallNativeApk, getNativeAppVersion } from "@/lib/utils/android-bridge";
 import { HeadsUpAlertsCard } from "@/components/settings/heads-up-alerts-card";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
+import { localDateStr } from "@/lib/utils/local-date";
 import { X, Bell, Moon, Sun, Database, Download, Upload, CheckCircle, ShieldCheck, Smartphone, RefreshCw, Palette, Image as ImageIcon } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { LocalDataTrustBadge } from "@/components/common/local-data-trust-badge";
@@ -75,7 +76,7 @@ export function ProfileSettingsSheet({ isOpen, onClose }: ProfileSettingsSheetPr
       const url = URL.createObjectURL(exportBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `odyssey-backup-${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `odyssey-backup-${localDateStr()}.json`;
       a.click();
       URL.revokeObjectURL(url);
       showToast("Backup JSON exported successfully.");

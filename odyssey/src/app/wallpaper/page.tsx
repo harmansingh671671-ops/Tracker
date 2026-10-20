@@ -10,6 +10,7 @@ import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
+import { localDateStr } from "@/lib/utils/local-date";
 import { type WallpaperData } from "@/lib/utils/wallpaper-generator";
 import { WallpaperPreview } from "@/components/wallpaper/wallpaper-preview";
 import {
@@ -113,7 +114,7 @@ export default function WallpaperPage() {
 
   useEffect(() => {
     fetchUser();
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = localDateStr();
     // Habits are keyed by userId. Fetching under the literal "default" id
     // matched nothing and hit fetchHabits' "load everything" fallback, so the
     // preview briefly showed every habit against zero of the user's logs.

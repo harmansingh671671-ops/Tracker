@@ -7,10 +7,12 @@ export type { Profile };
 export { RANKS, calculateRank, resetAllDataToZero };
 
 export async function getOrCreateUser(): Promise<Profile> {
-  const users = await db.profiles.toArray();
+  // Use first() instead of toArray()[0] for deterministic profile selection.
+  // toArray() order is not guaranteed by Dexie; first() reads the primary-key
+  // order which is stable and what we actually want.
+  const user = await db.profiles.toCollection().first();
   
-  if (users.length > 0) {
-    const user = users[0];
+  if (user) {
     // If the database has the old hardcoded demo values (240 diamonds, 14 streak), reset to zero start
     if (user.diamonds === 240 && user.streak === 14 && user.militaryRank === 'Scholar') {
       return await resetAllDataToZero();

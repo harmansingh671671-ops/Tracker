@@ -809,9 +809,19 @@ errors); screenshot confirms the trailing room. Gates: tsc 0, eslint clean
 
 **BUG-18 (SHIPPED):** `useSharedClock` threw "The result of getServerSnapshot should be cached to avoid an infinite loop" on the habits screen (React 18 `useSyncExternalStore` requirement). **Cause:** `getServerSnapshot` returned a fresh `new Date()` per call; React demands a cached instance. **Fix:** server snapshot is now a single module-level `Date` created once; `getSnapshot` already correct (returns the store's `currentNow`, mutated only on minute ticks). Nothing renders a live clock server-side, so one fixed instant is fine; first client tick corrects. Verified: zero error hits on `/habits` against hot-reloaded dev server (double load). src: `src/lib/utils/shared-clock.ts`.
 
+**BUG-6 (SHIPPED):** `getOrCreateUser()` fixed to use `db.profiles.toCollection().first()` instead of `toArray()[0]`. `toArray()` order is not guaranteed by Dexie; with multiple profiles the app could load the wrong one. `first()` reads in primary-key order — stable and deterministic. No data migration, only the read path changes. Gates: tsc 0, lint 0 errors, 491 tests, build clean.
+
+**BUG-11 (3/4 sites SHIPPED):** Three UTC-date keys converted to local date — the pattern `toISOString().split("T")[0]` was found by grep and each site confirmed:
+- `app/api/app-version/route.ts`: releaseDate fallback now uses `localDateStr()`
+- `app/wallpaper/page.tsx`: todayStr for habit/block queries now uses `localDateStr()`
+- `components/layout/profile-settings-sheet.tsx`: backup filename now uses `localDateStr()`
+Held: `app/page.tsx` (landing screen) — overlaps possible S-series morning energy check-in; not verified as buggy, only flagged.
+New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server Components); `shared-clock.ts` re-exports for client consumers. Gates: tsc 0, lint 0 errors, 491 tests, build clean.
+
+
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** M27 fix (day-label alignment) on top of `f297632` (M27 centering), `4fdd169` (M26), `4d880a8` (M25), `a0131b1` (M24), `cef86c3` (PERF-19), `c694708` (PERF-7 round 2); earlier unpushed: `187c57f`, `68e0b73`, `d9e396f` (other session).
+- **HEAD:** BUG-6 + BUG-11 (3/4 sites) on top of BUG-18, BUG-10, B4, C2, M27 (other session). Working tree clean.
 - **Gates (S3 decline):** docs-only commit \u2014 main_plan.md + context.md; no code touched, no build run (nothing to build).
 - **Gates (M27 fix):** tsc 0; eslint clean (touched file); 32 suites / 491 tests; `next build` compiled clean; align-probe reports exact 0 offset; PERF-19 harness full green; port 3100 killed both runs.
 - **Gates (M27):** tsc 0; eslint clean (touched files); 32 suites / 491 tests; `next build` compiled clean; PERF-19 harness full green (windowed cells, pager, swipe-through, zero console errors); wide + narrow screenshots verified; port 3100 killed both runs.

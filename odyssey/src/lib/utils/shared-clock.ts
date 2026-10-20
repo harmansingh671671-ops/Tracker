@@ -15,6 +15,9 @@
 
 import { useSyncExternalStore } from "react";
 
+// Re-export local date/time formatters (no React, safe for Server Components)
+export { localDateStr, localTimeStr, localTimeStrWithSeconds } from "./local-date";
+
 /** One minute, in ms. The clock's resolution. */
 export const MINUTE_MS = 60_000;
 
@@ -94,35 +97,6 @@ export function useSharedClockPrecise(): Date {
   // For now this is the same source; if a true per-second tick is ever
   // needed again we can add a second store with a 1 s timer.
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-}
-
-/** Milliseconds until the next minute boundary. */
-export function msUntilNextMinute(now: Date = new Date()): number {
-  const ms = MINUTE_MS - (now.getTime() % MINUTE_MS);
-  return ms === 0 ? MINUTE_MS : ms;
-}
-
-/** `YYYY-MM-DD` in local time. */
-export function localDateStr(d: Date = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** `HH:MM` in local time. */
-export function localTimeStr(d: Date = new Date()): string {
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-/** `HH:MM:SS` in local time. */
-export function localTimeStrWithSeconds(d: Date = new Date()): string {
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
 }
 
 export { MINUTE_MS as minuteMs };

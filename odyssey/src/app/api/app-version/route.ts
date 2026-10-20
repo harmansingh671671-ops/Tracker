@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logWarn } from "@/lib/utils/logger";
+import { localDateStr } from "@/lib/utils/local-date";
 import versionConfig from "../../../../version.json";
 
 export interface AppVersionInfo {
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     versionCode: versionConfig.versionCode || 8,
     versionName: versionConfig.versionName || "1.3.3",
     apkUrl: `${origin}/downloads/odyssey-latest.apk`,
-    releaseDate: versionConfig.releaseDate || new Date().toISOString().split("T")[0],
+    releaseDate: versionConfig.releaseDate || localDateStr(),
     mandatory: Boolean(versionConfig.mandatory),
     changelog: Array.isArray(versionConfig.changelog) ? versionConfig.changelog : [
       "Smart Live Date Engine: Automatically opens today's live schedule on app start and midnight rollover",
