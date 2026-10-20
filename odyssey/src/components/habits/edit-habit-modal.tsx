@@ -330,7 +330,6 @@ export function EditHabitModal({
                 targetValue={habit.targetValue}
                 selectedDate={selectedHistoryDate}
                 todayStr={today}
-                showLegend={false}
                 showStats={true}
                 onSelectDate={(dateStr) => {
                   setSelectedHistoryDate(dateStr);

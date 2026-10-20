@@ -494,6 +494,16 @@ export default function HabitsPage() {
     await markHabitSlip(userId, habit.id, date, !isSlipped);
   }, [userId, isFutureSelectedDate, markHabitSlip]);
 
+  // PERF-19: the heatmap's delegated tap-to-toggle now arrives with the
+  // habitId first, so ONE stable callback can serve every matrix on the page
+  // instead of a fresh closure per card per render (which would defeat the
+  // matrix's React.memo).
+  const handleHeatmapCellToggle = useCallback(
+    (habitId: string, dateStr: string, e: React.MouseEvent | React.TouchEvent) =>
+      handleToggle(habitId, dateStr, e),
+    [handleToggle]
+  );
+
   // B4 gesture handlers — consumed by `HabitGestureCard`, which replaces the
   // removed hold-to-edit plumbing above.
   //
@@ -968,8 +978,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
                       selectedDate={selectedDate}
                       todayStr={todayStr}
                       showStats={false}
-                      onSelectDate={(newDate) => setSelectedDate(newDate)}
-                      onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
+                      onSelectDate={setSelectedDate}
+                      onToggleDate={handleHeatmapCellToggle}
                     />
                   </div>
                 </HabitGestureCard>

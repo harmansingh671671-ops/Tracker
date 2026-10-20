@@ -723,6 +723,43 @@ compiled clean. Not visually verified per-pixel (headless only) and no
 device FPS measurement (the PERF-7 gfxinfo clause remains owed).
 
 
+
+**PERF-19 — heatmap re-render isolation + one delegated click (SHIPPED):**
+owner brief: the ~365-cell 52-week matrix re-rendered entirely whenever any
+unrelated parent state changed, and mounted a click listener + a tooltip on
+every cell. Canvas was evaluated and rejected — 365 static DOM nodes are
+inside the compositor budget once re-renders are isolated, and DOM keeps theme
+tokens, focusability and screen-reader names — so the fix is isolation + paint
+diet. New architecture: the grid became a PURE memoized component
+(`habit-heatmap-grid.tsx`: no hooks, no store access; one data memo bakes every
+day’s fill/flags and the counted partial ratio) behind a thin wrapper
+(`habit-github-heatmap.tsx`) that subscribes to PER-HABIT store slices
+(`s.historyLogs[habitId]`, `s.historyValues[habitId]`) — safe because the habit
+store replaces each habit’s map object on write to that habit only, so another
+habit’s completion runs nobody else’s selectors. ONE click listener on the
+scroll container resolves the day via `data-date`/`data-future` (was per-cell);
+per-cell `title` dropped for a compact `aria-label`, `hover:*` and
+`transition-all` dropped, dead `showLegend` removed; the page serves all cards
+through a single stable toggle callback. The interaction contract is verified
+unchanged: clicking a NON-selected day first selects it; a second click toggles.
+Functional check on the seeded production build (headless Chrome, 2 habits incl.
+a counted partial): 728 cells render, select → complete → un-complete →
+future-day select all resolve through the single delegated handler, partial
+alpha 0.576 (value 2 of 4), zero console errors/warnings. **Durable lesson for
+verify scripts:** the app auto-creates its own Lv.1 profile on first load and
+`getOrCreateUser` takes `users[0]` — a seed that merely ADDS a profile loses
+(the page never shows seed-user habits); the seed must CLEAR profiles (and
+habit logs) before its puts. Also: the 52-week matrix ends at the current
+week’s Sunday, so future-day cells only exist within the current week; and a
+completed cell serializes as `rgb(...)` while tints/partials are `rgba(...,
+alpha)` — a parser must look at background-color specifically or the
+box-shadow’s alpha matches first. Gates: tsc 0, eslint 0 errors (touched files;
+3 pre-existing unrelated warnings in edit-habit-modal), 31 suites / 482 tests,
+`next build` clean. Still owed: device-side FPS/jank measurement (same bucket
+as the PERF-0/9 gfxinfo check); isolation is code-verified, not
+render-count-verified.
+
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -747,7 +784,9 @@ device FPS measurement (the PERF-7 gfxinfo clause remains owed).
 
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** PERF-7 round 2 (scroll-jank deletes) on top of `9093647` (B4 round 4), `aa66b7a` (B4 round 3), `d9e396f` (BUG-18), `68e0b73` (other session, C2), `187c57f` (B4 round 2). On `main`; **the agent never pushes - the owner pushes.** Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **HEAD:** PERF-19 (heatmap isolation + delegation) on top of `c694708` (PERF-7 round 2), `9093647` (B4 round 4), `aa66b7a` (B4 round 3); earlier unpushed: `187c57f`, `68e0b73`, `d9e396f` (other session).
+- **Working tree (2026-10-20):** clean after the PERF-19 commit; 4 touched files + new `habit-heatmap-grid.tsx` staged by explicit path; the other session’s files never touched.
+- **Gates (PERF-19):** tsc 0; eslint 0 errors (touched files; 3 pre-existing unrelated warnings in edit-habit-modal); 31 suites / 482 tests; `next build` compiled clean; functional browser check green (728 cells, select/complete/un-complete/future-select all through the one delegated handler, counted partial alpha 0.576, zero console errors).
 - **Working tree (2026-10-20):** clean after this commit; the heatmap render-isolation refactor (React.memo grid, per-habit store selectors, delegated cell clicks) is NEXT, in flight on top of this commit.
 - **Working tree (2026-10-20):** clean after the round-4 commit; explicit paths only, other session's files never touched.
 - **Working tree (2026-10-20):** clean after the round-3 commit. The other session's previously-uncommitted file (`timeline-hour-slot.tsx`) landed in their `68e0b73` — no foreign files left. Expect more commits from them mid-feature; re-check `git status --short` and log before every commit and stage explicit paths only.
@@ -759,3 +798,4 @@ device FPS measurement (the PERF-7 gfxinfo clause remains owed).
 - **Verify artifacts:** `%TEMP%\opencode\verify\` (`perf16-smoke.js`,
   `rail-check.js`, `verify-perf5.js`, `verify-c2-hold*.js`); Chrome path and seed
   keys as recorded above.
+- **PERF-19 verify artifacts:** `%TEMP%\opencode\verify\perf19\` (`verify-perf19.js` + its `seed.js`; the seed must clear `profiles` first — see the durable lesson in the PERF-19 entry).

@@ -1,12 +1,41 @@
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
+/**
+ * PERF-19 — the wrapper of `HeatmapGrid` (which holds the render half). This
+ * file is where the re-render isolation happens:
+ *
+ * - State is read through **per-habit zustand slices** —
+ *   `s.historyLogs[habitId]` / `s.historyValues[habitId]` — not the whole
+ *   store. The store replaces a habit's map object only when THAT habit is
+ *   written, so a log on one habit no longer re-renders every matrix on the
+ *   page, and profile/wallet/clock updates do not either.
+ * - All 365-day data building happens in ONE `useMemo` keyed on those
+ *   slices; the per-day objects carry every flag and the counted
+ *   partial-fill ratio, so the memoized grid render is a pure function of a
+ *   stable payload.
+ * - One delegated `click` handler resolves the tapped day from `data-*`
+ *   attributes (no per-cell handler props), and `mousedown`/`touchstart` are
+ *   stopped once at the container so the enclosing card's hold/swipe
+ *   gestures never arm from a touch inside the matrix.
+ *
+ * There are no hover states and no tooltips by brief (see the grid comment);
+ * the old per-cell `title` strings survive as short `aria-label`s.
+ */
+
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
-import { completionRatio, partialFillAlpha } from "@/lib/utils/habit-completion";
+import { completionRatio } from "@/lib/utils/habit-completion";
 import type { Habit } from "@/lib/db";
+import {
+  HeatmapGrid,
+  type HeatmapDay,
+} from "@/components/habits/habit-heatmap-grid";
+
+const EMPTY_LOGS: Record<string, boolean> = {};
+const EMPTY_VALUES: Record<string, number> = {};
 
 export interface HabitGitHubHeatmapProps {
   habitId: string;
@@ -24,27 +53,10 @@ export interface HabitGitHubHeatmapProps {
   weeksCount?: number; // default 52 (full year)
   todayStr?: string;
   onSelectDate?: (dateStr: string) => void;
-  onToggleDate?: (dateStr: string, e: React.MouseEvent) => void;
-  showLegend?: boolean;
+  /** Delegated tap-to-toggle; `habitId` lets ONE stable page callback serve every card. */
+  onToggleDate?: (habitId: string, dateStr: string, e: React.MouseEvent) => void;
   showStats?: boolean;
   className?: string;
-}
-
-interface HeatmapDay {
-  dateStr: string;
-  dayNumber: number;
-  monthShort: string;
-  monthIndex: number;
-  year: number;
-  weekday: string;
-  dayOfWeek: number; // 1=Mon..7=Sun
-  rowIndex: number; // 0=Mon..6=Sun
-  colIndex: number;
-  isScheduled: boolean;
-  isToday: boolean;
-  isOpened: boolean;
-  isFuture: boolean;
-  isCompleted: boolean;
 }
 
 interface MonthHeader {
@@ -69,22 +81,21 @@ export function HabitGitHubHeatmap({
   todayStr: propTodayStr,
   onSelectDate,
   onToggleDate,
-  showLegend = true,
   showStats = true,
   className = "",
 }: HabitGitHubHeatmapProps) {
-  const { user } = useUserStore();
-  const { historyLogs, historyValues, toggleHabitLog } = useHabitStore();
+  // PERF-19: per-habit slices only — the matrix re-renders when THIS habit's
+  // logs/values change or the payload shifts; nothing else re-renders it.
+  const ownLogs = useHabitStore((s) => s.historyLogs[habitId]);
+  const ownValues = useHabitStore((s) => s.historyValues?.[habitId]);
+  const logsMap = ownLogs ?? EMPTY_LOGS;
+  const valuesMap = ownValues ?? EMPTY_VALUES;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const habitColor = useMemo(
     () => getHabitColor({ category, name, id: habitId }),
     [category, name, habitId]
   );
-
-  // Counted progress per date, for the water-in-the-bucket fill (`B17`). Read
-  // here rather than in the matrix memo because only the render needs it.
-  const valuesMap = historyValues[habitId] ?? {};
 
   const today = propTodayStr || getLocalTodayStr();
   const activeSelectedDate = selectedDate || today;
@@ -100,14 +111,9 @@ export function HabitGitHubHeatmap({
     return [1, 2, 3, 4, 5, 6, 7];
   }, [targetDays, targetDaysPerWeek]);
 
-  // Compute 52-week continuous GitHub-style matrix ending on current week's Sunday
-  const {
-    columns,
-    monthHeaders,
-    totalCompletions,
-    scheduledElapsedCount,
-    percentage,
-  } = useMemo(() => {
+  // ONE pass builds every day object (all flags + the counted partial-fill
+  // ratio) and the month-header lookup — the grid just renders its output.
+  const { columns, headerByCol, totalCompletions, percentage } = useMemo(() => {
     const [ty, tm, td] = today.split("-").map(Number);
     const todayDate = new Date(ty, tm - 1, td);
 
@@ -126,7 +132,8 @@ export function HabitGitHubHeatmap({
       endSunday.getDate() - (numWeeks * 7 - 1)
     );
 
-    const habitLogsMap = historyLogs[habitId] || {};
+    const subject = { type, targetValue };
+    const headerByCol: Record<number, string> = {};
     const cols: HeatmapDay[][] = [];
     const headers: MonthHeader[] = [];
 
@@ -137,8 +144,8 @@ export function HabitGitHubHeatmap({
 
     for (let c = 0; c < numWeeks; c++) {
       const colDays: HeatmapDay[] = [];
-      let colNewMonthName = "";
       let colHasMonthStart = false;
+      let colNewMonthName = "";
 
       for (let r = 0; r < 7; r++) {
         const dayOffset = c * 7 + r;
@@ -159,12 +166,20 @@ export function HabitGitHubHeatmap({
         const isToday = dateStr === today;
         const isOpened = dateStr === activeSelectedDate;
         const isFuture = dateStr > today;
-        const isCompleted = Boolean(habitLogsMap[dateStr]);
+        const isCompleted = Boolean(logsMap[dateStr]);
         const dayOfWeek = r + 1; // 1=Mon..7=Sun
         const isScheduled = effectiveScheduledDays.includes(dayOfWeek);
 
         if (isCompleted) completions++;
-        if (isScheduled && !isFuture) scheduledElapsed++;
+        if (isScheduled && !isFuture && dateStr <= today) scheduledElapsed++;
+
+        // Counted partial fill (`B17`): only counted, scheduled, logged,
+        // incomplete days fill in proportion; zeros stay empty so the
+        // rest-day / dashed styling still reads.
+        const partialRatio =
+          type === "counted" && !isCompleted && isScheduled && !isFuture
+            ? completionRatio(subject, { value: valuesMap[dateStr] })
+            : 0;
 
         // Detect if this column contains the start of a new month
         if (monthIndex !== lastMonthIndex && dayNumber <= 7) {
@@ -188,40 +203,35 @@ export function HabitGitHubHeatmap({
           isOpened,
           isFuture,
           isCompleted,
+          partialRatio,
         });
       }
 
       // Add month header with spacing
       if (colHasMonthStart && c - lastHeaderCol >= 3) {
-        headers.push({
-          label: colNewMonthName,
-          colIndex: c,
-        });
+        headers.push({ label: colNewMonthName, colIndex: c });
+        headerByCol[c] = colNewMonthName;
         lastHeaderCol = c;
       }
 
       cols.push(colDays);
     }
 
-    const pct =
-      scheduledElapsed > 0
-        ? Math.round((completions / scheduledElapsed) * 100)
-        : 0;
-
-    return {
-      columns: cols,
-      monthHeaders: headers,
-      totalCompletions: completions,
-      scheduledElapsedCount: scheduledElapsed,
-      percentage: pct,
+    return { columns: cols, headerByCol, totalCompletions: completions,
+      percentage:
+        scheduledElapsed > 0
+          ? Math.round((completions / scheduledElapsed) * 100)
+          : 0,
     };
   }, [
+    logsMap,
+    valuesMap,
     today,
     weeksCount,
-    historyLogs,
-    habitId,
     activeSelectedDate,
     effectiveScheduledDays,
+    type,
+    targetValue,
   ]);
 
   // Automatically scroll to the right (Today) on mount / date update
@@ -231,37 +241,52 @@ export function HabitGitHubHeatmap({
     }
   }, [today, weeksCount]);
 
-  const handleDayClick = async (
-    e: React.MouseEvent,
-    dateStr: string,
-    isFuture: boolean,
-    _isScheduled: boolean
-  ) => {
-    e.stopPropagation();
+  // The delegated handlers: one `mousedown`/`touchstart` stop so the card's
+  // gesture shell never arms from a touch inside the matrix (its spacer in
+  // the habits page does this too — belt and braces for the other callers),
+  // and ONE click resolution through `data-*` attributes.
+  const onMatrixMouse = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => e.stopPropagation(),
+    []
+  );
 
-    // 1. If clicking a date different from active selected day: select/open that day
-    if (dateStr !== activeSelectedDate) {
-      if (onSelectDate) {
-        onSelectDate(dateStr);
+  const onMatrixClick = useCallback(
+    (e: React.MouseEvent) => {
+      const cell = (e.target as HTMLElement).closest(
+        "[data-date]"
+      ) as HTMLElement | null;
+      if (!cell) return;
+      // Only a real cell click must not fall through to the enclosing card.
+      e.stopPropagation();
+      const dateStr = cell.dataset.date as string;
+      if (dateStr !== activeSelectedDate) {
+        // A different day is being opened, not toggled (future included —
+        // selecting a future day was always allowed; completing it is not).
+        onSelectDate?.(dateStr);
+        return;
       }
-      return;
-    }
-
-    // 2. If clicking on already selected day: toggle completion
-    if (isFuture) return;
-
-    if (onToggleDate) {
-      onToggleDate(dateStr, e);
-    } else if (user) {
-      const isNowCompleted = await toggleHabitLog(user.id, habitId, dateStr);
-      if (isNowCompleted) {
-        triggerStreaksConfetti(e.clientX, e.clientY, habitColor);
+      // Clicking the already-selected day toggles the completion.
+      const isFuture = cell.dataset.future === "1";
+      if (isFuture) return;
+      if (onToggleDate) {
+        onToggleDate(habitId, dateStr, e);
+        return;
       }
-    }
-  };
-
-  const cellClass = "w-[11.5px] h-[11.5px] sm:w-[12.5px] sm:h-[12.5px] rounded-[2.5px]";
-  const gapClass = "gap-[2.5px] sm:gap-[3px]";
+      // Fallback (no parent handler): the store path directly, so callers
+      // like the edit modal still get confetti-streak parity.
+      void (async () => {
+        const user = useUserStore.getState().user;
+        if (!user) return;
+        const isNowCompleted = await useHabitStore
+          .getState()
+          .toggleHabitLog(user.id, habitId, dateStr);
+        if (isNowCompleted) {
+          triggerStreaksConfetti(e.clientX, e.clientY, habitColor);
+        }
+      })();
+    },
+    [activeSelectedDate, onSelectDate, onToggleDate, habitId, habitColor]
+  );
 
   return (
     <div className={`w-full flex flex-col gap-2 pt-1 select-none ${className}`}>
@@ -285,7 +310,7 @@ export function HabitGitHubHeatmap({
           <div className="h-[12px] sm:h-[13px] mb-1 shrink-0" />
 
           {/* Fixed 7-Row Day-of-Week Labels */}
-          <div className={`flex flex-col ${gapClass} shrink-0`}>
+          <div className={`flex flex-col gap-[2.5px] sm:gap-[3px] shrink-0`}>
             {ROW_LABELS.map((label, rIdx) => (
               <div
                 key={rIdx}
@@ -304,170 +329,15 @@ export function HabitGitHubHeatmap({
           ref={scrollRef}
           className="flex-1 overflow-x-auto scrollbar-none select-none pb-1"
           style={{ WebkitOverflowScrolling: "touch" }}
+          onMouseDown={onMatrixMouse}
+          onTouchStart={onMatrixMouse}
+          onClick={onMatrixClick}
         >
-          <div className="inline-flex flex-col min-w-max">
-            {/* Top Month Labels aligned with week columns */}
-            <div className={`flex items-end mb-1 ${gapClass} h-[12px] sm:h-[13px]`}>
-              {columns.map((_, colIdx) => {
-                const header = monthHeaders.find((h) => h.colIndex === colIdx);
-                return (
-                  <div
-                    key={colIdx}
-                    className="w-[11.5px] sm:w-[12.5px] text-[8.5px] sm:text-[9.5px] font-mono font-bold text-on-surface-variant/70 relative shrink-0 leading-none select-none"
-                  >
-                    {header ? (
-                      <span className="absolute left-0 bottom-0 whitespace-nowrap">
-                        {header.label}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 52 Columns of 7 Square Dots (Mon at top, Sun at bottom) */}
-            <div className={`flex ${gapClass}`}>
-              {columns.map((colDays, colIdx) => (
-                <div key={colIdx} className={`flex flex-col ${gapClass} shrink-0`}>
-                  {colDays.map((day) => {
-                    const isNotScheduled = !day.isScheduled;
-
-                    // A counted habit partway to its target fills in proportion
-                    // ("water in the bucket", `B17`). 0 for every other type, 0
-                    // once the day is complete (that renders solid), and 0 on a
-                    // rest day so the dashed rest-day styling still reads.
-                    const partial =
-                      type === "counted" && !day.isCompleted && day.isScheduled
-                        ? completionRatio({ type, targetValue }, { value: valuesMap[day.dateStr] })
-                        : 0;
-
-                    let backgroundColor: string | undefined = undefined;
-                    let borderColor: string | undefined = undefined;
-                    let borderWidth: string | undefined = undefined;
-                    let borderStyle: string | undefined = undefined;
-                    let boxShadow: string | undefined = undefined;
-
-                    if (day.isCompleted) {
-                      if (day.isScheduled) {
-                        backgroundColor = habitColor;
-                        if (day.isOpened) {
-                          boxShadow = `0 0 0 1.5px rgba(255,255,255,0.9), 0 0 0 2.5px ${habitColor}, 0 0 6px ${habitColor}`;
-                        } else if (day.isToday) {
-                          boxShadow = `0 0 0 1px rgba(255,255,255,0.8), 0 0 4px ${habitColor}80`;
-                        }
-                        /* No glow on other completed cells: painting a shadow
-                           on ~360 cells of every matrix is live scroll-jank;
-                           the opened / today rings carry the emphasis. */
-                      } else {
-                        // Unscheduled / rest-day completed
-                        backgroundColor = `${habitColor}80`;
-                        borderColor = habitColor;
-                        borderWidth = "1px";
-                        borderStyle = "solid";
-                        if (day.isOpened) {
-                          boxShadow = `0 0 0 1.5px rgba(255,255,255,0.85), 0 0 0 2.5px ${habitColor}, 0 0 6px ${habitColor}75`;
-                        }
-                      }
-                    } else if (isNotScheduled) {
-                      if (day.isOpened) {
-                        backgroundColor = `${habitColor}18`;
-                        borderColor = `${habitColor}80`;
-                        borderWidth = "1px";
-                        borderStyle = "solid";
-                        boxShadow = `0 0 0 1.5px ${habitColor}80, 0 0 6px ${habitColor}60`;
-                      } else {
-                        backgroundColor = undefined;
-                        borderColor = undefined;
-                      }
-                    } else if (partial > 0) {
-                      // Scheduled, logged, not yet at target: the faded fill.
-                      backgroundColor = `${habitColor}${partialFillAlpha(partial)}`;
-                      borderColor = habitColor;
-                      borderWidth = "1px";
-                      borderStyle = "solid";
-                      boxShadow = day.isOpened
-                        ? `0 0 0 1.5px ${habitColor}, 0 0 6px ${habitColor}80`
-                        : undefined;
-                    } else if (day.isOpened) {
-                      backgroundColor = `${habitColor}22`;
-                      borderColor = habitColor;
-                      borderWidth = "1.5px";
-                      borderStyle = "solid";
-                      boxShadow = `0 0 0 1.5px ${habitColor}, 0 0 6px ${habitColor}80`;
-                    } else if (day.isToday) {
-                      backgroundColor = "transparent";
-                      borderColor = habitColor;
-                      borderWidth = "1px";
-                      borderStyle = "solid";
-                      boxShadow = `0 0 0 1px ${habitColor}60`;
-                    }
-
-                    return (
-                      <button
-                        key={day.dateStr}
-                        type="button"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onClick={(e) =>
-                          handleDayClick(
-                            e,
-                            day.dateStr,
-                            day.isFuture,
-                            day.isScheduled
-                          )
-                        }
-                        title={`${day.weekday}, ${day.monthShort} ${day.dayNumber}, ${day.year}: ${
-                          day.isCompleted
-                            ? day.isScheduled
-                              ? "Completed ✓"
-                              : "Unscheduled Completed (!)"
-                            : partial > 0
-                            ? `In progress — ${valuesMap[day.dateStr] ?? 0} of ${targetValue ?? "?"}`
-                            : isNotScheduled
-                            ? "Rest Day (Click to open / register)"
-                            : day.isFuture
-                            ? "Upcoming"
-                            : "Not completed"
-                        }${
-                          day.isOpened
-                            ? " • Opened Day (Click to toggle)"
-                            : day.isToday
-                            ? " • Today"
-                            : " • Click to open day"
-                        }`}
-                        className={`${cellClass} flex items-center justify-center transition-all select-none cursor-pointer ${
-                          day.isCompleted
-                            ? `hover:brightness-110 active:scale-90 ${
-                                day.isOpened ? "scale-110 z-10" : "shadow-2xs"
-                              }`
-                            : isNotScheduled
-                            ? day.isOpened
-                              ? "scale-110 z-10"
-                              : "bg-surface-container-high/50 border border-dashed border-outline/40 hover:border-outline/55 hover:bg-surface-container-high/70"
-                            : day.isOpened
-                            ? "scale-110 z-10"
-                            : day.isToday
-                            ? "hover:bg-surface-bright active:scale-90"
-                            : "bg-surface-container-highest/80 border border-outline/30 hover:border-outline/50 hover:bg-surface-bright active:scale-90"
-                        }`}
-                        style={{
-                          backgroundColor,
-                          borderColor,
-                          borderWidth,
-                          borderStyle,
-                          boxShadow,
-                        }}
-                      >
-                        {!day.isScheduled && day.isCompleted && (
-                          <div className="w-1 h-1 rounded-full bg-white shadow-xs" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+          <HeatmapGrid
+            columns={columns}
+            monthHeaderByCol={headerByCol}
+            habitColor={habitColor}
+          />
         </div>
       </div>
     </div>
