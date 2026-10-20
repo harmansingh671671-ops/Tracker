@@ -52,7 +52,7 @@ interface TimelineHourSlotProps {
  * How long a finger has to rest on a block before it owns the gesture. Below
  * this, a moving finger is scrolling the day and must not move anything.
  */
-const HOLD_TO_DRAG_MS = 350;
+const HOLD_TO_DRAG_MS = 250;
 
 /** The movement that turns a press into a page scroll rather than a grab. */
 const DRAG_SLOP_PX = 10;
@@ -189,8 +189,9 @@ export function TimelineHourSlot({
       justDraggedRef.current = false;
       return;
     }
-    // Edit is now opened by a right-to-left swipe, not a tap -- and the swipe
-    // only counts after the block has been grabbed by holding it. See onPointerDown.
+    // Edit is opened by a right-to-left swipe, not a tap. A swipe needs no hold
+    // (it never fought the page's scroll); only a vertical drag waits for the grab.
+    // See onPointerMove.
     return;
     if (isPastHour) {
       if (isLongPressTriggeredRef.current) {
@@ -301,9 +302,12 @@ export function TimelineHourSlot({
           const dy = e.clientY - ds.startY;
           if (!ds.moved && Math.hypot(dx, dy) < DRAG_SLOP_PX) return;
           if (!ds.moved) {
-            // Not grabbed: the finger is only passing over the block, so the
-            // gesture is the page's. Drop it and let the scroll run.
-            if (!ds.armed) {
+            ds.isSwipe = Math.abs(dx) > Math.abs(dy);
+            ds.isDrag = !ds.isSwipe;
+            // A sideways swipe opens the editor and never fought the page's
+            // scroll, so it needs no hold. A vertical drag is the one that
+            // competes with scrolling, so it still waits for the grab.
+            if (ds.isDrag && !ds.armed) {
               cancelGrab();
               dragStateRef.current = null;
               return;
@@ -312,8 +316,6 @@ export function TimelineHourSlot({
             justDraggedRef.current = true;
             cancelGrab();
             setIsDragging(true);
-            ds.isSwipe = Math.abs(dx) > Math.abs(dy);
-            ds.isDrag = !ds.isSwipe;
             ds.dx = dx;
             try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
             if (ds.isDrag) showGhost(e.clientX, e.clientY);
