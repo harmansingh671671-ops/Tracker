@@ -54,13 +54,20 @@ function subscribe(cb: Subscriber) {
   };
 }
 
+// React requires every `getServerSnapshot` to hand back the SAME cached
+// instance on each call; a fresh `new Date()` there throws
+// "The result of getServerSnapshot should be cached to avoid an infinite
+// loop" (observed on the habits screen). One fixed instant is fine for SSR:
+// nothing renders a live clock server-side, and the first client tick
+// corrects it.
+const serverNow = new Date();
+
 function getSnapshot() {
   return currentNow;
 }
 
 function getServerSnapshot() {
-  // SSR: a fixed instant is fine; the first client tick will correct it.
-  return new Date();
+  return serverNow;
 }
 
 /**

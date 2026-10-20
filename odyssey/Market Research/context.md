@@ -680,9 +680,11 @@ intact Ã¢â‚¬â€ no intermingling.
 
 **BUG-10 (RESOLVED - BY DESIGN):** owner decision 2026-10-20: the 20:00 evening "plan tomorrow" reminder stays a sub-screen prompt only. `AppShell`'s early-return for `pathname === "/"` and `"/day-schedule"` (mounting only `AppUpdateModal`, never `EveningReminderModal`) is intended, not a defect, so the home screen and quick-schedule page stay free of the modal and the OS notification it fires. Original finding (reminder never appears on `/`) was correct but, on owner decision, not a defect. Do not re-open without a product reason. src: `src/components/layout/app-shell.tsx:35`.
 
+**BUG-18 (SHIPPED):** `useSharedClock` threw "The result of getServerSnapshot should be cached to avoid an infinite loop" on the habits screen (React 18 `useSyncExternalStore` requirement). **Cause:** `getServerSnapshot` returned a fresh `new Date()` per call; React demands a cached instance. **Fix:** server snapshot is now a single module-level `Date` created once; `getSnapshot` already correct (returns the store's `currentNow`, mutated only on minute ticks). Nothing renders a live clock server-side, so one fixed instant is fine; first client tick corrects. Verified: zero error hits on `/habits` against hot-reloaded dev server (double load). src: `src/lib/utils/shared-clock.ts`.
+
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** the C2 drag/swipe reliability commit on top of B4 round 2. Working tree clean.
+- **HEAD:** BUG-18 fix committed (`shared-clock` getServerSnapshot caching) on top of `f8fb417` (BUG-10 by-design), `13af9b5` (B4), `352155a` (C2 context), `aa1c36f`/`05bedee` (C2). Working tree clean.
   same hold/swipe set on heatmap cards, pencil removed. Round 1 is `13af9b5`. On
   top of the other session's `aa2865b` (docs) and `f8fb417` (BUG-10 resolved by
   design: the evening reminder stays sub-screen only Ã¢â‚¬â€ owner decision). Committed
