@@ -68,6 +68,13 @@ const CELL_BASE =
   "relative flex items-center justify-center transition-transform select-none cursor-pointer";
 
 /**
+ * Day-of-week labels for the left of the matrix (moved here in M27 so they
+ * travel with the centered matrix unit). Row 0 is Monday (top), row 6 Sunday.
+ * Only M, W and F plus Sunday are labeled; empty strings are silent spacers.
+ */
+const ROW_LABELS = ["M", "", "W", "", "F", "", "S"];
+
+/**
  * The one style decision table, pure of `day` + `habitColor`. A plain
  * completed cell gets NO always-on glow (365 painted shadows was live
  * scroll-jank — PERF-7 round 2); emphasis is spent only on the opened day
@@ -199,54 +206,81 @@ export const HeatmapGrid = memo(function HeatmapGrid({
 }: HeatmapGridProps) {
   return (
     <div className="flex flex-col w-full">
-      {/* Top month labels aligned with week columns. M26: this band spans the
-          CARD row (not just the matrix) so the pager arrows can flank it at
-          the card's edges and spend the dead space the windowing freed. */}
-      <div className={`flex items-center mb-1 ${GAP} h-6`}>
+      {/* Pager band (M26): spans the card row so the arrows flank it at the
+          card's edges. The label slots + filler live in the middle group,
+          which mirrors the day-label column width below so both center
+          together (M27: on wide screens the matrix unit is centered, not
+          left-glued, and the void it freed goes to BOTH sides evenly). */}
+      <div className="flex items-center mb-1 h-6">
         <div className="shrink-0">{headerLeftSlot ?? null}</div>
-        {columns.map((_, colIdx) => {
-          const header = monthHeaderByCol[colIdx];
-          return (
-            <div
-              key={colIdx}
-              className="w-[11.5px] sm:w-[12.5px] text-[8.5px] sm:text-[9.5px] font-mono font-bold text-on-surface-variant/70 relative shrink-0 leading-none select-none"
-            >
-              {header ? (
-                <span className="absolute left-0 bottom-0 whitespace-nowrap">
-                  {header}
-                </span>
-              ) : null}
-            </div>
-          );
-        })}
-        {/* M24: matching trailing slot so the header row line-up never
-            disagrees with the body's filler column. */}
-        <div
-          className="w-[11.5px] sm:w-[12.5px] shrink-0 select-none"
-          aria-hidden="true"
-        />
-        {/* Dead space between the matrix and the right arrow. */}
-        <div className="flex-1" />
+        <div className={`flex items-center mx-auto ${GAP}`}>
+          {/* Mirror of the day-label column (same width) — keeps the slot
+              x-positions locked to the columns in every screen size. */}
+          <div className="w-3 pr-1 shrink-0" aria-hidden="true" />
+          {columns.map((_, colIdx) => {
+            const header = monthHeaderByCol[colIdx];
+            return (
+              <div
+                key={colIdx}
+                className="w-[11.5px] sm:w-[12.5px] text-[8.5px] sm:text-[9.5px] font-mono font-bold text-on-surface-variant/70 relative shrink-0 leading-none select-none"
+              >
+                {header ? (
+                  <span className="absolute left-0 bottom-0 whitespace-nowrap">
+                    {header}
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+          {/* M24: matching trailing slot so the header row line-up never
+              disagrees with the body's filler column. */}
+          <div
+            className="w-[11.5px] sm:w-[12.5px] shrink-0 select-none"
+            aria-hidden="true"
+          />
+        </div>
         <div className="shrink-0">{headerRightSlot ?? null}</div>
       </div>
 
-      {/* The window's week columns, 7 square dots each (Mon top, Sun bottom);
-          the wrapper slices them out of the full year. One delegated click
-          handler on the wrapper resolves the day from data-* attrs —
-          no per-cell handler props. */}
-      <div className={`flex ${GAP} self-start`}>
-        {columns.map((colDays, colIdx) => (
-          <div key={colIdx} className={`flex flex-col ${GAP} shrink-0`}>
-            {colDays.map((day) => cellFragment(day, habitColor))}
+      {/* Body: the day-label column + the window's week columns, centered as
+          ONE unit (M27) so a phone keeps last week near the card's middle and
+          a wide screen splits the spare room evenly. One delegated click
+          handler on the wrapper resolves the day from data-* attrs — no
+          per-cell handler props. */}
+      <div className="flex self-center">
+        {/* Day-of-week labels moved INTO the grid (M27): they must travel
+            with the centered matrix, and their column width is what the
+            band's mirror spacer reproduces. */}
+        <div className="flex flex-col shrink-0 pr-1 select-none">
+          <div className="h-6 mb-1 shrink-0" />
+          <div className="flex flex-col gap-[2.5px] sm:gap-[3px] shrink-0">
+            {ROW_LABELS.map((label, rIdx) => (
+              <div
+                key={rIdx}
+                className="h-[11.5px] sm:h-[12.5px] w-3 flex items-center justify-start shrink-0"
+              >
+                <span className="text-[8px] sm:text-[9px] font-mono font-bold text-on-surface-variant/60 leading-none">
+                  {label}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
-        {/* M24: one invisible trailing column of exact cell width so the
-            current week (the matrix's last) never sits flush against the
-            scroll edge. Not clickable, no data-date, no painted style. */}
-        <div className={`flex flex-col ${GAP} shrink-0`} aria-hidden="true">
-          {Array.from({ length: 7 }, (_, row) => (
-            <div key={row} className={CELL} />
+        </div>
+        <div className={`flex ${GAP}`}>
+          {columns.map((colDays, colIdx) => (
+            <div key={colIdx} className={`flex flex-col ${GAP} shrink-0`}>
+              {colDays.map((day) => cellFragment(day, habitColor))}
+            </div>
           ))}
+          {/* M24: one invisible trailing column of exact cell width so the
+              current week (the matrix's last) never sits flush against the
+              edge or the pager arrow. Not clickable, no data-date, no
+              painted style. */}
+          <div className={`flex flex-col ${GAP} shrink-0`} aria-hidden="true">
+            {Array.from({ length: 7 }, (_, row) => (
+              <div key={row} className={CELL} />
+            ))}
+          </div>
         </div>
       </div>
     </div>

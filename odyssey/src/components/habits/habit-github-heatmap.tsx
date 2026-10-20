@@ -44,7 +44,6 @@ import {
 
 const EMPTY_LOGS: Record<string, boolean> = {};
 const EMPTY_VALUES: Record<string, number> = {};
-
 export interface HabitGitHubHeatmapProps {
   habitId: string;
   name?: string;
@@ -71,10 +70,6 @@ interface MonthHeader {
   label: string;
   colIndex: number;
 }
-
-// 7 rows: Row 0 is Monday (on top), Row 6 is Sunday (on bottom).
-// Labeled: M (Mon), W (Wed), F (Fri), S (Sun)
-const ROW_LABELS = ["M", "", "W", "", "F", "", "S"];
 
 export function HabitGitHubHeatmap({
   habitId,
@@ -370,49 +365,24 @@ export function HabitGitHubHeatmap({
         </div>
       )}
 
-      {/* Main Heatmap Container with Fixed Left Day Labels & Windowed Grid.
-          The pager flanks the month-label band inside the grid (M26); there
-          is NO inner scroller (M25): the 16-week window fits the card, so a
-          vertical touch anywhere here is page scroll. */}
-      <div className="flex items-start w-full relative">
-        {/* FIXED LEFT DAY-OF-WEEK LABELS (M, W, F, S) */}
-        <div className="flex flex-col shrink-0 pr-1 select-none z-10">
-          {/* Header Spacer matching the month band height */}
-          <div className="h-6 mb-1 shrink-0" />
-
-          {/* Fixed 7-Row Day-of-Week Labels */}
-          <div className={`flex flex-col gap-[2.5px] sm:gap-[3px] shrink-0`}>
-            {ROW_LABELS.map((label, rIdx) => (
-              <div
-                key={rIdx}
-                className="h-[11.5px] sm:h-[12.5px] w-3 flex items-center justify-start shrink-0"
-              >
-                <span className="text-[8px] sm:text-[9px] font-mono font-bold text-on-surface-variant/60 leading-none">
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* THE GRID (Month Headers + the windowed week columns of dots).
-            `touch-action: pan-y` is belt-and-braces with the card's own
-            pan-y: nothing inside the matrix may trap the vertical pan. */}
-        <div
-          className="flex-1 min-w-0 select-none pb-1"
-          style={{ touchAction: "pan-y" }}
-          onMouseDown={onMatrixMouse}
-          onTouchStart={onMatrixMouse}
-          onClick={onMatrixClick}
-        >
-          <HeatmapGrid
-            columns={windowedColumns}
-            monthHeaderByCol={windowedHeaderByCol}
-            habitColor={habitColor}
-            headerLeftSlot={pagerLeft}
-            headerRightSlot={pagerRight}
-          />
-        </div>
+      {/* Main Heatmap Container: the grid owns the day-labels column and the
+          month band with the flanking pager (M26/M27). NO inner scroller
+          (M25): the 16-week window fits the card, so a vertical touch anywhere
+          here is page scroll. */}
+      <div
+        className="flex-1 min-w-0 select-none pb-1"
+        style={{ touchAction: "pan-y" }}
+        onMouseDown={onMatrixMouse}
+        onTouchStart={onMatrixMouse}
+        onClick={onMatrixClick}
+      >
+        <HeatmapGrid
+          columns={windowedColumns}
+          monthHeaderByCol={windowedHeaderByCol}
+          habitColor={habitColor}
+          headerLeftSlot={pagerLeft}
+          headerRightSlot={pagerRight}
+        />
       </div>
     </div>
   );
