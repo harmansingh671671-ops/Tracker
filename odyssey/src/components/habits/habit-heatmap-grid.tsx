@@ -215,8 +215,9 @@ export const HeatmapGrid = memo(function HeatmapGrid({
         />
       </div>
 
-      {/* 52 columns of 7 square dots (Mon top, Sun bottom). One delegated
-          click handler on the wrapper resolves the day from data-* attrs —
+      {/* The window's week columns, 7 square dots each (Mon top, Sun bottom);
+          the wrapper slices them out of the full year. One delegated click
+          handler on the wrapper resolves the day from data-* attrs —
           no per-cell handler props. */}
       <div className={`flex ${GAP}`}>
         {columns.map((colDays, colIdx) => (

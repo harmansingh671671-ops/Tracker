@@ -22,17 +22,25 @@
  * the old per-cell `title` strings survive as short `aria-label`s.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { completionRatio } from "@/lib/utils/habit-completion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Habit } from "@/lib/db";
 import {
   HeatmapGrid,
   type HeatmapDay,
 } from "@/components/habits/habit-heatmap-grid";
+import {
+  HEATMAP_VISIBLE_WEEKS,
+  HEATMAP_WINDOW_STEP,
+  clampWindowStart,
+  maxWindowStart,
+  sliceHeatmapWindow,
+} from "@/components/habits/heatmap-window";
 
 const EMPTY_LOGS: Record<string, boolean> = {};
 const EMPTY_VALUES: Record<string, number> = {};
@@ -50,7 +58,7 @@ export interface HabitGitHubHeatmapProps {
   type?: Habit["type"];
   targetValue?: number;
   selectedDate?: string;
-  weeksCount?: number; // default 52 (full year)
+  weeksCount?: number; // data horizon, default 52 (full year); render is windowed
   todayStr?: string;
   onSelectDate?: (dateStr: string) => void;
   /** Delegated tap-to-toggle; `habitId` lets ONE stable page callback serve every card. */
@@ -90,7 +98,6 @@ export function HabitGitHubHeatmap({
   const ownValues = useHabitStore((s) => s.historyValues?.[habitId]);
   const logsMap = ownLogs ?? EMPTY_LOGS;
   const valuesMap = ownValues ?? EMPTY_VALUES;
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   const habitColor = useMemo(
     () => getHabitColor({ category, name, id: habitId }),
@@ -234,12 +241,34 @@ export function HabitGitHubHeatmap({
     targetValue,
   ]);
 
-  // Automatically scroll to the right (Today) on mount / date update
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    }
-  }, [today, weeksCount]);
+  // M25: the matrix renders a WINDOW (newest 16 weeks by default) out of the
+  // full-year data above — that is what keeps N cards at ~112 cells instead of
+  // ~365, and what lets the inner scroller disappear (a nested scroll
+  // container captured vertical pans). `windowStart` slides in 4-week pages.
+  const windowMaxStart = maxWindowStart(weeksCount, HEATMAP_VISIBLE_WEEKS);
+  const [windowStart, setWindowStart] = useState(() =>
+    maxWindowStart(weeksCount, HEATMAP_VISIBLE_WEEKS)
+  );
+  const { columns: windowedColumns, headerByCol: windowedHeaderByCol } =
+    useMemo(
+      () =>
+        sliceHeatmapWindow(
+          columns,
+          headerByCol,
+          windowStart,
+          HEATMAP_VISIBLE_WEEKS
+        ),
+      [columns, headerByCol, windowStart]
+    );
+  const pageWindow = useCallback(
+    (dir: -1 | 1) =>
+      setWindowStart((s) =>
+        clampWindowStart(s + dir * HEATMAP_WINDOW_STEP, windowMaxStart)
+      ),
+    [windowMaxStart]
+  );
+  const atOldest = windowStart === 0;
+  const atNewest = windowStart === windowMaxStart;
 
   // The delegated handlers: one `mousedown`/`touchstart` stop so the card's
   // gesture shell never arms from a touch inside the matrix (its spacer in
@@ -302,7 +331,42 @@ export function HabitGitHubHeatmap({
         </div>
       )}
 
-      {/* Main Heatmap Container with Fixed Left Day Labels & Scrollable Dots */}
+      {/* M25 week pager: hidden entirely when everything fits the window.
+          Sits on its own row so it can never fight the matrix for width. */}
+      {windowMaxStart > 0 && (
+        <div className="flex items-center justify-end gap-0.5 pr-0.5">
+          <button
+            type="button"
+            onClick={() => pageWindow(-1)}
+            disabled={atOldest}
+            aria-label="4 weeks earlier"
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+              atOldest
+                ? "text-on-surface-variant/25"
+                : "text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface cursor-pointer"
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => pageWindow(1)}
+            disabled={atNewest}
+            aria-label="4 weeks later"
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+              atNewest
+                ? "text-on-surface-variant/25"
+                : "text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface cursor-pointer"
+            }`}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Main Heatmap Container with Fixed Left Day Labels & Windowed Grid.
+          NO inner scroller (M25): the 16-week window fits the card, so a
+          vertical touch anywhere here is page scroll. */}
       <div className="flex items-start w-full relative">
         {/* FIXED LEFT DAY-OF-WEEK LABELS (M, W, F, S) */}
         <div className="flex flex-col shrink-0 pr-1.5 select-none z-10">
@@ -324,18 +388,19 @@ export function HabitGitHubHeatmap({
           </div>
         </div>
 
-        {/* HORIZONTALLY SCROLLABLE GRID (Month Headers + 52 Week Columns of Dots) */}
+        {/* THE GRID (Month Headers + the windowed week columns of dots).
+            `touch-action: pan-y` is belt-and-braces with the card's own
+            pan-y: nothing inside the matrix may trap the vertical pan. */}
         <div
-          ref={scrollRef}
-          className="flex-1 overflow-x-auto scrollbar-none select-none pb-1"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className="flex-1 min-w-0 select-none pb-1"
+          style={{ touchAction: "pan-y" }}
           onMouseDown={onMatrixMouse}
           onTouchStart={onMatrixMouse}
           onClick={onMatrixClick}
         >
           <HeatmapGrid
-            columns={columns}
-            monthHeaderByCol={headerByCol}
+            columns={windowedColumns}
+            monthHeaderByCol={windowedHeaderByCol}
             habitColor={habitColor}
           />
         </div>

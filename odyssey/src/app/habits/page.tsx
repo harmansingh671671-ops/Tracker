@@ -8,6 +8,7 @@ import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { HabitListCard } from "@/components/habits/habit-list-card";
+import { HabitsSkeleton } from "@/components/habits/habits-skeleton";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
@@ -49,8 +50,7 @@ export default function HabitsPage() {
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   // PERF-8b: the id as a scalar keeps the memoised rows' handler props stable
   // when the profile object itself is replaced (an XP award, a settings save).
-  const userId = user?.id ?? null;
-  const {
+  const userId = user?.id ?? null;  const {
     habits,
     todayLogs,
     historyLogs,
@@ -74,12 +74,14 @@ export default function HabitsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  // `B6`: the view mode is a *saved preference*, and the heatmap is the default
-  // (the owner's choice — a long-history view on opening the screen). The stored
-  // value is applied once the client has hydrated, because reading
+  // `B6` + M25: the view mode is a *saved preference*, and the heatmap is the
+  // default (the owner's choice — a long-history view on opening the screen).
+  // The stored value is applied once the client has hydrated, because reading
   // `localStorage` during the first render would make the server and client
-  // markup disagree.
-  const [viewMode, setViewModeState] = useState<HabitViewMode>("heatmap");
+  // markup disagree. M25: the first render assumes NOTHING (not even the
+  // heatmap default) — the old default-then-correct swap mounted every matrix
+  // TWICE and flashed heatmap-then-list; `null` shows the skeleton instead.
+  const [viewMode, setViewModeState] = useState<HabitViewMode | null>(null);
   const setViewMode = useCallback((next: HabitViewMode) => {
     setViewModeState(next);
     writeString(HABITS_VIEW_STORAGE_KEY, next);
@@ -92,11 +94,12 @@ export default function HabitsPage() {
 
   const isFutureSelectedDate = selectedDate > todayStr;
 
-  // `B6`: apply the saved view once the client has hydrated. Deferred with
-  // `queueMicrotask` rather than set synchronously — the same fix `M14` used for
-  // the rank dialog — because a synchronous `setState` in an effect cascades a
-  // second render pass. A brief flash of the default heatmap is the accepted
-  // cost of not reading storage during render.
+  // `B6` + M25: apply the saved view once the client has hydrated, and resolve
+  // it before ANY card content renders (the skeleton gate above). Deferred with
+  // `queueMicrotask` rather than set synchronously — the same fix `M14` used
+  // for the rank dialog — because a synchronous `setState` in an effect
+  // cascades a second render pass. An unset preference resolves to the
+  // heatmap default at this point, which is where the default belongs.
   useEffect(() => {
     queueMicrotask(() => {
       const saved = readString(HABITS_VIEW_STORAGE_KEY, "");
@@ -104,6 +107,8 @@ export default function HabitsPage() {
       if (saved === "list" || saved === "grid") {
         setViewModeState("list");
       } else if (saved === "heatmap") {
+        setViewModeState("heatmap");
+      } else {
         setViewModeState("heatmap");
       }
     });
@@ -800,8 +805,15 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
         </div>
       </div>
 
-      {/* Main Content Area Based on View Mode */}
-      {habits.length === 0 ? (
+      {/* Main Content Area Based on View Mode. M25 skeleton-first: until the
+          saved view preference is resolved AND the store has data (or the
+          empty verdict is certain) no card content mounts — so the screen
+          never paints the default heatmap, then the saved view, and never
+          flashes the empty state before real habits arrive. Revisits with
+          cached habits skip this entirely. */}
+      {viewMode === null || !userId || (habits.length === 0 && habitsLoading) ? (
+        <HabitsSkeleton />
+      ) : habits.length === 0 ? (
         <HabitsEmptyState onAddFirst={() => setIsCreateModalOpen(true)} />
       ) : viewMode === "list" ? (
         /* 1. LIST VIEW: Full-width interactive cards for selected date */
@@ -873,9 +885,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
           </AnimatePresence>
         </div>
       ) : (
-        /* 2. HEATMAP VIEW (`B6`): one scrollable long-history matrix per habit,
-           full width. The compact 70-day matrix showed ~10 weeks, which is not
-           "long history"; the 52-week matrix is, and it scrolls. */
+        /* 2. HEATMAP VIEW (`B6`, windowed `M25`): one 16-week matrix per habit
+           with ‹/› paging instead of the year-wide inner scroller. */
         <div className="space-y-2.5 overflow-x-clip">
           <AnimatePresence mode="popLayout" initial={false}>
             {habits.map((h) => {
@@ -957,12 +968,13 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
                   </div>
 
-                  {/* Long-history matrix (`B6`): 52 weeks, horizontally scrollable.
-                      Wrap it in a spacer that STOPS the legacy pointer events: a
-                      touch on the matrix is a horizontal pan of the matrix
-                      itself, so it must never start (or commit) a card swipe or
-                      arm a card hold — but a swipe from the card's header area
-                      still works (B4 round 2). */}
+                  {/* Long-history matrix, windowed + paged (`B6`, `M25`).
+                      Wrap it in a spacer that STOPS the legacy pointer events:
+                      a touch on the matrix must never start (or commit) a
+                      card swipe or arm a card hold — the page itself stays
+                      the scroll target, since the matrix has no inner
+                      scroller (a swipe from the card's header area still
+                      works, B4 round 2). */}
                   <div
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
