@@ -27,6 +27,12 @@ export const GESTURE_SLOP_PX = 8;
  * reported needing a deliberate hold-then-drag before a swipe registered. */
 export const SWIPE_COMMIT_PX = 40;
 
+/** How far a COUNTED card locks to the right when its swipe-right commits:
+ * the revealed gap on the left is exactly this wide and holds the option
+ * rectangles stacked vertically (B4 round 3). Also the distance the options
+ * progress against while the drag previews them. */
+export const SWIPE_LOCK_PX = 150;
+
 export type GestureAxis = "x" | "y";
 export type SwipeDirection = "left" | "right";
 

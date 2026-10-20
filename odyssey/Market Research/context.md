@@ -660,6 +660,32 @@ intact Ã¢â‚¬â€ no intermingling.
 
 **`B4` round 2 Ã¢â‚¬â€ direct swipes, heatmap gestures (SHIPPED):** owner feedback on the first build: swipes registered only via a deliberate hold-then-drag. Root cause class: the first commit re-checked horizontal-vs-vertical on the FULL drag (`|dx| > |dy|` at release), so a casual touch swipe Ã¢â‚¬â€ which always drifts vertically in its first pixels and may engage a list scroll Ã¢â‚¬â€ was reclassified dead at release. Fix: the axis is decided ONCE at the first 8px of travel (`decideGestureAxis`, the C2 grab-to-drag 8px-slop lesson) and locked; a locked-horizontal swipe commits at 40px (down from 56) however the finger drifts afterwards, and a locked-vertical drag is inert to the end. The shell still never calls `preventDefault`, so the list scroll keeps working. **The three gestures moved onto the heatmap view's cards too** (hold = fully done, swipe-left = edit, swipe-right = done / three rectangles): the matrix is a horizontal-pan surface, so it is wrapped in a spacer that stops the legacy `mousedown`/`touchstart` at the source Ã¢â‚¬â€ a touch panning the heatmap weeks never arms a card hold or commits a card swipe, but swiping from the card's header area does. The round-1 pencil button was removed per owner (edit access on mobile heatmap restores via swipe-left). Pure helpers grew 8 Ã¢â€ â€™ 12 tests. Gates: tsc 0, lint 0 errors, 31 suites / 482 tests green, build clean. Still not visually verified (no device/harness here).
 
+**`B4` round 3 — counted swipe-right becomes a locked options panel (SHIPPED):**
+owner feedback repeated verbatim: the counted card's three rectangles must come up
+TO THE LEFT OF THE CARD while the card stays locked to the right, and animate in
+WITH the swipe — not appear on release as a bottom-corner overlay. New behaviour:
+swiping right on a counted card commits into a LOCKED state, where the card's body
+squeezes rightward (right edge fixed — a margin/width reflow, so nothing can ever
+overflow the row or spawn a horizontal scrollbar) and the three rectangles sit in
+the revealed left gap, stacked vertically, with their opacity and slide-in driven
+by the same travel that drives the squeeze, so they visibly ride out of the left
+edge together with the card. **Choosing an option applies it and KEEPS the card
+locked with the options still selectable** (owner: "keep it locked with options to
+select") — `+1` can be tapped over and over to tally. The card returns to rest on a
+swipe back LEFT (a swipe left never opens the edit sheet while a panel is open) or
+on a tap of its visible part. The identical panel works on heatmap cards (the
+squeezed 52-week matrix just narrows and stays scrollable). **Durable lesson:** the
+one-shot `suppressClickRef` a commit sets is never consumed when the releasing
+touch had real travel (travelled touches release NO synthesized click) — reset it
+at the next pointer-down (`startGesture`), or the tap AFTER a swipe is silently
+swallowed. Also split the shell for the repo's size rule: gesture engine hook
+`use-habit-card-gestures.ts`, overlays `habit-gesture-overlays.tsx`, lock width as
+`SWIPE_LOCK_PX` in the pure helpers. Gates: tsc 0, lint 0 errors, 31 suites /
+482 tests, build clean, 13 routes. Still not visually verified (no device /
+component harness here), and the sticky-panel reading of the owner's sentence is
+our interpretation — flag on the report to change to apply-and-close if wrong.
+
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -684,22 +710,9 @@ intact Ã¢â‚¬â€ no intermingling.
 
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** BUG-18 fix committed (`shared-clock` getServerSnapshot caching) on top of `f8fb417` (BUG-10 by-design), `13af9b5` (B4), `352155a` (C2 context), `aa1c36f`/`05bedee` (C2). Working tree clean.
-  same hold/swipe set on heatmap cards, pencil removed. Round 1 is `13af9b5`. On
-  top of the other session's `aa2865b` (docs) and `f8fb417` (BUG-10 resolved by
-  design: the evening reminder stays sub-screen only Ã¢â‚¬â€ owner decision). Committed
-  on `main`; **the agent never pushes Ã¢â‚¬â€ the owner pushes.** Earlier: `352155a`
-  (context for C2), `aa1c36f`/`05bedee` (C2 swipe/drag: feature itself `653c565`),
-  `dd31a4c` (`S10` docs), `f516a8b` (`B6`), `956cb5d` (`B17`), `993a2c9` (`B16`).
-  Everything through `e67dc01` is on `origin/main`; `8700852` onward are
-  **unpushed**.
-- **Working tree (2026-10-20):** my round-2 files were all committed; one file sat
-  **uncommitted from the other session** at commit time Ã¢â‚¬â€
-  `src/components/planner/timeline-hour-slot.tsx` Ã¢â‚¬â€ deliberately NOT staged;
-  expect it in their next commit.
-- **Gates (B4 round 2):** tsc 0; eslint 0 errors; **31 suites / 482 tests** green
-  (486 at `dd31a4c` Ã¢â€ â€™ 470 from the other session's commits this window, +12 from
-  `B4` rounds 1+2 combined); production build clean, 13 routes.
+- **HEAD:** B4 round 3 (counted locked options panel) committed on top of `d9e396f` (BUG-18 shared-clock getServerSnapshot fix) and `68e0b73` (other session: C2 drag/swipe reliability on the schedule rail — landed BEFORE this commit, not intermingled), and `187c57f` (B4 round 2), `13af9b5` (B4 round 1): features + docs in one commit per the commit sequence. On `main`; **the agent never pushes — the owner pushes.** Earlier today: `aa2865b` (docs), `f8fb417` (BUG-10 by design), `352155a`/`aa1c36f`/`05bedee` (C2 swipe/drag), `dd31a4c` (S10), `f516a8b` (B6), `956cb5d` (B17), `993a2c9` (B16). Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **Working tree (2026-10-20):** clean after the round-3 commit. The other session's previously-uncommitted file (`timeline-hour-slot.tsx`) landed in their `68e0b73` — no foreign files left. Expect more commits from them mid-feature; re-check `git status --short` and log before every commit and stage explicit paths only.
+- **Gates (B4 round 3):** tsc 0; eslint 0 errors (touched files); **31 suites / 482 tests** green (unchanged count — helpers untouched, all new behaviour is component-only); production build clean, 13 routes.
 - **Next:** no pre-approved queue. Candidates in plan order when the owner picks:
   `B13` (pause/archive + the 14-day inactive prompt), `B1` (searchable template
   library), finishing `B2`'s missing form fields. Wallpaper / `B5` stays on
