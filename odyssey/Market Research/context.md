@@ -760,6 +760,19 @@ as the PERF-0/9 gfxinfo check); isolation is code-verified, not
 render-count-verified.
 
 
+**M24 — heatmap trailing blank column (SHIPPED):** owner instruction: one
+empty space to the right of the matrix’s last column, exactly one column
+wide. The last column IS the current week and sat flush against the right
+scroll edge. Added inside the pure grid (one aria-hidden filler column + the
+matching month-label slot), so both renderers — habit-card matrix AND edit
+modal — get it from one change; filler cells carry no `data-date`, so the
+delegated click handler can never target them. All PERF-19 functional
+assertions re-run green after the change (728 interactive cells,
+select/complete/un-complete/future-select, partial alpha 0.576, zero console
+errors); screenshot confirms the trailing room. Gates: tsc 0, eslint clean
+(touched file), 31 suites / 482 tests, build clean.
+
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -784,7 +797,8 @@ render-count-verified.
 
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** PERF-19 (heatmap isolation + delegation) on top of `c694708` (PERF-7 round 2), `9093647` (B4 round 4), `aa66b7a` (B4 round 3); earlier unpushed: `187c57f`, `68e0b73`, `d9e396f` (other session).
+- **HEAD:** M24 (heatmap trailing blank column) on top of `cef86c3` (PERF-19), `c694708` (PERF-7 round 2), `9093647` (B4 round 4); earlier unpushed: `187c57f`, `68e0b73`, `d9e396f` (other session).
+- **Gates (M24):** tsc 0; eslint clean (touched file); 31 suites / 482 tests; `next build` compiled clean; PERF-19 verify harness re-ran fully green on the seeded production build; port 3100 killed both runs.
 - **Working tree (2026-10-20):** clean after the PERF-19 commit; 4 touched files + new `habit-heatmap-grid.tsx` staged by explicit path; the other session’s files never touched.
 - **Gates (PERF-19):** tsc 0; eslint 0 errors (touched files; 3 pre-existing unrelated warnings in edit-habit-modal); 31 suites / 482 tests; `next build` compiled clean; functional browser check green (728 cells, select/complete/un-complete/future-select all through the one delegated handler, counted partial alpha 0.576, zero console errors).
 - **Working tree (2026-10-20):** clean after this commit; the heatmap render-isolation refactor (React.memo grid, per-habit store selectors, delegated cell clicks) is NEXT, in flight on top of this commit.

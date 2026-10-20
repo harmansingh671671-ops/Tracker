@@ -207,6 +207,12 @@ export const HeatmapGrid = memo(function HeatmapGrid({
             </div>
           );
         })}
+        {/* M24: matching trailing slot so the header row line-up never
+            disagrees with the body's filler column. */}
+        <div
+          className="w-[11.5px] sm:w-[12.5px] shrink-0 select-none"
+          aria-hidden="true"
+        />
       </div>
 
       {/* 52 columns of 7 square dots (Mon top, Sun bottom). One delegated
@@ -218,6 +224,14 @@ export const HeatmapGrid = memo(function HeatmapGrid({
             {colDays.map((day) => cellFragment(day, habitColor))}
           </div>
         ))}
+        {/* M24: one invisible trailing column of exact cell width so the
+            current week (the matrix's last) never sits flush against the
+            scroll edge. Not clickable, no data-date, no painted style. */}
+        <div className={`flex flex-col ${GAP} shrink-0`} aria-hidden="true">
+          {Array.from({ length: 7 }, (_, row) => (
+            <div key={row} className={CELL} />
+          ))}
+        </div>
       </div>
     </div>
   );
