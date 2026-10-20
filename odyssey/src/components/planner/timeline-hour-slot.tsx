@@ -52,7 +52,7 @@ interface TimelineHourSlotProps {
  * How long a finger has to rest on a block before it owns the gesture. Below
  * this, a moving finger is scrolling the day and must not move anything.
  */
-const HOLD_TO_DRAG_MS = 450;
+const HOLD_TO_DRAG_MS = 350;
 
 /** The movement that turns a press into a page scroll rather than a grab. */
 const DRAG_SLOP_PX = 10;
@@ -164,7 +164,18 @@ export function TimelineHourSlot({
     const el = rootRef.current;
     if (!el) return;
     const vetoScroll = (e: TouchEvent) => {
-      if (dragStateRef.current?.armed) e.preventDefault();
+      const ds = dragStateRef.current;
+      if (!ds) return;
+      if (ds.armed) { e.preventDefault(); return; }
+      // Still waiting for the grab: let a passing finger scroll, but stop tiny
+      // drift from starting one -- on a real phone that drift is what fires
+      // pointercancel and kills the hold before it can arm.
+      const t = e.touches && e.touches[0];
+      if (t) {
+        const dx = t.clientX - ds.startX;
+        const dy = t.clientY - ds.startY;
+        if (Math.hypot(dx, dy) < 8) e.preventDefault();
+      }
     };
     el.addEventListener("touchmove", vetoScroll, { passive: false });
     return () => el.removeEventListener("touchmove", vetoScroll);
@@ -375,7 +386,7 @@ export function TimelineHourSlot({
           setIsDragging(false);
           setDragTarget(null);
         }}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y [-webkit-touch-callout:none] transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${
           options?.isInsideGroup
             ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
             : cat.cardBg
