@@ -250,9 +250,11 @@ export const HeatmapGrid = memo(function HeatmapGrid({
       <div className="flex self-center">
         {/* Day-of-week labels moved INTO the grid (M27): they must travel
             with the centered matrix, and their column width is what the
-            band's mirror spacer reproduces. */}
+            band's mirror spacer reproduces. The month band above the body
+            already offsets the body from the card top — the separate label
+            column's old spacer double-counted it and pushed every label two
+            rows down. */}
         <div className="flex flex-col shrink-0 pr-1 select-none">
-          <div className="h-6 mb-1 shrink-0" />
           <div className="flex flex-col gap-[2.5px] sm:gap-[3px] shrink-0">
             {ROW_LABELS.map((label, rIdx) => (
               <div
