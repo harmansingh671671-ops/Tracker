@@ -991,9 +991,9 @@ export function PlannerContent() {
           onClick={handleOpenQuickSchedule}
         />
       ) : (
-        /* 24-Hour Chrono Stream Timeline - Structured Vertical Rail
+        /* 24-Hour Chrono Stream Timeline
            Only shown when there ARE blocks */
-        <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
+        <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3">
           {hourGroups.map((group) => {
           const isSleep = group.type === "sleep";
           const isRecentlySaved =

@@ -559,117 +559,14 @@ export function TimelineHourSlot({
     );
   }
 
-  // Open / Unscheduled Slot
+  // Open / Unscheduled Slot — no swipe gestures, only tap to schedule
   return (
     <div
       ref={rootRef}
       key={`slot-${slot.hour}`}
       data-hour={slot.hour}
       onClick={handleSlotClick}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
       onContextMenu={(e) => e.preventDefault()}
-      onPointerDown={(e) => {
-        const isMouse = e.pointerType === "mouse";
-        cancelGrab();
-        dragStateRef.current = { startX: e.clientX, startY: e.clientY, hour: slot.hour, moved: false, armed: isMouse, prevTargetEl: null, isSwipe: false, isDrag: false, dx: 0 };
-        if (!isMouse) grabTimerRef.current = setTimeout(armGrab, HOLD_TO_DRAG_MS);
-      }}
-      onPointerMove={(e) => {
-        const ds = dragStateRef.current;
-        if (!ds) return;
-        const dx = e.clientX - ds.startX;
-        const dy = e.clientY - ds.startY;
-        if (!ds.moved && Math.hypot(dx, dy) < DRAG_SLOP_PX) return;
-        if (!ds.moved) {
-          ds.isSwipe = Math.abs(dx) > Math.abs(dy);
-          ds.isDrag = !ds.isSwipe;
-          if (ds.isDrag && !ds.armed) {
-            return;
-          }
-          ds.moved = true;
-          justDraggedRef.current = true;
-          cancelGrab();
-          setIsDragging(true);
-          ds.dx = dx;
-          try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
-        }
-        ds.dx = e.clientX - ds.startX;
-        if (ds.isSwipe && rootRef.current) {
-          rootRef.current.style.transition = "none";
-          rootRef.current.style.transform = `translateX(${ds.dx}px)`;
-        }
-        e.preventDefault();
-      }}
-      onPointerUp={(e) => {
-        const ds = dragStateRef.current;
-        cancelGrab();
-        if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
-        const wasMoved = !!ds?.moved;
-        if (wasMoved) {
-          justDraggedRef.current = true;
-          setTimeout(() => { justDraggedRef.current = false; }, 100);
-          if (ds?.isSwipe && rootRef.current) {
-            const swipeThreshold = 40; // min pixels to trigger action
-            const didCommit = Math.abs(ds.dx) > swipeThreshold;
-            
-            if (didCommit) {
-              // Swipe left: open edit modal
-              // Swipe right: cycle review status
-              if (ds.dx < 0) {
-                rootRef.current.style.transition = "transform 0.18s ease";
-                rootRef.current.style.transform = "translateX(-18px)";
-                setTimeout(() => {
-                  if (rootRef.current) {
-                    rootRef.current.style.transition = "";
-                    rootRef.current.style.transform = "";
-                  }
-                }, 180);
-                setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
-              } else {
-                // Swipe right: cycle review status
-                rootRef.current.style.transition = "transform 0.18s ease";
-                rootRef.current.style.transform = "translateX(18px)";
-                setTimeout(() => {
-                  if (rootRef.current) {
-                    rootRef.current.style.transition = "";
-                    rootRef.current.style.transform = "";
-                  }
-                }, 180);
-                setTimeout(() => {
-                  onToggleStatus(e as unknown as React.MouseEvent, slot.hour, slot.block, slot.status);
-                }, 120);
-              }
-            } else {
-              // Didn't commit: snap back
-              rootRef.current.style.transition = "transform 0.18s ease";
-              rootRef.current.style.transform = "translateX(0)";
-              setTimeout(() => {
-                if (rootRef.current) {
-                  rootRef.current.style.transition = "";
-                  rootRef.current.style.transform = "";
-                }
-              }, 180);
-            }
-          }
-        }
-        dragStateRef.current = null;
-        setIsDragging(false);
-        setDragTarget(null);
-      }}
-      onPointerCancel={() => {
-        const ds = dragStateRef.current;
-        cancelGrab();
-        if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
-        dragStateRef.current = null;
-        setIsDragging(false);
-        setDragTarget(null);
-      }}
       className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y [-webkit-touch-callout:none] transition-all duration-200 active:scale-[0.99] border ${cat.cardBorder} ${cat.cardBg} my-0.5 ${
         isRecentlySaved
           ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
