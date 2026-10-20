@@ -678,7 +678,7 @@ intact — no intermingling.
 
 ## §10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** **`B4`** this commit — swipe/hold gestures on habit cards (hold = fully
+- **HEAD:** `f8fb417` (BUG-10 resolved by design) on top of `13af9b5` (B4 swipe/hold gestures on habit cards), `352155a` (context for C2), `aa1c36f`/`05bedee` (C2 swipe/drag). Working tree clean.
   done, swipe-left = edit sheet, swipe-right = done / three rectangles on counted
   habits), grid view removed, switcher is List + Heatmap. Committed on `main`;
   **the agent never pushes — the owner pushes.** Before it: the other session's
