@@ -1,38 +1,64 @@
 import { describe, it, expect } from "vitest";
-import { swipeDirection, halfTargetFloor } from "./swipe-gesture";
+import {
+  SWIPE_COMMIT_PX,
+  decideGestureAxis,
+  swipeDirection,
+  halfTargetFloor,
+} from "./swipe-gesture";
 
-describe("swipeDirection (B4)", () => {
-  it("commits left and right at the 56px threshold", () => {
-    expect(swipeDirection(-56, 0)).toBe("left");
-    expect(swipeDirection(-120, 0)).toBe("left");
-    expect(swipeDirection(56, 0)).toBe("right");
-    expect(swipeDirection(120, 0)).toBe("right");
+describe("decideGestureAxis (B4 round 2: the axis is decided once, early)", () => {
+  it("stays undecided before the 8px slop", () => {
+    expect(decideGestureAxis(0, 0)).toBeNull();
+    expect(decideGestureAxis(7.99, 0)).toBeNull();
   });
 
-  it("rejects short drags — they fall through to the tap handler", () => {
-    expect(swipeDirection(0, 0)).toBeNull();
-    expect(swipeDirection(55, 0)).toBeNull();
-    expect(swipeDirection(-55, 0)).toBeNull();
+  it("locks horizontal when the first travel is horizontal", () => {
+    expect(decideGestureAxis(10, 9)).toBe("x");
+    expect(decideGestureAxis(12, 0)).toBe("x");
   });
 
-  it("rejects vertical drags — that is a list scroll, not a gesture", () => {
-    expect(swipeDirection(0, 60)).toBeNull();
-    expect(swipeDirection(0, -60)).toBeNull();
+  it("locks vertical when the first travel is vertical — that is a scroll", () => {
+    expect(decideGestureAxis(9, 10)).toBe("y");
+    expect(decideGestureAxis(0, 12)).toBe("y");
   });
 
-  it("rejects diagonals where the vertical component catches up", () => {
-    // |dy| * 1.2 beats |dx| in both of these
-    expect(swipeDirection(56, -56)).toBeNull();
-    expect(swipeDirection(-56, 56)).toBeNull();
-  });
-
-  it("commits a wide horizontal drag that also has vertical drift", () => {
-    expect(swipeDirection(100, 60)).toBe("right");
-    expect(swipeDirection(-100, 60)).toBe("left");
+  it("breaks a tied first move toward horizontal (swipe intent)", () => {
+    expect(decideGestureAxis(10, 10)).toBe("x");
   });
 });
 
-describe("halfTargetFloor (B4, owner decision: round DOWN)", () => {
+describe("swipeDirection (B4 round 2: commits directly on the locked axis)", () => {
+  it("commits left and right at the 40px threshold once locked horizontal", () => {
+    expect(swipeDirection("x", -40)).toBe("left");
+    expect(swipeDirection("x", -120)).toBe("left");
+    expect(swipeDirection("x", 40)).toBe("right");
+    expect(swipeDirection("x", 120)).toBe("right");
+    expect(SWIPE_COMMIT_PX).toBe(40);
+  });
+
+  it("rejects a locked-horizontal swipe shorter than the threshold", () => {
+    expect(swipeDirection("x", 0)).toBeNull();
+    expect(swipeDirection("x", 39)).toBeNull();
+    expect(swipeDirection("x", -39)).toBeNull();
+  });
+
+  it("never commits when the axis locked vertical — that gesture is a scroll", () => {
+    expect(swipeDirection("y", -500)).toBeNull();
+    expect(swipeDirection("y", 120)).toBeNull();
+  });
+
+  it("never commits while the axis is still undecided", () => {
+    expect(swipeDirection(null, -120)).toBeNull();
+  });
+
+  it("commits a swipe whose finger drifted vertically mid-gesture — no hold needed", () => {
+    // This is the owner case: a casual swipe drifts up/down as the list
+    // scrolls; the lock already decided "x", so only the final dx counts.
+    expect(swipeDirection("x", -60)).toBe("left");
+  });
+});
+
+describe("halfTargetFloor (owner decision: round DOWN)", () => {
   it("floors half the target", () => {
     expect(halfTargetFloor(20)).toBe(10);
     expect(halfTargetFloor(15)).toBe(7);

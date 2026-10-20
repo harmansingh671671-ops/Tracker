@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * B4 — the gesture wrapper for list-view habit cards.
+ * B4 — the gesture wrapper for habit cards (list view AND heatmap view).
  *
  * Three gestures replace what used to be hold-to-edit:
  *   - hold (~400 ms, with a haptic tick) → mark the habit FULLY done for the
@@ -11,6 +11,12 @@
  *   - swipe right → simple: mark done · counted: reveal three small action
  *     rectangles (All Done / +X where X is half the target rounded down / +1).
  *
+ * Round 2 (owner): swipes work DIRECTLY, no hold-then-drag. The gesture's
+ * axis is decided once, from the first 8px of travel (`decideGestureAxis`):
+ * horizontally-locked swipes commit even if the finger drifts vertically and
+ * the list scrolls underneath; vertically-locked drags are inert scrolls. The
+ * shell never calls `preventDefault` — the list scroll must keep working.
+ *
  * The gesture handlers deliberately use the legacy `onTouchStart`/`onMouseDown`
  * events rather than Pointer Events: every interactive child inside the card
  * (the completion ring, the counted progress bar, the avoid control) already
@@ -18,9 +24,9 @@
  * hold. Pointer Events would bubble past those child guards and reintroduce
  * the problem.
  *
- * The drag tracking also uses a ref alongside the state value: the release
- * handler must read the *last* horizontal offset, and a `useCallback` closure
- * would otherwise see a stale state snapshot.
+ * The drag tracking also uses refs alongside state values: the release
+ * handler must read the *last* offset and the locked axis, and a `useCallback`
+ * closure would otherwise see a stale state snapshot.
  */
 
 import { useCallback, useRef, useState } from "react";
@@ -29,6 +35,8 @@ import { Check, ListPlus, Pencil } from "lucide-react";
 import { type Habit } from "@/lib/db";
 import {
   GESTURE_START_PX,
+  type GestureAxis,
+  decideGestureAxis,
   halfTargetFloor,
   swipeDirection,
 } from "@/lib/utils/swipe-gesture";
@@ -61,7 +69,8 @@ interface HabitGestureCardProps {
   habit: Habit;
   className?: string;
   style?: React.CSSProperties;
-  onCardClick: (habit: Habit, e: React.MouseEvent | React.TouchEvent) => void;
+  /** Body tap. Heatmap rows deliberately pass nothing — only the matrix cells react there. */
+  onCardClick?: (habit: Habit, e: React.MouseEvent | React.TouchEvent) => void;
   onEdit: (habit: Habit) => void;
   /** Hold, or a committed swipe-right on a simple habit. */
   onComplete: (habit: Habit) => void;
@@ -94,6 +103,11 @@ export function HabitGestureCard({
   // what the gesture just did.
   const suppressClickRef = useRef(false);
   const moveRef = useRef<{ dx: number; dy: number } | null>(null);
+  // The axis, decided ONCE per gesture from the first 8px of travel. After the
+  // lock a horizontal swipe commits whatever the finger drifts to, and a
+  // vertically-locked drag is inert — this is what makes a casual swipe work
+  // directly instead of needing a deliberate hold-then-drag.
+  const axisRef = useRef<GestureAxis | null>(null);
 
   const clearHold = useCallback(() => {
     if (holdTimerRef.current) {
@@ -107,6 +121,7 @@ export function HabitGestureCard({
       if ("button" in e && e.button !== 0) return;
       startPosRef.current = pointOf(e);
       moveRef.current = null;
+      axisRef.current = null;
       setDragDx(null);
       clearHold();
       holdTimerRef.current = setTimeout(() => {
@@ -128,11 +143,14 @@ export function HabitGestureCard({
       const dy = point.y - start.y;
       moveRef.current = { dx, dy };
       if (Math.hypot(dx, dy) > GESTURE_START_PX) clearHold();
-      // Track only horizontal drags for the visual; a vertical one is a list
-      // scroll and gets no card translation at all.
-      setDragDx(
-        Math.abs(dx) > Math.abs(dy) ? Math.max(-96, Math.min(96, dx)) : null
-      );
+      // Lock the axis the first time the travel passes the slop; after that
+      // the decision is final for this drag.
+      if (axisRef.current === null) {
+        axisRef.current = decideGestureAxis(dx, dy);
+      }
+      // Only a horizontally-locked drag gets the visual translation; a
+      // vertically-locked one is a list scroll and must not move the card.
+      setDragDx(axisRef.current === "x" ? Math.max(-96, Math.min(96, dx)) : null);
     },
     [clearHold]
   );
@@ -141,10 +159,12 @@ export function HabitGestureCard({
     clearHold();
     startPosRef.current = null;
     const move = moveRef.current;
+    const axis = axisRef.current;
     moveRef.current = null;
+    axisRef.current = null;
     setDragDx(null);
     if (!move) return;
-    const dir = swipeDirection(move.dx, move.dy);
+    const dir = swipeDirection(axis, move.dx);
     if (!dir) return;
     suppressClickRef.current = true;
     if (dir === "left") {
@@ -165,6 +185,7 @@ export function HabitGestureCard({
         e.stopPropagation();
         return;
       }
+      if (!onCardClick) return;
       onCardClick(habit, e);
     },
     [habit, onCardClick]
@@ -179,8 +200,8 @@ export function HabitGestureCard({
     onCountedAction(habit, kind);
   };
 
-  const editVisible = dragDx !== null && dragDx < -28;
-  const completeVisible = dragDx !== null && dragDx > 28;
+  const editVisible = dragDx !== null && dragDx < -24;
+  const completeVisible = dragDx !== null && dragDx > 24;
 
   return (
     <motion.div
@@ -212,6 +233,7 @@ export function HabitGestureCard({
           clearHold();
           startPosRef.current = null;
           moveRef.current = null;
+          axisRef.current = null;
           setDragDx(null);
         }}
         onContextMenu={(e) => {

@@ -33,7 +33,6 @@ import {
   LayoutList,
   CalendarDays,
   X,
-  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HabitGestureCard } from "@/components/habits/habit-gesture-card";
@@ -872,21 +871,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
                 : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
               const habitColor = getHabitColor(h);
               return (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0.85, y: 6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{
-                    layout: { type: "spring", stiffness: 350, damping: 28 },
-                    opacity: { duration: 0.2 },
-                    scale: { duration: 0.2 },
-                  }}
+                <HabitGestureCard
                   key={h.id}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setEditingHabit(h);
-                  }}
+                  habit={h}
                   className={`p-3 sm:p-3.5 rounded-2xl bg-surface-container-low border shadow-xs transition-colors duration-200 select-none flex flex-col justify-between hover:bg-surface-container-high/40 active:scale-[0.98] border-l-4 ${
                     !isScheduled ? "border-dashed border-outline/20 opacity-90" : "border-outline/15"
                   } ${
@@ -898,6 +885,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     borderColor: isScheduled ? `${habitColor}35` : undefined,
                     boxShadow: isCompleted ? `0 0 10px ${habitColor}12` : undefined,
                   }}
+                  onEdit={setEditingHabit}
+                  onComplete={handleHoldComplete}
+                  onCountedAction={handleCountedSwipeAction}
                 >
                   {/* Quad Card Header */}
                   <div className="flex items-start justify-between gap-1.5 min-w-0">
@@ -924,22 +914,6 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
-                        {/* B4: hold-to-edit was removed everywhere, and swipes
-                            would fight the matrix's own horizontal scroll, so
-                            the heatmap row needs an explicit edit button for
-                            mobile users (desktop keeps right-click). */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingHabit(h);
-                          }}
-                          className="text-on-surface-variant hover:text-on-surface cursor-pointer"
-                          title="Edit habit"
-                          aria-label={`Edit ${h.name}`}
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
                         {/* Same honest-zero rule: no icon with an empty count. */}
                         {(h.type === "avoid" || getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0) !== "") && (
                           <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
@@ -969,22 +943,32 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
                   </div>
 
-                  {/* Long-history matrix (`B6`): 52 weeks, horizontally scrollable. */}
-                  <HabitGitHubHeatmap
-                    habitId={h.id}
-                    name={h.name}
-                    targetDays={h.targetDays}
-                    targetDaysPerWeek={h.targetDaysPerWeek}
-                    category={h.category}
-                    type={h.type}
-                    targetValue={h.targetValue}
-                    selectedDate={selectedDate}
-                    todayStr={todayStr}
-                    showStats={false}
-                    onSelectDate={(newDate) => setSelectedDate(newDate)}
-                    onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
-                  />
-                </motion.div>
+                  {/* Long-history matrix (`B6`): 52 weeks, horizontally scrollable.
+                      Wrap it in a spacer that STOPS the legacy pointer events: a
+                      touch on the matrix is a horizontal pan of the matrix
+                      itself, so it must never start (or commit) a card swipe or
+                      arm a card hold — but a swipe from the card's header area
+                      still works (B4 round 2). */}
+                  <div
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  >
+                    <HabitGitHubHeatmap
+                      habitId={h.id}
+                      name={h.name}
+                      targetDays={h.targetDays}
+                      targetDaysPerWeek={h.targetDaysPerWeek}
+                      category={h.category}
+                      type={h.type}
+                      targetValue={h.targetValue}
+                      selectedDate={selectedDate}
+                      todayStr={todayStr}
+                      showStats={false}
+                      onSelectDate={(newDate) => setSelectedDate(newDate)}
+                      onToggleDate={(dateStr, e) => handleToggle(h.id, dateStr, e)}
+                    />
+                  </div>
+                </HabitGestureCard>
               );
             })}
           </AnimatePresence>

@@ -2,30 +2,58 @@
  * B4 — pure decision helpers for the habit-card gestures. Extracted so the
  * thresholds are testable: this repo has no component-test harness, so every
  * number the gesture shell depends on lives here instead of in the component.
+ *
+ * Owner feedback (2026-10-20, second round): swipes must work DIRECTLY, not
+ * via a deliberate hold-then-drag. A casual touch swipe always drifts
+ * vertically in its first few pixels, so the horizontal-vs-vertical decision
+ * is made ONCE — from the earliest travel past the slop, the C2 grab-to-drag
+ * lesson — and is never revisited. After the lock, a horizontally-locked
+ * gesture commits at a shorter distance even if the finger wanders up or
+ * down (the list may even scroll underneath); a vertically-locked gesture is
+ * a scroll and stays inert to the end.
  */
 
 /** Total movement past which a press stops being a hold. Matches the 12px the
- * long-press-to-edit gesture used before B4 replaced it, so a scroll during a
- * press cancels the hold exactly the same way it always did. */
+ * long-press-to-edit gesture used before B4 replaced it. */
 export const GESTURE_START_PX = 12;
 
-/** Horizontal distance a swipe must cover to commit its action on release. */
-export const SWIPE_COMMIT_PX = 56;
+/** Movement needed before the gesture's axis is decided. Below this the drag
+ * is still undecided; C2's grab-to-drag work used the same 8px slop and it
+ * matches the browser's own scroll slop. */
+export const GESTURE_SLOP_PX = 8;
 
-/** A swipe only commits while it is horizontal: if the vertical component
- * catches up to this ratio of the horizontal one, the touch is a list scroll
- * and the card must not fire. */
-export const SWIPE_AXIS_RATIO = 1.2;
+/** Horizontal distance a horizontally-locked swipe must cover to commit its
+ * action on release. Reduced from 56px (first B4 build) after the owner
+ * reported needing a deliberate hold-then-drag before a swipe registered. */
+export const SWIPE_COMMIT_PX = 40;
 
+export type GestureAxis = "x" | "y";
 export type SwipeDirection = "left" | "right";
 
 /**
- * Decide the committed action of a pointer release that tracked a drag.
- * Returns null when the movement was a scroll (vertical dominant) or too
- * short to have committed — the card then falls through to its tap handler.
+ * Decide which axis a drag belongs to, once, from the first slop of travel.
+ * Returns null while the gesture has not yet moved the slop (undecided),
+ * "x" for a horizontal gesture (a swipe candidate) and "y" for a scroll.
+ * The first move wins: a horizontal start stays horizontal whatever the
+ * finger does later, and vice versa.
  */
-export function swipeDirection(dx: number, dy: number): SwipeDirection | null {
-  if (Math.abs(dy) * SWIPE_AXIS_RATIO > Math.abs(dx)) return null;
+export function decideGestureAxis(dx: number, dy: number): GestureAxis | null {
+  if (Math.hypot(dx, dy) < GESTURE_SLOP_PX) return null;
+  return Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+}
+
+/**
+ * Commit decision for a drag on a LOCKED axis. Only "x" can commit; a locked
+ * vertical gesture is a scroll and never commits. Returns null when the swipe
+ * is too short to have committed — the card then falls through to its tap
+ * handler (which the browser itself suppresses for anything beyond a small
+ * travel, so a dead zone does not arise in practice on touch).
+ */
+export function swipeDirection(
+  axis: GestureAxis | null,
+  dx: number
+): SwipeDirection | null {
+  if (axis !== "x") return null;
   if (Math.abs(dx) < SWIPE_COMMIT_PX) return null;
   return dx < 0 ? "left" : "right";
 }

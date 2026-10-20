@@ -658,6 +658,8 @@ build clean, 13 routes. **Concurrency:** the other session committed `9a747d0`�
 applied on their committed tree and their habits-screen shared-clock change survived
 intact — no intermingling.
 
+**`B4` round 2 — direct swipes, heatmap gestures (SHIPPED):** owner feedback on the first build: swipes registered only via a deliberate hold-then-drag. Root cause class: the first commit re-checked horizontal-vs-vertical on the FULL drag (`|dx| > |dy|` at release), so a casual touch swipe — which always drifts vertically in its first pixels and may engage a list scroll — was reclassified dead at release. Fix: the axis is decided ONCE at the first 8px of travel (`decideGestureAxis`, the C2 grab-to-drag 8px-slop lesson) and locked; a locked-horizontal swipe commits at 40px (down from 56) however the finger drifts afterwards, and a locked-vertical drag is inert to the end. The shell still never calls `preventDefault`, so the list scroll keeps working. **The three gestures moved onto the heatmap view's cards too** (hold = fully done, swipe-left = edit, swipe-right = done / three rectangles): the matrix is a horizontal-pan surface, so it is wrapped in a spacer that stops the legacy `mousedown`/`touchstart` at the source — a touch panning the heatmap weeks never arms a card hold or commits a card swipe, but swiping from the card's header area does. The round-1 pencil button was removed per owner (edit access on mobile heatmap restores via swipe-left). Pure helpers grew 8 → 12 tests. Gates: tsc 0, lint 0 errors, 31 suites / 482 tests green, build clean. Still not visually verified (no device/harness here).
+
 ### 2026-10-19 — today's entries (condensed)
 
 **`C2` grab-to-drag — a finger must hold before a block moves (SHIPPED):** the Schedule screen's blocks were dragging on a casual scroll. The card carried `touch-action: none` and 10 px of travel started the move, so the page could not scroll from any finger that landed on a block — on a full day that is most of the rail — and the block went to whatever hour the thumb passed. A finger now has to **rest on a block for 250 ms** (`HOLD_TO_DRAG_MS`); only then does the block lift (`opacity-50 scale-95`, the look the drag already used) and follow. The card is `touch-pan-y` again, and the page's scroll is cancelled **only after the grab is armed**, from a **non-passive `touchmove` listener on the card**. That listener is the whole trick: React attaches `touchstart`/`touchmove` at the app root **passively**, so Chrome never waits for the main thread, gives the gesture to the compositor, and marks later moves `cancelable: false` — a veto from a passive handler is ignored ("Ignored attempt to cancel a touchmove event"). With a non-passive listener the touch is "blocking", the first move is cancelable, and `preventDefault()` after arming holds the gesture. `touch-action` is fixed at touchstart, so it **cannot** be switched mid-gesture — that is why the veto is a listener and not a class toggle; `pan-y` is also what lets a passing finger still scroll natively. The 10 px slop now only splits drag (vertical) from swipe-to-edit (horizontal) **after** the grab, so a held swipe still opens the editor and an un-held one cannot. Mouse is untouched (`pointerType === "mouse"` arms at pointerdown) — a desktop has no scroll to fight. A press that starts on the card's own buttons (tick, cross, sleep chevron) never arms; before this, a drag from the chevron moved the block. **No haptic:** `navigator.vibrate` needs `VIBRATE`, which the manifest deliberately does not hold, so the lift is the only signal. Verified with real `Input.dispatchTouchEvent` on a 390-wide page: quick flick over a block → no move, `defaultPrevented: false`, later moves non-cancelable (the browser took it as a scroll); hold+drag → the block moves and saves; hold+swipe → the editor opens; hold+release → inert, no ghost; tap → inert; button-drag → inert; mouse drag → unchanged; light and dark, 360/390/430. **Caveat:** headless Chrome never changed `scrollY`, so the scroll motion itself still needs a finger on the phone. Artifacts: `verify-c2-hold.js`, `verify-c2-hold-visual.js`, `verify-c2-hold-widths.js. **Mobile follow-up (same commit):** the first build did not work on a phone -- a resting finger's tiny drift started a scroll that fired `pointercancel` and killed the 250 ms timer before it could arm, so neither drag nor swipe ever started. Fixed by vetoing `touchmove` while cumulative movement is under 8 px (below the browser's scroll slop, so a real scroll still starts) and adding `-webkit-touch-callout: none`; the hold was shortened from 450 ms to 250 ms to clear the OS long-press threshold. A sideways swipe now needs **no hold** -- it never fought the page's scroll, so gating it behind the hold was both wrong and the reason the owner could not open the editor on a phone. Verified again: tsc 0, lint 0 errors, 470 tests, build clean, full gesture suite green.
@@ -678,18 +680,22 @@ intact — no intermingling.
 
 ## §10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** `f8fb417` (BUG-10 resolved by design) on top of `13af9b5` (B4 swipe/hold gestures on habit cards), `352155a` (context for C2), `aa1c36f`/`05bedee` (C2 swipe/drag). Working tree clean.
-  done, swipe-left = edit sheet, swipe-right = done / three rectangles on counted
-  habits), grid view removed, switcher is List + Heatmap. Committed on `main`;
-  **the agent never pushes — the owner pushes.** Before it: the other session's
-  `9a747d0`…`aa1c36f` (C2 grab-to-drag: feature itself 653c565, tuning commits add the mobile robustness (drift veto, callout suppression, 250 ms hold); M22 rail-card removal; M23
-  distribution pop-up), `dd31a4c` (`S10` docs-only re-settle), `f516a8b` (`B6`),
-  `956cb5d` (`B17`), `014db2f` (`BUG-17`, other session), `993a2c9` (`B16`).
-  Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
-- **Working tree (2026-10-20, `B4`):** clean after that commit.
-- **Gates:** tsc 0; eslint 0 errors; **31 suites / 478 tests** green (486 at
-  `dd31a4c` → 470 from the other session's commits this window, +8 from `B4`);
-  production build clean, 13 routes.
+- **HEAD:** **`B4` round 2** — direct swipes (axis locked early, 40px commit) and the
+  same hold/swipe set on heatmap cards, pencil removed. Round 1 is `13af9b5`. On
+  top of the other session's `aa2865b` (docs) and `f8fb417` (BUG-10 resolved by
+  design: the evening reminder stays sub-screen only — owner decision). Committed
+  on `main`; **the agent never pushes — the owner pushes.** Earlier: `352155a`
+  (context for C2), `aa1c36f`/`05bedee` (C2 swipe/drag: feature itself `653c565`),
+  `dd31a4c` (`S10` docs), `f516a8b` (`B6`), `956cb5d` (`B17`), `993a2c9` (`B16`).
+  Everything through `e67dc01` is on `origin/main`; `8700852` onward are
+  **unpushed**.
+- **Working tree (2026-10-20):** my round-2 files were all committed; one file sat
+  **uncommitted from the other session** at commit time —
+  `src/components/planner/timeline-hour-slot.tsx` — deliberately NOT staged;
+  expect it in their next commit.
+- **Gates (B4 round 2):** tsc 0; eslint 0 errors; **31 suites / 482 tests** green
+  (486 at `dd31a4c` → 470 from the other session's commits this window, +12 from
+  `B4` rounds 1+2 combined); production build clean, 13 routes.
 - **Next:** no pre-approved queue. Candidates in plan order when the owner picks:
   `B13` (pause/archive + the 14-day inactive prompt), `B1` (searchable template
   library), finishing `B2`'s missing form fields. Wallpaper / `B5` stays on
