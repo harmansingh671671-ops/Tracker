@@ -11,21 +11,20 @@
  * the counted panel while it is locked; swipe right marks a simple habit done
  * / locks a counted card to the right, revealing its three option rectangles.
  *
- * Round 3 (owner): the counted card's options ride the DRAG. The card never
- * slides past the row edge — the locked position is a margin/width reflow
- * (right edge fixed, so no horizontal page overflow is ever created) — and the
- * options fade and slide in proportionally with the travel, coming out of the
- * left edge together with the card. Selecting an option applies it and KEEPS
- * the card locked with the options still selectable, so +1 can be tapped
- * repeatedly to tally; the card returns to rest when swiped back left or
- * tapped.
+ * Round 4 (owner: "don't resize the card, move it as it is, and put the
+ * options right to the card outside the card"): the locked position is a plain
+ * translateX — the card keeps its full size and slides over as one piece. The
+ * option rectangles hang IMMEDIATELY OUTSIDE the card's left edge
+ * (`right: 100%` on an absolutely positioned child of the transformed
+ * surface), so they are flush against the moving card at all times and ride
+ * every drag with zero extra choreography. Consequence: the translated card
+ * extends past the row's right edge, so the view wrappers carry
+ * `overflow-x-clip` — nothing can ever scroll the page horizontally, and the
+ * card's far side simply slides past the edge.
  *
- * Geometry: positive travel (counted) is squeezed on the INNER surface with
- * inline margin/width CSS transitions; negative travel is a plain transform.
- * The surface sits INSIDE the `motion.div` so framer's layout spring never
- * fights the inline drag transform, and the outer block's box is unaffected by
- * the inner width change, so the layout spring stays dormant during the
- * squeeze.
+ * Geometry: every drag preview and the locked state are inline `transform`
+ * values on the surface. The surface sits INSIDE the `motion.div` so framer's
+ * layout spring never fights the inline drag transform.
  */
 
 import { useCallback } from "react";
@@ -81,32 +80,22 @@ export function HabitGestureCard({
     [habit, onCountedAction]
   );
 
-  // The squeeze: positive travel for a counted card becomes the margin/width
-  // reflow; while locked the margin rests at the lock spot and further
-  // rightward travel squeezes a little more, returning on release.
+  // Every drag state is a translateX: simple habits drag with their full
+  // signed travel; a counted card travels rightward (the locked panel) or
+  // leftward again (back to rest) with LOCK + travel while locked.
   const positivePreview = dragDx != null && dragDx > 0 ? dragDx : 0;
-  const leftPreview = dragDx != null && dragDx < 0 ? dragDx : 0;
-  const squeezeOffset = isCounted
+  const previewSlide = isCounted
     ? locked
-      ? SWIPE_LOCK_PX + positivePreview
-      : positivePreview
-    : 0;
-  // Leftward preview is a plain transform for every type; simple habits also
-  // drag with the transform on the right (their swipe-right commits a plain
-  // completion, with no squeeze needed).
-  const previewSlide = isCounted ? leftPreview : dragDx ?? 0;
-  const squeezes = isCounted && (locked || positivePreview > 0);
+      ? SWIPE_LOCK_PX + (dragDx ?? 0)
+      : Math.max(0, dragDx ?? 0)
+    : Math.max(-96, Math.min(96, dragDx ?? 0));
   const progress = locked ? 1 : Math.max(0, Math.min(1, positivePreview / SWIPE_LOCK_PX));
 
   const innerStyle: React.CSSProperties = {
     ...style,
     touchAction: "pan-y",
     transform: `translateX(${previewSlide}px)`,
-    transition: dragging
-      ? "none"
-      : "transform 160ms ease-out, margin-left 220ms cubic-bezier(0.2, 0.9, 0.3, 1), width 220ms cubic-bezier(0.2, 0.9, 0.3, 1)",
-    marginLeft: `${squeezeOffset}px`,
-    width: squeezes ? `calc(100% - ${squeezeOffset}px)` : "100%",
+    transition: dragging ? "none" : "transform 200ms cubic-bezier(0.2, 0.9, 0.3, 1)",
   };
 
   return (
@@ -141,7 +130,6 @@ export function HabitGestureCard({
           <CountedSwipeOptions
             half={half}
             habitColor={habitColor}
-            visible={locked || positivePreview > 0}
             progress={progress}
             interactive={locked}
             onAction={applyOption}

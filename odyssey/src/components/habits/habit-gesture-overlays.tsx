@@ -1,14 +1,17 @@
 "use client";
 
 /**
- * B4 round 3 — the overlays of the gesture shell, extracted to keep the shell
+ * B4 round 4 — the overlays of the gesture shell, extracted to keep the shell
  * under the repo's component-size limit.
  *
- * `CountedSwipeOptions` is the option rectangles revealed in the gap a counted
- * card leaves when it locks to the right. They ride the drag: `progress`
- * (0→1 against `SWIPE_LOCK_PX`) drives both their opacity and their slide-in,
- * so the options come out of the left edge WITH the card as it is swiped
- * right, exactly as the owner asked — not popping in after release.
+ * `CountedSwipeOptions` is the option rectangles revealed beside a counted
+ * card. They hang IMMEDIATELY OUTSIDE the card's left edge (`right: 100%` on
+ * an absolutely positioned child of the card's transformed surface) — flush
+ * against the card, never on top of it, and they ride every drag with the card
+ * for free, exactly as the owner asked ("put the options right to the card,
+ * outside the card"). The column is mounted for every counted card and fades
+ * through CSS `opacity 140ms`, so both the drag-in and the release-away are
+ * continuous rather than a pop.
  *
  * Selecting an option does NOT close the panel by design (owner: "keep it
  * locked with options to select"): `+1` can be tapped repeatedly to tally, and
@@ -27,8 +30,6 @@ type CountedKind = "all" | "half" | "one";
 interface CountedSwipeOptionsProps {
   half: number;
   habitColor: string;
-  /** Rendered only while a counted card is dragging right or locked. */
-  visible: boolean;
   /** 0..1 — how far the card has travelled toward / is at its locked spot. */
   progress: number;
   /** Clickable only once the card is locked; during the drag they are a ghost. */
@@ -39,12 +40,10 @@ interface CountedSwipeOptionsProps {
 export function CountedSwipeOptions({
   half,
   habitColor,
-  visible,
   progress,
   interactive,
   onAction,
 }: CountedSwipeOptionsProps) {
-  if (!visible) return null;
   // The option buttons must stop the pointer events the shell tracks, or
   // tapping "All Done" would also arm a card hold or start a new swipe.
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
@@ -54,11 +53,12 @@ export function CountedSwipeOptions({
   };
   return (
     <div
-      className="absolute left-1.5 top-1/2 z-20 flex flex-col gap-1"
+      className="absolute right-full top-1/2 z-20 mr-1.5 flex flex-col gap-1"
       style={{
-        width: SWIPE_LOCK_PX - 12,
+        width: SWIPE_LOCK_PX - 10,
         opacity: progress,
-        transform: `translateY(-50%) translateX(${(progress - 1) * 24}px)`,
+        transform: `translateY(-50%) translateX(${(progress - 1) * 20}px)`,
+        transition: "opacity 140ms ease-out",
         pointerEvents: interactive ? "auto" : "none",
       }}
     >

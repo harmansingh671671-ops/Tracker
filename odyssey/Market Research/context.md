@@ -686,6 +686,26 @@ component harness here), and the sticky-panel reading of the owner's sentence is
 our interpretation — flag on the report to change to apply-and-close if wrong.
 
 
+**`B4` round 4 — desk geometry reversed on owner instruction (SHIPPED):**
+minutes after round 3 the owner gave the visual geometry: "don't resize the
+card, move it as it is, and put the options right to the card outside the
+card." The locked state dropped the margin/width reflow for a plain
+translateX — the card translation happens in full, and the rectangles hang
+`right: 100%` (immediately outside the card's left edge) on a child of the
+transformed card surface, so they are flush against the moving card at all
+times, with no choreography at all — the card and panel move as ONE piece.
+Because a translated full-size card extends past the row's right edge, both
+view wrappers (list + heatmap) gained `overflow-x-clip` — deliberately: a
+transformed child WIDENS the document's scrollable overflow and would let the
+entire page be panned sideways; the clip makes the card's far side simply
+slide past the edge instead. The options column is now mounted on EVERY
+counted card (opacity 0 at rest, `pointer-events: none` until locked) and
+fades via CSS (`opacity 140ms`), so open and close are continuous. Gates:
+tsc 0, eslint 0 errors (touched files), 31 suites / 482 tests, build clean,
+13 routes. Still no visual verification (no device/harness) — this also means
+the round-3 "nothing ever overflows" claim is now obsolete by design.
+
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -710,9 +730,10 @@ our interpretation — flag on the report to change to apply-and-close if wrong.
 
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** B4 round 3 (counted locked options panel) committed on top of `d9e396f` (BUG-18 shared-clock getServerSnapshot fix) and `68e0b73` (other session: C2 drag/swipe reliability on the schedule rail — landed BEFORE this commit, not intermingled), and `187c57f` (B4 round 2), `13af9b5` (B4 round 1): features + docs in one commit per the commit sequence. On `main`; **the agent never pushes — the owner pushes.** Earlier today: `aa2865b` (docs), `f8fb417` (BUG-10 by design), `352155a`/`aa1c36f`/`05bedee` (C2 swipe/drag), `dd31a4c` (S10), `f516a8b` (B6), `956cb5d` (B17), `993a2c9` (B16). Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **HEAD:** B4 round 4 (translate, options flush outside the card) committed on top of B4 round 3 (counted locked options panel), `d9e396f` (BUG-18 shared-clock getServerSnapshot fix), `68e0b73` (other session, C2 drag/swipe reliability) and `187c57f` (B4 round 2): features + docs in one commit per the commit sequence. On `main`; **the agent never pushes — the owner pushes.** Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **Working tree (2026-10-20):** clean after the round-4 commit; explicit paths only, other session's files never touched.
 - **Working tree (2026-10-20):** clean after the round-3 commit. The other session's previously-uncommitted file (`timeline-hour-slot.tsx`) landed in their `68e0b73` — no foreign files left. Expect more commits from them mid-feature; re-check `git status --short` and log before every commit and stage explicit paths only.
-- **Gates (B4 round 3):** tsc 0; eslint 0 errors (touched files); **31 suites / 482 tests** green (unchanged count — helpers untouched, all new behaviour is component-only); production build clean, 13 routes.
+- **Gates (B4 round 4):** tsc 0; eslint 0 errors (touched files); 31 suites / 482 tests; production build clean, 13 routes.
 - **Next:** no pre-approved queue. Candidates in plan order when the owner picks:
   `B13` (pause/archive + the 14-day inactive prompt), `B1` (searchable template
   library), finishing `B2`'s missing form fields. Wallpaper / `B5` stays on

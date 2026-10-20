@@ -801,7 +801,11 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
            div: putting key= on the parent remounts the whole subtree including
 AnimatePresence, which suppresses the enter transition and leaves the
             cards stuck at the initial opacity of 0. */
-         <div className="space-y-2.5">
+         /* overflow-x-clip: a locked counted card translates past the row's
+             right edge (`HabitGestureCard` round 4); without the clip the
+             transformed card would widen the document's scrollable area and
+             the whole page could be panned sideways. */
+         <div className="space-y-2.5 overflow-x-clip">
             <AnimatePresence mode="popLayout" initial={false}>
 {habits.map((h) => {
                 const isScheduled = isHabitScheduledOnDate(h, selectedDate);
@@ -862,7 +866,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
         /* 2. HEATMAP VIEW (`B6`): one scrollable long-history matrix per habit,
            full width. The compact 70-day matrix showed ~10 weeks, which is not
            "long history"; the 52-week matrix is, and it scrolls. */
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 overflow-x-clip">
           <AnimatePresence mode="popLayout" initial={false}>
             {habits.map((h) => {
               const isScheduled = isHabitScheduledOnDate(h, selectedDate);
