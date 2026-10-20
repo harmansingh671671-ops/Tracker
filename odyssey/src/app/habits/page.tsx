@@ -7,7 +7,6 @@ import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
-import { GridHabitCard } from "@/components/habits/grid-habit-card";
 import { HabitListCard } from "@/components/habits/habit-list-card";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
@@ -32,13 +31,17 @@ import {
   Sparkles,
   Lock,
   LayoutList,
-  LayoutGrid,
   CalendarDays,
   X,
+  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { HabitGestureCard } from "@/components/habits/habit-gesture-card";
+import { halfTargetFloor } from "@/lib/utils/swipe-gesture";
 
-type HabitViewMode = "list" | "grid" | "heatmap";
+// B4 (2026-10-20, owner instruction): the grid view was removed — grid cards
+// are now list rows, so list and heatmap are the whole switcher.
+type HabitViewMode = "list" | "heatmap";
 
 /** Where the Habits view-mode preference is stored — `B6` requires a "saved preference". */
 const HABITS_VIEW_STORAGE_KEY = "odyssey_habits_view";
@@ -98,8 +101,11 @@ export default function HabitsPage() {
   useEffect(() => {
     queueMicrotask(() => {
       const saved = readString(HABITS_VIEW_STORAGE_KEY, "");
-      if (saved === "list" || saved === "grid" || saved === "heatmap") {
-        setViewModeState(saved);
+      // "grid" falls back to list: the grid view was removed for B4 (2026-10-20).
+      if (saved === "list" || saved === "grid") {
+        setViewModeState("list");
+      } else if (saved === "heatmap") {
+        setViewModeState("heatmap");
       }
     });
   }, []);
@@ -148,11 +154,6 @@ export default function HabitsPage() {
     closeValueInput();
     showToast(`Logged ${value} ${habit.unit ?? "units"}`);
   }, [valueInputHabit, valueInputAmount, loadedUserId, setHabitLogValue, showToast, closeValueInput]);
-
-  // Long press / tap-and-hold timer refs
-  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isLongPressRef = useRef<boolean>(false);
-  const pressStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Drag gesture refs for counted habits progress bar
   const isDraggingRef = useRef<boolean>(false);
@@ -494,46 +495,85 @@ export default function HabitsPage() {
     await markHabitSlip(userId, habit.id, date, !isSlipped);
   }, [userId, isFutureSelectedDate, markHabitSlip]);
 
-  // Long press gesture listeners to open habit editing modal.
-  // PERF-8b: `useCallback` because these are props of the memoised habit
-  // rows; refs and a stable setState keep them identity-stable.
-  const startPress = useCallback((habit: Habit, e: React.TouchEvent | React.MouseEvent) => {
-    if ("button" in e && e.button !== 0) return;
-    isLongPressRef.current = false;
-    if ("touches" in e && e.touches.length > 0) {
-      pressStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if ("clientX" in e) {
-      pressStartPosRef.current = { x: e.clientX, y: e.clientY };
-    }
-    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
-    pressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true;
-      try {
-        if (typeof window !== "undefined" && navigator?.vibrate) {
-          navigator.vibrate(50);
+  // B4 gesture handlers — consumed by `HabitGestureCard`, which replaces the
+  // removed hold-to-edit plumbing above.
+  //
+  // Hold, or a committed swipe-right on a simple habit: mark the habit FULLY
+  // done for the selected day. Counted habits fill to target through the same
+  // store path as the existing fill-to-target gestures; streaks, counters and
+  // confetti all move inside the store exactly as they do for a tap.
+  const handleHoldComplete = useCallback(
+    async (habit: Habit) => {
+      if (!userId) return;
+      if (isFutureSelectedDate) {
+        showToast("Cannot complete habits for future dates.");
+        return;
+      }
+      const type = habit.type ?? "simple";
+      // Quit habits complete through the clean/slip pair, never a "done" mark.
+      if (type === "avoid") return;
+      if (type === "counted") {
+        const target = habit.targetValue ?? 0;
+        if (!(target > 0)) {
+          showToast("Add a target amount to this habit first");
+          return;
         }
-      } catch (e) { logWarn("page", "haptic feedback failed", e); }
-      setEditingHabit(habit);
-    }, 400);
-  }, [setEditingHabit]);
+        await setHabitLogValue(userId, habit.id, selectedDate, target);
+        showToast(`Filled to ${target} ${habit.unit ?? "units"}`);
+        return;
+      }
+      // Simple: read the store snapshot at call time (the `handleToggle`
+      // pattern) so this callback stays referentially stable. Repeating the
+      // hold must not undo — a repeat is a no-op, undo lives on the ring tap.
+      const before = useHabitStore.getState();
+      const isAlreadyDone =
+        selectedDate === todayStr
+          ? Boolean(before.todayLogs[habit.id]?.completed || before.historyLogs[habit.id]?.[selectedDate])
+          : Boolean(before.historyLogs[habit.id]?.[selectedDate] ?? before.todayLogs[habit.id]?.completed);
+      if (isAlreadyDone) {
+        showToast("Already completed");
+        return;
+      }
+      await handleToggle(habit.id, selectedDate);
+    },
+    [userId, isFutureSelectedDate, selectedDate, todayStr, setHabitLogValue, showToast, handleToggle]
+  );
 
-  const movePress = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    if (!pressTimerRef.current) return;
-    const clientX = "touches" in e && e.touches.length > 0 ? e.touches[0].clientX : "clientX" in e ? e.clientX : 0;
-    const clientY = "touches" in e && e.touches.length > 0 ? e.touches[0].clientY : "clientY" in e ? e.clientY : 0;
-    const dist = Math.hypot(clientX - pressStartPosRef.current.x, clientY - pressStartPosRef.current.y);
-    if (dist > 12) {
-      clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
-  }, []);
-
-  const endPress = useCallback(() => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
-  }, []);
+  // The three rectangles a counted habit's swipe-right reveals.
+  const handleCountedSwipeAction = useCallback(
+    async (habit: Habit, kind: "all" | "half" | "one") => {
+      if (!userId) return;
+      if (isFutureSelectedDate) {
+        showToast("Cannot complete habits for future dates.");
+        return;
+      }
+      const unit = habit.unit ?? "units";
+      const target = habit.targetValue ?? 0;
+      const storeValue = useHabitStore.getState().historyValues?.[habit.id]?.[selectedDate];
+      const base = typeof storeValue === "number" ? storeValue : 0;
+      if (kind === "all") {
+        if (!(target > 0)) {
+          showToast("Add a target amount to this habit first");
+          return;
+        }
+        await setHabitLogValue(userId, habit.id, selectedDate, target);
+        showToast(`Filled to ${target} ${unit}`);
+        return;
+      }
+      // +X is half the target, rounded DOWN (owner decision); values cap at
+      // the target so a repeat can never overshoot it.
+      const step = kind === "half" ? halfTargetFloor(habit.targetValue) : 1;
+      if (step < 1) return;
+      await setHabitLogValue(
+        userId,
+        habit.id,
+        selectedDate,
+        target > 0 ? Math.min(target, base + step) : base + step
+      );
+      showToast(`Logged +${step} ${unit}`);
+    },
+    [userId, isFutureSelectedDate, selectedDate, setHabitLogValue, showToast]
+  );
 
   // Drag gesture handlers for counted habits progress bar
   const handleDragStart = useCallback((habit: Habit, e: React.MouseEvent | React.TouchEvent, currentValue: number) => {
@@ -610,10 +650,8 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
   }, [habits, isFutureSelectedDate, user, setHabitLogValue, showToast]);
 
   const handleCardClick = useCallback(async (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
-      if (isLongPressRef.current) {
-        isLongPressRef.current = false;
-        return;
-      }
+      // B4: the old isLongPressRef guard for hold-to-edit lived here; the
+      // gesture card now suppresses the click a hold/swipe synthesizes itself.
       if (isFutureSelectedDate) {
         showToast("Cannot complete habits for future dates.");
         return;
@@ -684,7 +722,7 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
         </div>
       </div>
 
-      {/* View Switcher Header (List vs Grid vs Heatmap) & Stats Summary */}
+      {/* View Switcher Header (List / Heatmap) & Stats Summary */}
       <div className="flex items-center justify-between gap-2 pt-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Cross-fades on day change. Implemented with a CSS transition rather
@@ -719,7 +757,9 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
           )}
         </div>
 
-        {/* 3-Mode View Switcher */}
+        {/* View Switcher (List / Heatmap). B4, owner instruction 2026-10-20:
+            the Grid card was merged into the list view, so the switcher is two
+            modes. A stored "grid" preference falls back to List on restore. */}
         <div className="flex items-center bg-surface-container-low p-1 rounded-xl border border-outline/15 shadow-xs shrink-0">
           <button
             type="button"
@@ -733,20 +773,6 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
           >
             <LayoutList className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">List</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode("grid")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
-              viewMode === "grid"
-                ? "bg-primary text-on-primary font-bold shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-            title="Grid View"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Grid</span>
           </button>
 
           <button
@@ -785,31 +811,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
                 const habitColor = getHabitColor(h);
 
               return (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, y: 10, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{
-                    layout: { type: "spring", stiffness: 350, damping: 28 },
-                    opacity: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-                    scale: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-                    y: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-                  }}
+                <HabitGestureCard
                   key={`${selectedDate}-${h.id}`}
-                  onTouchStart={(e) => startPress(h, e)}
-                  onTouchMove={movePress}
-                  onTouchEnd={endPress}
-                  onTouchCancel={endPress}
-                  onMouseDown={(e) => startPress(h, e)}
-                  onMouseMove={movePress}
-                  onMouseUp={endPress}
-                  onMouseLeave={endPress}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setEditingHabit(h);
-                  }}
-                  onClick={(e) => handleCardClick(h, e)}
+                  habit={h}
                   className={`group flex flex-col p-3.5 rounded-2xl cursor-pointer transition-colors duration-200 select-none border active:scale-[0.99] shadow-xs ${
                     isCompleted
                       ? "bg-surface-container-low/90 shadow-sm"
@@ -826,6 +830,10 @@ AnimatePresence, which suppresses the enter transition and leaves the
                         : `${habitColor}35`
                       : undefined,
                   }}
+                  onCardClick={handleCardClick}
+                  onEdit={setEditingHabit}
+                  onComplete={handleHoldComplete}
+                  onCountedAction={handleCountedSwipeAction}
                 >
                   <HabitListCard
                     habit={h}
@@ -846,43 +854,13 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     showToast={showToast}
                     setHabitLogValue={setHabitLogValue}
                   />
-                </motion.div>
+                </HabitGestureCard>
               );
             })}
           </AnimatePresence>
         </div>
-) : viewMode === "grid" ? (
-        /* 2. GRID VIEW: 2-Column Compact mobile cards for selected date */
-        <div className="grid grid-cols-2 gap-2.5">
-          <AnimatePresence mode="popLayout" initial={false}>
-            {habits.map((h) => (
-              <GridHabitCard
-                key={h.id}
-                habit={h}
-                selectedDate={selectedDate}
-                todayStr={todayStr}
-                isFutureSelectedDate={isFutureSelectedDate}
-                todayLogs={todayLogs}
-                historyLogs={historyLogs}
-                historyValues={historyValues}
-                userId={user?.id ?? null}
-                setHabitLogValue={setHabitLogValue}
-                showToast={showToast}
-                handleCardClick={handleCardClick}
-                handleToggle={handleToggle}
-                onAvoidClean={(isClean) => handleAvoidClean(h, selectedDate, isClean)}
-                onAvoidSlip={(isSlipped) => handleAvoidSlip(h, selectedDate, isSlipped)}
-                handleDragStart={handleDragStart}
-                startPress={startPress}
-                movePress={movePress}
-                endPress={endPress}
-                setEditingHabit={setEditingHabit}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
       ) : (
-        /* 3. HEATMAP VIEW (`B6`): one scrollable long-history matrix per habit,
+        /* 2. HEATMAP VIEW (`B6`): one scrollable long-history matrix per habit,
            full width. The compact 70-day matrix showed ~10 weeks, which is not
            "long history"; the 52-week matrix is, and it scrolls. */
         <div className="space-y-2.5">
@@ -905,14 +883,6 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     scale: { duration: 0.2 },
                   }}
                   key={h.id}
-                  onTouchStart={(e) => startPress(h, e)}
-                  onTouchMove={movePress}
-                  onTouchEnd={endPress}
-                  onTouchCancel={endPress}
-                  onMouseDown={(e) => startPress(h, e)}
-                  onMouseMove={movePress}
-                  onMouseUp={endPress}
-                  onMouseLeave={endPress}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setEditingHabit(h);
@@ -954,6 +924,22 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-0.5">
+                        {/* B4: hold-to-edit was removed everywhere, and swipes
+                            would fight the matrix's own horizontal scroll, so
+                            the heatmap row needs an explicit edit button for
+                            mobile users (desktop keeps right-click). */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingHabit(h);
+                          }}
+                          className="text-on-surface-variant hover:text-on-surface cursor-pointer"
+                          title="Edit habit"
+                          aria-label={`Edit ${h.name}`}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
                         {/* Same honest-zero rule: no icon with an empty count. */}
                         {(h.type === "avoid" || getDaysDoneLabel(daysDoneByHabit[h.id] ?? 0) !== "") && (
                           <span className={`font-bold text-[10px] font-mono flex items-center gap-0.5 ${h.type === "avoid" ? "text-error" : isDaysDoneActive(daysDoneByHabit[h.id] ?? 0) ? "text-amber-400" : "text-on-surface-variant/60"}`}>

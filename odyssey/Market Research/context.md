@@ -622,6 +622,42 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 →
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-10-20 — today's entries
+
+**`B4` swipe & hold on habit cards (SHIPPED):** habit cards are now mounted in
+`HabitGestureCard` with three gestures replacing the old hold-to-edit: **hold
+(400 ms) marks the habit FULLY done** (counted fills to target through the same
+`setHabitLogValue` store path as the existing fill-to-target gestures — streak,
+counters and confetti move inside the store, not the handler; simple goes through
+`handleToggle`; a repeat never undoes — undo stays on the ring tap); **swipe right
+marks a simple habit done, or by owner decision reveals three small rectangles on a
+counted habit** (`All Done` / `+X` where X is half the target **rounded down** /
+`+1`, capped at the target); **swipe left opens the edit sheet**. Vertical drags are
+inert (axis-ratio 1.2) so list scrolling is untouched. **The shell deliberately uses
+the legacy `onTouchStart`/`onMouseDown` events, NOT Pointer Events:** every
+interactive child (ring, counted progress bar, avoid control) already stops those
+legacy events, and that is the only thing keeping a press on them from starting a
+card hold — a hold on the ring, followed by the ring's own click, would have undone
+the hold's completion. Pointer events would bubble past those child guards. The
+click-synthesis suppression after a gesture moved off `isLongPressRef` into the shell
+(`suppressClickRef`). **Grid view removed per owner** ("make the grid card in the
+list format", then chose merge): the switcher is List + Heatmap, `GridHabitCard`
+(382 lines) is deleted orphan with no remaining importers, and a saved `grid`
+preference falls back to List on restore. Heatmap rows deliberately get **no**
+hold/swipe (a swipe there fights the matrix's own horizontal scroll, and holding a
+matrix cell would misfire) — they gained an explicit pencil button because mobile
+users in heatmap view would otherwise lose edit access entirely; desktop keeps
+right-click. **No haptic, known parity gap:** the hold calls `navigator.vibrate(50)`
+exactly where the old hold-to-edit did, but that is a silent no-op on Android — the
+manifest deliberately lacks `VIBRATE` (see the C2 entry below); feedback is visual
+only. **Gesture thresholds are pure helpers** (`swipeDirection`, `halfTargetFloor`,
+8 tests) because there is no component harness; the gestures themselves were not
+seen on a device — verified by tsc 0, lint 0 errors, 31 suites / 478 tests green,
+build clean, 13 routes. **Concurrency:** the other session committed `9a747d0`…
+`aa1c36f` (C2 grab-to-drag, M22/M23) **while this feature was in flight**; edits were
+applied on their committed tree and their habits-screen shared-clock change survived
+intact — no intermingling.
+
 ### 2026-10-19 — today's entries (condensed)
 
 **`C2` grab-to-drag — a finger must hold before a block moves (SHIPPED):** the Schedule screen's blocks were dragging on a casual scroll. The card carried `touch-action: none` and 10 px of travel started the move, so the page could not scroll from any finger that landed on a block — on a full day that is most of the rail — and the block went to whatever hour the thumb passed. A finger now has to **rest on a block for 250 ms** (`HOLD_TO_DRAG_MS`); only then does the block lift (`opacity-50 scale-95`, the look the drag already used) and follow. The card is `touch-pan-y` again, and the page's scroll is cancelled **only after the grab is armed**, from a **non-passive `touchmove` listener on the card**. That listener is the whole trick: React attaches `touchstart`/`touchmove` at the app root **passively**, so Chrome never waits for the main thread, gives the gesture to the compositor, and marks later moves `cancelable: false` — a veto from a passive handler is ignored ("Ignored attempt to cancel a touchmove event"). With a non-passive listener the touch is "blocking", the first move is cancelable, and `preventDefault()` after arming holds the gesture. `touch-action` is fixed at touchstart, so it **cannot** be switched mid-gesture — that is why the veto is a listener and not a class toggle; `pan-y` is also what lets a passing finger still scroll natively. The 10 px slop now only splits drag (vertical) from swipe-to-edit (horizontal) **after** the grab, so a held swipe still opens the editor and an un-held one cannot. Mouse is untouched (`pointerType === "mouse"` arms at pointerdown) — a desktop has no scroll to fight. A press that starts on the card's own buttons (tick, cross, sleep chevron) never arms; before this, a drag from the chevron moved the block. **No haptic:** `navigator.vibrate` needs `VIBRATE`, which the manifest deliberately does not hold, so the lift is the only signal. Verified with real `Input.dispatchTouchEvent` on a 390-wide page: quick flick over a block → no move, `defaultPrevented: false`, later moves non-cancelable (the browser took it as a scroll); hold+drag → the block moves and saves; hold+swipe → the editor opens; hold+release → inert, no ghost; tap → inert; button-drag → inert; mouse drag → unchanged; light and dark, 360/390/430. **Caveat:** headless Chrome never changed `scrollY`, so the scroll motion itself still needs a finger on the phone. Artifacts: `verify-c2-hold.js`, `verify-c2-hold-visual.js`, `verify-c2-hold-widths.js. **Mobile follow-up (same commit):** the first build did not work on a phone -- a resting finger's tiny drift started a scroll that fired `pointercancel` and killed the 250 ms timer before it could arm, so neither drag nor swipe ever started. Fixed by vetoing `touchmove` while cumulative movement is under 8 px (below the browser's scroll slop, so a real scroll still starts) and adding `-webkit-touch-callout: none`; the hold was shortened from 450 ms to 250 ms to clear the OS long-press threshold. A sideways swipe now needs **no hold** -- it never fought the page's scroll, so gating it behind the hold was both wrong and the reason the owner could not open the editor on a phone. Verified again: tsc 0, lint 0 errors, 470 tests, build clean, full gesture suite green.
@@ -638,8 +674,24 @@ section below; today's entries are kept in full.
 
 **M23 (SHIPPED):** Schedule Distribution pop-up decluttered on owner instruction: header subtitle ("Breakdown of planned hours and activities"), "Planned Total" label, "% Planned" pill and "X Hours planned / Y Hours free" row all removed, **followed within minutes by the clock icon + "X / 24 Hours" count — the overview banner is now only the colour strip, with its segments abutting gapless (`gap-0.5` removed; the gaps misread as unscheduled time on the day).** Per-category cards: the duplicate subtitle ("Deep Work", "Health & Habits", etc.) deleted — one bold heading only; the space under "X% of day" now filled by a share-of-day track bar in the category's solid colour (honest small fills for ~4%). Verified seeded-7h-day + zero-day pop-up, light + dark, 0 console errors. Lesson reinforced: `next start` serves the LAST built bundle — after editing, rebuild before visual checks or you screenshot the old UI.
 
-## §10 Git + task state (re-created after condensation; as of 2026-10-19)
+## §10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** the C2 swipe/drag tuning commit (swipe hold-free, drag hold 250 ms), on top of the previous C2 grab-to-drag commit. The grab-to-drag feature itself shipped in `653c565` (an ancestor of `3b06900`); this commit adds the mobile robustness (veto small drift, callout, 250 ms hold). Working tree clean. Unpushed commit count: run `git log --oneline origin/main..HEAD`. — several.
-- **Push state:** owner pushes; `push` is never run by this agent.
-- **Verify artifacts:** `%TEMP%\opencode\verify\` (`perf16-smoke.js` 6-route smoke, `rail-check.js` planner tap→pop-up check, `verify-perf5.js`, `verify-c2-hold*.js`); Chrome path and seed keys as recorded above.
+- **HEAD:** **`B4`** this commit — swipe/hold gestures on habit cards (hold = fully
+  done, swipe-left = edit sheet, swipe-right = done / three rectangles on counted
+  habits), grid view removed, switcher is List + Heatmap. Committed on `main`;
+  **the agent never pushes — the owner pushes.** Before it: the other session's
+  `9a747d0`…`aa1c36f` (C2 grab-to-drag: feature itself 653c565, tuning commits add the mobile robustness (drift veto, callout suppression, 250 ms hold); M22 rail-card removal; M23
+  distribution pop-up), `dd31a4c` (`S10` docs-only re-settle), `f516a8b` (`B6`),
+  `956cb5d` (`B17`), `014db2f` (`BUG-17`, other session), `993a2c9` (`B16`).
+  Everything through `e67dc01` is on `origin/main`; `8700852` onward are **unpushed**.
+- **Working tree (2026-10-20, `B4`):** clean after that commit.
+- **Gates:** tsc 0; eslint 0 errors; **31 suites / 478 tests** green (486 at
+  `dd31a4c` → 470 from the other session's commits this window, +8 from `B4`);
+  production build clean, 13 routes.
+- **Next:** no pre-approved queue. Candidates in plan order when the owner picks:
+  `B13` (pause/archive + the 14-day inactive prompt), `B1` (searchable template
+  library), finishing `B2`'s missing form fields. Wallpaper / `B5` stays on
+  Phase-5 hold.
+- **Verify artifacts:** `%TEMP%\opencode\verify\` (`perf16-smoke.js`,
+  `rail-check.js`, `verify-perf5.js`, `verify-c2-hold*.js`); Chrome path and seed
+  keys as recorded above.
