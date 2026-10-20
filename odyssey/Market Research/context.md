@@ -674,6 +674,8 @@ intact — no intermingling.
 
 **M23 (SHIPPED):** Schedule Distribution pop-up decluttered on owner instruction: header subtitle ("Breakdown of planned hours and activities"), "Planned Total" label, "% Planned" pill and "X Hours planned / Y Hours free" row all removed, **followed within minutes by the clock icon + "X / 24 Hours" count — the overview banner is now only the colour strip, with its segments abutting gapless (`gap-0.5` removed; the gaps misread as unscheduled time on the day).** Per-category cards: the duplicate subtitle ("Deep Work", "Health & Habits", etc.) deleted — one bold heading only; the space under "X% of day" now filled by a share-of-day track bar in the category's solid colour (honest small fills for ~4%). Verified seeded-7h-day + zero-day pop-up, light + dark, 0 console errors. Lesson reinforced: `next start` serves the LAST built bundle — after editing, rebuild before visual checks or you screenshot the old UI.
 
+**BUG-10 (RESOLVED - BY DESIGN):** owner decision 2026-10-20: the 20:00 evening "plan tomorrow" reminder stays a sub-screen prompt only. `AppShell`'s early-return for `pathname === "/"` and `"/day-schedule"` (mounting only `AppUpdateModal`, never `EveningReminderModal`) is intended, not a defect, so the home screen and quick-schedule page stay free of the modal and the OS notification it fires. Original finding (reminder never appears on `/`) was correct but, on owner decision, not a defect. Do not re-open without a product reason. src: `src/components/layout/app-shell.tsx:35`.
+
 ## §10 Git + task state (as of 2026-10-20)
 
 - **HEAD:** **`B4`** this commit — swipe/hold gestures on habit cards (hold = fully
