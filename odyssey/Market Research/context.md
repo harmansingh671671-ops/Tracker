@@ -640,6 +640,6 @@ section below; today's entries are kept in full.
 
 ## §10 Git + task state (re-created after condensation; as of 2026-10-19)
 
-- **HEAD:** the C2 grab-to-drag mobile follow-up commit, parent `3b06900` (M23 follow-up). The grab-to-drag feature itself shipped in `653c565` (an ancestor of `3b06900`); this commit adds the mobile robustness (veto small drift, callout, 250 ms hold). Working tree clean. Unpushed commit count: run `git log --oneline origin/main..HEAD`. — several.
+- **HEAD:** the C2 swipe/drag tuning commit (swipe hold-free, drag hold 250 ms), on top of the previous C2 grab-to-drag commit. The grab-to-drag feature itself shipped in `653c565` (an ancestor of `3b06900`); this commit adds the mobile robustness (veto small drift, callout, 250 ms hold). Working tree clean. Unpushed commit count: run `git log --oneline origin/main..HEAD`. — several.
 - **Push state:** owner pushes; `push` is never run by this agent.
 - **Verify artifacts:** `%TEMP%\opencode\verify\` (`perf16-smoke.js` 6-route smoke, `rail-check.js` planner tap→pop-up check, `verify-perf5.js`, `verify-c2-hold*.js`); Chrome path and seed keys as recorded above.
