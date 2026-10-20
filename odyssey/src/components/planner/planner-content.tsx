@@ -74,6 +74,16 @@ const hourLabel = (h: number) => `${String(((h % 24) + 24) % 24).padStart(2, "0"
 const durationOf = (startTime: string, endTime: string) =>
   (((hourOf(endTime) - hourOf(startTime)) % 24) + 24) % 24 || 1;
 
+/** Compute the previous or next date string (YYYY-MM-DD) relative to a given date. */
+const shiftDate = (dateStr: string, days: number): string => {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export function PlannerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -130,6 +140,10 @@ export function PlannerContent() {
   const isLongPressTriggeredRef = useRef(false);
   const removedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const flightTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Day-swipe gesture state (S15 - horizontal day navigation on empty areas)
+  const daySwipeRef = useRef<{ startX: number; startY: number; moved: boolean; isHorizontal: boolean } | null>(null);
+  const DAY_SWIPE_THRESHOLD = 60; // min pixels to trigger day change
 
   const showHint = (msg: string) => {
     setHintToast(msg);
@@ -859,7 +873,67 @@ export function PlannerContent() {
 
   return (
     <>
-    <div className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4">
+    <div 
+      className="flex-1 flex flex-col w-full max-w-xl mx-auto px-4 pb-20 pt-2 space-y-4"
+      onPointerDown={(e) => {
+        // Only start day-swipe if pointer is NOT on an hour slot
+        const target = e.target as Element | null;
+        if (target?.closest?.("[data-hour]")) return;
+        if (target?.closest?.("button, a, input, select, textarea")) return;
+        
+        daySwipeRef.current = { 
+          startX: e.clientX, 
+          startY: e.clientY, 
+          moved: false, 
+          isHorizontal: false 
+        };
+      }}
+      onPointerMove={(e) => {
+        const ds = daySwipeRef.current;
+        if (!ds) return;
+        
+        const dx = e.clientX - ds.startX;
+        const dy = e.clientY - ds.startY;
+        const dist = Math.hypot(dx, dy);
+        
+        // Axis detection at 8px threshold
+        if (!ds.moved && dist < 8) return;
+        
+        if (!ds.moved) {
+          ds.isHorizontal = Math.abs(dx) > Math.abs(dy);
+          ds.moved = true;
+        }
+        
+        // Only horizontal swipes trigger day navigation
+        if (!ds.isHorizontal) {
+          daySwipeRef.current = null;
+          return;
+        }
+      }}
+      onPointerUp={(e) => {
+        const ds = daySwipeRef.current;
+        if (!ds || !ds.isHorizontal) {
+          daySwipeRef.current = null;
+          return;
+        }
+        
+        const dx = e.clientX - ds.startX;
+        
+        if (Math.abs(dx) > DAY_SWIPE_THRESHOLD) {
+          // Swipe left: go to tomorrow (next day)
+          // Swipe right: go to yesterday (previous day)
+          const nextDate = dx < 0 
+            ? shiftDate(selectedDate, 1)  // tomorrow
+            : shiftDate(selectedDate, -1); // yesterday
+          handleSelectDate(nextDate);
+        }
+        
+        daySwipeRef.current = null;
+      }}
+      onPointerCancel={() => {
+        daySwipeRef.current = null;
+      }}
+    >
 
       {/* M9 - Completion fraction ("3/5 Habits Done · 60%"). Sits above the
           date strip so the day's standing is read first; animated and built

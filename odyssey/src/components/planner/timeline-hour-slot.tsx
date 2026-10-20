@@ -287,7 +287,6 @@ export function TimelineHourSlot({
         onMouseLeave={handleMouseUp}
         onContextMenu={(e) => e.preventDefault()}
         onPointerDown={(e) => {
-          if (!slot.block) return;
           // The card's own controls are their own gesture: a press on the tick,
           // the cross or the sleep chevron must never start a block move.
           if ((e.target as Element | null)?.closest?.("button, a, input, select, textarea")) return;
@@ -300,16 +299,16 @@ export function TimelineHourSlot({
         }}
         onPointerMove={(e) => {
           const ds = dragStateRef.current;
-          if (!ds || !slot.block) return;
+          if (!ds) return;
           const dx = e.clientX - ds.startX;
           const dy = e.clientY - ds.startY;
           if (!ds.moved && Math.hypot(dx, dy) < DRAG_SLOP_PX) return;
           if (!ds.moved) {
             ds.isSwipe = Math.abs(dx) > Math.abs(dy);
             ds.isDrag = !ds.isSwipe;
-            // A sideways swipe opens the editor and never fought the page's
-            // scroll, so it needs no hold. A vertical drag is the one that
-            // competes with scrolling, so it still waits for the grab.
+            // A sideways swipe opens the editor (left) or cycles review (right) and
+            // never fought the page's scroll, so it needs no hold. A vertical drag
+            // is the one that competes with scrolling, so it still waits for the grab.
             if (ds.isDrag && !ds.armed) {
               // Don't cancel the hold -- the veto will suppress scroll drift
               // up to HOLD_DRIFT_PX. Let the hold timer finish arming.
@@ -321,16 +320,16 @@ export function TimelineHourSlot({
             setIsDragging(true);
             ds.dx = dx;
             try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { void err; }
-            if (ds.isDrag) showGhost(e.clientX, e.clientY);
+            if (ds.isDrag && slot.block) showGhost(e.clientX, e.clientY);
           }
           ds.dx = e.clientX - ds.startX;
-          if (ds.isDrag) placeGhost(e.clientX, e.clientY);
+          if (ds.isDrag && slot.block) placeGhost(e.clientX, e.clientY);
           if (ds.isSwipe && rootRef.current) {
             rootRef.current.style.transition = "none";
             rootRef.current.style.transform = `translateX(${ds.dx}px)`;
           }
           e.preventDefault();
-          if (ds.isDrag && onMoveBlock) {
+          if (ds.isDrag && onMoveBlock && slot.block) {
             const targetEl = hourSlotFromPoint(e.clientX, e.clientY);
             const h = hourFromSlot(targetEl);
             if (targetEl !== ds.prevTargetEl) {
@@ -343,7 +342,7 @@ export function TimelineHourSlot({
             if (h !== null && h !== dragTarget) setDragTarget(h);
           }
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
           const ds = dragStateRef.current;
           cancelGrab();
           hideGhost();
@@ -353,16 +352,49 @@ export function TimelineHourSlot({
             justDraggedRef.current = true;
             setTimeout(() => { justDraggedRef.current = false; }, 100);
             if (ds?.isSwipe && rootRef.current) {
-              rootRef.current.style.transition = "transform 0.18s ease";
-              rootRef.current.style.transform = ds.dx < 0 ? "translateX(-18px)" : "translateX(0)";
-              setTimeout(() => {
-                if (rootRef.current) {
-                  rootRef.current.style.transition = "";
-                  rootRef.current.style.transform = "";
+              const swipeThreshold = 40; // min pixels to trigger action
+              const didCommit = Math.abs(ds.dx) > swipeThreshold;
+              
+              if (didCommit) {
+                // Swipe left: open edit modal
+                // Swipe right: cycle review status
+                if (ds.dx < 0) {
+                  rootRef.current.style.transition = "transform 0.18s ease";
+                  rootRef.current.style.transform = "translateX(-18px)";
+                  setTimeout(() => {
+                    if (rootRef.current) {
+                      rootRef.current.style.transition = "";
+                      rootRef.current.style.transform = "";
+                    }
+                  }, 180);
+                  if (slot.block) {
+                    setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
+                  }
+                } else {
+                  // Swipe right: cycle review status
+                  rootRef.current.style.transition = "transform 0.18s ease";
+                  rootRef.current.style.transform = "translateX(18px)";
+                  setTimeout(() => {
+                    if (rootRef.current) {
+                      rootRef.current.style.transition = "";
+                      rootRef.current.style.transform = "";
+                    }
+                  }, 180);
+                  // Cycle review status for all slots (custom or empty)
+                  setTimeout(() => {
+                    onToggleStatus(e as unknown as React.MouseEvent, slot.hour, slot.block, slot.status);
+                  }, 120);
                 }
-              }, 180);
-              if (ds.dx < 0) {
-                setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
+              } else {
+                // Didn't commit: snap back
+                rootRef.current.style.transition = "transform 0.18s ease";
+                rootRef.current.style.transform = "translateX(0)";
+                setTimeout(() => {
+                  if (rootRef.current) {
+                    rootRef.current.style.transition = "";
+                    rootRef.current.style.transform = "";
+                  }
+                }, 180);
               }
             } else if (ds?.isDrag && ds.hour !== null && dragTarget !== null && dragTarget !== ds.hour && onMoveBlock && slot.block) {
               onMoveBlock(slot.block, dragTarget);
@@ -574,7 +606,7 @@ export function TimelineHourSlot({
         }
         e.preventDefault();
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
         const ds = dragStateRef.current;
         cancelGrab();
         if (ds?.prevTargetEl) setHourHighlight(ds.prevTargetEl, false);
@@ -583,16 +615,46 @@ export function TimelineHourSlot({
           justDraggedRef.current = true;
           setTimeout(() => { justDraggedRef.current = false; }, 100);
           if (ds?.isSwipe && rootRef.current) {
-            rootRef.current.style.transition = "transform 0.18s ease";
-            rootRef.current.style.transform = ds.dx < 0 ? "translateX(-18px)" : "translateX(0)";
-            setTimeout(() => {
-              if (rootRef.current) {
-                rootRef.current.style.transition = "";
-                rootRef.current.style.transform = "";
+            const swipeThreshold = 40; // min pixels to trigger action
+            const didCommit = Math.abs(ds.dx) > swipeThreshold;
+            
+            if (didCommit) {
+              // Swipe left: open edit modal
+              // Swipe right: cycle review status
+              if (ds.dx < 0) {
+                rootRef.current.style.transition = "transform 0.18s ease";
+                rootRef.current.style.transform = "translateX(-18px)";
+                setTimeout(() => {
+                  if (rootRef.current) {
+                    rootRef.current.style.transition = "";
+                    rootRef.current.style.transform = "";
+                  }
+                }, 180);
+                setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
+              } else {
+                // Swipe right: cycle review status
+                rootRef.current.style.transition = "transform 0.18s ease";
+                rootRef.current.style.transform = "translateX(18px)";
+                setTimeout(() => {
+                  if (rootRef.current) {
+                    rootRef.current.style.transition = "";
+                    rootRef.current.style.transform = "";
+                  }
+                }, 180);
+                setTimeout(() => {
+                  onToggleStatus(e as unknown as React.MouseEvent, slot.hour, slot.block, slot.status);
+                }, 120);
               }
-            }, 180);
-            if (ds.dx < 0) {
-              setTimeout(() => onOpenHour(slot.hour, slot.block, slot.hour + 1), 120);
+            } else {
+              // Didn't commit: snap back
+              rootRef.current.style.transition = "transform 0.18s ease";
+              rootRef.current.style.transform = "translateX(0)";
+              setTimeout(() => {
+                if (rootRef.current) {
+                  rootRef.current.style.transition = "";
+                  rootRef.current.style.transform = "";
+                }
+              }, 180);
             }
           }
         }
