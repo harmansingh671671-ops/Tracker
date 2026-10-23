@@ -2,6 +2,7 @@
 
 import { logWarn, readString, writeString } from "@/lib/utils/logger";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
@@ -19,7 +20,7 @@ import { useSharedClock } from "@/lib/utils/shared-clock";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
-import { consumeNewAchievements } from "@/lib/utils/achievements";
+import { useDaysDoneMilestones } from "@/components/habits/use-days-done-milestones";
 import {
   XP_CREATION_DIAMONDS,
   XP_CREATION_XP,
@@ -46,6 +47,15 @@ type HabitViewMode = "list" | "heatmap";
 /** Where the Habits view-mode preference is stored — `B6` requires a "saved preference". */
 const HABITS_VIEW_STORAGE_KEY = "odyssey_habits_view";
 
+// PERF-5 -- the dialog primitive kit is ~20 KB gzipped and this screen draws no
+// dialog on first paint, so it must not be part of the route's first load. Same
+// pattern as `rank-up-dialog` in `header.tsx`; the page also mounts this only
+// once a milestone fires, so the chunk is fetched at that moment, not at hydrate.
+const MilestoneDialog = dynamic(
+  () => import("@/components/gamification/milestone-dialog").then((m) => m.MilestoneDialog),
+  { ssr: false }
+);
+
 export default function HabitsPage() {
   const { user, fetchUser, addXp, addDiamonds } = useUserStore();
   // PERF-8b: the id as a scalar keeps the memoised rows' handler props stable
@@ -70,6 +80,10 @@ export default function HabitsPage() {
     loading: habitsLoading,
     loadedUserId,
   } = useHabitStore();
+
+  // S24: one popup per crossed day milestone, whatever surface wrote the day.
+  const { celebration: milestone, dismiss: dismissMilestone } =
+    useDaysDoneMilestones(daysDoneByHabit, habits);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -313,9 +327,6 @@ export default function HabitsPage() {
       // `toggleHabitLog` sees the same values the previous render read.
       const before = useHabitStore.getState();
       const habit = before.habits.find((h) => h.id === habitId);
-      // Captured before the toggle: after it, the store's counter already includes
-      // this day, so the milestone check would never see the crossing.
-      const prevDaysDone = before.daysDoneByHabit[habitId] ?? 0;
       const isNowCompleted = await toggleHabitLog(userId, habitId, targetDate);
       const habitColor = habit ? getHabitColor(habit) : undefined;
       const isScheduled = habit ? isHabitScheduledOnDate(habit, targetDate) : true;
@@ -357,15 +368,10 @@ export default function HabitsPage() {
         live.historyLogs
       ).isAllCompleted;
 
-      // M15 -- achievement micro-narratives. Only fires on a genuine upward
-      // crossing of a days-done milestone, and only once per habit per milestone.
-      const newDaysDone = live.daysDoneByHabit[habitId] ?? prevDaysDone;
-      const unlocked = consumeNewAchievements(habitId, prevDaysDone, newDaysDone);
-      if (unlocked.length > 0) {
-        unlocked.forEach((a, i) => {
-          window.setTimeout(() => showToast(`${a.title} — ${a.narrative}`), i * 4200);
-        });
-      }
+      // M15/S24 -- milestone celebrations are NOT toasts any more: the popup
+      // queue in `useDaysDoneMilestones` reads the store's days-done map, so it
+      // also covers the surfaces this handler never runs for (heatmap cell,
+      // inline calendar, counted stepper, edit modal).
 
       // M13 -- the toast copy lives in a tested module so the rules (never claim
       // more than happened, never call pending XP earned) are enforced once.
@@ -1014,6 +1020,12 @@ AnimatePresence, which suppresses the enter transition and leaves the
           onSave={handleUpdateHabit}
           onDelete={handleDeleteHabit}
         />
+      )}
+
+      {/* S24 -- day-milestone popup, mounted only while one is queued so the
+          dialog kit is not part of this route's first load (PERF-5). */}
+      {milestone && (
+        <MilestoneDialog entry={milestone} onClose={dismissMilestone} />
       )}
 
       {/* Create Habit Modal with Template Library */}

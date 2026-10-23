@@ -61,7 +61,33 @@ describe("consumeNewAchievements", () => {
     expect(getAchievement("streak-7")?.threshold).toBe(7);
     expect(getAchievement("nope")).toBeUndefined();
   });
-  it("catalogue has 4 milestones", () => {
-    expect(DAYS_MILESTONES.length).toBe(4);
+  it("catalogue has 8 milestones: 3/7/14/21/30/60/100/365 (S24 spec, MASTER_TODO_REVISED §1016)", () => {
+    // S24: the ladder users see is per-habit DAYS DONE (ADR 0005) — the
+    // `streak-*` ids are internal keys only, kept so celebrated flags survive.
+    expect(DAYS_MILESTONES.map((a) => a.threshold)).toEqual([3, 7, 14, 21, 30, 60, 100, 365]);
+  });
+  it("fires the big rungs on upward crossing", () => {
+    expect(newlyCrossedDayMilestones(20, 21)).toEqual(["streak-21"]);
+    expect(newlyCrossedDayMilestones(59, 60)).toEqual(["streak-60"]);
+    expect(newlyCrossedDayMilestones(99, 100)).toEqual(["streak-100"]);
+    expect(newlyCrossedDayMilestones(364, 365)).toEqual(["streak-365"]);
+  });
+  it("a restore jump lists every rung it passes in ASCENDING order (the popup takes them one at a time)", () => {
+    expect(newlyCrossedDayMilestones(0, 366)).toEqual([
+      "streak-3", "streak-7", "streak-14", "streak-21", "streak-30", "streak-60", "streak-100", "streak-365",
+    ]);
+  });
+  it("already being past a big rung never re-fires it", () => {
+    expect(newlyCrossedDayMilestones(100, 101)).toEqual([]);
+    expect(newlyCrossedDayMilestones(365, 366)).toEqual([]);
+  });
+  it("every rung has a title and a narrative (warm-copy rule: never celebrate an empty promise)", () => {
+    for (const a of DAYS_MILESTONES) {
+      expect(a.title.trim().length).toBeGreaterThan(0);
+      expect(a.narrative.trim().length).toBeGreaterThan(0);
+      expect(a.id.trim().length).toBeGreaterThan(0);
+    }
+    const ids = DAYS_MILESTONES.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

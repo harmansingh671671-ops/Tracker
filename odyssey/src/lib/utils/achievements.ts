@@ -11,9 +11,9 @@ export interface Achievement {
 
 /**
  * Per-habit milestones, now counted in **days done** rather than consecutive
- * days (ADR 0005). The thresholds are unchanged; what changed is that reaching
- * them is permanent -- undoing an old day no longer walks a user back below a
- * milestone they already crossed.
+ * days (ADR 0005). Reaching them is permanent -- undoing an old day no longer
+ * walks a user back below a milestone they already crossed. The rungs are
+ * 3, 7, 14, 21, 30, 60, 100, 365 days done (MASTER_TODO_REVISED §1016).
  *
  * The `id`s keep their `streak-` prefix on purpose: they are the keys in the
  * celebrated-log (`odyssey_achievements_celebrated`), so renaming them would
@@ -23,7 +23,11 @@ export const DAYS_MILESTONES: Achievement[] = [
   { id: "streak-3", title: "3 days done", narrative: "Three days in the bank. Momentum is real.", threshold: 3 },
   { id: "streak-7", title: "7 days done", narrative: "A whole week of showing up. That's a habit forming.", threshold: 7 },
   { id: "streak-14", title: "14 days done", narrative: "Fourteen days done. The routine is yours now.", threshold: 14 },
+  { id: "streak-21", title: "21 days done", narrative: "Twenty-one days done. You did not need a round number to keep going.", threshold: 21 },
   { id: "streak-30", title: "30 days done", narrative: "Thirty days done. Quietly remarkable.", threshold: 30 },
+  { id: "streak-60", title: "60 days done", narrative: "Sixty days done. This is just how your week works now.", threshold: 60 },
+  { id: "streak-100", title: "100 days done", narrative: "A hundred days done. Each one was a decision you made, and you kept making it.", threshold: 100 },
+  { id: "streak-365", title: "365 days done", narrative: "Three hundred and sixty-five days done. However long that took on a calendar, each one was a day you showed up.", threshold: 365 },
 ];
 
 export function getAchievement(id: string): Achievement | undefined {
