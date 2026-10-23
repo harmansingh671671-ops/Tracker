@@ -805,7 +805,7 @@ still unanswered, and it is why a code-first build would have guessed. **S21 (Ea
 Frog) was briefed next** and awaits one reward-policy decision before any code: the
 source table states the same bonus as both `2.0x XP` (which is +15 over the live 15 XP
 base) and `+20 XP`; §22.3 also requires the Frog/Keystone combination rule.
-Recorded as **contradiction C13 (OPEN)** in `main_plan.md`. No code, no build.
+Recorded as **contradiction C13 (OPEN)** in `main_plan.md`. **The owner then asked to keep S21 for later, after every phase is complete** — recorded as `DEFERRED — BY OWNER DECISION 2026-10-23` in `main_plan.md`, with the reward decision (C13) still open. No code, no build.
 
 
 
@@ -846,7 +846,7 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 - **HEAD:** `7ef4476` (S19 follow-up: keystone row at the **top of Advanced settings**, confirm before replacing) on top of `7ffdcd7` (S19 keystone pin), `13e87ce` (S24 milestone popups), `e340321` (S18 plate warning), `c7b8b6c` (S17 declined per owner), `2eadd00` (planner: empty-slot swipes removed), `9d2ba4e` (S15 day-swipe). Branch `main` is local-only and never pushed by this session; working tree clean after the S20/S21 docs commit (the untracked `fleet/` directory belongs to another session and is never staged).
 - **Gates (S24):** tsc 0; eslint 0 errors (80 pre-existing warnings repo-wide); 33 suites / 505 tests; `next build` compiled clean; scripted probe PASS in light AND dark (7th day done opens the popup, habit named, panel opaque in both themes, dismisses, never returns on reload); the 61 KB dialog-kit chunk is absent from the `/habits` manifest; port 3100 killed and confirmed closed.
 - **Gates (S19):** tsc 0; eslint 0 errors (80 pre-existing warnings repo-wide; the only warning in the touched files is the pre-existing unused `getDisplayHobbies`); 34 suites / 522 tests (17 new keystone tests); `next build` compiled clean; probes A and B PASS — A: light + dark at 360px, keystone first in list and heatmap, marker on the second line (name 93-109px, ring inside the card), designation at the top of Advanced settings (hidden until Edit Details → Show), replacement confirmation (Keep current leaves the pin untouched, Replace moves it, no-keystone applies immediately, alert readable in both themes), moving the pin reorders the list and moves the badge, wallpaper shows the keystone first with six habits competing for four slots; B: the first habit created through the real UI is pinned. Port 3100 killed and confirmed closed; port 3000 (owner) untouched.
-- **Gates (S20 decline / S21 brief):** docs-only session — no code, no build; `main_plan.md` + this file only. S21 awaits the reward decision (C13).
+- **Gates (S20 decline / S21 defer / S22 + S23 briefs):** docs-only session — no code, no build; `main_plan.md` + this file only. S21 deferred to after the phases (C13 open); S22 and S23 briefed, neither approved.
 - **Gates (S15 brief-only):** docs-only session log — no code, no build from this session.
 - **Gates (S3 decline):** docs-only commit \u2014 main_plan.md + context.md; no code touched, no build run (nothing to build).
 - **Gates (M27 fix):** tsc 0; eslint clean (touched file); 32 suites / 491 tests; `next build` compiled clean; align-probe reports exact 0 offset; PERF-19 harness full green; port 3100 killed both runs.
@@ -861,16 +861,18 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 - **Working tree (2026-10-20):** clean after the round-3 commit. The other session's previously-uncommitted file (`timeline-hour-slot.tsx`) landed in their `68e0b73` — no foreign files left. Expect more commits from them mid-feature; re-check `git status --short` and log before every commit and stage explicit paths only.
 - **Gates (PERF-7 round 2):** tsc 0; eslint 0 errors (touched files); 31 suites / 482 tests; `next build` compiled clean.
 - **Next:** no pre-approved queue — owner picks one per session. `S20` (today's
-  highlight) was briefed and then **declined by the owner on 2026-10-23** (recorded in
-  `main_plan.md`; do not re-open without a fresh instruction). `S21` (Eat That Frog) was
-  briefed next and **awaits one reward-policy decision** before code (2.0x = +15 over the
-  15 XP base vs the same table's +20; plus how it combines with the deferred keystone
-  1.5x — see contradiction C13). Remaining: `S22` (PARTIAL — "hero" still
-  undefined), `S23` (week-over-week delta), `S25` (morning energy check-in). Non-S: `B13`
-  (pause/archive + the 14-day inactive prompt), `B1` (searchable template library), finishing
-  `B2`'s missing form fields. Wallpaper / `B5` stays on Phase-5 hold. One pre-existing defect
-  still worth its own small item: the Schedule page's "Daily Allocation" box counts
-  "Scheduled" by a different rule than the S18 plate (BUG-17 family).
+  highlight) was **declined** by the owner 2026-10-23; `S21` (Eat That Frog) is
+  **deferred until every phase is complete** (reward decision C13 still open). `S22`
+  (PARTIAL: the planner strip's "Next" names an unlogged habit by storage order, and the
+  wallpaper ignores completion entirely) and `S23` (week-over-week delta card) were both
+  **briefed 2026-10-23 and neither is approved yet**; they are the live candidates.
+  Also open: `S25` (morning energy check-in), `B13` (pause/archive + the 14-day inactive
+  prompt), `B1` (searchable template library), finishing `B2`'s missing form fields.
+  Wallpaper / `B5` stays on Phase-5 hold. One pre-existing defect still worth its own
+  small item: the Schedule page's "Daily Allocation" box counts "Scheduled" by a
+  different rule than the S18 plate (BUG-17 family). The stats screen's **93% Adherence
+  tile is a hardcoded placeholder** — a candidate defect of its own, found while
+  briefing S23.
 - **S19 verify artifacts:** %TEMP%\opencode\verify\s19\ (s19-probe.js + seed-s19.js, s19-probe-first.js, plus the style/stack diagnostics). Seed writes into profiles[0] and sets odyssey_habits_view, odyssey_theme_mode and odyssey_wallpaper_enabled (the wallpaper route redirects to /stats while the toggle is off). Open the habit edit sheet by dispatching a contextmenu on the card: real touch swipes and Puppeteer hit points land on child SVGs in headless and silently do nothing.
 - **Verify artifacts:** `%TEMP%\opencode\verify\` (`perf16-smoke.js`,
   `rail-check.js`, `verify-perf5.js`, `verify-c2-hold*.js`); Chrome path and seed
