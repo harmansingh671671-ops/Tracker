@@ -1,5 +1,6 @@
 import { type ScheduleBlock } from "@/lib/db";
 import { type Habit } from "@/lib/db";
+import { withKeystoneOnWallpaper } from "@/lib/utils/keystone";
 
 export interface WallpaperData {
   chapter: number;
@@ -17,6 +18,8 @@ export interface WallpaperData {
   activeHour?: number;
   topClockOffset?: number;
   userStreak?: number;
+  /** S19 — the user's keystone habit, held in the rotating row. */
+  keystoneHabitId?: string;
 }
 
 export interface HourlyBlock {
@@ -649,7 +652,12 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   const rawHabits = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
     ? data.habits
     : placeholderHabits();
-  const userHobbies = selectDynamicHabits(rawHabits, currentHour, 4);
+  const userHobbies = withKeystoneOnWallpaper(
+    selectDynamicHabits(rawHabits, currentHour, 4),
+    rawHabits,
+    data.keystoneHabitId,
+    4
+  );
 
   if (userHobbies.length > 0) {
     const hobHeaderY = hobSectionStartY;

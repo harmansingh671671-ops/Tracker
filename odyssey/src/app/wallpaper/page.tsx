@@ -191,6 +191,8 @@ export default function WallpaperPage() {
       // Was `user?.streak || 1`, which fed the native header a fabricated
       // streak: a brand-new user with a real streak of 0 was rendered "1".
       userStreak: user?.streak ?? 0,
+      // S19 — the wallpaper row keeps a permanent place for the keystone.
+      keystoneHabitId: user?.keystoneHabitId,
     };
   }, [activeDay, rankInfo, user, blocks, habits, selectedDateStr, selectedFormattedDate, simMode]);
 

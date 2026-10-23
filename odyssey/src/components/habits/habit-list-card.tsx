@@ -25,6 +25,7 @@ import { type Habit, type HabitLog } from "@/lib/db";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
+import { KeystoneBadge } from "@/components/habits/keystone-badge";
 import { getHabitColor, isHabitScheduledOnDate, habitCategoryLabel } from "@/lib/utils/habit-colors";
 import { getCompletionRecord, isHabitComplete, isHabitSlipped } from "@/lib/utils/habit-completion";
 import { formatLastDone } from "@/lib/utils/last-done";
@@ -46,6 +47,8 @@ interface HabitListCardProps {
   /** `lastCompletedAt[habit.id]` — formatted inside, see the M7 note below. */
   lastDoneAt?: string;
   userId: string | null;
+  /** S19 — the user's one keystone habit; stable boolean, so memo still holds. */
+  isKeystone?: boolean;
   onSelectDate: (date: string) => void;
   onToggle: (
     habitId: string,
@@ -70,6 +73,7 @@ export const HabitListCard = memo(function HabitListCard({
   daysDone,
   lastDoneAt,
   userId,
+  isKeystone = false,
   onSelectDate,
   onToggle,
   onAvoidClean,
@@ -260,11 +264,18 @@ export const HabitListCard = memo(function HabitListCard({
 
             {/* M7 -- see the header comment. Anchored to `todayStr`, not the
                 selected date: browsing to a past date still answers "when did
-                I last do this" truthfully. */}
-            {lastDone && (
-              <p className="mt-0.5 text-[11px] font-mono text-on-surface-variant/80 truncate">
-                {lastDone}
-              </p>
+                I last do this" truthfully. S19's marker shares this line for the
+                same reason: outside the name row, it cannot take width from the
+                name, the status pills or the completion ring. */}
+            {(isKeystone || lastDone) && (
+              <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                {isKeystone && <KeystoneBadge />}
+                {lastDone && (
+                  <span className="text-[11px] font-mono text-on-surface-variant/80 truncate">
+                    {lastDone}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

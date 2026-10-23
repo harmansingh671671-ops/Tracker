@@ -9,6 +9,7 @@ import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { HabitListCard } from "@/components/habits/habit-list-card";
+import { KeystoneBadge } from "@/components/habits/keystone-badge";
 import { HabitsSkeleton } from "@/components/habits/habits-skeleton";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitDateStrip } from "@/components/habits/habit-date-strip";
@@ -20,6 +21,7 @@ import { useSharedClock } from "@/lib/utils/shared-clock";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
+import { orderHabitsForDisplay } from "@/lib/utils/keystone";
 import { useDaysDoneMilestones } from "@/components/habits/use-days-done-milestones";
 import {
   XP_CREATION_DIAMONDS,
@@ -57,7 +59,7 @@ const MilestoneDialog = dynamic(
 );
 
 export default function HabitsPage() {
-  const { user, fetchUser, addXp, addDiamonds } = useUserStore();
+  const { user, fetchUser, updateUser, addXp, addDiamonds } = useUserStore();
   // PERF-8b: the id as a scalar keeps the memoised rows' handler props stable
   // when the profile object itself is replaced (an XP award, a settings save).
   const userId = user?.id ?? null;  const {
@@ -293,6 +295,12 @@ export default function HabitsPage() {
     return habits.filter((h) => isHabitScheduledOnDate(h, selectedDate));
   }, [habits, selectedDate]);
 
+  // S19 — the keystone leads both views; a stale or archived id changes nothing.
+  const orderedHabits = useMemo(
+    () => orderHabitsForDisplay(habits, user?.keystoneHabitId),
+    [habits, user?.keystoneHabitId]
+  );
+
   const total = scheduledHabits.length || habits.length;
   const completed = habits.filter((h) => {
     return selectedDate === todayStr
@@ -413,7 +421,7 @@ export default function HabitsPage() {
     color?: string;
   }) => {
     if (!user) return;
-    await addHabit({
+    const created = await addHabit({
       userId: user.id,
       name: data.name,
       category: data.category,
@@ -432,6 +440,9 @@ export default function HabitsPage() {
       color: data.color,
       archivedAt: undefined,
     });
+    // S19 — the first habit becomes the keystone (the empty state promises it);
+    // later habits never steal the pin from a habit that already holds it.
+    if (!user.keystoneHabitId) await updateUser({ keystoneHabitId: created.id });
     // One-off rewards for creating a habit. Deliberately NOT routed through the
     // vault: nothing was completed, so there is no day for it to accrue against.
     // It stays an immediate credit.
@@ -490,6 +501,20 @@ export default function HabitsPage() {
     if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit deleted.");
   };
+
+  // S19 — designation only ever MOVES the pin (choosing another habit rewrites
+  // the id; archiving retires it), so there is no clear path and no toast on
+  // success. A failed write is reported: the chip appears only if it landed.
+  const handleSetKeystone = useCallback(
+    async (habitId: string) => {
+      try {
+        await updateUser({ keystoneHabitId: habitId });
+      } catch {
+        showToast("Couldn't save your keystone — try again.");
+      }
+    },
+    [updateUser, showToast]
+  );
 
   // A quit habit's day is one of three things: clean (the run grows), a slip (the run
   // ends), or cleared. Tapping the active choice clears the day, which is the only way
@@ -835,7 +860,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
              the whole page could be panned sideways. */
          <div className="space-y-2.5 overflow-x-clip">
             <AnimatePresence mode="popLayout" initial={false}>
-{habits.map((h) => {
+{orderedHabits.map((h) => {
                 const isScheduled = isHabitScheduledOnDate(h, selectedDate);
                 const log = getCompletionRecord(h, selectedDate, todayStr, { todayLogs, historyLogs, historyValues });
                 const isCompleted = isHabitComplete(h, log);
@@ -877,6 +902,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                     daysDone={daysDoneByHabit[h.id] ?? 0}
                     lastDoneAt={lastCompletedAt[h.id]}
                     userId={userId}
+                    isKeystone={h.id === user?.keystoneHabitId}
                     onSelectDate={setSelectedDate}
                     onToggle={handleToggle}
                     onAvoidClean={handleAvoidClean}
@@ -895,7 +921,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
            with ‹/› paging instead of the year-wide inner scroller. */
         <div className="space-y-2.5 overflow-x-clip">
           <AnimatePresence mode="popLayout" initial={false}>
-            {habits.map((h) => {
+            {orderedHabits.map((h) => {
               const isScheduled = isHabitScheduledOnDate(h, selectedDate);
               const isCompleted = selectedDate === todayStr
                 ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
@@ -933,9 +959,12 @@ AnimatePresence, which suppresses the enter transition and leaves the
                         <HabitIcon icon={h.icon} name={h.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" style={{ color: habitColor }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-xs font-bold text-on-surface truncate leading-tight" title={h.name}>
-                          {h.name}
-                        </h4>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <h4 className="text-xs font-bold text-on-surface truncate leading-tight" title={h.name}>
+                            {h.name}
+                          </h4>
+                          {h.id === user?.keystoneHabitId && <KeystoneBadge />}
+                        </div>
                         <div className="flex items-center gap-1 text-[10px] font-mono text-on-surface-variant">
                           <span className="truncate font-semibold" style={{ color: habitColor }}>
                             {habitCategoryLabel(h)}
@@ -1019,6 +1048,8 @@ AnimatePresence, which suppresses the enter transition and leaves the
           onClose={() => setEditingHabit(null)}
           onSave={handleUpdateHabit}
           onDelete={handleDeleteHabit}
+          isKeystone={editingHabit.id === user?.keystoneHabitId}
+          onSetKeystone={handleSetKeystone}
         />
       )}
 

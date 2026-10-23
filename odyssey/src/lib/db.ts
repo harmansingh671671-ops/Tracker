@@ -42,6 +42,9 @@ export interface Profile {
   equippedSound: string;
   
   notificationsEnabled: boolean;
+
+  /** The user's one keystone habit; a stale or archived id resolves to nothing (`utils/keystone.ts`), so archival retires the pin without rewriting the profile. */
+  keystoneHabitId?: string;
 }
 
 /**

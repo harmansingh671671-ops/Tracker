@@ -47,6 +47,10 @@ interface EditHabitModalProps {
      }
   ) => void;
   onDelete: (habitId: string) => void;
+  /** S19 — this habit is the user's one keystone habit. */
+  isKeystone?: boolean;
+  /** Omitted where designation is not offered; the row hides itself then. */
+  onSetKeystone?: (habitId: string) => void;
 }
 
 const EMOJIS = [
@@ -91,6 +95,8 @@ export function EditHabitModal({
   onClose,
   onSave,
   onDelete,
+  isKeystone = false,
+  onSetKeystone,
 }: EditHabitModalProps) {
   const { user } = useUserStore();
   const { historyLogs, toggleHabitLog, daysDoneByHabit } = useHabitStore();
@@ -263,6 +269,35 @@ export function EditHabitModal({
             </button>
           </div>
         </div>
+
+        {/* S19 — keystone designation. Above the tabs, so it is reachable from
+            the default History tab, not buried in Edit Details. There is
+            deliberately no "clear": choosing another habit moves the pin, so it
+            cannot be left empty by accident. Hidden when the surface does not
+            offer the action. */}
+        {onSetKeystone && (
+          <div className="rounded-2xl border border-outline/10 bg-surface-container-low px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-on-surface">Keystone habit</p>
+              <p className="text-[11px] font-mono text-on-surface-variant">
+                The one habit that holds the rest up
+              </p>
+            </div>
+            {isKeystone ? (
+              <span className="px-3 py-1.5 rounded-full bg-primary/15 border border-primary/40 text-primary text-[11px] font-mono font-bold shrink-0">
+                Keystone
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSetKeystone(habit.id)}
+                className="px-3 py-1.5 rounded-full bg-primary text-on-primary text-[11px] font-bold shrink-0 cursor-pointer active:scale-95 transition-transform"
+              >
+                Make keystone
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 2-Segmented Tab Switcher */}
         <div className="grid grid-cols-2 p-1 bg-surface-container-low rounded-2xl border border-outline/10">

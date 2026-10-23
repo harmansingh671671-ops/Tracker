@@ -10,6 +10,7 @@ import {
   placeholderHabits,
   type HourlyBlock,
 } from "@/lib/utils/wallpaper-generator";
+import { withKeystoneOnWallpaper } from "@/lib/utils/keystone";
 import {
   Check,
   Zap,
@@ -367,7 +368,12 @@ export function WallpaperPreview({
         const rawHabits = (data.habits && data.habits.length > 0)
           ? data.habits
           : placeholderHabits();
-        const userHobbies = selectDynamicHabits(rawHabits, activeHour, 4);
+        const userHobbies = withKeystoneOnWallpaper(
+          selectDynamicHabits(rawHabits, activeHour, 4),
+          rawHabits,
+          data.keystoneHabitId,
+          4
+        );
         const count = userHobbies.length;
 
         return (
