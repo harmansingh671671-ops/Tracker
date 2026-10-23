@@ -51,6 +51,8 @@ interface EditHabitModalProps {
   isKeystone?: boolean;
   /** Omitted where designation is not offered; the row hides itself then. */
   onSetKeystone?: (habitId: string) => void;
+  /** The CURRENT keystone's name, so a replacement can ask first. */
+  keystoneHabitName?: string;
 }
 
 const EMOJIS = [
@@ -97,6 +99,7 @@ export function EditHabitModal({
   onDelete,
   isKeystone = false,
   onSetKeystone,
+  keystoneHabitName,
 }: EditHabitModalProps) {
   const { user } = useUserStore();
   const { historyLogs, toggleHabitLog, daysDoneByHabit } = useHabitStore();
@@ -117,6 +120,7 @@ export function EditHabitModal({
   const [unit, setUnit] = useState("");
   const [targetValue, setTargetValue] = useState("");
   const [color, setColor] = useState("");
+  const [confirmKeystone, setConfirmKeystone] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -269,35 +273,6 @@ export function EditHabitModal({
             </button>
           </div>
         </div>
-
-        {/* S19 — keystone designation. Above the tabs, so it is reachable from
-            the default History tab, not buried in Edit Details. There is
-            deliberately no "clear": choosing another habit moves the pin, so it
-            cannot be left empty by accident. Hidden when the surface does not
-            offer the action. */}
-        {onSetKeystone && (
-          <div className="rounded-2xl border border-outline/10 bg-surface-container-low px-4 py-3 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-on-surface">Keystone habit</p>
-              <p className="text-[11px] font-mono text-on-surface-variant">
-                The one habit that holds the rest up
-              </p>
-            </div>
-            {isKeystone ? (
-              <span className="px-3 py-1.5 rounded-full bg-primary/15 border border-primary/40 text-primary text-[11px] font-mono font-bold shrink-0">
-                Keystone
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onSetKeystone(habit.id)}
-                className="px-3 py-1.5 rounded-full bg-primary text-on-primary text-[11px] font-bold shrink-0 cursor-pointer active:scale-95 transition-transform"
-              >
-                Make keystone
-              </button>
-            )}
-          </div>
-        )}
 
         {/* 2-Segmented Tab Switcher */}
         <div className="grid grid-cols-2 p-1 bg-surface-container-low rounded-2xl border border-outline/10">
@@ -661,6 +636,73 @@ export function EditHabitModal({
               </button>
               {showAdvanced && (
                 <div className="px-4 pb-4 space-y-3">
+                  {/* Keystone designation (S19). Owner decision 2026-10-23:
+                      top of Advanced settings, and replacing an existing keystone
+                      asks first. Deliberately no "clear": choosing another
+                      habit moves the pin, so it cannot be left empty by
+                      accident. Hidden when the surface has no action. */}
+                  {onSetKeystone && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <label className="text-xs font-mono text-on-surface-variant font-medium">
+                            KEYSTONE HABIT
+                          </label>
+                          <p className="text-[11px] text-on-surface-variant/70">
+                            The one habit that holds the rest up
+                          </p>
+                        </div>
+                        {isKeystone ? (
+                          <span className="px-3 py-1.5 rounded-full bg-primary/15 border border-primary/40 text-primary text-[11px] font-mono font-bold shrink-0">
+                            Keystone
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              keystoneHabitName ? setConfirmKeystone(true) : onSetKeystone(habit.id)
+                            }
+                            className="px-3 py-1.5 rounded-full bg-primary text-on-primary text-[11px] font-bold shrink-0 cursor-pointer active:scale-95 transition-transform"
+                          >
+                            Make keystone
+                          </button>
+                        )}
+                      </div>
+
+                      {confirmKeystone && !isKeystone && keystoneHabitName && (
+                        <div
+                          role="alert"
+                          className="rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5 space-y-2"
+                        >
+                          <p className="text-xs text-on-surface">
+                            <span className="font-bold">{keystoneHabitName}</span> is your
+                            keystone. Replace it with
+                            <span className="font-bold"> {habit.name}</span>?
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSetKeystone(habit.id);
+                                setConfirmKeystone(false);
+                              }}
+                              className="flex-1 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform"
+                            >
+                              Replace keystone
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmKeystone(false)}
+                              className="flex-1 py-2 rounded-lg bg-surface-container border border-outline/15 text-on-surface text-xs font-bold cursor-pointer"
+                            >
+                              Keep current
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Priority */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-mono text-on-surface-variant font-medium">PRIORITY</label>

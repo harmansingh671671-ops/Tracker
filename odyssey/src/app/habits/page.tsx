@@ -21,7 +21,7 @@ import { useSharedClock } from "@/lib/utils/shared-clock";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
-import { orderHabitsForDisplay } from "@/lib/utils/keystone";
+import { orderHabitsForDisplay, resolveKeystoneHabit } from "@/lib/utils/keystone";
 import { useDaysDoneMilestones } from "@/components/habits/use-days-done-milestones";
 import {
   XP_CREATION_DIAMONDS,
@@ -1049,6 +1049,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
           onSave={handleUpdateHabit}
           onDelete={handleDeleteHabit}
           isKeystone={editingHabit.id === user?.keystoneHabitId}
+          keystoneHabitName={resolveKeystoneHabit(habits, user?.keystoneHabitId)?.name}
           onSetKeystone={handleSetKeystone}
         />
       )}

@@ -61,11 +61,25 @@ nothing but is never rendered.
 
 Both surfaces (preview and generated canvas) call the same wrapper, so they cannot disagree.
 
-### 2.4 Designation lives in the habit edit sheet, above the tabs
+### 2.4 Designation lives in the sheet's Advanced settings
+
+**Owner decision (2026-10-23):** the control sits at the **top of the edit sheet's Advanced
+settings** (Edit Details → Advanced settings → Show), not above the tabs.
+Most people set a keystone once, so it should not compete with the History content on every
+open. The automatic first-habit rule is what keeps a keystone reachable without opening the
+sheet at all, which is what makes hiding the control acceptable.
+
+### 2.4.0 Replacing a keystone asks first
+
+If another habit is already the keystone, `Make keystone` does **not** move the pin silently.
+An inline confirmation names both habits — "Keystone Run is your keystone. Replace
+it with Morning Stretch?" — with `Replace keystone` and `Keep current`; the message
+carries `role="alert"` so it is announced. `Keep current` leaves the profile untouched.
+With no keystone set there is nothing to confirm and the pin applies immediately. The current
+keystone's name comes from the same resolver, so an archived or stale keystone produces no
+confirmation and no silent overwrite.
 
 The row is "Keystone habit" with the secondary line "The one habit that holds the rest up".
-It renders **above** the sheet's History / Edit Details switcher, so the default History tab
-shows it without a second tap; no new state and no change to the default tab were needed.
 
 The action is a `Make keystone` button; once set, it renders as a quiet `Keystone` chip.
 There is **deliberately no "clear keystone" action**: choosing another habit moves the pin,
@@ -118,7 +132,8 @@ number reads `keystoneHabitId`.
   The marker lives on the card's second line, outside the name row, so it cannot take width
   from the name, the status pills or the completion ring at 360px.
 - The first habit is pinned automatically; a user who never opens the edit sheet still has a
-  keystone from the moment they have a habit.
+  keystone from the moment they have a habit. Moving it always passes through a confirmation,
+  so a stray tap cannot replace the habit the rest of the system treats as the anchor.
 - A habit can disappear from a list only by being deleted or archived; archiving also
   silently unpins it, which is the intended one-step retirement.
 - Two wallpaper selectors are now one rule. A future third surface must call
@@ -133,7 +148,7 @@ number reads `keystoneHabitId`.
 - The 17 unit tests in `src/lib/utils/keystone.test.ts` cover the **three pure functions
   only**: resolution tolerance, list ordering, and the wallpaper wrap. They say nothing about
   the wiring.
-- The wiring — ordering in both views, the marker on both card types, the sheet row above the
-  tabs, both wallpaper wraps, and the first-habit pin — is verified by a **scripted browser
+- The wiring — ordering in both views, the marker on both card types, the sheet row inside Advanced
+settings, both wallpaper wraps, and the first-habit pin — is verified by a **scripted browser
   probe**, not by unit tests. A green unit suite is not evidence that the screen shows the
   keystone first.
