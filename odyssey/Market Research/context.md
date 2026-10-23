@@ -787,6 +787,9 @@ errors); screenshot confirms the trailing room. Gates: tsc 0, eslint clean
 
 **S3 declined (both variants) \u2014 plan updated, no code:** owner asked what "S3" was; briefed that the research docs give the ID two meanings - energy level tags (folded under B9) and a pre-habit 5-minute nudge (only in the integration roadmap). Decision 2026-10-20: **decline both, do not re-open without a product reason.** An `S3` DECLINED line was added to main_plan.md in the S-series and `B9`'s wording was corrected: priority is shipped (S2), energy declined, B9's remaining scope = context tags. No schema or code change. Next-queue candidates unchanged: B13 (pause/archive + 14-day reminder), B1 (searchable template library), B2 (remaining form fields); owed device-side checks and ADR items otherwise.\n
 
+**BEFORE-BUILD BRIEF on S15 was stale - corrected before anything committed:** I briefed S15 as NOT BUILT and proposed gesture zoning; the other session had already shipped it (`9d2ba4e`: swipe-right on hour slots cycles review status, swipe-left edits) and then **removed the empty-area day-swipe** (`2eadd00`, "remove swipe gestures on empty slots"). Owner instruction 2026-10-23 stands as the ruling on the feature: **"don't make it more complicated, keep the swiping thing simple, don't add anything more"** - i.e. NO edge-band/header overlay ideas on top, keep the slot gestures as they are. A prior version of this entry said "S15 declined"; withdrawn as factually wrong (it is SHIPPED, partly retracted by 2eadd00; the plan line may need that retraction noted). No code change from this session.
+
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -821,7 +824,8 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 ## Ã‚Â§10 Git + task state (as of 2026-10-20)
 
-- **HEAD:** BUG-6 + BUG-11 (3/4 sites) on top of BUG-18, BUG-10, B4, C2, M27 (other session). Working tree clean.
+- **HEAD:** `c7b8b6c` (docs: S17 declined by owner) → `2eadd00` (planner: empty-slot swipes removed) → `9d2ba4e` (S15 day-swipe + review-status cycle, other session) → `af03782` (BUG-6 + BUG-11 3/4 sites, other session) → `b08dc06` (S3 declined, this session) → `44ea11a` (M27 align fix) → `f297632` (M27 centering); earlier per prior entries.
+- **Gates (S15 brief-only):** docs-only session log — no code, no build from this session.
 - **Gates (S3 decline):** docs-only commit \u2014 main_plan.md + context.md; no code touched, no build run (nothing to build).
 - **Gates (M27 fix):** tsc 0; eslint clean (touched file); 32 suites / 491 tests; `next build` compiled clean; align-probe reports exact 0 offset; PERF-19 harness full green; port 3100 killed both runs.
 - **Gates (M27):** tsc 0; eslint clean (touched files); 32 suites / 491 tests; `next build` compiled clean; PERF-19 harness full green (windowed cells, pager, swipe-through, zero console errors); wide + narrow screenshots verified; port 3100 killed both runs.
