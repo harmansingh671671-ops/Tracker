@@ -10,6 +10,8 @@ import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
 import { resolveEditedCategory } from "@/lib/utils/schedule-category-edit";
+import { evaluateDayLoad } from "@/lib/utils/day-load";
+import { DayLoadBanner } from "@/components/schedule/day-load-banner";
 import { LoadingIndicator } from "@/components/common/loading-indicator";
 import {
   ChevronLeft,
@@ -539,6 +541,13 @@ function DayScheduleContent() {
   }, [full24Hours, isPlannedHour]);
 
   /**
+   * S18 — the "plate" verdict derives from the SAVED plan (`blocks`), not from
+   * `full24Hours`: that memo also counts typed-but-unsaved titles, which the
+   * planner rail deliberately shows but the warning must not report.
+   */
+  const dayLoad = useMemo(() => evaluateDayLoad(blocks), [blocks]);
+
+  /**
    * The bar's 24 one-hour slices, left to right = 00:00 → 23:00, so it reads as
    * the day rather than as five buckets with the order discarded. Same planned
    * test as `categoryStats` above, by construction.
@@ -998,6 +1007,13 @@ function DayScheduleContent() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 pt-3 space-y-4">
+        {/* S18 verdict hidden while the day's blocks are still fetching:
+            the store keeps ONE blocks array, so during a date flip it can
+            briefly hold the PREVIOUS day's hours under the new day's header —
+            rendering the banner there would print a confident number about
+            the wrong day. Same exposure exists for the allocation box (older
+            surface, pre-existing). */}
+        {!loading && <DayLoadBanner load={dayLoad} />}
         {/* 24-HOUR CATEGORY DISTRIBUTION BOX (Matching Planner Page)
 
             Above the day-title input: the allocation is the read-at-a-glance
