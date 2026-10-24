@@ -396,6 +396,22 @@ export interface HabitLog {
   loggedAt: string;
 }
 
+/**
+ * S25 — one self-reported energy level per user per day, 1 (drained) to 5
+ * (charged). The id is `${userId}:${date}` so the primary key itself enforces
+ * "one answer a day": re-answering replaces, and a stray double-tap cannot
+ * create a second row.
+ */
+export interface EnergyLog {
+  /** `${userId}:${date}` — see above. */
+  id: string;
+  userId: string;
+  /** Local calendar day. `YYYY-MM-DD`. */
+  date: string;
+  level: 1 | 2 | 3 | 4 | 5;
+  loggedAt: string;
+}
+
 export interface WeeklyReport {
   id: string;
   userId: string;
@@ -459,6 +475,7 @@ class OdysseyDB extends Dexie {
   weeklyReports!: Table<WeeklyReport>;
   inboxItems!: Table<InboxItem>;
   rewardSettlements!: Table<RewardSettlement>;
+  energyLogs!: Table<EnergyLog>;
 
   constructor() {
     super('OdysseyDB');
@@ -498,6 +515,13 @@ class OdysseyDB extends Dexie {
         const next = normalizeHabitCategory(String(habit.category ?? ''));
         if (next !== habit.category) habit.category = next;
       });
+    });
+
+    // S25 — additive: a new table only, no existing field touched, so there is
+    // nothing for `up()` to do. Declared as version 3 (not edited into version 2)
+    // so an existing install gains the store in place instead of being reset.
+    this.version(3).stores({
+      energyLogs: 'id, [userId+date]',
     });
   }
 }
