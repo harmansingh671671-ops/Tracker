@@ -10,6 +10,7 @@ import {
   type DayHabitProgress,
 } from "@/lib/utils/habit-progress";
 import { isHabitScheduledOnDate } from "@/lib/utils/habit-colors";
+import { selectNextUnloggedHabit } from "@/lib/utils/habit-priority";
 import { type Habit, type HabitLog } from "@/lib/db";
 
 interface CompletionFractionHeaderProps {
@@ -52,18 +53,18 @@ export function CompletionFractionHeader({
     historyLogs
   );
 
-  const nextHabit =
-    habits.find((h) => {
-      const scheduled = isHabitScheduledOnDate(h, selectedDate);
-      const done = isHabitCompletedOnDate(
-        h,
-        selectedDate,
-        todayStr,
-        todayLogs,
-        historyLogs
-      );
-      return scheduled && !done;
-    }) ?? null;
+  // S22 — name the most important unfinished habit, not the first one stored.
+  const nextHabit = selectNextUnloggedHabit(habits, (h) => {
+    const scheduled = isHabitScheduledOnDate(h, selectedDate);
+    const done = isHabitCompletedOnDate(
+      h,
+      selectedDate,
+      todayStr,
+      todayLogs,
+      historyLogs
+    );
+    return scheduled && !done;
+  });
 
   useEffect(() => {
     const el = scrollerRef.current;

@@ -809,6 +809,9 @@ Recorded as **contradiction C13 (OPEN)** in `main_plan.md`. **The owner then ask
 
 
 
+
+**S22 shipped — unlogged habits take precedence (loop-supervised playbook; the builder never spawned):** two visible changes, one rule behind both. The planner strip's one-liner now names the highest-priority habit still open today (critical, then focus, then optional, then unprioritised; ties keep stored order) instead of whichever row the database returned first. The wallpaper's four habit slots lead with habits due today and not done, then due-and-done, then habits not due today, each group keeping the existing time-of-day order; a finished habit shows a green `✓ DONE` pill where its streak pill used to be. Keystone precedence settled the open S22 question: the keystone keeps slot 1 even when done and unlogged-first applies to the rest. Completion uses the strict `isHabitComplete` truth read from `habitLogs` for the shown date, never the dead `weeklyReports` table. The payload field is optional, so a caller without it gets byte-identical old behaviour. The playbook's fleet dispatch failed before the builder ran (`spawn …\opencode ENOENT`), so the supervisor wrote and implemented directly — disclosed, and the dead run was cleaned up. Gates: tsc 0; eslint 0 errors (14 pre-existing warnings in the touched files); 36 suites / 545 tests (23 in the two gate files); `next build` clean; 11/11 scripted probe checks in light AND dark; port 3100 killed. Limits: only the preview renderer is reachable today (the canvas renderer behind the Android bridge has no page caller), and a legacy counted log whose stored boolean disagrees with its value reads done in the planner but open on the wallpaper.
+
 ### 2026-10-20 â€” today's entries (condensed)
 
 **C2 drag/swipe reliability (SHIPPED):** fixed mobile drag-and-drop reliability and added swipe-to-edit for empty slots. Root cause: the 250 ms hold timer was too long for real fingers (tiny drift killed it before arming), the drift veto was tighter (8 px) than the browser's scroll slop (~10 px), and the code cancelled the hold on drift instead of waiting. Fixed by: (1) shortening hold to 150 ms, (2) raising drift veto to 12 px (covers browser slop), (3) making onPointerMove wait for arming instead of cancelling. Also added swipe-to-edit to empty slots (right-to-left swipe opens the hour editor) by giving them the same pointer handlers as filled blocks. Verified: tsc 0, lint 0 errors, 482 tests, build clean, all gesture scenarios (quick flick, hold+drag, hold+swipe, hold+release, tap, button-drag, mouse drag, empty-slot swipe) pass in headless Chrome; light/dark/360/390/430.
@@ -841,9 +844,10 @@ Held: `app/page.tsx` (landing screen) — overlaps possible S-series morning ene
 New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server Components); `shared-clock.ts` re-exports for client consumers. Gates: tsc 0, lint 0 errors, 491 tests, build clean.
 
 
-## §10 Git + task state (as of 2026-10-23)
+## §10 Git + task state (as of 2026-10-24)
 
-- **HEAD:** `7ef4476` (S19 follow-up: keystone row at the **top of Advanced settings**, confirm before replacing) on top of `7ffdcd7` (S19 keystone pin), `13e87ce` (S24 milestone popups), `e340321` (S18 plate warning), `c7b8b6c` (S17 declined per owner), `2eadd00` (planner: empty-slot swipes removed), `9d2ba4e` (S15 day-swipe). Branch `main` is local-only and never pushed by this session; working tree clean after the S20/S21 docs commit (the untracked `fleet/` directory belongs to another session and is never staged).
+- **HEAD:** S22 commit (unlogged-first wallpaper + priority `Next`) on top of `73577e5` (S22 red gate), `dd8463a` (S20 decline / S21 defer / S22+S23 briefs), `8e0043e` (plan updates), `7ef4476` (S19 follow-up: keystone row at the top of Advanced settings), `7ffdcd7` (S19 keystone pin), `13e87ce` (S24 milestone popups), `e340321` (S18 schedule plate).
+- **Gates (S22):** tsc 0; eslint 0 errors (14 pre-existing warnings in the touched files); 36 suites / 545 tests; `next build` compiled clean; 11/11 probe checks in light AND dark (priority `Next`, keystone first with `DONE`, both unlogged habits present, archived absent, four slots); port 3100 killed. The gate was committed red at `73577e5`; four of its own expectations were corrected by the supervisor before any implementation (arithmetic/fallback-order only — no rule weakened), and the verifier's finding that the fallback path never exceeded the slot count was closed with a fifth test.
 - **Gates (S24):** tsc 0; eslint 0 errors (80 pre-existing warnings repo-wide); 33 suites / 505 tests; `next build` compiled clean; scripted probe PASS in light AND dark (7th day done opens the popup, habit named, panel opaque in both themes, dismisses, never returns on reload); the 61 KB dialog-kit chunk is absent from the `/habits` manifest; port 3100 killed and confirmed closed.
 - **Gates (S19):** tsc 0; eslint 0 errors (80 pre-existing warnings repo-wide; the only warning in the touched files is the pre-existing unused `getDisplayHobbies`); 34 suites / 522 tests (17 new keystone tests); `next build` compiled clean; probes A and B PASS — A: light + dark at 360px, keystone first in list and heatmap, marker on the second line (name 93-109px, ring inside the card), designation at the top of Advanced settings (hidden until Edit Details → Show), replacement confirmation (Keep current leaves the pin untouched, Replace moves it, no-keystone applies immediately, alert readable in both themes), moving the pin reorders the list and moves the badge, wallpaper shows the keystone first with six habits competing for four slots; B: the first habit created through the real UI is pinned. Port 3100 killed and confirmed closed; port 3000 (owner) untouched.
 - **Gates (S20 decline / S21 defer / S22 + S23 briefs):** docs-only session — no code, no build; `main_plan.md` + this file only. S21 deferred to after the phases (C13 open); S22 and S23 briefed, neither approved.
@@ -860,19 +864,17 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 - **Working tree (2026-10-20):** clean after the round-4 commit; explicit paths only, other session's files never touched.
 - **Working tree (2026-10-20):** clean after the round-3 commit. The other session's previously-uncommitted file (`timeline-hour-slot.tsx`) landed in their `68e0b73` — no foreign files left. Expect more commits from them mid-feature; re-check `git status --short` and log before every commit and stage explicit paths only.
 - **Gates (PERF-7 round 2):** tsc 0; eslint 0 errors (touched files); 31 suites / 482 tests; `next build` compiled clean.
-- **Next:** no pre-approved queue — owner picks one per session. `S20` (today's
-  highlight) was **declined** by the owner 2026-10-23; `S21` (Eat That Frog) is
-  **deferred until every phase is complete** (reward decision C13 still open). `S22`
-  (PARTIAL: the planner strip's "Next" names an unlogged habit by storage order, and the
-  wallpaper ignores completion entirely) and `S23` (week-over-week delta card) were both
-  **briefed 2026-10-23 and neither is approved yet**; they are the live candidates.
-  Also open: `S25` (morning energy check-in), `B13` (pause/archive + the 14-day inactive
-  prompt), `B1` (searchable template library), finishing `B2`'s missing form fields.
-  Wallpaper / `B5` stays on Phase-5 hold. One pre-existing defect still worth its own
-  small item: the Schedule page's "Daily Allocation" box counts "Scheduled" by a
-  different rule than the S18 plate (BUG-17 family). The stats screen's **93% Adherence
-  tile is a hardcoded placeholder** — a candidate defect of its own, found while
+- **Next:** no pre-approved queue — owner picks one per session. `S22` is **SHIPPED** (2026-10-24).
+  `S23` (week-over-week delta card) was briefed 2026-10-23 and is the live candidate, not yet
+  approved. `S20` (today's highlight) was **declined** by the owner 2026-10-23; `S21` (Eat That Frog)
+  is **deferred until every phase is complete** (reward decision C13 still open). Also open: `S25`
+  (morning energy check-in), `B13` (pause/archive + the 14-day inactive prompt), `B1` (searchable
+  template library), finishing `B2`'s missing form fields. Wallpaper / `B5` stays on Phase-5 hold.
+  One pre-existing defect still worth its own small item: the Schedule page's "Daily Allocation" box
+  counts "Scheduled" by a different rule than the S18 plate (BUG-17 family). The stats screen's
+  **93% Adherence tile is a hardcoded placeholder** — a candidate defect of its own, found while
   briefing S23.
+- **S22 verify artifacts:** `%TEMP%\opencode\verify\s22\s22-probe.js` (seeds five live habits plus one archived with priorities and today's logs; asserts the planner `Next` and the wallpaper order/`DONE` marks in light and dark; screenshots `planner-light.png`, `planner-dark.png`, `wallpaper.png`).
 - **S19 verify artifacts:** %TEMP%\opencode\verify\s19\ (s19-probe.js + seed-s19.js, s19-probe-first.js, plus the style/stack diagnostics). Seed writes into profiles[0] and sets odyssey_habits_view, odyssey_theme_mode and odyssey_wallpaper_enabled (the wallpaper route redirects to /stats while the toggle is off). Open the habit edit sheet by dispatching a contextmenu on the card: real touch swipes and Puppeteer hit points land on child SVGs in headless and silently do nothing.
 - **Verify artifacts:** `%TEMP%\opencode\verify\` (`perf16-smoke.js`,
   `rail-check.js`, `verify-perf5.js`, `verify-c2-hold*.js`); Chrome path and seed

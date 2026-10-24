@@ -6,11 +6,10 @@ import {
   build24HourlyBlocks,
   getCenteredHourlyWindow,
   resolveHobbyEmoji,
-  selectDynamicHabits,
   placeholderHabits,
   type HourlyBlock,
 } from "@/lib/utils/wallpaper-generator";
-import { withKeystoneOnWallpaper } from "@/lib/utils/keystone";
+import { selectWallpaperHabits } from "@/lib/utils/wallpaper-habits";
 import {
   Check,
   Zap,
@@ -368,12 +367,13 @@ export function WallpaperPreview({
         const rawHabits = (data.habits && data.habits.length > 0)
           ? data.habits
           : placeholderHabits();
-        const userHobbies = withKeystoneOnWallpaper(
-          selectDynamicHabits(rawHabits, activeHour, 4),
-          rawHabits,
-          data.keystoneHabitId,
-          4
-        );
+        const userHobbies = selectWallpaperHabits(rawHabits, {
+          hour: activeHour,
+          maxCount: 4,
+          dateStr: data.dateStr,
+          completedIds: data.completedHabitIds ? new Set(data.completedHabitIds) : undefined,
+          keystoneId: data.keystoneHabitId,
+        });
         const count = userHobbies.length;
 
         return (
@@ -407,9 +407,15 @@ export function WallpaperPreview({
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/35 font-bold shrink-0 shadow-sm">
-                    {h.currentStreak || 0}d 🔥
-                  </span>
+                  {data.completedHabitIds?.includes(h.id) ? (
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-400/15 text-emerald-300 border border-emerald-400/35 font-bold shrink-0 shadow-sm">
+                      ✓ DONE
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/35 font-bold shrink-0 shadow-sm">
+                      {h.currentStreak || 0}d 🔥
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

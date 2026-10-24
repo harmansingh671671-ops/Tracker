@@ -49,7 +49,7 @@ const all = [early, mid, late, weekly];
 
 describe("selectDynamicHabits (unchanged behaviour)", () => {
   it("still chooses by time-of-day distance", () => {
-    expect(ids(selectDynamicHabits(all, 8, 4))).toEqual(["weekly", "mid", "late", "early"]);
+    expect(ids(selectDynamicHabits(all, 8, 3))).toEqual(["weekly", "mid", "late"]);
   });
 
   it("returns the input untouched when it fits", () => {
@@ -59,21 +59,32 @@ describe("selectDynamicHabits (unchanged behaviour)", () => {
 });
 
 describe("selectWallpaperHabits", () => {
-  it("without completion information behaves exactly like the time-only selector", () => {
+  it("without completion information keeps today's behaviour: input order when everything fits", () => {
     expect(ids(selectWallpaperHabits(all, { hour: 8, maxCount: 4 }))).toEqual([
-      "weekly",
+      "early",
       "mid",
       "late",
-      "early",
+      "weekly",
+    ]);
+  });
+
+  it("without completion information still chooses by time when there are more habits than slots", () => {
+    // Five habits against three slots: this is the branch a "just slice the
+    // first N" regression would otherwise pass, because every test above fits.
+    const five = [...all, habit("fifth", "Fifth", "10:00 AM")];
+    expect(ids(selectWallpaperHabits(five, { hour: 8, maxCount: 3 }))).toEqual([
+      "weekly",
+      "fifth",
+      "mid",
     ]);
   });
 
   it("keeps the keystone first without completion information", () => {
-    expect(ids(selectWallpaperHabits(all, { hour: 8, maxCount: 4, keystoneId: "early" }))).toEqual([
-      "early",
-      "weekly",
+    expect(ids(selectWallpaperHabits(all, { hour: 8, maxCount: 4, keystoneId: "mid" }))).toEqual([
       "mid",
+      "early",
       "late",
+      "weekly",
     ]);
   });
 
@@ -118,7 +129,8 @@ describe("selectWallpaperHabits", () => {
       completedIds: new Set(),
       keystoneId: "late",
     });
-    expect(ids(picked)).toEqual(["late", "early", "mid", "weekly"]);
+    // Nothing is done, so time-of-day decides the rest: mid(4) then early(14).
+    expect(ids(picked)).toEqual(["late", "mid", "early", "weekly"]);
     expect(new Set(ids(picked)).size).toBe(picked.length);
   });
 
@@ -130,8 +142,9 @@ describe("selectWallpaperHabits", () => {
       completedIds: new Set(),
       keystoneId: "early",
     });
+    // The cut is mid, late; the keystone still takes a slot, so late drops.
     expect(picked).toHaveLength(2);
-    expect(ids(picked)).toEqual(["early", "late"]);
+    expect(ids(picked)).toEqual(["early", "mid"]);
   });
 
   it("reorders even when every habit fits (there are fewer than maxCount)", () => {
@@ -175,6 +188,6 @@ describe("selectWallpaperHabits", () => {
   it("a completion set without a date cannot reorder anything (no date means no due-ness)", () => {
     expect(
       ids(selectWallpaperHabits(all, { hour: 8, maxCount: 4, completedIds: new Set(["mid"]) }))
-    ).toEqual(["weekly", "mid", "late", "early"]);
+    ).toEqual(["early", "mid", "late", "weekly"]);
   });
 });

@@ -1,6 +1,6 @@
 import { type ScheduleBlock } from "@/lib/db";
 import { type Habit } from "@/lib/db";
-import { withKeystoneOnWallpaper } from "@/lib/utils/keystone";
+import { selectDynamicHabits, selectWallpaperHabits } from "@/lib/utils/wallpaper-habits";
 
 export interface WallpaperData {
   chapter: number;
@@ -20,6 +20,11 @@ export interface WallpaperData {
   userStreak?: number;
   /** S19 — the user's keystone habit, held in the rotating row. */
   keystoneHabitId?: string;
+  /**
+   * S22 — habit ids completed on `dateStr`. Optional: when absent the row keeps
+   * the old time-of-day-only order, so an older native caller is unaffected.
+   */
+  completedHabitIds?: string[];
 }
 
 export interface HourlyBlock {
@@ -166,57 +171,6 @@ export function placeholderHabits(): Habit[] {
       currentStreak: 0,
     },
   ];
-}
-
-export function selectDynamicHabits(
-  habits: Habit[] = [],
-  currentHour: number = new Date().getHours(),
-  maxCount: number = 4
-): Habit[] {
-  if (!habits || habits.length === 0) return [];
-  if (habits.length <= maxCount) return habits;
-
-  const parseHabitHour = (h: Habit): number => {
-    if (h.timeOfDay) {
-      const match = h.timeOfDay.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-      if (match) {
-        let hour = parseInt(match[1], 10);
-        const ampm = match[3]?.toUpperCase();
-        if (ampm === "PM" && hour < 12) hour += 12;
-        if (ampm === "AM" && hour === 12) hour = 0;
-        return hour;
-      }
-      const rawLower = h.timeOfDay.toLowerCase();
-      if (rawLower.includes("morn")) return 8;
-      if (rawLower.includes("afternoon")) return 14;
-      if (rawLower.includes("even") || rawLower.includes("night")) return 20;
-    }
-    if (h.period === "morning") return 8;
-    if (h.period === "afternoon") return 14;
-    if (h.period === "evening") return 20;
-
-    const name = (h.name || "").toLowerCase();
-    const cat = (h.category || "").toLowerCase();
-    if (name.includes("morn") || name.includes("sun") || name.includes("wake")) return 7;
-    if (name.includes("night") || name.includes("bed") || name.includes("sleep")) return 22;
-    if (name.includes("lunch") || name.includes("noon")) return 12;
-    if (name.includes("dinner") || name.includes("even")) return 19;
-    if (cat.includes("mind") || cat.includes("spirit")) return 9;
-    if (cat.includes("health") || cat.includes("vital")) return 11;
-    if (cat.includes("learn") || cat.includes("work")) return 15;
-
-    return 12;
-  };
-
-  const scored = habits.map((h, idx) => {
-    const targetH = parseHabitHour(h);
-    const dist = (targetH - currentHour + 24) % 24;
-    const score = dist > 14 ? (24 - dist + 12) : dist;
-    return { habit: h, score, originalIndex: idx };
-  });
-
-  scored.sort((a, b) => a.score - b.score || a.originalIndex - b.originalIndex);
-  return scored.slice(0, maxCount).map((s) => s.habit);
 }
 
 interface DisplayHobby {
@@ -652,12 +606,13 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
   const rawHabits = (data.includeHobbies !== false && data.habits && data.habits.length > 0)
     ? data.habits
     : placeholderHabits();
-  const userHobbies = withKeystoneOnWallpaper(
-    selectDynamicHabits(rawHabits, currentHour, 4),
-    rawHabits,
-    data.keystoneHabitId,
-    4
-  );
+  const userHobbies = selectWallpaperHabits(rawHabits, {
+    hour: currentHour,
+    maxCount: 4,
+    dateStr: data.dateStr,
+    completedIds: data.completedHabitIds ? new Set(data.completedHabitIds) : undefined,
+    keystoneId: data.keystoneHabitId,
+  });
 
   if (userHobbies.length > 0) {
     const hobHeaderY = hobSectionStartY;
@@ -709,29 +664,32 @@ export async function generateWallpaperCanvas(data: WallpaperData): Promise<HTML
       ctx.fillText(emoji, iconX + iconSize / 2, iconY + iconSize * 0.68);
       ctx.textAlign = "left";
 
-      // Right Streak Pill
-      const streakText = `${h.currentStreak || 0}d 🔥`;
+      // Right State Pill — a habit already done today says so instead of showing
+      // a streak it has already earned. Same geometry either way, so the row
+      // never shifts when completion changes.
+      const done = data.completedHabitIds?.includes(h.id) ?? false;
+      const pillText = done ? "✓ DONE" : `${h.currentStreak || 0}d 🔥`;
       ctx.font = "700 24px 'JetBrains Mono', monospace";
-      const streakTextW = ctx.measureText(streakText).width;
-      const streakBadgeW = streakTextW + 28;
-      const streakBadgeH = hobCount <= 2 ? 46 : 40;
-      const streakBadgeX = cardPad + cardW - streakBadgeW - 22;
-      const streakBadgeY = hY + (hobCardH - streakBadgeH) / 2;
+      const pillTextW = ctx.measureText(pillText).width;
+      const stateBadgeW = pillTextW + 28;
+      const stateBadgeH = hobCount <= 2 ? 46 : 40;
+      const stateBadgeX = cardPad + cardW - stateBadgeW - 22;
+      const stateBadgeY = hY + (hobCardH - stateBadgeH) / 2;
 
-      ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
-      ctx.strokeStyle = "rgba(245, 158, 11, 0.45)";
+      ctx.fillStyle = done ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)";
+      ctx.strokeStyle = done ? "rgba(16, 185, 129, 0.45)" : "rgba(245, 158, 11, 0.45)";
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.roundRect(streakBadgeX, streakBadgeY, streakBadgeW, streakBadgeH, streakBadgeH / 2);
+      ctx.roundRect(stateBadgeX, stateBadgeY, stateBadgeW, stateBadgeH, stateBadgeH / 2);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#fbbf24";
-      ctx.fillText(streakText, streakBadgeX + 14, streakBadgeY + streakBadgeH * 0.68);
+      ctx.fillStyle = done ? "#6ee7b7" : "#fbbf24";
+      ctx.fillText(pillText, stateBadgeX + 14, stateBadgeY + stateBadgeH * 0.68);
 
       // Middle Title & Subtitle (Spacious horizontal layout - up to 680px width)
       const textX = iconX + iconSize + 22;
-      const maxTextW = streakBadgeX - textX - 20;
+      const maxTextW = stateBadgeX - textX - 20;
 
       // Title
       ctx.font = `700 ${hobCount <= 2 ? 32 : 28}px 'Plus Jakarta Sans', sans-serif`;

@@ -37,7 +37,7 @@ describe("habitPriorityRank", () => {
   });
 
   it("treats an unknown stored priority as no priority rather than guessing", () => {
-    expect(habitPriorityRank({ priority: "urgent" } as Habit)).toBe(3);
+    expect(habitPriorityRank({ priority: "urgent" })).toBe(3);
   });
 });
 

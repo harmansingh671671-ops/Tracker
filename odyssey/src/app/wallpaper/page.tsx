@@ -7,10 +7,11 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
-import { db, type ScheduleBlock } from "@/lib/db";
+import { db, type ScheduleBlock, type HabitLog } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
 import { localDateStr } from "@/lib/utils/local-date";
+import { isHabitComplete } from "@/lib/utils/habit-completion";
 import { type WallpaperData } from "@/lib/utils/wallpaper-generator";
 import { WallpaperPreview } from "@/components/wallpaper/wallpaper-preview";
 import {
@@ -66,6 +67,32 @@ export default function WallpaperPage() {
   const [lockWallpaper, setLockWallpaper] = useState<string | null>(() => getNativeAlternateWallpaper("lock"));
   const [homeWallpaper, setHomeWallpaper] = useState<string | null>(() => getNativeAlternateWallpaper("home"));
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // S22 — the wallpaper marks a habit done only when that day's log says so.
+  // Read straight from IndexedDB, keyed by user+date: the habit store's
+  // `todayLogs` slice is rebuilt without values after a day rollover, which
+  // would make a counted habit that was finished today read as still open.
+  const [todayLogRecords, setTodayLogRecords] = useState<Record<string, HabitLog>>({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const todayStr = localDateStr();
+
+    db.habitLogs
+      .where("[userId+date]")
+      .equals([user.id, todayStr])
+      .toArray()
+      .then((logs) => {
+        if (cancelled) return;
+        setTodayLogRecords(Object.fromEntries(logs.map((log) => [log.habitId, log])));
+      })
+      .catch((error) => logWarn("wallpaper", "Failed to load today's habit logs", error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const customFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -174,6 +201,14 @@ export default function WallpaperPage() {
     return getRankInfo(calculateRank(daysComplied));
   }, [daysComplied]);
 
+  const completedHabitIds = useMemo(
+    () =>
+      habits
+        .filter((habit) => isHabitComplete(habit, todayLogRecords[habit.id]))
+        .map((habit) => habit.id),
+    [habits, todayLogRecords]
+  );
+
   const wallpaperData: WallpaperData = useMemo(() => {
     return {
       chapter: 1,
@@ -193,8 +228,10 @@ export default function WallpaperPage() {
       userStreak: user?.streak ?? 0,
       // S19 — the wallpaper row keeps a permanent place for the keystone.
       keystoneHabitId: user?.keystoneHabitId,
+      // S22 — leads the row with what is still open today and marks what is done.
+      completedHabitIds,
     };
-  }, [activeDay, rankInfo, user, blocks, habits, selectedDateStr, selectedFormattedDate, simMode]);
+  }, [activeDay, rankInfo, user, blocks, habits, selectedDateStr, selectedFormattedDate, simMode, completedHabitIds]);
 
   const handleEngineChange = (engine: "live" | "static") => {
     setActiveEngine(engine);
