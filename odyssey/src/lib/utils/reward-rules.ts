@@ -31,6 +31,38 @@ export const DIAMONDS_PER_COMPLETION = 1;
 export const XP_PERFECT_DAY_BONUS = 50;
 
 /**
+ * S19 — the keystone multiplier.
+ *
+ * Completing the keystone habit pays 1.5x the live per-completion rate. It is a
+ * MULTIPLIER on the base constant rather than a second frozen number, so
+ * retuning `XP_PER_COMPLETION` cannot leave the keystone behind.
+ */
+export const KEYSTONE_XP_MULTIPLIER = 1.5;
+
+/**
+ * S21 — the frog multiplier.
+ *
+ * Finishing the day's frog inside the morning window pays 2x the live base.
+ * Same reason as the keystone: one base, one multiplier, no duplicate number.
+ */
+export const FROG_XP_MULTIPLIER = 2;
+
+/**
+ * The keystone ADD-ON: round(base * 1.5) - base, never negative.
+ *
+ * The base is paid by the ordinary completion, so only the difference is
+ * captured on the log. 15 -> round(22.5) - 15 = 8.
+ */
+export function keystoneBonusXp(base: number = XP_PER_COMPLETION): number {
+  return Math.max(0, Math.round(base * KEYSTONE_XP_MULTIPLIER) - base);
+}
+
+/** The frog ADD-ON: round(base * 2) - base, never negative. */
+export function frogBonusXp(base: number = XP_PER_COMPLETION): number {
+  return Math.max(0, Math.round(base * FROG_XP_MULTIPLIER) - base);
+}
+
+/**
  * One-off rewards for creating a habit.
  *
  * Not routed through the vault. The vault settles *completions* against a
@@ -109,11 +141,13 @@ export function isPerfectDay(
 }
 
 export interface DayReward {
-  /** Total XP for the day: per-completion XP plus any perfect-day bonus. */
+  /** Total XP for the day: per-completion XP plus every bonus. */
   xp: number;
   diamonds: number;
   /** The perfect-day component alone, so a UI can label it separately. */
   perfectBonusXp: number;
+  /** Captured S19/S21 add-ons included in `xp`, so a UI can label them. */
+  bonusXp: number;
 }
 
 /** Whole days between two `YYYY-MM-DD` strings. `b` must not precede `a`. */
@@ -178,13 +212,21 @@ export function advanceStreakForSettlement(
  * and the celebration card all call this, so they cannot disagree about how much
  * a day is worth.
  */
-export function computeDayReward(completedCount: number, perfect: boolean): DayReward {
+export function computeDayReward(
+  completedCount: number,
+  perfect: boolean,
+  bonusXp: number = 0
+): DayReward {
   const safeCount = Math.max(0, Math.floor(completedCount) || 0);
   const perfectBonusXp = perfect ? XP_PERFECT_DAY_BONUS : 0;
+  // Bonuses are captured whole XP amounts. A negative or fractional value is a
+  // caller bug; paying it would be worse than dropping it.
+  const safeBonusXp = Math.max(0, Math.floor(bonusXp) || 0);
 
   return {
-    xp: safeCount * XP_PER_COMPLETION + perfectBonusXp,
+    xp: safeCount * XP_PER_COMPLETION + perfectBonusXp + safeBonusXp,
     diamonds: safeCount * DIAMONDS_PER_COMPLETION,
     perfectBonusXp,
+    bonusXp: safeBonusXp,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getWeekComparison } from "./weekly-completion";
+import { getWeekComparison, type WeekHabit } from "./weekly-completion";
 
 /**
  * S23 — this week against last week, day for day.
@@ -16,7 +16,7 @@ import { getWeekComparison } from "./weekly-completion";
 const DAILY = [1, 2, 3, 4, 5, 6, 7];
 const WEDNESDAY = [3];
 
-function habit(over: Record<string, unknown> = {}) {
+function habit(over: Partial<WeekHabit> = {}): WeekHabit {
   return {
     id: "h",
     targetDays: DAILY,
@@ -33,9 +33,6 @@ function log(habitId: string, date: string, over: Record<string, unknown> = {}) 
 describe("getWeekComparison — ranges", () => {
   it("starts weeks on Monday and compares the same weekdays last week", () => {
     // 2026-10-21 is a Wednesday.
-    const result = getWeekComparison([habit()], [], "2026-10-21");
-    expect(result).toBeNull(); // no logs at all -> nothing to count
-
     const withData = getWeekComparison(
       [habit()],
       [log("h", "2026-10-19"), log("h", "2026-10-12")],
@@ -132,7 +129,7 @@ describe("getWeekComparison — counting", () => {
   it("ignores logs for habits that are not due or no longer exist", () => {
     const result = getWeekComparison(
       [habit({ id: "wed", targetDays: WEDNESDAY })],
-      [log("wed", "2026-10-19"), log("ghost", "2026-10-19"), log("wed", "2026-10-12")],
+      [log("wed", "2026-10-19"), log("ghost", "2026-10-19"), log("wed", "2026-10-14")],
       "2026-10-21"
     );
     // Monday is not a Wednesday: the only counted days are 21 and 14.

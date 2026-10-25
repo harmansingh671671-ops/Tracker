@@ -5,7 +5,9 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
-import { db, type ScheduleBlock } from "@/lib/db";
+import { db, type Habit, type HabitLog, type ScheduleBlock } from "@/lib/db";
+import { HabitCompletionCard } from "@/components/stats/habit-completion-card";
+import { getWeekComparison } from "@/lib/utils/weekly-completion";
 import { calculateRank, getRankInfo, getNextRank } from "@/lib/utils/gamification";
 import { getJourneyStartDate, getJourneyDayNumberForDate } from "@/lib/utils/journey";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
@@ -62,6 +64,8 @@ export default function StatsPage() {
   const [wallpaperResolved, setWallpaperResolved] = useState(false);
   const [totalPlannedHours, setTotalPlannedHours] = useState(0);
   const [allBlocks, setAllBlocks] = useState<ScheduleBlock[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
 
   // Month navigation for heatmap
   const today = useMemo(() => new Date(), []);
@@ -94,6 +98,30 @@ export default function StatsPage() {
       setTotalPlannedHours(blocks.length);
     });
   }, [fetchUser]);
+
+  // S23: habits and their logs are a second small read. The rate is computed on
+  // read from `isHabitComplete`, never stored in the dead `weeklyReports` table,
+  // so a backfilled past day corrects the card instead of leaving it stale.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    Promise.all([
+      db.habits.where("userId").equals(user.id).toArray(),
+      db.habitLogs.where("userId").equals(user.id).toArray(),
+    ]).then(([loadedHabits, loadedLogs]) => {
+      if (cancelled) return;
+      setHabits(loadedHabits);
+      setHabitLogs(loadedLogs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const weekComparison = useMemo(
+    () => getWeekComparison(habits, habitLogs, todayStr),
+    [habits, habitLogs, todayStr]
+  );
 
   // Resolve native state separately, and only reveal the studio once it has
   // actually answered -- see wallpaperResolved above.
@@ -639,6 +667,10 @@ export default function StatsPage() {
           </div>
         </div>
       </div>
+
+      {/* S23 — habit completion, this week against the same days last week.
+          Rendered only when both weeks have something to count. */}
+      {weekComparison && <HabitCompletionCard comparison={weekComparison} />}
 
       {/* Day Overview Pop-up Modal (Opens on Tap) */}
       {popupDate && popupDayStats && (

@@ -11,8 +11,11 @@ import {
   XP_PER_COMPLETION,
   advanceStreakForSettlement,
   computeDayReward,
+  frogBonusXp,
   isPerfectDay,
+  keystoneBonusXp,
 } from '../utils/reward-rules';
+import { isFrogBonusWindow, todaysFrogHabit } from '../utils/frog';
 
 /**
  * Reward rates live in `lib/utils/reward-rules.ts` and are re-exported here so
@@ -21,6 +24,50 @@ import {
  * site.
  */
 export { XP_PER_COMPLETION, DIAMONDS_PER_COMPLETION };
+
+/**
+ * The bonuses a completion earns right now (S19/S21).
+ *
+ * Captured on the log because the reward is paid when the day ends: by then the
+ * clock has moved and the keystone may have changed. Returns zeros when the
+ * habit did not just become complete.
+ */
+async function earnedCompletionBonuses(
+  userId: string,
+  habitId: string,
+  date: string,
+  becameCompleted: boolean
+): Promise<{ keystone: number; frog: number }> {
+  if (!becameCompleted) return { keystone: 0, frog: 0 };
+
+  const profile = await db.profiles.get(userId);
+  const keystone = profile?.keystoneHabitId === habitId ? keystoneBonusXp() : 0;
+
+  let frog = 0;
+  if (date === getLocalTodayStr() && isFrogBonusWindow(new Date())) {
+    const habits = await db.habits.where('userId').equals(userId).toArray();
+    if (todaysFrogHabit(habits, date)?.id === habitId) frog = frogBonusXp();
+  }
+
+  return { keystone, frog };
+}
+
+/**
+ * Which captured fields to write. Re-completing recaptures, un-completing
+ * clears (the bonus was for a completion that no longer exists), and any other
+ * write leaves what was already captured untouched.
+ */
+function bonusFields(
+  becameCompleted: boolean,
+  isCompleted: boolean,
+  keystone: number,
+  frog: number,
+  hasExistingLog: boolean
+): Partial<Pick<HabitLog, 'keystoneBonusXp' | 'frogBonusXp'>> {
+  if (becameCompleted) return { keystoneBonusXp: keystone, frogBonusXp: frog };
+  if (!isCompleted && hasExistingLog) return { keystoneBonusXp: 0, frogBonusXp: 0 };
+  return {};
+}
 
 export interface TemporaryWallet {
   /**
@@ -35,6 +82,8 @@ export interface TemporaryWallet {
     xp: number;
     diamonds: number;
     perfectBonusXp: number;
+    /** Captured keystone + frog XP included in `xp` (S19/S21). */
+    bonusXp: number;
   }>;
   totalXp: number;
   totalDiamonds: number;
@@ -319,6 +368,9 @@ const valuesMap: Record<string, Record<string, number>> = {};
     const habitsById = new Map(allHabits.map(h => [h.id, h]));
     const countsByDate: Record<string, number> = {};
     const completedIdsByDate: Record<string, Set<string>> = {};
+    // S19/S21: bonuses were captured on the log at completion time, so summing
+    // them here cannot be moved by a later edit or a changed keystone.
+    const bonusXpByDate: Record<string, number> = {};
     allLogs.forEach(l => {
       const habit = habitsById.get(l.habitId);
       if (!habit) return; // habit hard-deleted -> cannot verify it was due
@@ -326,6 +378,8 @@ const valuesMap: Record<string, Record<string, number>> = {};
       countsByDate[l.date] = (countsByDate[l.date] || 0) + 1;
       if (!completedIdsByDate[l.date]) completedIdsByDate[l.date] = new Set();
       completedIdsByDate[l.date].add(l.habitId);
+      bonusXpByDate[l.date] =
+        (bonusXpByDate[l.date] || 0) + (l.keystoneBonusXp ?? 0) + (l.frogBonusXp ?? 0);
     });
 
     const settledRows = await db.rewardSettlements.where('userId').equals(userId).toArray();
@@ -337,7 +391,11 @@ const valuesMap: Record<string, Record<string, number>> = {};
         const count = countsByDate[d];
         if (count > 0) {
           const perfect = isPerfectDay(allHabits, d, completedIdsByDate[d]);
-          unclaimedDays.push({ date: d, completedCount: count, ...computeDayReward(count, perfect) });
+          unclaimedDays.push({
+            date: d,
+            completedCount: count,
+            ...computeDayReward(count, perfect, bonusXpByDate[d] || 0),
+          });
         }
       }
     });
@@ -349,7 +407,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
 
     const todayCount = countsByDate[today] || 0;
     const todayPerfect = isPerfectDay(allHabits, today, completedIdsByDate[today] || new Set());
-    const todayReward = computeDayReward(todayCount, todayPerfect);
+    const todayReward = computeDayReward(todayCount, todayPerfect, bonusXpByDate[today] || 0);
 
     const totalXp = unclaimedDays.reduce((sum, d) => sum + d.xp, 0);
     const totalDiamonds = unclaimedDays.reduce((sum, d) => sum + d.diamonds, 0);
@@ -422,6 +480,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
             xp: day.xp,
             diamonds: day.diamonds,
             perfectBonusXp: day.perfectBonusXp,
+            bonusXp: day.bonusXp,
             settledAt: now,
           });
         } catch (e) {
@@ -534,10 +593,15 @@ const valuesMap: Record<string, Record<string, number>> = {};
       if (isAvoid) value = 0;
     }
 
+    const becameCompleted = isCompleted && !wasCompleted;
+    const { keystone, frog } = await earnedCompletionBonuses(userId, habitId, date, becameCompleted);
+    const bonusPatch = bonusFields(becameCompleted, isCompleted, keystone, frog, Boolean(existingLog));
+
     if (existingLog) {
       await db.habitLogs.update(existingLog.id, {
         completed: isCompleted,
         ...(counted || isAvoid ? { value } : {}),
+        ...bonusPatch,
         loggedAt: new Date().toISOString()
       });
     } else {
@@ -548,6 +612,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
         date,
         completed: isCompleted,
         ...(counted || isAvoid ? { value } : {}),
+        ...bonusPatch,
         loggedAt: new Date().toISOString()
       };
       await db.habitLogs.add(newLog);
@@ -559,7 +624,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       const updatedToday = { ...state.todayLogs };
       if (date === todayStr) {
         if (existingLog) {
-          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted || isAvoid ? { value } : {}) };
+          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted || isAvoid ? { value } : {}), ...bonusPatch };
         } else {
           updatedToday[habitId] = {
             id: uuidv4(),
@@ -568,6 +633,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
             date,
             completed: isCompleted,
             ...(counted || isAvoid ? { value } : {}),
+            ...bonusPatch,
             loggedAt: new Date().toISOString()
           };
         }
@@ -612,7 +678,6 @@ const valuesMap: Record<string, Record<string, number>> = {};
     // toggle: completing or un-completing a past day must not bump or drop the
     // streak (BUG-15). That rule still matters while the phone reads this field.
     if (habit) {
-      const becameCompleted = isCompleted && !wasCompleted;
       const becameIncomplete = !isCompleted && wasCompleted;
       const newTotal = becameCompleted ? habit.totalCompletions + 1 : becameIncomplete ? Math.max(0, habit.totalCompletions - 1) : habit.totalCompletions;
       const isToday = date === getLocalTodayStr();
@@ -661,10 +726,15 @@ const valuesMap: Record<string, Record<string, number>> = {};
       ? (typeof target === "number" && Number.isFinite(target) && target > 0 ? value >= target : false)
       : value > 0;
 
+    const becameCompleted = isCompleted && !wasCompleted;
+    const { keystone, frog } = await earnedCompletionBonuses(userId, habitId, date, becameCompleted);
+    const bonusPatch = bonusFields(becameCompleted, isCompleted, keystone, frog, Boolean(existingLog));
+
     if (existingLog) {
       await db.habitLogs.update(existingLog.id, {
         completed: isCompleted,
         ...(counted ? { value } : {}),
+        ...bonusPatch,
         loggedAt: new Date().toISOString()
       });
     } else if (value > 0 || !counted) {
@@ -675,6 +745,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
         date,
         completed: isCompleted,
         ...(counted ? { value } : {}),
+        ...bonusPatch,
         loggedAt: new Date().toISOString()
       };
       await db.habitLogs.add(newLog);
@@ -686,7 +757,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
       const updatedToday = { ...state.todayLogs };
       if (date === todayStr) {
         if (existingLog) {
-          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted ? { value } : {}) };
+          updatedToday[habitId] = { ...existingLog, completed: isCompleted, ...(counted ? { value } : {}), ...bonusPatch };
         } else if (value > 0 || !counted) {
           updatedToday[habitId] = {
             id: uuidv4(),
@@ -695,6 +766,7 @@ const valuesMap: Record<string, Record<string, number>> = {};
             date,
             completed: isCompleted,
             ...(counted ? { value } : {}),
+            ...bonusPatch,
             loggedAt: new Date().toISOString()
           };
         }
@@ -731,7 +803,6 @@ const valuesMap: Record<string, Record<string, number>> = {};
     // Update streak based on isCompleted transition. Only TODAY's transition
     // moves the streak; past-day changes leave it alone (BUG-15).
     if (habit) {
-      const becameCompleted = isCompleted && !wasCompleted;
       const becameIncomplete = !isCompleted && wasCompleted;
       const newTotal = becameCompleted ? habit.totalCompletions + 1 : becameIncomplete ? Math.max(0, habit.totalCompletions - 1) : habit.totalCompletions;
       const isToday = date === todayStr;
@@ -783,10 +854,17 @@ const valuesMap: Record<string, Record<string, number>> = {};
     const value = slipped ? 1 : 0;
     const loggedAt = new Date().toISOString();
 
+    // Clearing a slip is a completion transition like any other, so it can earn
+    // the keystone bonus. It can never earn the frog: quit habits are excluded
+    // from `todaysFrogHabit`.
+    const becameClean = !slipped && !wasClean;
+    const { keystone, frog } = await earnedCompletionBonuses(userId, habitId, date, becameClean);
+    const bonusPatch = bonusFields(becameClean, completed, keystone, frog, Boolean(existingLog));
+
     if (existingLog) {
-      await db.habitLogs.update(existingLog.id, { completed, value, loggedAt });
+      await db.habitLogs.update(existingLog.id, { completed, value, ...bonusPatch, loggedAt });
     } else {
-      await db.habitLogs.add({ id: uuidv4(), habitId, userId, date, completed, value, loggedAt });
+      await db.habitLogs.add({ id: uuidv4(), habitId, userId, date, completed, value, ...bonusPatch, loggedAt });
     }
 
     const todayStr = getLocalTodayStr();
@@ -795,8 +873,8 @@ const valuesMap: Record<string, Record<string, number>> = {};
       const updatedToday = { ...state.todayLogs };
       if (date === todayStr) {
         updatedToday[habitId] = existingLog
-          ? { ...existingLog, completed, value, loggedAt }
-          : { id: uuidv4(), habitId, userId, date, completed, value, loggedAt };
+          ? { ...existingLog, completed, value, ...bonusPatch, loggedAt }
+          : { id: uuidv4(), habitId, userId, date, completed, value, ...bonusPatch, loggedAt };
       }
 
       const updatedHistory = { ...state.historyLogs };
@@ -813,7 +891,6 @@ const valuesMap: Record<string, Record<string, number>> = {};
     // Only today moves the clean-day run, the rule the rest of the store follows
     // (BUG-15). A slip ends the run; clearing one starts a fresh single clean day.
     if (date === todayStr) {
-      const becameClean = !slipped && !wasClean;
       const becameSlipped = slipped && wasClean;
       const totalCompletions = becameClean
         ? habit.totalCompletions + 1

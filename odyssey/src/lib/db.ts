@@ -394,6 +394,16 @@ export interface HabitLog {
   value?: number;
   notes?: string;
   loggedAt: string;
+  /**
+   * XP captured at the moment this day became complete (S19), not re-derived at
+   * settlement: `loggedAt` is the LAST write, so editing a counted value later
+   * would otherwise move or erase a bonus the user already earned.
+   *
+   * Additive fields, deliberately not indexed -- no Dexie version bump.
+   */
+  keystoneBonusXp?: number;
+  /** XP captured at the moment this day became the frog inside the window (S21). */
+  frogBonusXp?: number;
 }
 
 export interface WeeklyReport {
@@ -448,6 +458,8 @@ export interface RewardSettlement {
   diamonds: number;
   /** The perfect-day component of `xp`, kept separate so a card can label it. */
   perfectBonusXp: number;
+  /** The captured keystone + frog component of `xp` (S19/S21). */
+  bonusXp?: number;
   settledAt: string;
 }
 
