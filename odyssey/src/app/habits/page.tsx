@@ -40,6 +40,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HabitGestureCard } from "@/components/habits/habit-gesture-card";
+import { HabitSessionModal } from "@/components/habits/habit-session-modal";
+import { clampCountedValue } from "@/lib/utils/habit-units";
 import { halfTargetFloor } from "@/lib/utils/swipe-gesture";
 
 // B4 (2026-10-20, owner instruction): the grid view was removed — grid cards
@@ -89,6 +91,11 @@ export default function HabitsPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  /** `initialTab` for the edit sheet -- the session page opens it on "edit",
+   *  every other open path (swipe-left, tap) opens on "history". */
+  const [editingTab, setEditingTab] = useState<"history" | "edit">("history");
+  /** The counted habit whose session page (timer/counter) is open. */
+  const [sessionHabit, setSessionHabit] = useState<Habit | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   // `B6` + M25: the view mode is a *saved preference*, and the heatmap is the
   // default (the owner's choice — a long-history view on opening the screen).
@@ -307,6 +314,18 @@ export default function HabitsPage() {
       ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
       : Boolean(historyLogs[h.id]?.[selectedDate] ?? todayLogs[h.id]?.completed);
   }).length;
+
+  // The session page edits today's count through the same store path as the
+  // card's water bar, so its "value so far" is read the same way advantageously.
+  const sessionValue = useMemo(() => {
+    if (!sessionHabit) return 0;
+    const log = getCompletionRecord(sessionHabit, selectedDate, todayStr, {
+      todayLogs,
+      historyLogs,
+      historyValues,
+    });
+    return typeof log?.value === "number" ? log.value : 0;
+  }, [sessionHabit, selectedDate, todayStr, todayLogs, historyLogs, historyValues]);
    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const formattedSelectedDate = useMemo(() => {
@@ -493,6 +512,11 @@ export default function HabitsPage() {
      });
     if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit updated.");
+    // The session page may be under this sheet with the OLD habit object
+    // (unit, target). Refresh it from the live store; a deleted habit gets
+    // `null` here, which unmounts the session rather than showing a ghost.
+    const live = useHabitStore.getState();
+    setSessionHabit((prev) => (prev ? live.habits.find((h) => h.id === prev.id) ?? null : null));
   };
 
   const handleDeleteHabit = async (habitId: string) => {
@@ -500,6 +524,9 @@ export default function HabitsPage() {
     // force: the habit list itself just changed in the database.
     if (user) await fetchHabits(user.id, selectedDate, { force: true });
     showToast("Habit deleted.");
+    // A deleted habit can be the one under a session page — that page has
+    // nothing to write into anymore, so it closes.
+    setSessionHabit((prev) => (prev?.id === habitId ? null : prev));
   };
 
   // S19 — designation only ever MOVES the pin (choosing another habit rewrites
@@ -544,9 +571,15 @@ export default function HabitsPage() {
   // removed hold-to-edit plumbing above.
   //
   // Hold, or a committed swipe-right on a simple habit: mark the habit FULLY
-  // done for the selected day. Counted habits fill to target through the same
-  // store path as the existing fill-to-target gestures; streaks, counters and
-  // confetti all move inside the store exactly as they do for a tap.
+  // done for the selected day.
+  //
+  // Hold on a COUNTED habit changed owner-side (2026-10-25): it now opens the
+  // session page (timer for time units, counter otherwise) instead of
+  // completing — `onHold` in the gesture hook routes it here and `onComplete`
+  // never fires for counted cards. Swipe-right still locks a counted card and
+  // reveals its fill options, so nothing else about counted gestures moved.
+  // Streaks, counters and confetti all move inside the store exactly as they
+  // do for a tap.
   const handleHoldComplete = useCallback(
     async (habit: Habit) => {
       if (!userId) return;
@@ -693,6 +726,19 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     });
     showToast("Target completed for all counted habits");
   }, [habits, isFutureSelectedDate, user, setHabitLogValue, showToast]);
+
+  // Hold on a counted habit → the session page (timer/counter). A counted
+  // habit WITHOUT a target still opens: the page explains and links to edit.
+  const handleSessionOpen = useCallback(
+    (habit: Habit) => {
+      if (isFutureSelectedDate) {
+        showToast("Cannot complete habits for future dates.");
+        return;
+      }
+      setSessionHabit(habit);
+    },
+    [isFutureSelectedDate, showToast]
+  );
 
   const handleCardClick = useCallback(async (habit: Habit, e?: React.MouseEvent | React.TouchEvent) => {
       // B4: the old isLongPressRef guard for hold-to-edit lived here; the
@@ -889,6 +935,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                   onCardClick={handleCardClick}
                   onEdit={setEditingHabit}
                   onComplete={handleHoldComplete}
+                  onHold={handleSessionOpen}
                   onCountedAction={handleCountedSwipeAction}
                 >
                   <HabitListCard
@@ -944,6 +991,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                   }}
                   onEdit={setEditingHabit}
                   onComplete={handleHoldComplete}
+                  onHold={handleSessionOpen}
                   onCountedAction={handleCountedSwipeAction}
                 >
                   {/* Quad Card Header */}
@@ -1036,16 +1084,43 @@ AnimatePresence, which suppresses the enter transition and leaves the
         </div>
       )}
 
+      {/* Counted-habit session page (timer / counter), opened by press-and-hold
+          on a counted card in either view. */}
+      {sessionHabit && (
+        <HabitSessionModal
+          key={sessionHabit.id}
+          habit={sessionHabit}
+          currentValue={sessionValue}
+          isFutureSelectedDate={isFutureSelectedDate}
+          onSetValue={(value) => {
+            if (!userId || isFutureSelectedDate) return;
+            void setHabitLogValue(userId, sessionHabit.id, selectedDate, clampCountedValue(value));
+          }}
+          showToast={showToast}
+          /* Keeps the session mounted: the edit sheet stacks above it, so a
+             running timer survives the detour and the page is still there
+             when the sheet closes. */
+          onRequestEdit={() => {
+            setEditingHabit(sessionHabit);
+            setEditingTab("edit");
+          }}
+          onClose={() => setSessionHabit(null)}
+        />
+      )}
+
       {/* Edit Habit Modal */}
       {editingHabit && (
         <EditHabitModal
           habit={editingHabit}
           isOpen={true}
-          initialTab="history"
+          initialTab={editingTab}
           selectedDate={selectedDate}
           todayStr={todayStr}
           onSelectDate={(newDate) => setSelectedDate(newDate)}
-          onClose={() => setEditingHabit(null)}
+          onClose={() => {
+            setEditingHabit(null);
+            setEditingTab("history");
+          }}
           onSave={handleUpdateHabit}
           onDelete={handleDeleteHabit}
           isKeystone={editingHabit.id === user?.keystoneHabitId}

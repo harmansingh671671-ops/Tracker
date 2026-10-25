@@ -47,6 +47,8 @@ interface HabitGestureCardProps {
   onCardClick?: (habit: Habit, e: React.MouseEvent | React.TouchEvent) => void;
   onEdit: (habit: Habit) => void;
   onComplete: (habit: Habit) => void;
+  /** Hold on a counted habit — opens the session page. See the gesture hook. */
+  onHold?: (habit: Habit) => void;
   onCountedAction: (habit: Habit, kind: CountedKind) => void;
   children: React.ReactNode;
 }
@@ -58,6 +60,7 @@ export function HabitGestureCard({
   onCardClick,
   onEdit,
   onComplete,
+  onHold,
   onCountedAction,
   children,
 }: HabitGestureCardProps) {
@@ -70,6 +73,7 @@ export function HabitGestureCard({
     habitType,
     onEdit,
     onComplete,
+    onHold,
     onCardClick,
   });
 

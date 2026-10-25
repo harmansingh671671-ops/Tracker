@@ -40,6 +40,10 @@ interface HabitCardGestureOptions {
   onEdit: (habit: Habit) => void;
   /** Hold, or a committed swipe-right on a simple habit. */
   onComplete: (habit: Habit) => void;
+  /** Hold on a COUNTED habit: opens the session page (2026-10-25, owner
+   *  instruction) instead of completing. Absent, or a simple/avoid habit,
+   *  hold keeps its original meaning. */
+  onHold?: (habit: Habit) => void;
   /** Body tap. Heatmap rows pass nothing — only the matrix cells react there. */
   onCardClick?: (habit: Habit, e: React.MouseEvent | React.TouchEvent) => void;
 }
@@ -79,7 +83,7 @@ function pointOf(e: React.MouseEvent | React.TouchEvent): { x: number; y: number
 
 export function useHabitCardGestures(
   habit: Habit,
-  { habitType, onEdit, onComplete, onCardClick }: HabitCardGestureOptions
+  { habitType, onEdit, onComplete, onHold, onCardClick }: HabitCardGestureOptions
 ): {
   /** Counted panel open (card locked right, options selectable). */
   locked: boolean;
@@ -129,10 +133,13 @@ export function useHabitCardGestures(
         holdTimerRef.current = null;
         suppressClickRef.current = true;
         triggerHaptic();
-        onComplete(habit);
+        // A counted habit's hold opens the session; completing it in one
+        // gesture skipped the very choice the session page exists for.
+        if (habitType === "counted" && onHold) onHold(habit);
+        else onComplete(habit);
       }, HOLD_MS);
     },
-    [habit, onComplete, clearHold]
+    [habit, habitType, onHold, onComplete, clearHold]
   );
 
   const moveGesture = useCallback(

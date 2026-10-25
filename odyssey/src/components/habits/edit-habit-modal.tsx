@@ -6,6 +6,7 @@ import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
+import { UnitPicker } from "@/components/habits/unit-picker";
 import {
   X,
   Check,
@@ -581,28 +582,15 @@ export function EditHabitModal({
 
             {type === "counted" && (
               <>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-on-surface-variant font-medium">UNIT</label>
-                  <input
-                    type="text"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    placeholder="pages, cups, reps..."
-                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-on-surface-variant font-medium">DAILY TARGET</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={targetValue}
-                    onChange={(e) => setTargetValue(e.target.value)}
-                    placeholder="20"
-                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-                  />
-                </div>
+                {/* Same preset picker the create form uses (2026-10-25):
+                    preset chips, or Custom's amount-left / unit-right pair.
+                    This is what keeps the two pages consistent. */}
+                <UnitPicker
+                  unit={unit}
+                  targetValue={targetValue}
+                  onUnitChange={setUnit}
+                  onTargetChange={setTargetValue}
+                />
 
                 {/* Emergency version - only for counted habits; the floor a day
                     must reach to still count as done (see compliance.ts). */}

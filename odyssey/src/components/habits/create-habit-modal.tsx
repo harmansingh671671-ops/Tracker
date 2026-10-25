@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { type HabitCategory, type HabitType } from "@/lib/db";
 import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/habit-template-library";
+import { UnitPicker } from "@/components/habits/unit-picker";
 import { X, Check, Sparkles, ArrowLeft } from "lucide-react";
 
 interface CreateHabitModalProps {
@@ -447,28 +448,16 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
 
             {type === "counted" && (
               <>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-on-surface-variant font-medium">UNIT</label>
-                  <input
-                    type="text"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    placeholder="pages, cups, reps..."
-                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-on-surface-variant font-medium">DAILY TARGET</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={targetValue}
-                    onChange={(e) => setTargetValue(e.target.value)}
-                    placeholder="20"
-                    className="w-full rounded-xl bg-surface-container border border-outline/10 px-3 py-2 text-sm text-on-surface"
-                  />
-                </div>
+                {/* Counted habits pick a preset unit (Time opens the timer,
+                    the others a counter) or Custom's two-column amount +
+                    unit pair -- the same picker as the edit sheet, so the
+                    two pages cannot drift apart. */}
+                <UnitPicker
+                  unit={unit}
+                  targetValue={targetValue}
+                  onUnitChange={setUnit}
+                  onTargetChange={setTargetValue}
+                />
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-mono text-on-surface-variant font-medium">EMERGENCY MINIMUM</label>
