@@ -434,7 +434,7 @@ catalogue lands here.
 - [ ] **B7** — Challenge-linked habits with preview + confirm. `NOT BUILT`
 - [ ] **B8** — Habit motivation fields (note/Why/identity/cue/routine/reward/2-min). `NOT BUILT` · also: `S4`–`S8`
 - [ ] **B9** — Priority / energy / context tags with text+icon (never colour alone). `NOT BUILT` · also: `S2`, `S3` — **energy levels declined by owner 2026-10-20 (see `S3`)**; priority is shipped (`S2`); B9's remaining scope is context tags
-- [ ] **B10** — Keystone / Daily Highlight / Frog, one each per day. `PARTIAL` — the keystone third shipped with `S19` (2026-10-23): one per user, pinned first in the habits list and the wallpaper, designated from the habit edit sheet; `S19`'s 1.5x XP multiplier is deferred by owner decision. `S20` (today's highlight) was **declined by the owner on 2026-10-23** after its brief. `S21` (Eat That Frog) is **deferred by owner decision 2026-10-23 to after every phase is complete** (reward decision C13 still open, recorded on its own line), so `B10` has no active third left. · also: `S19`–`S21`
+- [x] **B10** — Keystone / Daily Highlight / Frog, one each per day. **`SHIPPED` 2026-10-25 for the accepted scope — keystone and frog.** The keystone third shipped with `S19` (one per user, pinned first in the habits list and the wallpaper, designated from the habit edit sheet; its 1.5x XP multiplier completed 2026-10-25). The frog third shipped with `S21` 2026-10-25 (highest-priority habit due that day; +15 before 10:00, additive with the keystone). The Daily Highlight third was **declined by the owner on 2026-10-23** (`S20`), so "one each per day" is settled at two, not three. · also: `S19`–`S21`
 - [ ] **B11** — Habit stacking "After A, do B" + temptation bundles. `NOT BUILT` · also: `HD16`, `HD20`
 - [ ] **B12** — Flexible habits, rollover, hardening window. `NOT BUILT` · also: `HD17`
 - [ ] **B13** — Pause / archive / inactive review (14-day prompt). `PARTIAL` — the "freeze" half is **retired, not built**: the Streak Freeze Shield shop item was removed with `B25` (ADR 0005); what exists is archive-only (`Habit.archivedAt`), with no pause state and no 14-day inactive prompt · also: `HD18`, `HD19`, `B25`
@@ -474,7 +474,7 @@ catalogue lands here.
 - [x] **E1** — Monthly heatmap. `SHIPPED` — month grid + navigation · also: `HD21` (the 52-week variant is tracked separately)
 - [ ] **E2** — Per-habit history/streak separate from global. `PARTIAL` — streak shown, no graph/milestone history · also: `S1`
 - [x] **E3** — Milestones 7/14/30/60/100/365 with unique copy. **`SHIPPED` 2026-10-23 via `S24`** — every rung has its own title + narrative and is presented as a once-only popup; the shipped ladder is a superset (adds 3 and 21). · also: `S24`
-- [ ] **E4** — Weekly comparison/report. `NOT BUILT` · also: `S23`
+- [ ] **E4** — Weekly comparison/report. `PARTIAL` 2026-10-25 — the **comparison** half shipped with `S23`: a Habit completion card on the stats screen comparing this week with the same days last week, counts + percentage points. The fuller **weekly report** (a review artefact beyond the one card) is not built. · also: `S23`
 - [ ] **E5** — Time/day performance by period and weekday. `NOT BUILT` · also: `HD23`, `HD24`
 - [ ] **E6** — Optional 1–5 morning energy log. `NOT BUILT` — the S25 implementation was removed by owner decision 2026-10-25; do not re-open. · also: `S25`
 - [ ] **E7** — Deep Work hours/target and time allocation. `NOT BUILT` · also: `HD22`
