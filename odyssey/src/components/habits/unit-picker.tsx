@@ -17,6 +17,7 @@
 import { UNIT_PRESETS, isUnitPresetId, timeUnitMinuteFactor } from "@/lib/utils/habit-units";
 import { Timer, Pencil } from "lucide-react";
 import { useMemo } from "react";
+import { FormLabel } from "./form-section";
 
 interface UnitPickerProps {
   unit: string;
@@ -49,9 +50,7 @@ export function UnitPicker({ unit, targetValue, onUnitChange, onTargetChange }: 
 
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-mono text-on-surface-variant font-medium">
-        DAILY TARGET &amp; TYPE
-      </label>
+      <FormLabel>Daily target &amp; type</FormLabel>
 
       <div className="flex gap-1.5 p-1 bg-surface-container-low rounded-2xl border border-outline/10">
         {UNIT_PRESETS.map((p) => (
