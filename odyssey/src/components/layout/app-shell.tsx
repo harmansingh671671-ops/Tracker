@@ -24,12 +24,6 @@ const AppUpdateModal = dynamic(
   () => import("@/components/common/app-update-modal").then((m) => m.AppUpdateModal),
   { ssr: false }
 );
-// S25 — asks once a day, after the first paint. Kept out of the early-return
-// branch below: onboarding and the day editor must never be interrupted.
-const EnergyCheckIn = dynamic(
-  () => import("@/components/energy/energy-check-in").then((m) => m.EnergyCheckIn),
-  { ssr: false }
-);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -98,7 +92,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <FloatingFeedbackButton />
       {afterPaint && (
         <>
-          <EnergyCheckIn />
           <EveningReminderModal />
           <AppUpdateModal />
         </>
