@@ -1061,6 +1061,15 @@ AnimatePresence, which suppresses the enter transition and leaves the
                   <div
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
+                    /* And the contextmenu the phone synthesizes on a
+                       long-press — a matrix cell's hold has ALWAYS been the
+                       tap-to-toggle per-date function (owner 2026-10-26), so
+                       without this the cell's long-press bubbled into the
+                       card's own hold path and opened the edit sheet. */
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   >
                     <HabitGitHubHeatmap
                       habitId={h.id}

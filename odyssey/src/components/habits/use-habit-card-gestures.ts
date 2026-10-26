@@ -231,6 +231,16 @@ export function useHabitCardGestures(
     onContextMenu: (e) => {
       e.preventDefault();
       e.stopPropagation();
+      // Counted cards: the phone's long-press ALSO fires contextmenu (and a
+      // drifting press can clear the hold timer above but still reach this
+      // event), which is exactly the "sometimes the edit sheet opened"
+      // inconsistency the owner reported 2026-10-26. Every hold path on a
+      // counted card now lands on the session. Simple/avoid keep the old
+      // right-click-to-edit path.
+      if (habitType === "counted" && onHold) {
+        onHold(habit);
+        return;
+      }
       onEdit(habit);
     },
     onClick: tapGesture,

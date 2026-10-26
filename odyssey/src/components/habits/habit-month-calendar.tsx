@@ -376,6 +376,15 @@ export function HabitMonthCalendar({
               onTouchEnd={() => endPress()}
               onMouseLeave={endPress}
               onTouchCancel={endPress}
+              /* A phone's long-press also synthesizes contextmenu; without
+                 stopping it here the bubble reached the gesture card and
+                 opened the edit sheet (the owner's "sometimes edit" report),
+                 stacking on top of this tile's own long-press behaviour. A
+                 tile hold is a date action, never a card action. */
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (isLongPressRef.current) {
