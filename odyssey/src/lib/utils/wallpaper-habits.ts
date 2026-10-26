@@ -1,5 +1,6 @@
 import { type Habit } from "@/lib/db";
-import { isHabitScheduledOnDate } from "./habit-colors";
+import { getLocalTodayStr, isHabitScheduledOnDate } from "./habit-colors";
+import { isPauseActive, isPauseWindowOn } from "./habit-lifecycle";
 import { withKeystoneOnWallpaper } from "./keystone";
 
 /**
@@ -64,9 +65,16 @@ export function selectDynamicHabits(
   maxCount: number = 4
 ): Habit[] {
   if (!habits || habits.length === 0) return [];
-  if (habits.length <= maxCount) return habits;
+  // B13: a habit paused today has no place on a "what's next" wallpaper row.
+  // The dateless legacy path has only "now" to answer with, so it uses today.
+  const today = getLocalTodayStr();
+  const eligible = habits.filter(
+    (h) => !h.archivedAt && !isPauseActive(h.pausedUntil, today)
+  );
+  if (eligible.length === 0) return [];
+  if (eligible.length <= maxCount) return eligible;
 
-  const scored = habits.map((h, idx) => ({
+  const scored = eligible.map((h, idx) => ({
     habit: h,
     score: timeScore(h, currentHour),
     originalIndex: idx,
@@ -126,7 +134,7 @@ export function selectWallpaperHabits(
   };
 
   const ordered = habits
-    .filter((habit) => !habit.archivedAt)
+    .filter((habit) => !habit.archivedAt && !isPauseWindowOn(habit, dateStr))
     .map((habit, index) => ({
       habit,
       group: group(habit),

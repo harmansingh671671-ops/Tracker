@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, type Habit, type HabitLog } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { getLocalTodayStr, isHabitScheduledOnDate, getHabitColor } from '../utils/habit-colors';
+import { addDays, normalizePauseDays, pauseUntil } from '../utils/habit-lifecycle';
 import { isHabitComplete } from '../utils/habit-completion';
 import { buildDaysDoneMap, countDaysDoneForHabit } from '../utils/compliance';
 import { readHabitCache, writeHabitCache, clearHabitCache } from '../habit-cache';
@@ -156,6 +157,16 @@ interface HabitState {
   /** Record (or clear) a slip for an `avoid` habit on `date`. No-op for other types. */
   markHabitSlip: (userId: string, habitId: string, date: string, slipped: boolean) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
+  /** B13: dated-window pause; `days` is validated (int 1..30) — invalid input is a no-op. */
+  pauseHabit: (id: string, days: number) => Promise<void>;
+  /** B13: end a pause now; the window is CLAMPED to yesterday so past paused days stay exempt in history (ADR 0006). */
+  resumeHabit: (id: string) => Promise<void>;
+  /** B13: bring an archived habit back; the caller refetches with force afterwards. */
+  restoreHabit: (id: string) => Promise<void>;
+  /** B13: true delete — removes the habit AND its logs (the only destructive path). */
+  destroyHabit: (id: string) => Promise<void>;
+  /** B13: archived rows, newest first. Read-only for the UI; never mutates `habits`. */
+  fetchArchivedHabits: (userId: string) => Promise<Habit[]>;
   clearAllHabits: (userId: string) => Promise<void>;
 }
 
@@ -919,6 +930,68 @@ const valuesMap: Record<string, Record<string, number>> = {};
     set((state) => ({
       habits: state.habits.filter(h => h.id !== id)
     }));
+  },
+
+  pauseHabit: async (id, days) => {
+    const length = normalizePauseDays(days);
+    if (length === null) return; // trust boundary: only valid windows are written
+    const today = getLocalTodayStr();
+    // `days` counts today itself: a 3-day pause exempts today..today+2, so the
+    // stored window ENDS at today + (days - 1) and the "Paused · N days left"
+    // chip reads the number the user chose (pauseDaysLeft is inclusive).
+    const updates: Partial<Habit> = {
+      pausedFrom: today,
+      pausedUntil: pauseUntil(today, length - 1),
+    };
+    await db.habits.update(id, updates);
+    set((state) => ({
+      habits: state.habits.map((h) => (h.id === id ? { ...h, ...updates } : h)),
+    }));
+  },
+
+  resumeHabit: async (id) => {
+    const today = getLocalTodayStr();
+    const yesterday = addDays(today, -1);
+    const habit = get().habits.find((h) => h.id === id);
+    // Preserve the window it actually paused within, clamped to yesterday: past
+    // paused days stay exempt in every derived report instead of reading as
+    // "missed" (ADR 0006). A window that never covered yesterday is erased.
+    if (habit?.pausedFrom && habit.pausedFrom <= yesterday) {
+      await db.habits.update(id, { pausedUntil: yesterday });
+      set((state) => ({
+        habits: state.habits.map((h) =>
+          h.id === id ? { ...h, pausedUntil: yesterday } : h
+        ),
+      }));
+    } else {
+      await db.habits.update(id, { pausedFrom: undefined, pausedUntil: undefined });
+      set((state) => ({
+        habits: state.habits.map((h) =>
+          h.id === id ? { ...h, pausedFrom: undefined, pausedUntil: undefined } : h
+        ),
+      }));
+    }
+  },
+
+  restoreHabit: async (id) => {
+    await db.habits.update(id, { archivedAt: undefined });
+    // No in-memory insert: the caller refetches with force so the store, the
+    // order and the logs come back from the db in one authoritative read.
+  },
+
+  destroyHabit: async (id) => {
+    await db.habitLogs.where('habitId').equals(id).delete();
+    await db.habits.delete(id);
+    set((state) => ({
+      habits: state.habits.filter(h => h.id !== id),
+    }));
+  },
+
+  fetchArchivedHabits: async (userId) => {
+    const all = await db.habits.where('userId').equals(userId).toArray();
+    return all
+      .filter((h) => Boolean(h.archivedAt))
+      .sort((a, b) => (b.archivedAt ?? "").localeCompare(a.archivedAt ?? ""));
   },
 
   clearAllHabits: async (userId) => {

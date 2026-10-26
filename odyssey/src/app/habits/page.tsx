@@ -7,6 +7,9 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
+import { HabitReviewCard } from "@/components/habits/habit-review-card";
+import { PausedHabitRow } from "@/components/habits/paused-habit-row";
+import { ArchivedHabitsSection } from "@/components/habits/archived-habits-section";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { HabitListCard } from "@/components/habits/habit-list-card";
 import { KeystoneBadge } from "@/components/habits/keystone-badge";
@@ -17,6 +20,12 @@ import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
+import {
+  isPauseActive,
+  isHabitStale,
+  lastTouchedDate,
+  pauseDaysLeft,
+} from "@/lib/utils/habit-lifecycle";
 import { useSharedClock } from "@/lib/utils/shared-clock";
 import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
@@ -37,6 +46,7 @@ import {
   LayoutList,
   CalendarDays,
   X,
+  Archive,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HabitGestureCard } from "@/components/habits/habit-gesture-card";
@@ -50,6 +60,14 @@ type HabitViewMode = "list" | "heatmap";
 
 /** Where the Habits view-mode preference is stored — `B6` requires a "saved preference". */
 const HABITS_VIEW_STORAGE_KEY = "odyssey_habits_view";
+
+/**
+ * B13: the 14-day review's dismiss marker. It stores WHICH habit ids were
+ * dismissed (not a date), so the review card only re-opens when a NEW habit
+ * crosses the 14 quiet days — resuming or pausing a dismissed one does not
+ * resurrect the same annoyance.
+ */
+const REVIEW_DISMISS_STORAGE_KEY = "odyssey_b13_review";
 
 // PERF-5 -- the dialog primitive kit is ~20 KB gzipped and this screen draws no
 // dialog on first paint, so it must not be part of the route's first load. Same
@@ -81,6 +99,11 @@ export default function HabitsPage() {
     addHabit,
     updateHabit,
     deleteHabit,
+    pauseHabit,
+    resumeHabit,
+    restoreHabit,
+    destroyHabit,
+    fetchArchivedHabits,
     loading: habitsLoading,
     loadedUserId,
   } = useHabitStore();
@@ -111,6 +134,14 @@ export default function HabitsPage() {
   }, []);
   const [valueInputHabit, setValueInputHabit] = useState<{ habit: Habit; log: { completed?: boolean; value?: number } | undefined; date: string } | null>(null);
   const [valueInputAmount, setValueInputAmount] = useState("");
+
+  // B13 — the archive drawer state. `null` rows mean "not read yet"; the icon
+  // shows its badge as soon as the read lands.
+  const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  // Dismissed review ids, `null` until the client marker is read (SSR-safe:
+  // an `useState(localStorage...)` initializer would desync server markup).
+  const [dismissedStaleIds, setDismissedStaleIds] = useState<string[] | null>(null);
 
   const [todayStr, setTodayStr] = useState<string>(getLocalTodayStr);
   const [selectedDate, setSelectedDate] = useState<string>(getLocalTodayStr);
@@ -297,16 +328,104 @@ export default function HabitsPage() {
     });
   }, [fetchUser, fetchHabits, selectedDate]);
 
+  // B13 — read the review dismiss marker once, after hydration (SSR safety:
+  // never inside an useState initializer). Deferred with `queueMicrotask` —
+  // the same pattern the view-mode effect uses — because a synchronous
+  // setState in an effect cascades a second render pass.
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const raw = readString(REVIEW_DISMISS_STORAGE_KEY, "");
+        if (raw !== "") {
+          const parsed: unknown = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setDismissedStaleIds(parsed.filter((x): x is string => typeof x === "string"));
+          } else {
+            setDismissedStaleIds([]);
+          }
+        } else {
+          setDismissedStaleIds([]);
+        }
+      } catch (e) {
+        logWarn("habits", "review dismiss marker unreadable", e);
+        setDismissedStaleIds([]);
+      }
+    });
+  }, []);
+
+  const refreshArchived = useCallback(async () => {
+    if (!loadedUserId) return;
+    try {
+      const rows = await fetchArchivedHabits(loadedUserId);
+      setArchivedHabits(rows);
+    } catch (e) {
+      logWarn("habits", "archive read failed", e);
+    }
+  }, [loadedUserId, fetchArchivedHabits]);
+
+  useEffect(() => {
+    let alive = true;
+    queueMicrotask(() => {
+      if (alive) void refreshArchived();
+    });
+    return () => {
+      alive = false;
+    };
+  }, [refreshArchived]);
+
   // Track scheduled habits count for daily progress stats while keeping natural order
   const scheduledHabits = useMemo(() => {
     return habits.filter((h) => isHabitScheduledOnDate(h, selectedDate));
   }, [habits, selectedDate]);
 
   // S19 — the keystone leads both views; a stale or archived id changes nothing.
+  // B13: paused habits sort to the BOTTOM of this list (keystone.ts), and the
+  // views below render them as quiet rows instead of full cards.
   const orderedHabits = useMemo(
     () => orderHabitsForDisplay(habits, user?.keystoneHabitId),
     [habits, user?.keystoneHabitId]
   );
+
+  // B13 — split the display list: full cards first, paused quiet-rows last.
+  const pausedHabits = useMemo(
+    () => orderedHabits.filter((h) => isPauseActive(h.pausedUntil, todayStr)),
+    [orderedHabits, todayStr]
+  );
+  const activeHabits = useMemo(
+    () => orderedHabits.filter((h) => !isPauseActive(h.pausedUntil, todayStr)),
+    [orderedHabits, todayStr]
+  );
+
+  // B13 — the 14-day review's candidates: every non-paused, non-archived habit
+  // whose last ANY-log day (or, for one never touched, its created day) is 14+
+  // days ago. A partial counted fill still counts as a touch — the review only
+  // speaks about habits that got NOTHING for two weeks.
+  const staleHabits = useMemo(() => {
+    if (loadedUserId !== userId || !userId) return [];
+    return habits.filter((h) => {
+      if (h.archivedAt) return false;
+      if (isPauseActive(h.pausedUntil, todayStr)) return false;
+      const logDates = Object.keys(historyLogs[h.id] ?? {});
+      const last = lastTouchedDate(logDates.map((date) => ({ date })));
+      return isHabitStale(last, h.createdAt, todayStr);
+    });
+    // isHabitStale/lastTouchedDate are imported pure functions, not reactive.
+  }, [habits, historyLogs, todayStr, userId, loadedUserId]);
+
+  const offeredStaleHabits = useMemo(() => {
+    if (dismissedStaleIds === null) return [];
+    return staleHabits.filter((h) => !dismissedStaleIds.includes(h.id));
+  }, [staleHabits, dismissedStaleIds]);
+
+  const dismissStale = useCallback((ids: string[]) => {
+    const merged = Array.from(new Set([...(dismissedStaleIds ?? []), ...ids]));
+    setDismissedStaleIds(merged);
+    try {
+      writeString(REVIEW_DISMISS_STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) {
+      logWarn("habits", "review dismiss marker not persisted", e);
+    }
+  }, [dismissedStaleIds]);
 
   const total = scheduledHabits.length || habits.length;
   const completed = habits.filter((h) => {
@@ -528,6 +647,83 @@ export default function HabitsPage() {
     // nothing to write into anymore, so it closes.
     setSessionHabit((prev) => (prev?.id === habitId ? null : prev));
   };
+
+  // B13 — pause / resume / let go / restore. Each one refetches with force
+  // (the list itself changed in the database) and refreshes the archive read.
+  const handlePauseHabit = useCallback(
+    async (habitId: string, days: number) => {
+      await pauseHabit(habitId, days);
+      // The habit is off the expectations list; the review must not reactivate
+      // only because it resumed — its quiet stretch was already dismissed.
+      dismissStale([habitId]);
+      if (userId) await fetchHabits(userId, selectedDate, { force: true });
+      showToast(`Paused for ${days} day${days === 1 ? "" : "s"}.`);
+    },
+    [pauseHabit, dismissStale, userId, fetchHabits, selectedDate, showToast]
+  );
+
+  const handleResumeHabit = useCallback(
+    async (habitId: string) => {
+      await resumeHabit(habitId);
+      dismissStale([habitId]);
+      if (userId) await fetchHabits(userId, selectedDate, { force: true });
+      showToast("Habit resumed.");
+    },
+    [resumeHabit, dismissStale, userId, fetchHabits, selectedDate, showToast]
+  );
+
+  const handleLetGoHabit = useCallback(
+    async (habit: Habit) => {
+      // `deleteHabit` is a soft-archive: the habit and ALL of its history stay
+      // in the database, restorable from the archive drawer.
+      await deleteHabit(habit.id);
+      if (userId) await fetchHabits(userId, selectedDate, { force: true });
+      void refreshArchived();
+      showToast("Habit let go — bring it back anytime from the archive.");
+      setSessionHabit((prev) => (prev?.id === habit.id ? null : prev));
+    },
+    [deleteHabit, userId, fetchHabits, selectedDate, refreshArchived, showToast]
+  );
+
+  const handleRestoreHabit = useCallback(
+    async (habitId: string) => {
+      await restoreHabit(habitId);
+      if (userId) await fetchHabits(userId, selectedDate, { force: true });
+      await refreshArchived();
+      showToast("Habit restored.");
+    },
+    [restoreHabit, userId, fetchHabits, selectedDate, refreshArchived, showToast]
+  );
+
+  const handleDeleteForever = useCallback(
+    async (habitId: string) => {
+      await destroyHabit(habitId);
+      if (userId) await fetchHabits(userId, selectedDate, { force: true });
+      await refreshArchived();
+      showToast("Habit and its history deleted.");
+    },
+    [destroyHabit, userId, fetchHabits, selectedDate, refreshArchived, showToast]
+  );
+
+  const handleArchiveIconClick = useCallback(() => {
+    if (archivedHabits.length === 0) {
+      showToast("Nothing archived yet");
+      return;
+    }
+    setShowArchived((v) => !v);
+  }, [archivedHabits.length, showToast]);
+
+  // B13 — the pause state the edit sheet renders. Read from the LIVE store
+  // habit so a pause made inside the sheet updates it immediately, kept as a
+  // scalar so the modal's `habit` prop itself never changes identity (the
+  // sheet's form-seed guard depends on stable identity; a replaced object
+  // would reset unsaved edits).
+  const editingPausedLeft = useMemo(() => {
+    if (!editingHabit) return null;
+    const live = habits.find((h) => h.id === editingHabit.id);
+    if (!live || !isPauseActive(live.pausedUntil, todayStr)) return null;
+    return live.pausedUntil ? pauseDaysLeft(live.pausedUntil, todayStr) : null;
+  }, [editingHabit, habits, todayStr]);
 
   // S19 — designation only ever MOVES the pin (choosing another habit rewrites
   // the id; archiving retires it), so there is no clear path and no toast on
@@ -761,16 +957,35 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
       {/* Top Header Action Row */}
       <div className="flex items-center justify-between gap-3 pt-1">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight text-on-surface">Habits &amp; Routines</h1>
+          {/* B13 — the archive icon. The COUNT is the only permanent signal: the
+              section itself renders only when there is something to show and
+              the icon was tapped. An empty archive says so plainly. */}
+          <button
+            type="button"
+            onClick={handleArchiveIconClick}
+            title={archivedHabits.length === 0 ? "Archive" : `Archive — ${archivedHabits.length} habit${archivedHabits.length === 1 ? "" : "s"}`}
+            aria-label={`Archive (${archivedHabits.length})`}
+            className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
+              showArchived
+                ? "bg-primary/10 text-primary border-primary/30"
+                : "bg-surface-container-high text-on-surface-variant hover:text-on-surface border-outline/15"
+            }`}
+          >
+            <Archive className="w-4 h-4" />
+            {archivedHabits.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-primary text-on-primary text-[8px] font-bold font-mono rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-[3px]">
+                {archivedHabits.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-1.5 bg-primary hover:bg-primary-container text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md shadow-primary/20 active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Habit</span>
+          </button>
         </div>
-
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-1.5 bg-primary hover:bg-primary-container text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md shadow-primary/20 active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Habit</span>
-        </button>
       </div>
 
       {/* HabitDriven Segmented Date Strip with completion rings */}
@@ -812,6 +1027,24 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
           </span>
         </div>
       </div>
+
+      {/* B13 — the 14-day quiet review. Ask-first: it offers Pause / Let go /
+          Keep per quiet habit and never touches data by itself. It mounts only
+          once habits are loaded AND the client marker has been read, so the
+          server never paints it and a dismissed set is honored from frame 0. */}
+      {dismissedStaleIds !== null && (
+        <AnimatePresence>
+          {offeredStaleHabits.length > 0 && (
+            <HabitReviewCard
+              staleHabits={offeredStaleHabits}
+              onPause={(id, days) => void handlePauseHabit(id, days)}
+              onLetGo={(h) => void handleLetGoHabit(h)}
+              onKeep={(id) => dismissStale([id])}
+              onDismissAll={() => dismissStale(offeredStaleHabits.map((h) => h.id))}
+            />
+          )}
+        </AnimatePresence>
+      )}
 
       {/* View Switcher Header (List / Heatmap) & Stats Summary */}
       <div className="flex items-center justify-between gap-2 pt-1">
@@ -906,7 +1139,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
              the whole page could be panned sideways. */
          <div className="space-y-2.5 overflow-x-clip">
             <AnimatePresence mode="popLayout" initial={false}>
-{orderedHabits.map((h) => {
+{activeHabits.map((h) => {
                 const isScheduled = isHabitScheduledOnDate(h, selectedDate);
                 const log = getCompletionRecord(h, selectedDate, todayStr, { todayLogs, historyLogs, historyValues });
                 const isCompleted = isHabitComplete(h, log);
@@ -961,14 +1194,40 @@ AnimatePresence, which suppresses the enter transition and leaves the
                 </HabitGestureCard>
               );
             })}
-          </AnimatePresence>
-        </div>
+            </AnimatePresence>
+
+            {/* B13 — paused habits: visible, at the bottom, no expectations.
+                A simple identity row with the days-left chip and Resume; not a
+                swipeable card, because nothing on it can be progressed. */}
+            {pausedHabits.length > 0 && (
+              <div className="space-y-2.5 pt-1" aria-label="Paused habits">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {pausedHabits.map((h) => (
+                    <motion.div
+                      key={`paused-${h.id}`}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    >
+                      <PausedHabitRow
+                        habit={h}
+                        todayStr={todayStr}
+                        onResume={(id) => void handleResumeHabit(id)}
+                        onOpen={setEditingHabit}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
       ) : (
         /* 2. HEATMAP VIEW (`B6`, windowed `M25`): one 16-week matrix per habit
            with ‹/› paging instead of the year-wide inner scroller. */
         <div className="space-y-2.5 overflow-x-clip">
           <AnimatePresence mode="popLayout" initial={false}>
-            {orderedHabits.map((h) => {
+            {activeHabits.map((h) => {
               const isScheduled = isHabitScheduledOnDate(h, selectedDate);
               const isCompleted = selectedDate === todayStr
                 ? Boolean(todayLogs[h.id]?.completed || historyLogs[h.id]?.[selectedDate])
@@ -1089,8 +1348,43 @@ AnimatePresence, which suppresses the enter transition and leaves the
                 </HabitGestureCard>
               );
             })}
-          </AnimatePresence>
-        </div>
+            </AnimatePresence>
+
+            {/* B13 — paused habits in the heatmap view get the same quiet rows. */}
+            {pausedHabits.length > 0 && (
+              <div className="space-y-2.5 pt-1" aria-label="Paused habits">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {pausedHabits.map((h) => (
+                    <motion.div
+                      key={`paused-heatmap-${h.id}`}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    >
+                      <PausedHabitRow
+                        habit={h}
+                        todayStr={todayStr}
+                        onResume={(id) => void handleResumeHabit(id)}
+                        onOpen={setEditingHabit}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+      )}
+
+      {/* B13 — the archive drawer. Rendered only when there is something in it
+          AND the header icon was tapped; restored rows drop out as they come
+          back, and delete-forever is the only way a habit's history is lost. */}
+      {showArchived && archivedHabits.length > 0 && (
+        <ArchivedHabitsSection
+          archivedHabits={archivedHabits}
+          onRestore={(id) => void handleRestoreHabit(id)}
+          onDeleteForever={(id) => void handleDeleteForever(id)}
+        />
       )}
 
       {/* Counted-habit session page (timer / counter), opened by press-and-hold
@@ -1135,6 +1429,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
           isKeystone={editingHabit.id === user?.keystoneHabitId}
           keystoneHabitName={resolveKeystoneHabit(habits, user?.keystoneHabitId)?.name}
           onSetKeystone={handleSetKeystone}
+          onPause={(days) => void handlePauseHabit(editingHabit.id, days)}
+          onResume={() => void handleResumeHabit(editingHabit.id)}
+          pausedDaysLeft={editingPausedLeft}
         />
       )}
 

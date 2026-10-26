@@ -369,6 +369,15 @@ export interface Habit {
   totalCompletions: number;
   createdAt: string;
   archivedAt?: string;
+  /**
+   * B13 pause, as a DATED WINDOW of local `YYYY-MM-DD` strings (`pauseUntil` is
+   * derived, never typed). Every expectation check derives the pause from the
+   * date it asks about via `isPauseWindowOn` — no timer, nothing runs while the
+   * app is closed, and resume clamps the window to the day before today so
+   * deliberately-exempted past days stay exempt in every report. ADR 0006.
+   */
+  pausedFrom?: string;
+  pausedUntil?: string;
 }
 
 export interface HabitLog {

@@ -1,4 +1,5 @@
 import { type Habit, HABIT_CATEGORIES, normalizeHabitCategory } from "@/lib/db";
+import { isPauseWindowOn } from "@/lib/utils/habit-lifecycle";
 
 /**
  * Canonical habit colour, keyed on the four domains (P0-T3).
@@ -139,12 +140,19 @@ export function getLocalTodayStr(): string {
 
 /**
  * Checks whether a habit is scheduled / eligible on a given date string (YYYY-MM-DD).
+ *
+ * B13: a day inside the habit's pause window is NOT scheduled — this is the
+ * ROOT-CAUSE exemption (rule 17): every consumer of "is this habit expected
+ * today" (frog, S22 hero, planner counts, week reports, the habits page's
+ * done/total) runs through this one function, so a pause de-expects every
+ * surface by construction and nothing re-derives its own rule.
  */
 export function isHabitScheduledOnDate(
-  habit: { targetDays?: number[]; targetDaysPerWeek?: number },
+  habit: { targetDays?: number[]; targetDaysPerWeek?: number; pausedFrom?: string; pausedUntil?: string },
   dateStr: string
 ): boolean {
   if (!dateStr) return true;
+  if (isPauseWindowOn(habit, dateStr)) return false;
   const [y, m, d] = dateStr.split("-").map(Number);
   const dateObj = new Date(y, m - 1, d);
   const jsDay = dateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat

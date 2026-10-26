@@ -30,7 +30,10 @@ import {
   Flame,
   Sparkles,
   CheckCircle2,
+  PauseCircle,
+  Play,
 } from "lucide-react";
+import { PauseLengthPicker } from "./pause-length-picker";
 
 interface EditHabitModalProps {
   habit: Habit | null;
@@ -67,6 +70,12 @@ interface EditHabitModalProps {
   onSetKeystone?: (habitId: string) => void;
   /** The CURRENT keystone's name, so a replacement can ask first. */
   keystoneHabitName?: string;
+  /** B13 — pause this habit for `days` whole days (dated window, ADR 0006). */
+  onPause?: (days: number) => void;
+  /** B13 — end the active pause now (the window is clamped, not erased). */
+  onResume?: () => void;
+  /** B13 — whole days left, or null when the habit is not paused. */
+  pausedDaysLeft?: number | null;
 }
 
 // B2: the option lists moved to `habit-form-options.ts` — both forms import
@@ -85,6 +94,9 @@ export function EditHabitModal({
   isKeystone = false,
   onSetKeystone,
   keystoneHabitName,
+  onPause,
+  onResume,
+  pausedDaysLeft = null,
 }: EditHabitModalProps) {
   const { user } = useUserStore();
   const { historyLogs, toggleHabitLog, daysDoneByHabit } = useHabitStore();
@@ -114,6 +126,8 @@ export function EditHabitModal({
   const [openKeystone, setOpenKeystone] = useState(false);
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  // B13 — the sheet's pause picker is folded by default.
+  const [showPausePicker, setShowPausePicker] = useState(false);
 
   const today = propTodayStr || getLocalTodayStr();
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string>(selectedDate || today);
@@ -163,6 +177,7 @@ export function EditHabitModal({
       setColor(habit.color ?? "");
 
       setIsConfirmingDelete(false);
+      setShowPausePicker(false);
       setSelectedHistoryDate(selectedDate || today);
     }
   }
@@ -218,6 +233,8 @@ export function EditHabitModal({
     onClose();
   };
 
+  // B13 — the destructive-looking button is the SOFT path: letting go keeps the
+  // habit and its whole history in the database, restorable from the archive.
   const handleDeleteClick = () => {
     if (!isConfirmingDelete) {
       setIsConfirmingDelete(true);
@@ -226,6 +243,8 @@ export function EditHabitModal({
       onClose();
     }
   };
+
+  const isPausedHere = pausedDaysLeft !== null && pausedDaysLeft > 0;
 
   return (
     <div
@@ -600,6 +619,51 @@ export function EditHabitModal({
               type={type}
             />
 
+            {/* B13 — pause controls. A pause is a dated window: nothing runs
+                while the app is closed, the habit simply carries no
+                expectations until the window is over. */}
+            {(onPause || onResume) && (
+              <div className="space-y-2">
+                {isPausedHere ? (
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-surface-container-low border border-outline/10">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant">
+                      <PauseCircle className="w-4 h-4" />
+                      On pause · {pausedDaysLeft} {pausedDaysLeft === 1 ? "day" : "days"} left
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onResume?.();
+                        setShowPausePicker(false);
+                      }}
+                      className="h-8 px-3 rounded-lg bg-surface-container-high text-primary text-[11px] font-mono font-bold border border-outline/15 hover:bg-primary/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Play className="w-3 h-3" />
+                      Resume
+                    </button>
+                  </div>
+                ) : onPause && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPausePicker((v) => !v)}
+                    className="w-full py-3 px-4 rounded-2xl text-xs font-bold bg-surface-container-high/60 text-on-surface-variant hover:text-on-surface border border-outline/15 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <PauseCircle className="w-4 h-4" />
+                    <span>Take a break (pause)</span>
+                  </button>
+                )}
+                {onPause && showPausePicker && !isPausedHere && (
+                  <PauseLengthPicker
+                    onConfirm={(days) => {
+                      onPause(days);
+                      setShowPausePicker(false);
+                    }}
+                    onCancel={() => setShowPausePicker(false)}
+                  />
+                )}
+              </div>
+            )}
+
             {/* Action Buttons: Save and Delete */}
             <div className="pt-2 space-y-2">
               <button
@@ -622,15 +686,18 @@ export function EditHabitModal({
                 {isConfirmingDelete ? (
                   <>
                     <AlertTriangle className="w-4 h-4" />
-                    <span>Tap Again to Confirm Delete</span>
+                    <span>Tap again to let go</span>
                   </>
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4" />
-                    <span>Delete Habit</span>
+                    <span>Let go of this habit</span>
                   </>
                 )}
               </button>
+              <p className="text-[10px] font-mono text-on-surface-variant/80 text-center">
+                You can bring it back later from the archive. Its history is kept.
+              </p>
             </div>
           </form>
         )}
