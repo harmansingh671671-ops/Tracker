@@ -974,14 +974,21 @@ const valuesMap: Record<string, Record<string, number>> = {};
   },
 
   restoreHabit: async (id) => {
+    const row = await db.habits.get(id);
     await db.habits.update(id, { archivedAt: undefined });
     // No in-memory insert: the caller refetches with force so the store, the
     // order and the logs come back from the db in one authoritative read.
+    // The mirror is dropped too — restore now happens OFF the habits page
+    // (profile), so on top of it the next cold load could paint the habit as
+    // still archived (the cache is not date-validated for the habits list).
+    if (row?.userId) clearHabitCache(row.userId);
   },
 
   destroyHabit: async (id) => {
+    const row = await db.habits.get(id);
     await db.habitLogs.where('habitId').equals(id).delete();
     await db.habits.delete(id);
+    if (row?.userId) clearHabitCache(row.userId); // a destroyed habit must never paint from the mirror
     set((state) => ({
       habits: state.habits.filter(h => h.id !== id),
     }));

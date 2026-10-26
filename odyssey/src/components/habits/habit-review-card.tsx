@@ -104,7 +104,7 @@ export function HabitReviewCard({
                     <button
                       type="button"
                       onClick={() => onLetGo(h)}
-                      title="Let go — recoverable from the archive"
+                      title="Let go — recoverable from your profile's archive"
                       className="h-7 px-2 rounded-lg bg-surface-container-high text-on-surface-variant text-[10px] font-mono font-bold border border-outline/15 hover:text-error hover:border-error/30 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
                     >
                       <Archive className="w-3 h-3" />

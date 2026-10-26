@@ -9,7 +9,6 @@ import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { EditHabitModal } from "@/components/habits/edit-habit-modal";
 import { HabitReviewCard } from "@/components/habits/habit-review-card";
 import { PausedHabitRow } from "@/components/habits/paused-habit-row";
-import { ArchivedHabitsSection } from "@/components/habits/archived-habits-section";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { HabitListCard } from "@/components/habits/habit-list-card";
 import { KeystoneBadge } from "@/components/habits/keystone-badge";
@@ -46,7 +45,6 @@ import {
   LayoutList,
   CalendarDays,
   X,
-  Archive,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HabitGestureCard } from "@/components/habits/habit-gesture-card";
@@ -101,9 +99,6 @@ export default function HabitsPage() {
     deleteHabit,
     pauseHabit,
     resumeHabit,
-    restoreHabit,
-    destroyHabit,
-    fetchArchivedHabits,
     loading: habitsLoading,
     loadedUserId,
   } = useHabitStore();
@@ -135,12 +130,9 @@ export default function HabitsPage() {
   const [valueInputHabit, setValueInputHabit] = useState<{ habit: Habit; log: { completed?: boolean; value?: number } | undefined; date: string } | null>(null);
   const [valueInputAmount, setValueInputAmount] = useState("");
 
-  // B13 — the archive drawer state. `null` rows mean "not read yet"; the icon
-  // shows its badge as soon as the read lands.
-  const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
-  const [showArchived, setShowArchived] = useState(false);
-  // Dismissed review ids, `null` until the client marker is read (SSR-safe:
-  // an `useState(localStorage...)` initializer would desync server markup).
+  // B13 — the review's dismissed-ids marker, `null` until the client marker is
+  // read (SSR-safe: an `useState(localStorage...)` initializer would desync
+  // server markup). The archive itself lives on the profile page now.
   const [dismissedStaleIds, setDismissedStaleIds] = useState<string[] | null>(null);
 
   const [todayStr, setTodayStr] = useState<string>(getLocalTodayStr);
@@ -352,26 +344,6 @@ export default function HabitsPage() {
       }
     });
   }, []);
-
-  const refreshArchived = useCallback(async () => {
-    if (!loadedUserId) return;
-    try {
-      const rows = await fetchArchivedHabits(loadedUserId);
-      setArchivedHabits(rows);
-    } catch (e) {
-      logWarn("habits", "archive read failed", e);
-    }
-  }, [loadedUserId, fetchArchivedHabits]);
-
-  useEffect(() => {
-    let alive = true;
-    queueMicrotask(() => {
-      if (alive) void refreshArchived();
-    });
-    return () => {
-      alive = false;
-    };
-  }, [refreshArchived]);
 
   // Track scheduled habits count for daily progress stats while keeping natural order
   const scheduledHabits = useMemo(() => {
@@ -675,43 +647,14 @@ export default function HabitsPage() {
   const handleLetGoHabit = useCallback(
     async (habit: Habit) => {
       // `deleteHabit` is a soft-archive: the habit and ALL of its history stay
-      // in the database, restorable from the archive drawer.
+      // in the database, restorable from the archive on the profile page.
       await deleteHabit(habit.id);
       if (userId) await fetchHabits(userId, selectedDate, { force: true });
-      void refreshArchived();
-      showToast("Habit let go — bring it back anytime from the archive.");
+      showToast("Habit let go — bring it back anytime from your profile.");
       setSessionHabit((prev) => (prev?.id === habit.id ? null : prev));
     },
-    [deleteHabit, userId, fetchHabits, selectedDate, refreshArchived, showToast]
+    [deleteHabit, userId, fetchHabits, selectedDate, showToast]
   );
-
-  const handleRestoreHabit = useCallback(
-    async (habitId: string) => {
-      await restoreHabit(habitId);
-      if (userId) await fetchHabits(userId, selectedDate, { force: true });
-      await refreshArchived();
-      showToast("Habit restored.");
-    },
-    [restoreHabit, userId, fetchHabits, selectedDate, refreshArchived, showToast]
-  );
-
-  const handleDeleteForever = useCallback(
-    async (habitId: string) => {
-      await destroyHabit(habitId);
-      if (userId) await fetchHabits(userId, selectedDate, { force: true });
-      await refreshArchived();
-      showToast("Habit and its history deleted.");
-    },
-    [destroyHabit, userId, fetchHabits, selectedDate, refreshArchived, showToast]
-  );
-
-  const handleArchiveIconClick = useCallback(() => {
-    if (archivedHabits.length === 0) {
-      showToast("Nothing archived yet");
-      return;
-    }
-    setShowArchived((v) => !v);
-  }, [archivedHabits.length, showToast]);
 
   // B13 — the pause state the edit sheet renders. Read from the LIVE store
   // habit so a pause made inside the sheet updates it immediately, kept as a
@@ -957,35 +900,16 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
       {/* Top Header Action Row */}
       <div className="flex items-center justify-between gap-3 pt-1">
         <div className="flex items-center gap-2">
-          {/* B13 — the archive icon. The COUNT is the only permanent signal: the
-              section itself renders only when there is something to show and
-              the icon was tapped. An empty archive says so plainly. */}
-          <button
-            type="button"
-            onClick={handleArchiveIconClick}
-            title={archivedHabits.length === 0 ? "Archive" : `Archive — ${archivedHabits.length} habit${archivedHabits.length === 1 ? "" : "s"}`}
-            aria-label={`Archive (${archivedHabits.length})`}
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
-              showArchived
-                ? "bg-primary/10 text-primary border-primary/30"
-                : "bg-surface-container-high text-on-surface-variant hover:text-on-surface border-outline/15"
-            }`}
-          >
-            <Archive className="w-4 h-4" />
-            {archivedHabits.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-primary text-on-primary text-[8px] font-bold font-mono rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-[3px]">
-                {archivedHabits.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-1.5 bg-primary hover:bg-primary-container text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md shadow-primary/20 active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Habit</span>
-          </button>
+          <h1 className="text-xl font-bold tracking-tight text-on-surface">Habits &amp; Routines</h1>
         </div>
+
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-1.5 bg-primary hover:bg-primary-container text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md shadow-primary/20 active:scale-95 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New Habit</span>
+        </button>
       </div>
 
       {/* HabitDriven Segmented Date Strip with completion rings */}
@@ -1374,17 +1298,6 @@ AnimatePresence, which suppresses the enter transition and leaves the
               </div>
             )}
           </div>
-      )}
-
-      {/* B13 — the archive drawer. Rendered only when there is something in it
-          AND the header icon was tapped; restored rows drop out as they come
-          back, and delete-forever is the only way a habit's history is lost. */}
-      {showArchived && archivedHabits.length > 0 && (
-        <ArchivedHabitsSection
-          archivedHabits={archivedHabits}
-          onRestore={(id) => void handleRestoreHabit(id)}
-          onDeleteForever={(id) => void handleDeleteForever(id)}
-        />
       )}
 
       {/* Counted-habit session page (timer / counter), opened by press-and-hold

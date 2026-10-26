@@ -53,8 +53,11 @@ itself. A window that never covered yesterday is cleared outright.
 The only destructive path is `destroyHabit` (deletes the habit row AND its
 `habitLogs`), reachable only from inside the archive behind a two-click
 confirm. `restoreHabit` clears `archivedAt` and the caller refetches with
-force. Archive emptiness renders nothing — only the header's archive icon with
-a count badge (owner rule).
+force. **The archive UI lives on the PROFILE page** (`ArchivedHabitsCard`),
+per owner instruction 2026-10-26 — nothing archive-related renders on the
+habits screen — and both restore and destroy drop the localStorage mirror so
+no stale cache can paint a restored or destroyed habit wrongly. Archive
+emptiness says "Nothing archived yet" on the profile.
 
 ### The 14-day review is ask-first
 

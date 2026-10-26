@@ -25,6 +25,7 @@ import { getRankInfo, calculateRank, RANKS } from "@/lib/utils/gamification";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { LocalDataTrustBadge } from "@/components/common/local-data-trust-badge";
 import { Switch } from "@/components/ui/switch";
+import { ArchivedHabitsCard } from "@/components/habits/archived-habits-card";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 
 export default function ProfilePage() {
@@ -422,6 +423,10 @@ export default function ProfilePage() {
 
       {/* M1 - Local-data trust badge. Named surface: Profile. */}
       <LocalDataTrustBadge />
+
+      {/* B13 — the archive lives here (owner instruction 2026-10-26: not on
+          the habits screen). Restored habits go straight back to the list. */}
+      <ArchivedHabitsCard />
 
       {/* 6. Account & Data Actions */}
         <section className="rounded-3xl bg-surface-container-low border border-outline/15 p-4 sm:p-5 shadow-sm space-y-3">

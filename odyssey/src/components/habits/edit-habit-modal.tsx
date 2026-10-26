@@ -696,7 +696,7 @@ export function EditHabitModal({
                 )}
               </button>
               <p className="text-[10px] font-mono text-on-surface-variant/80 text-center">
-                You can bring it back later from the archive. Its history is kept.
+                You can bring it back later from your profile. Its history is kept.
               </p>
             </div>
           </form>
