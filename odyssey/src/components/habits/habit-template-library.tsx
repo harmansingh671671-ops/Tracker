@@ -15,8 +15,6 @@ import {
   readPrimaryGoal,
 } from "@/lib/utils/habit-template-order";
 import type { GoalTagId } from "@/lib/utils/goal-tags";
-import { scheduleSummary, periodSummary } from "@/lib/utils/habit-form-summary";
-import { TemplateDetailPreview } from "./template-detail-preview";
 
 export interface HabitTemplate {
   id: string;
@@ -284,9 +282,10 @@ export function HabitTemplateLibrary({
   const [exitingIds, setExitingIds] = useState<Record<string, boolean>>({});
   const [permanentlyRemovedIds, setPermanentlyRemovedIds] = useState<Record<string, boolean>>({});
   const [scrollTop, setScrollTop] = useState(0);
-  // B1 — tap a card for the full look before adding; add-all arms with a
-  // two-tap confirm so a whole pack is never swept in by one tap.
-  const [previewedId, setPreviewedId] = useState<string | null>(null);
+  // B1 — add-all arms with a two-tap confirm so a whole pack is never swept
+  // in by one tap. (Owner instruction 2026-10-28: tapping a template — card
+  // or its Add button — opens the EDIT PAGE directly; no preview screen in
+  // between. The preview panel survives only for share-link imports.)
   const [armAddAll, setArmAddAll] = useState(false);
 
   // Sync permanently removed ids if an existing habit was deleted by user so it reappears
@@ -358,9 +357,11 @@ export function HabitTemplateLibrary({
   }, [unaddedTemplates, searchQuery, selectedPack]);
 
   /**
-   * B1 — the single-add chain, reused verbatim by the card's Add button and
-   * the detail preview's Add. Same guard, same 150/450ms exit timings as the
-   * original inline body; both entry points must behave identically.
+   * B1 — add-all's single-add chain: the same guards, write path and
+   * 150/450ms exit timings the original inline quick-add body had, reused
+   * per template with a 90ms stagger so a pack sweeps in as a cascade.
+   * Single templates no longer quick-add at all (owner 2026-10-28: card or
+   * Add button opens the edit page; the habit is added on Save).
    */
   const addTemplate = (tpl: HabitTemplate) => {
     if (addedIds[tpl.id] || exitingIds[tpl.id] || permanentlyRemovedIds[tpl.id]) return;
@@ -399,42 +400,13 @@ export function HabitTemplateLibrary({
     if (packId === selectedPack) return;
     setSelectedPack(packId);
     setArmAddAll(false);
-    setPreviewedId(null);
   };
-
-  const previewedTemplate = previewedId
-    ? HABIT_TEMPLATES.find((t) => t.id === previewedId) ?? null
-    : null;
-
-  // The detail view replaces the whole browser; an early return keeps the
-  // list code below untouched. The template is looked up on the FULL list —
-  // a just-added one still shows its "Added!" state here.
-  if (previewedTemplate) {
-    const tpl = previewedTemplate;
-    return (
-      <div className="relative select-none flex-1 overflow-y-auto pr-1 -mr-1 min-h-0 px-1">
-        <TemplateDetailPreview
-          icon={tpl.icon}
-          name={tpl.name}
-          domain={tpl.domainLabel}
-          scheduleLine={scheduleSummary(tpl.targetDays)}
-          periodLine={periodSummary(tpl.period)}
-          description={tpl.description}
-          note={tpl.scienceNote}
-          onBack={() => setPreviewedId(null)}
-          primaryLabel="Add to my habits"
-          primaryDone={Boolean(addedIds[tpl.id])}
-          onPrimary={() => addTemplate(tpl)}
-          secondaryLabel="Tweak before adding"
-          onSecondary={() => onSelectTemplate(tpl)}
-        />
-      </div>
-    );
-  }
 
   const handleAddClick = (tpl: HabitTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
-    addTemplate(tpl);
+    // Owner 2026-10-28: the +Add button opens the edit page pre-filled —
+    // the habit is added when the user presses Save & Start Habit there.
+    onSelectTemplate(tpl);
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -681,7 +653,7 @@ export function HabitTemplateLibrary({
             return (
               <div
                 key={tpl.id}
-                onClick={() => !isExiting && setPreviewedId(tpl.id)}
+                onClick={() => !isExiting && onSelectTemplate(tpl)}
                 style={{
                   maxHeight: isExiting ? "0px" : "240px",
                   opacity: isExiting ? 0 : 1,
@@ -735,7 +707,7 @@ export function HabitTemplateLibrary({
                           ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30 scale-105"
                           : "bg-primary hover:bg-primary/90 text-on-primary shadow-xs"
                       }`}
-                      title="Add directly to your daily habits"
+                      title="Open it in the editor — saved from there"
                     >
                       {isJustAdded ? (
                         <>
