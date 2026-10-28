@@ -466,7 +466,7 @@ export function PlannerContent() {
     const c = category.toLowerCase();
     if (c.includes("sleep") || c.includes("rest")) return "sleep";
     if (c.includes("vitality") || c.includes("habit")) return "vitality";
-    if (c.includes("sync") || c.includes("meeting")) return "sync";
+    if (c.includes("sync") || c.includes("meeting") || c.includes("admin")) return "sync";
     if (c.includes("renewal") || c.includes("buffer")) return "renewal";
     return "work";
   }, []);

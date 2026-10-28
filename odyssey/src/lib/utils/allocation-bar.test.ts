@@ -100,7 +100,7 @@ describe("allocationCategory", () => {
     expect(new Set(fills).size).toBe(keys.length);
   });
 
-  it("falls back to Deep Work, matching how both pages count an empty category", () => {
+  it("falls back to the work category, matching how both pages count an empty category", () => {
     const fallback = allocationCategory("work");
     expect(allocationCategory(undefined)).toEqual(fallback);
     expect(allocationCategory(null)).toEqual(fallback);

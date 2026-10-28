@@ -40,7 +40,10 @@ export const ALLOCATION_SLOT_COUNT = 24;
  * word the card says. No raw hex — these are the palette classes already in use.
  */
 const ALLOCATION_CATEGORIES: Record<string, { fill: string; label: string }> = {
-  work: { fill: "bg-primary", label: "Deep Work" },
+  // B5: "Deep Focus" — the legend's names exist to match the hour cards
+  // (see the comment above), and the cards say Deep Focus since the two
+  // screens' palettes merged into one source.
+  work: { fill: "bg-primary", label: "Deep Focus" },
   vitality: { fill: "bg-emerald-500", label: "Vitality" },
   sync: { fill: "bg-sky-500", label: "Active Sync" },
   renewal: { fill: "bg-amber-500", label: "Renewal" },
