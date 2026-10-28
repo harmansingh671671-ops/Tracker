@@ -19,6 +19,10 @@ import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
+import { decodeShareLink, type SharedHabitData } from "@/lib/utils/habit-share";
+import { TemplateDetailPreview } from "@/components/habits/template-detail-preview";
+import { scheduleSummary, periodSummary, goalSummary } from "@/lib/utils/habit-form-summary";
+import { DOMAINS } from "@/components/habits/habit-form-options";
 import {
   isPauseActive,
   isHabitStale,
@@ -134,6 +138,12 @@ export default function HabitsPage() {
   // read (SSR-safe: an `useState(localStorage...)` initializer would desync
   // server markup). The archive itself lives on the profile page now.
   const [dismissedStaleIds, setDismissedStaleIds] = useState<string[] | null>(null);
+
+  // B1 — a habit-share link that landed on this screen (?import=…).
+  // `undefined` means "not read yet" (so the server never paints the offer);
+  // `null` means read and absent/dismissed. The URL parameter is stripped the
+  // moment it is read, so a refresh never re-offers an already-added habit.
+  const [importOffer, setImportOffer] = useState<SharedHabitData | null | undefined>(undefined);
 
   const [todayStr, setTodayStr] = useState<string>(getLocalTodayStr);
   const [selectedDate, setSelectedDate] = useState<string>(getLocalTodayStr);
@@ -344,6 +354,35 @@ export default function HabitsPage() {
       }
     });
   }, []);
+
+  // B1 — read the share-link offer once, after hydration (same SSR-safety
+  // pattern as the dismiss marker above). Malformed links fail flat with a
+  // plain-language answer; nothing is ever written from unreadable bytes.
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const raw = new URLSearchParams(window.location.search).get("import");
+        if (window.history?.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+        if (!raw) {
+          setImportOffer(null);
+          return;
+        }
+        const decoded = decodeShareLink(raw);
+        if (decoded) {
+          setImportOffer(decoded);
+        } else {
+          showToast("That link doesn't hold a valid Odyssey habit.");
+          setImportOffer(null);
+        }
+      } catch (e) {
+        logWarn("habits", "import link unreadable", e);
+        showToast("That link doesn't hold a valid Odyssey habit.");
+        setImportOffer(null);
+      }
+    });
+  }, [showToast]);
 
   // Track scheduled habits count for daily progress stats while keeping natural order
   const scheduledHabits = useMemo(() => {
@@ -562,6 +601,36 @@ export default function HabitsPage() {
     await fetchTemporaryWallet(user.id);
     await fetchHabits(user.id, selectedDate, { force: true });
     showToast(`Your journey with "${data.name}" begins now. First milestone: 3 days done. +${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
+  };
+
+  // B1 — an imported habit walks the SAME creation path as a hand-built one
+  // (same write, same rewards, same keystone rule), so an imported habit can
+  // never quietly differ from a crafted one. Unknown categories from old or
+  // hand-built links land on the form's default rather than writing a tag the
+  // pickers cannot show.
+  const handleImportAdd = async (offer: SharedHabitData) => {
+    if (!offer || !user) {
+      setImportOffer(null);
+      return;
+    }
+    await handleCreateHabit({
+      name: offer.name,
+      icon: offer.icon || "🧘",
+      category: DOMAINS.some((d) => d.id === offer.category)
+        ? (offer.category as HabitCategory)
+        : "Vitality & Fitness",
+      frequency: offer.targetDays.length,
+      targetDays: offer.targetDays,
+      timeOfDay: offer.timeOfDay === "anytime" ? undefined : offer.timeOfDay,
+      priority: "focus",
+      emergencyVersion:
+        offer.emergencyVersion != null ? String(offer.emergencyVersion) : undefined,
+      type: offer.type,
+      unit: offer.unit,
+      targetValue: offer.targetValue,
+    });
+    setImportOffer(null);
+    showToast("Habit imported from the shared link.");
   };
 
   const handleUpdateHabit = async (
@@ -968,6 +1037,32 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
             />
           )}
         </AnimatePresence>
+      )}
+
+      {/* B1 — the share-link offer. Mounts only after the URL was read
+          (`undefined` until then), so the server never paints it and a
+          refresh never re-offers a declined habit. Adding walks the same
+          creation path as every other habit. */}
+      {importOffer && (
+        <TemplateDetailPreview
+          icon={importOffer.icon || "🧘"}
+          name={importOffer.name}
+          domain={DOMAINS.some((d) => d.id === importOffer.category)
+            ? (importOffer.category as string)
+            : "Vitality & Fitness"}
+          scheduleLine={scheduleSummary(importOffer.targetDays)}
+          periodLine={periodSummary(importOffer.timeOfDay)}
+          goalLine={goalSummary({
+            type: importOffer.type,
+            unit: importOffer.unit,
+            targetValue: importOffer.targetValue,
+          })}
+          onPrimary={() => void handleImportAdd(importOffer)}
+          primaryLabel="Add this habit"
+          secondaryLabel="Not now"
+          onSecondary={() => setImportOffer(null)}
+          footer="Arrived from a habit-share link. It joins your list like any habit you create."
+        />
       )}
 
       {/* View Switcher Header (List / Heatmap) & Stats Summary */}

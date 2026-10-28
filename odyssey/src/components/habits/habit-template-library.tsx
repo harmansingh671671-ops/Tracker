@@ -15,6 +15,8 @@ import {
   readPrimaryGoal,
 } from "@/lib/utils/habit-template-order";
 import type { GoalTagId } from "@/lib/utils/goal-tags";
+import { scheduleSummary, periodSummary } from "@/lib/utils/habit-form-summary";
+import { TemplateDetailPreview } from "./template-detail-preview";
 
 export interface HabitTemplate {
   id: string;
@@ -282,6 +284,10 @@ export function HabitTemplateLibrary({
   const [exitingIds, setExitingIds] = useState<Record<string, boolean>>({});
   const [permanentlyRemovedIds, setPermanentlyRemovedIds] = useState<Record<string, boolean>>({});
   const [scrollTop, setScrollTop] = useState(0);
+  // B1 — tap a card for the full look before adding; add-all arms with a
+  // two-tap confirm so a whole pack is never swept in by one tap.
+  const [previewedId, setPreviewedId] = useState<string | null>(null);
+  const [armAddAll, setArmAddAll] = useState(false);
 
   // Sync permanently removed ids if an existing habit was deleted by user so it reappears
   const syncKey = `${existingHabitNames.map((n) => n.trim().toLowerCase()).sort().join(",")}||${Object.keys(exitingIds).sort().join(",")}`;
@@ -351,8 +357,12 @@ export function HabitTemplateLibrary({
     });
   }, [unaddedTemplates, searchQuery, selectedPack]);
 
-  const handleAddClick = (tpl: HabitTemplate, e: React.MouseEvent) => {
-    e.stopPropagation();
+  /**
+   * B1 — the single-add chain, reused verbatim by the card's Add button and
+   * the detail preview's Add. Same guard, same 150/450ms exit timings as the
+   * original inline body; both entry points must behave identically.
+   */
+  const addTemplate = (tpl: HabitTemplate) => {
     if (addedIds[tpl.id] || exitingIds[tpl.id] || permanentlyRemovedIds[tpl.id]) return;
 
     // 1. Show immediate Added feedback with checkmark
@@ -368,6 +378,63 @@ export function HabitTemplateLibrary({
       setPermanentlyRemovedIds((prev) => ({ ...prev, [tpl.id]: true }));
       await onQuickAdd(tpl);
     }, 450);
+  };
+
+  /**
+   * B1 — add-all: every template CURRENTLY LISTED (search + pack filter
+   * respected), added with a small per-card stagger so they cascade in
+   * rather than appearing at once. Each goes through the same single-add
+   * chain, so the guards, the write path and the animations are identical
+   * to adding them by hand.
+   */
+  const handleAddAllConfirm = () => {
+    const targets = [...filteredTemplates];
+    targets.forEach((tpl, i) => {
+      setTimeout(() => addTemplate(tpl), i * 90);
+    });
+    setArmAddAll(false);
+  };
+
+  const handlePackChange = (packId: string) => {
+    if (packId === selectedPack) return;
+    setSelectedPack(packId);
+    setArmAddAll(false);
+    setPreviewedId(null);
+  };
+
+  const previewedTemplate = previewedId
+    ? HABIT_TEMPLATES.find((t) => t.id === previewedId) ?? null
+    : null;
+
+  // The detail view replaces the whole browser; an early return keeps the
+  // list code below untouched. The template is looked up on the FULL list —
+  // a just-added one still shows its "Added!" state here.
+  if (previewedTemplate) {
+    const tpl = previewedTemplate;
+    return (
+      <div className="relative select-none flex-1 overflow-y-auto pr-1 -mr-1 min-h-0 px-1">
+        <TemplateDetailPreview
+          icon={tpl.icon}
+          name={tpl.name}
+          domain={tpl.domainLabel}
+          scheduleLine={scheduleSummary(tpl.targetDays)}
+          periodLine={periodSummary(tpl.period)}
+          description={tpl.description}
+          note={tpl.scienceNote}
+          onBack={() => setPreviewedId(null)}
+          primaryLabel="Add to my habits"
+          primaryDone={Boolean(addedIds[tpl.id])}
+          onPrimary={() => addTemplate(tpl)}
+          secondaryLabel="Tweak before adding"
+          onSecondary={() => onSelectTemplate(tpl)}
+        />
+      </div>
+    );
+  }
+
+  const handleAddClick = (tpl: HabitTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    addTemplate(tpl);
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -474,7 +541,10 @@ export function HabitTemplateLibrary({
               onFocus={() => {
                 if (!isExpanded && onExpand) onExpand();
               }}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setArmAddAll(false);
+              }}
               placeholder="Search templates (e.g. hydration, deep work, sleep)..."
               className="w-full pl-10 pr-12 py-2.5 rounded-2xl bg-surface-container-high/80 text-xs font-medium text-on-surface placeholder:text-on-surface-variant/40 border border-outline/15 focus:outline-none focus:border-primary transition-all shadow-xs"
             />
@@ -526,7 +596,7 @@ export function HabitTemplateLibrary({
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setSelectedPack(p.id)}
+                onClick={() => handlePackChange(p.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                   selectedPack === p.id
                     ? "bg-primary text-on-primary font-bold shadow-xs"
@@ -548,6 +618,29 @@ export function HabitTemplateLibrary({
               </button>
             );
           })}
+
+          {/* B1 — add the whole (searched) pack in one confirmed go. Hidden
+              for "All Templates" so nobody sweeps in twenty habits by
+              accident; hidden while the count is zero. Two-tap arm matches
+              the app's confirm pattern. */}
+          {selectedPack !== "all" && filteredTemplates.length > 0 && (
+            <button
+              type="button"
+              onClick={() => (armAddAll ? handleAddAllConfirm() : setArmAddAll(true))}
+              title={
+                armAddAll
+                  ? "Adds every template currently listed below"
+                  : `Add all ${filteredTemplates.length} listed template${filteredTemplates.length === 1 ? "" : "s"} — confirmed with a second tap`
+              }
+              className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-mono font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                armAddAll
+                  ? "bg-primary text-on-primary border-primary shadow-xs animate-pulse"
+                  : "bg-surface-container-high text-primary border-primary/30 hover:bg-primary/10"
+              }`}
+            >
+              {armAddAll ? `Confirm add ${filteredTemplates.length}?` : `+ Add all (${filteredTemplates.length})`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -588,7 +681,7 @@ export function HabitTemplateLibrary({
             return (
               <div
                 key={tpl.id}
-                onClick={() => !isExiting && onSelectTemplate(tpl)}
+                onClick={() => !isExiting && setPreviewedId(tpl.id)}
                 style={{
                   maxHeight: isExiting ? "0px" : "240px",
                   opacity: isExiting ? 0 : 1,

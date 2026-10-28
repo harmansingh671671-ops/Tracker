@@ -5,6 +5,7 @@ import { type HabitCategory, type Habit, type HabitType } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
+import { encodeShareLink } from "@/lib/utils/habit-share";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { UnitPicker } from "@/components/habits/unit-picker";
 import { IconGridPicker } from "@/components/habits/icon-grid-picker";
@@ -32,6 +33,7 @@ import {
   CheckCircle2,
   PauseCircle,
   Play,
+  Share2,
 } from "lucide-react";
 import { PauseLengthPicker } from "./pause-length-picker";
 
@@ -128,6 +130,11 @@ export function EditHabitModal({
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   // B13 — the sheet's pause picker is folded by default.
   const [showPausePicker, setShowPausePicker] = useState(false);
+  // B1 — the share link, built on tap (a click is always client-side, so
+  // `window` is safe there but never at render). It shares the SAVED habit,
+  // not the unsaved draft — the link always matches what the list shows.
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareCopyFailed, setShareCopyFailed] = useState(false);
 
   const today = propTodayStr || getLocalTodayStr();
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string>(selectedDate || today);
@@ -147,6 +154,10 @@ export function EditHabitModal({
     setPrevHabit(habit);
     if (habit) {
       setActiveTab(initialTab);
+      // B1 — one link per habit view: switching habits (or reopening) must not
+      // show the previous habit's link as if it belonged here.
+      setShareLink(null);
+      setShareCopyFailed(false);
       setName(habit.name || "");
       setIcon(habit.icon || "🧘");
       setDomain(habit.category || "Vitality & Fitness");
@@ -241,6 +252,38 @@ export function EditHabitModal({
     } else {
       onDelete(habit.id);
       onClose();
+    }
+  };
+
+  // B1 — share this habit as a self-contained link (no account, no server;
+  // the habit rides inside the link itself, ADR-free by design). The link is
+  // built from the SAVED habit, so a receiver gets exactly what the sender's
+  // list shows, not the open draft. If the clipboard is unavailable the link
+  // is shown as selectable text instead of failing silently (rule 26).
+  const handleShareClick = async () => {
+    if (!habit) return;
+    const parsedFloor = typeof habit.emergencyVersion === "string" && habit.type === "counted"
+      ? parseInt(habit.emergencyVersion, 10) : NaN;
+    const link = encodeShareLink(
+      {
+        name: habit.name,
+        icon: habit.icon,
+        category: habit.category,
+        targetDays: habit.targetDays,
+        timeOfDay: habit.period,
+        type: habit.type,
+        unit: habit.unit,
+        targetValue: habit.targetValue,
+        emergencyVersion: Number.isFinite(parsedFloor) && parsedFloor >= 1 ? parsedFloor : undefined,
+      },
+      typeof window !== "undefined" ? window.location.origin : undefined
+    );
+    setShareLink(link);
+    setShareCopyFailed(false);
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      setShareCopyFailed(true);
     }
   };
 
@@ -662,6 +705,36 @@ export function EditHabitModal({
                   />
                 )}
               </div>
+            )}
+
+            {/* B1 — share link: the habit rides inside the link, so nothing
+                leaves the device and no account is needed on either end. */}
+            <button
+              type="button"
+              onClick={() => void handleShareClick()}
+              className="w-full py-3 px-4 rounded-2xl text-xs font-bold bg-surface-container-high/60 text-on-surface hover:text-primary border border-outline/15 hover:border-primary/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>{shareLink ? "Link copied" : "Share this habit as a link"}</span>
+            </button>
+            {shareLink && !shareCopyFailed && (
+              <p className="text-[10px] font-mono text-on-surface-variant/80 text-center leading-relaxed">
+                Anyone opening the link in this app sees a preview and can add it — no account needed.
+              </p>
+            )}
+            {shareLink && shareCopyFailed && (
+              <>
+                <p className="text-[10px] font-mono text-error text-center">
+                  Copying is blocked here — select the link and copy it by hand:
+                </p>
+                <textarea
+                  readOnly
+                  value={shareLink}
+                  onFocus={(e) => e.currentTarget.select()}
+                  rows={3}
+                  className="w-full rounded-xl bg-surface-container-low border border-outline/10 p-2 text-[10px] font-mono text-on-surface-variant break-all"
+                />
+              </>
             )}
 
             {/* Action Buttons: Save and Delete */}
