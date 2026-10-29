@@ -308,12 +308,19 @@ class OdysseyWallpaperBridge(
                 // wallpapers -- so reuse it rather than duplicating that logic.
                 val restored = clearLockscreenWallpaper()
 
-                // Stand the background alarm down too. Without this the device
-                // keeps waking hourly for a feature the user has switched off.
+                // Stand the background alarms down too. Without this the device
+                // keeps waking hourly for wallpaper work the user has switched
+                // off -- both the still-image refresher and the XX:57 heads-up,
+                // which is part of the same wallpaper mechanism.
                 try {
                     OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
                 } catch (e: Exception) {
                     Log.w("OdysseyWallpaper", "Failed to cancel hourly alarm: ${e.message}")
+                }
+                try {
+                    OdysseyCadenceNotificationWorker.cancelCadenceNotification(context)
+                } catch (e: Exception) {
+                    Log.w("OdysseyWallpaper", "Failed to cancel cadence alarm: ${e.message}")
                 }
 
                 // Report honestly. The flag is down either way, but if the user's
@@ -456,7 +463,14 @@ class OdysseyWallpaperBridge(
                 // 2. Only refresh static lockscreen if Live Wallpaper is NOT currently running!
                 val wallpaperManager = WallpaperManager.getInstance(context)
                 val isLiveActive = wallpaperManager.wallpaperInfo?.packageName == context.packageName
-                if (!isLiveActive && OdysseyHourlyWallpaperWorker.isScheduled(context)) {
+                // Gate on the master switch itself -- NOT isScheduled(): that
+                // preference is only written by schedule/cancel and can read
+                // true long after the switch was turned off, which is how an
+                // app open re-applied the wallpaper on its own (BUG-7). This is
+                // also belt-and-braces: updateLockscreenWallpaper refuses when
+                // the switch is off.
+                val wallpaperEnabled = prefs.getBoolean("wallpaper_enabled", false)
+                if (!isLiveActive && wallpaperEnabled) {
                     try {
                         OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
                     } catch (e: Exception) {
@@ -521,7 +535,9 @@ class OdysseyWallpaperBridge(
                 // 2. Only refresh static lockscreen if Live Wallpaper is NOT currently active!
                 val wallpaperManager = WallpaperManager.getInstance(context)
                 val isLiveActive = wallpaperManager.wallpaperInfo?.packageName == context.packageName
-                if (!isLiveActive && OdysseyHourlyWallpaperWorker.isScheduled(context)) {
+                // Master switch, not isScheduled() -- see syncSchedule for why.
+                val wallpaperEnabled = prefs.getBoolean("wallpaper_enabled", false)
+                if (!isLiveActive && wallpaperEnabled) {
                     try {
                         OdysseyHourlyWallpaperWorker.updateLockscreenNow(context)
                     } catch (e: Exception) {
@@ -583,7 +599,13 @@ class OdysseyWallpaperBridge(
     @JavascriptInterface
     fun launchLiveWallpaperPicker() {
         try {
-            prefs.edit().putBoolean("wallpaper_enabled", true).apply()
+            // DELIBERATELY does not set wallpaper_enabled (removed for BUG-7):
+            // opening the picker tells nothing about whether the user will
+            // actually apply the wallpaper, and a cancelled picker flipping the
+            // master switch ON made the profile page disagree with reality.
+            // The flag is read true by OdysseyLiveWallpaperService's engine the
+            // first time it becomes visible -- the moment the wallpaper is
+            // genuinely applied.
             val wallpaperManager = WallpaperManager.getInstance(context)
             backupCurrentWallpaperIfNeeded(wallpaperManager)
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {

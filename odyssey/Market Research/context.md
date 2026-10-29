@@ -722,7 +722,43 @@ commit" already promised; safe because the JS bridge thread is never the UI
 thread). Verified with the repo Gradle 8.4 dist: `:app:compileDebugKotlin`
 BUILD SUCCESSFUL, only the two pre-existing `streakPaint` shadow warnings. Rule
 to keep: `apply()` fires and forgets — any code that checks its result must use
-`commit()`.
+`commit()`. 
+
+### 2026-10-29 — BUG-7 round 2: the master switch now survives a PHONE RESTART (APK 1.3.8)
+
+**Owner: "investigate if the app turn on the odyssey wallpaper without actually
+turning it on in the profile page, it has happened many time and whenever i turn
+on the wallpaper it drain the battery very fast."** The many-times trigger is a
+**phone restart**: the hourly wallpaper worker is also registered for
+`BOOT_COMPLETED`, and its apply path had **no `wallpaper_enabled` check at
+all** — every reboot re-stamped the Odyssey schedule wallpaper over the user's
+lock + home screens while the profile switch still read OFF. Three more paths
+in the same class, all found by reading the bridge: opening the live-wallpaper
+**picker flipped the switch ON before anything was applied** (a backed-out
+picker left the profile page saying ON); the sync paths gated the static
+refresh on the **stale** `isScheduled()` preference rather than the master
+switch; and the **XX:57 cadence alarm was re-armed on every app open, unconditionally** —
+an hourly doze-busting `RTC_WAKEUP` that ran even with the wallpaper fully off,
+which is the battery half of the owner report. **The honest-ON replacement:**
+`launchLiveWallpaperPicker()` no longer writes the flag;
+`OdysseyLiveWallpaperService.onVisibilityChanged` flips it when the engine
+actually becomes the applied wallpaper (the service only runs once applied),
+false → true only — OFF remains `setWallpaperMasterEnabled(false)`'s exclusive
+job, and that path now also cancels the cadence alarm. **Verified by
+failing-first static guards** (`%TEMP%\opencode\verify\verify-bug7-master-off.js`,
+9 assertions): 9 FAIL before the edits, 9 PASS after — the right shape because
+this feature has no test harness; the real gate is `gradle assembleDebug`, now
+**green via the JDK 17 path** (first native fix to ship with a compile gate —
+do not restate "Kotlin cannot be compiled here"). Web gates: tsc 0, lint 0
+errors, 46 suites / 640 tests, APK copied to `public/downloads/` and served
+against versionCode 13. **Device test is the remaining half** (the same
+disclosure as BUG-19): switch off → **restart the phone** → wallpaper and
+switch must both stay off, the XX:57 pings must stop, and applying the live
+wallpaper must turn the switch ON by itself. **Declined on plan evidence** —
+the per-minute paint-allocation caching the owner report prompted: `P8-E4`
+already measured the residual render cost at 1 render/minute as a rounding
+error and `PERF-1` says 1c/1h must not be implemented on the old 30 FPS
+reasoning; the real open battery items are `PERF-2` 2b/2d and `PERF-11`.
 
 ### 2026-10-20 — today's entries
 
@@ -980,7 +1016,7 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 ## §10 Git + task state (as of 2026-10-29)
 
-- **HEAD:** BUG-20 stats Adherence tile now computed (finished days only, hours-weighted, dash when nothing measured; 6 red-first tests, 14/14 probe in light and dark) ← BUG-7 + BUG-11 (docs-only commit, **audited 2026-10-29**): BUG-11 audit confirmed — no `toISOString().split("T")[0]` left in `src/`; BUG-7's native fix **confirmed present in the shipped 1.3.7 APK**, status corrected to `PARTIAL` pending the device test (see the §10 audit bullet) ← REL-1 release **v1.3.7** (versionCode 11 →12; APK rebuilt here and verified; cache-busted `apkUrl`; `BUG-19` now compiled and packaged, still `PARTIAL` pending the phone) ← BUG-19 one-ping-per-task notification fix (payload carries the original block span + native skip rule; 5 red-first tests) ← B5 (one colour source for the schedule screens + drift-proof test; 18/18 probe) ← B1 same-day revision (no preview screen — template taps open the editor; 34/34 probe) ← B1 (template library: add-all + preview + share links; codec `habit-share.ts` + 12 tests, 42/42 probe) ← B13 archive relocation (archive card on the profile page; habits header restored) ← B13 (pause / archive / 14-day review; ADR 0006) ← B4 round-5 fix commit (counted-card tap-and-hold opens the D1/D2 session consistently; tile/bar holds keep their day functions) ← `4447cac` (B2 SHIPPED: cleaner habit forms) ← counted-habit session commit (timer/counter page on hold + unit presets; D1/D2 → PARTIAL) ← S23 commit (week-over-week habit completion card) ← S19+S21 commit (keystone 1.5x + frog bonus) ← `3fd3f07` (S19/S21/S23 red gates) ← S25-removal commit (energy check-in removed; see `git log`) ← `f793b0d` (S25 feature, reverted) ← `2bc089f` (S25 red gate, reverted) ← `1d54bff` (S22 commit: unlogged-first wallpaper + priority `Next`) ← `73577e5` (S22 red gate), `dd8463a` (S20 decline / S21 defer / S22+S23 briefs), `8e0043e` (plan updates), `7ef4476` (S19 follow-up: keystone row at the top of Advanced settings), `7ffdcd7` (S19 keystone pin), `13e87ce` (S24 milestone popups), `e340321` (S18 schedule plate). Never pushed — local only.
+- **HEAD:** **BUG-7 round 2** — the master switch survives a **phone restart** (boot receiver + apply root gate; picker-open flip removed, replaced by the service's honest ON; sync gates on the flag, not the stale armed-pref; XX:57 cadence not armed/fired while off, cancelled on master-off) → APK **v1.3.8 / versionCode 13** in `public/downloads/`, version.json bumped first then built; 9-assertion static guard shipped 9-FAIL→9-PASS; gradle green via JDK 17; device test (off → restart → stays off) still owed → prior HEAD: BUG-20 stats Adherence tile now computed (finished days only, hours-weighted, dash when nothing measured; 6 red-first tests, 14/14 probe in light and dark) ← BUG-7 + BUG-11 (docs-only commit, **audited 2026-10-29**): BUG-11 audit confirmed — no `toISOString().split("T")[0]` left in `src/`; BUG-7's native fix **confirmed present in the shipped 1.3.7 APK**, status corrected to `PARTIAL` pending the device test (see the §10 audit bullet) ← REL-1 release **v1.3.7** (versionCode 11 →12; APK rebuilt here and verified; cache-busted `apkUrl`; `BUG-19` now compiled and packaged, still `PARTIAL` pending the phone) ← BUG-19 one-ping-per-task notification fix (payload carries the original block span + native skip rule; 5 red-first tests) ← B5 (one colour source for the schedule screens + drift-proof test; 18/18 probe) ← B1 same-day revision (no preview screen — template taps open the editor; 34/34 probe) ← B1 (template library: add-all + preview + share links; codec `habit-share.ts` + 12 tests, 42/42 probe) ← B13 archive relocation (archive card on the profile page; habits header restored) ← B13 (pause / archive / 14-day review; ADR 0006) ← B4 round-5 fix commit (counted-card tap-and-hold opens the D1/D2 session consistently; tile/bar holds keep their day functions) ← `4447cac` (B2 SHIPPED: cleaner habit forms) ← counted-habit session commit (timer/counter page on hold + unit presets; D1/D2 → PARTIAL) ← S23 commit (week-over-week habit completion card) ← S19+S21 commit (keystone 1.5x + frog bonus) ← `3fd3f07` (S19/S21/S23 red gates) ← S25-removal commit (energy check-in removed; see `git log`) ← `f793b0d` (S25 feature, reverted) ← `2bc089f` (S25 red gate, reverted) ← `1d54bff` (S22 commit: unlogged-first wallpaper + priority `Next`) ← `73577e5` (S22 red gate), `dd8463a` (S20 decline / S21 defer / S22+S23 briefs), `8e0043e` (plan updates), `7ef4476` (S19 follow-up: keystone row at the top of Advanced settings), `7ffdcd7` (S19 keystone pin), `13e87ce` (S24 milestone popups), `e340321` (S18 schedule plate). Never pushed — local only.
 
 **BUG-7 (PARTIAL — status corrected 2026-10-29 from `SHIPPED`):** Wallpaper master switch fix — the unconditional `putBoolean("wallpaper_enabled", true)` is removed from both `syncSchedule()` and `syncScheduleWithResult()`; the flag is now written only where the user asks for a wallpaper (`setWallpaperMasterEnabled(true)`, the live-wallpaper picker, `enableHourlyAutoUpdate()`). **Audited 2026-10-29 and confirmed inside the shipped 1.3.7 APK:** the fix commit `2f9cf5f` is an ancestor of release commit `e3d08f9`; the APK on disk (versionCode 12 / 1.3.7, built 11:42) was built from that tree against an 11:50 release commit; and `git diff e3d08f9 HEAD -- android/` is empty, so the packaged native code is exactly today's native code. `SHIPPED` was wrong because the line itself said behavioral verification was still pending and the DoD requires acceptance criteria to be **manually verified** — the same reason `BUG-19` stays `PARTIAL`. **Remaining:** device test — switch off → close → reopen → switch must stay OFF. src: `android/app/src/main/java/com/odyssey/tracker/OdysseyWallpaperBridge.kt:425,507`
 

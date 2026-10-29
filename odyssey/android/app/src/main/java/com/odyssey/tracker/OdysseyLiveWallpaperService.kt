@@ -188,6 +188,19 @@ class OdysseyLiveWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
             if (visible) {
+                // This engine only runs while Odyssey is the applied system
+                // wallpaper, so becoming visible IS "the user applied it" --
+                // the honest moment to arm the master switch that BUG-7's
+                // launchLiveWallpaperPicker() can no longer set (a cancelled
+                // picker must not flip the switch). Only ever false -> true:
+                // switching OFF stays the exclusive job of
+                // setWallpaperMasterEnabled(false). In the restore-failed edge
+                // the live wallpaper genuinely remains applied (and the bridge
+                // reports the off as failed), so flag and reality agree.
+                val prefs = getSharedPreferences("odyssey_prefs", MODE_PRIVATE)
+                if (!prefs.getBoolean("wallpaper_enabled", false)) {
+                    prefs.edit().putBoolean("wallpaper_enabled", true).apply()
+                }
                 handler.removeCallbacks(refreshRunnable)
                 handler.post(refreshRunnable)
             } else {

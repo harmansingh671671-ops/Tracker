@@ -31,6 +31,18 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "Hourly wallpaper alarm triggered! Refreshing lockscreen...")
 
+        // This receiver is invoked by BOOT_COMPLETED as well as the hourly
+        // alarm, so only this check stands between a phone restart and the
+        // Odyssey schedule wallpaper being stamped over the user's own lock +
+        // home screens -- the exact "the wallpaper turned itself on" report
+        // behind BUG-7. Checked here (so no render thread starts) and again in
+        // updateLockscreenWallpaper (so direct callers cannot bypass it).
+        val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("wallpaper_enabled", false)) {
+            Log.d(TAG, "Master wallpaper switch is off - ignoring wallpaper trigger")
+            return
+        }
+
         val pendingResult = goAsync()
         Thread {
             try {
@@ -55,6 +67,17 @@ class OdysseyHourlyWallpaperWorker : BroadcastReceiver() {
         }
 
         val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+
+        // Root gate for every caller (the alarm receiver checks it too; this is
+        // the defence against direct entry like updateLockscreenNow). A phone
+        // restart, an alarm that was armed before the switch went off, or an
+        // app open that syncs the schedule must never apply the Odyssey
+        // schedule wallpaper while the master switch is off -- BUG-7.
+        if (!prefs.getBoolean("wallpaper_enabled", false)) {
+            Log.d(TAG, "Master wallpaper switch is off - not applying Odyssey wallpaper")
+            return
+        }
+
         val todayDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val rawJson = prefs.getString("schedule_json_$todayDateStr", null) ?: prefs.getString("latest_schedule_json", null) ?: return
 

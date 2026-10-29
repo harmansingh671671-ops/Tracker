@@ -1,10 +1,10 @@
 {
-  "versionCode": 12,
-  "versionName": "1.3.7",
+  "versionCode": 13,
+  "versionName": "1.3.8",
   "releaseDate": "2026-10-29",
   "mandatory": false,
   "changelog": [
-    "One Alert Per Task: a task longer than an hour now notifies you once, when it starts, instead of repeating for every hour it covers",
-    "Consistent Colours: the planner, the day view and the allocation legend now use the same colour and the same name for each category"
+    "Wallpaper Switch Now Sticks: the Odyssey wallpaper no longer switches itself back on after a phone restart, and opening Wallpaper Studio no longer counts as switching it on",
+    "Battery: with the wallpaper off, no wallpaper work, hourly alarms or XX:57 reminder wake-ups run in the background at all"
   ]
 }

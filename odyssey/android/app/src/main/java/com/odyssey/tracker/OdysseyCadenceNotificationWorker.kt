@@ -61,6 +61,17 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         }
 
         fun scheduleNextCadenceNotification(context: Context) {
+            // The XX:57 heads-up is part of the wallpaper mechanism. This is
+            // called on EVERY schedule sync (every app open), so without this
+            // gate a master switch the user turned off was silently re-armed on
+            // the next launch -- the same off-does-not-survive as BUG-7 -- and
+            // the alarm (RTC_WAKEUP + allow-while-idle) woke the device hourly
+            // even with the wallpaper off. Default false: unreadable means off.
+            val prefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("wallpaper_enabled", false)) {
+                Log.d(TAG, "Master wallpaper switch is off - not arming cadence notification")
+                return
+            }
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
             val intent = Intent(context, OdysseyCadenceNotificationWorker::class.java).apply {
                 action = ALARM_ACTION
@@ -149,6 +160,16 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "XX:57 Cadence notification alarm received! Evaluating upcoming hour...")
+
+        // Belt and braces: an alarm armed before the master switch went off,
+        // or a BOOT-completed broadcast, must not post a heads-up for wallpaper
+        // work the user has switched off. scheduleNextCadenceNotification will
+        // not re-arm below either.
+        val triggerPrefs = context.getSharedPreferences("odyssey_prefs", Context.MODE_PRIVATE)
+        if (!triggerPrefs.getBoolean("wallpaper_enabled", false)) {
+            Log.d(TAG, "Master wallpaper switch is off - dropping cadence trigger")
+            return
+        }
 
         ensureNotificationChannel(context)
 
