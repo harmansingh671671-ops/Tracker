@@ -658,6 +658,19 @@ needed after edits.
 `node_modules` there belongs to the `omniroute` provider — do not delete it.
 Verified: `opencode mcp list` shows fleet / playwright / rea all `connected`.
 
+**Android build fix — `OdysseyWallpaperBridge` type errors (2026-10-29).** Android
+Studio reported 3 Kotlin errors ("inferred type is Unit but Boolean was
+expected", lines 412/445/508). Root cause: both sync helpers assigned
+`val success = editor.apply()` — `SharedPreferences.Editor.apply()` returns
+Unit (void), never a Boolean, so the `if (success)` conditions and the outer
+`return try` degenerated to Unit. Fixed both sites to `editor.commit()` (the
+synchronous boolean variant the methods' own doc contract "synchronous disk
+commit" already promised; safe because the JS bridge thread is never the UI
+thread). Verified with the repo Gradle 8.4 dist: `:app:compileDebugKotlin`
+BUILD SUCCESSFUL, only the two pre-existing `streakPaint` shadow warnings. Rule
+to keep: `apply()` fires and forgets — any code that checks its result must use
+`commit()`.
+
 ### 2026-10-20 — today's entries
 
 **`B4` swipe & hold on habit cards (SHIPPED):** habit cards are now mounted in

@@ -440,7 +440,11 @@ class OdysseyWallpaperBridge(
             // The flag is written only where the user actually asks for a
             // wallpaper: setWallpaperMasterEnabled(true), the live-wallpaper
             // picker, and enableHourlyAutoUpdate().
-            val success = editor.apply()
+            // `apply()` returns Unit; `commit()` is the synchronous boolean
+            // variant this method's contract (and the if below) requires. The
+            // call runs on the WebView JS bridge thread, so a blocking disk
+            // commit does not touch the UI thread.
+            val success = editor.commit()
 
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service for instant canvas redraw
@@ -503,7 +507,9 @@ class OdysseyWallpaperBridge(
             // REMOVED 2026-10-15: `editor.putBoolean("wallpaper_enabled", true)`
             // -- same defect and same reasoning as in syncSchedule() above. See
             // that comment; a data sync must not re-arm the master switch.
-            val success = editor.apply()
+            // Same as syncSchedule(): `commit()` for a synchronous boolean
+            // result, `apply()` would return Unit here.
+            val success = editor.commit()
 
             if (success) {
                 // 1. Broadcast to Live Wallpaper Service
