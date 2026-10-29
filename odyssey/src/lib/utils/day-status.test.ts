@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluateDayCompletion, getHeatmapCellStyles, blockHourSpan, resolveHourOwners } from "./day-status";
+import { evaluateDayCompletion, getHeatmapCellStyles, blockHourSpan, resolveHourOwners, computeAdherence } from "./day-status";
 import type { ScheduleBlock } from "@/lib/db";
 
 type Status = ScheduleBlock["status"];
@@ -195,5 +195,97 @@ describe("getHeatmapCellStyles", () => {
     expect(Object.keys(styles).sort()).toEqual(
       ["bgClass", "borderClass", "glowClass", "label", "textClass"].sort()
     );
+  });
+});
+
+/**
+ * BUG-20. The stats screen used to print a hardcoded 93%. These tests pin the
+ * rule the real number must obey, and the one case that matters most: when
+ * there is nothing to measure it must return null so the tile shows a dash
+ * rather than inventing a figure.
+ */
+describe("computeAdherence - finished-day adherence", () => {
+  const TODAY = "2026-10-04";
+
+  /** Real stats for one date, built through the same function the UI uses. */
+  const day = (date: string, ...statuses: Status[]) =>
+    evaluateDayCompletion(
+      statuses.map((s, i) => ({ ...block(s, i), date })),
+      date,
+      1
+    );
+
+  const mapOf = (...stats: ReturnType<typeof day>[]) =>
+    Object.fromEntries(stats.map((s) => [s.date, s]));
+
+  it("returns null rather than a number when nothing has finished", () => {
+    const result = computeAdherence({}, TODAY);
+    expect(result.percent).toBeNull();
+    expect(result.plannedHours).toBe(0);
+    expect(result.completedHours).toBe(0);
+    expect(result.daysCounted).toBe(0);
+  });
+
+  it("ignores today and future days, because their hours are not misses yet", () => {
+    // Today: 4 planned hours, nothing done. Yesterday: 2 planned, both done.
+    const result = computeAdherence(
+      mapOf(
+        day(TODAY, "pending", "pending", "pending", "pending"),
+        day("2026-10-03", "completed", "completed"),
+        day("2026-10-05", "pending", "pending")
+      ),
+      TODAY
+    );
+    expect(result.daysCounted).toBe(1);
+    expect(result.plannedHours).toBe(2);
+    expect(result.percent).toBe(100);
+  });
+
+  it("weights by hours, not by days", () => {
+    // Day A: 4 of 4 done (100%). Day B: 1 of 6 done (17%).
+    // A per-day average would say 58%; the truth is 5 of 10 hours = 50%.
+    const result = computeAdherence(
+      mapOf(
+        day("2026-10-01", "completed", "completed", "completed", "completed"),
+        day(
+          "2026-10-02",
+          "completed",
+          "pending",
+          "pending",
+          "pending",
+          "pending",
+          "pending"
+        )
+      ),
+      TODAY
+    );
+    expect(result.completedHours).toBe(5);
+    expect(result.plannedHours).toBe(10);
+    expect(result.percent).toBe(50);
+  });
+
+  it("does not count a finished day that had nothing planned", () => {
+    const result = computeAdherence(
+      mapOf(day("2026-10-02"), day("2026-10-03", "completed")),
+      TODAY
+    );
+    expect(result.daysCounted).toBe(1);
+    expect(result.percent).toBe(100);
+  });
+
+  it("rounds to a whole percent", () => {
+    const result = computeAdherence(
+      mapOf(day("2026-10-03", "completed", "pending", "pending")),
+      TODAY
+    );
+    expect(result.percent).toBe(33);
+  });
+
+  it("counts a missed hour against adherence, not as unknown", () => {
+    const result = computeAdherence(
+      mapOf(day("2026-10-03", "completed", "missed")),
+      TODAY
+    );
+    expect(result.percent).toBe(50);
   });
 });

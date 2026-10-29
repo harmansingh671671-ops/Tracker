@@ -12,6 +12,7 @@ import { calculateRank, getRankInfo, getNextRank } from "@/lib/utils/gamificatio
 import { getJourneyStartDate, getJourneyDayNumberForDate } from "@/lib/utils/journey";
 import { useWallpaperToggle } from "@/lib/stores/wallpaper-toggle-store";
 import {
+  computeAdherence,
   evaluateDayCompletion,
   getHeatmapCellStyles,
   resolveHourOwners,
@@ -62,7 +63,6 @@ export default function StatsPage() {
   // wallpaper UI at all. Fail-closed: showing the card and then hiding it would
   // flash a feature the user may have already switched off.
   const [wallpaperResolved, setWallpaperResolved] = useState(false);
-  const [totalPlannedHours, setTotalPlannedHours] = useState(0);
   const [allBlocks, setAllBlocks] = useState<ScheduleBlock[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
@@ -95,7 +95,6 @@ export default function StatsPage() {
     fetchUser();
     db.scheduleBlocks.toArray().then((blocks) => {
       setAllBlocks(blocks);
-      setTotalPlannedHours(blocks.length);
     });
   }, [fetchUser]);
 
@@ -161,6 +160,13 @@ export default function StatsPage() {
   const daysDoneCount = useMemo(() => {
     return Object.values(dayStatsByDate).filter((s) => s.isCompletelyDone).length;
   }, [dayStatsByDate]);
+
+  // BUG-20: this tile used to print a hardcoded 93%. Real figure, derived from
+  // the same per-hour stats the heatmap paints, over finished days only.
+  const adherence = useMemo(
+    () => computeAdherence(dayStatsByDate, todayStr),
+    [dayStatsByDate, todayStr]
+  );
 
   const currentRankName = calculateRank(daysDoneCount);
   const rankInfo = useMemo(() => {
@@ -659,10 +665,14 @@ export default function StatsPage() {
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-on-surface">93%</span>
+              <span className="text-2xl font-bold font-mono text-on-surface">
+                {adherence.percent === null ? "—" : `${adherence.percent}%`}
+              </span>
             </div>
             <p className="text-[11px] font-mono text-on-surface-variant mt-0.5 truncate">
-              {totalPlannedHours}h Planned
+              {adherence.percent === null
+                ? "No finished days yet"
+                : `${adherence.completedHours}h of ${adherence.plannedHours}h`}
             </p>
           </div>
         </div>

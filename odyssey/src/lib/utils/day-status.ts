@@ -142,6 +142,58 @@ export function evaluateDayCompletion(
 }
 
 /**
+ * What the stats screen's Adherence tile reports (BUG-20).
+ */
+export interface AdherenceSummary {
+  /** Clock-hours completed across the days counted. */
+  completedHours: number;
+  /** Clock-hours planned across the days counted. */
+  plannedHours: number;
+  /** Whole-number percentage, or null when nothing has been measured yet. */
+  percent: number | null;
+  /** How many finished days the figure is based on. */
+  daysCounted: number;
+}
+
+/**
+ * Adherence across finished days: of the clock-hours planned on days that are
+ * over, how many were actually completed.
+ *
+ * Only days strictly before `todayStr` count. A day still in progress has
+ * pending hours that are not misses yet, so including it would report a low
+ * number every morning that rises as the day is reviewed — a figure the user
+ * cannot trust. Future-dated plans are excluded for the same reason.
+ *
+ * `percent` is null when no finished day had planned hours, so the caller can
+ * show a dash. This replaces a hardcoded "93%" that no data ever produced.
+ */
+export function computeAdherence(
+  statsByDate: Record<string, DayCompletionStats>,
+  todayStr: string
+): AdherenceSummary {
+  let completedHours = 0;
+  let plannedHours = 0;
+  let daysCounted = 0;
+
+  for (const [dateStr, stats] of Object.entries(statsByDate)) {
+    // yyyy-MM-dd sorts lexicographically, so this is a real date comparison.
+    if (dateStr >= todayStr) continue;
+    if (stats.plannedHours <= 0) continue;
+    plannedHours += stats.plannedHours;
+    completedHours += stats.completedHours;
+    daysCounted += 1;
+  }
+
+  return {
+    completedHours,
+    plannedHours,
+    percent:
+      plannedHours > 0 ? Math.round((completedHours / plannedHours) * 100) : null,
+    daysCounted,
+  };
+}
+
+/**
  * Returns the CSS styling classes for the heatmap grid cell based on day status.
  */
 export function getHeatmapCellStyles(stats: DayCompletionStats, isSelected: boolean = false, isToday: boolean = false): {
