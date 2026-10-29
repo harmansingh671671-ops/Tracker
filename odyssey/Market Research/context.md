@@ -615,14 +615,36 @@ telemetry; any new schema field documented in `db.ts` with a migration note;
 
 ---
 
-## 9. SESSION LOG Ã¢â‚¬â€ durable learnings
+## 9. SESSION LOG — durable learnings
 
 Newest first. One entry per shipped feature or hard-won lesson. Facts, not
-opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 Ã¢â€ â€™
+opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â†’
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
-### 2026-10-20 Ã¢â‚¬â€ today's entries
+### 2026-10-29 — tooling: OpenCode MCP servers made durable
+
+**MCP `playwright` + `rea` kept failing ("Request timed out").** Three real
+causes, all fixed at the root: ① `rea` was launched with the `mcp` management
+command (prints usage and exits) instead of the **global `--mcp` flag** which
+starts REA's stdio server; ② both servers launched through `npx`, which spends
+~5-10s per start on Windows resolving before any handshake; ③ the configs were
+split across the legacy `mcp.<name>` shape in two global files. The durable
+setup: the packages are installed once into `.mcp-servers/` at the repo root
+(outside any npm-global location that node/npm reinstalls wipe) and the config
+points `node` at their entry scripts there.
+`package.json` pins `@playwright/mcp@0.0.83` and `rea-agents@6.5.0`;
+`reinstall.cmd` re-installs pinned versions and re-verifies both MCP
+`initialize` handshakes in one command. All three servers are launched as
+plain `node <entry-script>` (fleet already was — that is why it never broke);
+the config hot-reloads server definitions on save, so a TUI restart is not
+needed after edits.
+`~/.config/opencode/opencode.json` was retired to `.bak` so
+`opencode.jsonc` is the single source, and OpenCode's own
+`node_modules` there belongs to the `omniroute` provider — do not delete it.
+Verified: `opencode mcp list` shows fleet / playwright / rea all `connected`.
+
+### 2026-10-20 — today's entries
 
 **`B4` swipe & hold on habit cards (SHIPPED):** habit cards are now mounted in
 `HabitGestureCard` with three gestures replacing the old hold-to-edit: **hold

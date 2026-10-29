@@ -30,3 +30,6 @@ test_hindsight.py
 # checkout starts with no context at all.
 transcripts.zip
 UI_GUIDE.md
+
+# OpenCode MCP server packages - installed in place, reproducible via reinstall.cmd
+.mcp-servers/node_modules/

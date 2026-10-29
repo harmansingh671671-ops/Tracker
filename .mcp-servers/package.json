@@ -1,0 +1,10 @@
+﻿{
+  "name": "mcp-servers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dedicated install for OpenCode MCP servers. Years-long stable location; run reinstall.cmd to repair.",
+  "dependencies": {
+    "@playwright/mcp": "0.0.83",
+    "rea-agents": "6.5.0"
+  }
+}
