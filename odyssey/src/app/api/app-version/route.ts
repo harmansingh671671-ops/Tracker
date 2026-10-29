@@ -21,10 +21,16 @@ export async function GET(request: Request) {
     }
   } catch (e) { logWarn("route", "could not determine origin from request URL", e); }
 
+  const versionCode = versionConfig.versionCode || 8;
+
   const versionData: AppVersionInfo = {
-    versionCode: versionConfig.versionCode || 8,
+    versionCode,
     versionName: versionConfig.versionName || "1.3.3",
-    apkUrl: `${origin}/downloads/odyssey-latest.apk`,
+    // The file name never changes between releases, so a CDN or browser holding
+    // the previous APK would hand back the OLD build right after the version
+    // check announced a new one. The version query makes each release a
+    // distinct cache entry; the static path itself still resolves unchanged.
+    apkUrl: `${origin}/downloads/odyssey-latest.apk?v=${versionCode}`,
     releaseDate: versionConfig.releaseDate || localDateStr(),
     mandatory: Boolean(versionConfig.mandatory),
     changelog: Array.isArray(versionConfig.changelog) ? versionConfig.changelog : [
