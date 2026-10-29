@@ -23,6 +23,10 @@ import java.util.Locale
  * Runs outside the app at every XX:57 (3 minutes before the next hour starts).
  * - Reads the next hour's task from latest_schedule_json.
  * - If the upcoming hour is Sleep or Rest, silently skips the notification.
+ * - Announces a TASK once: if the upcoming hour is a continuation of a task
+ *   that started earlier (payload `blockStartHour`), it stays silent — one
+ *   notification per upcoming hour, never one per hour of a long task
+ *   (owner 2026-10-29).
  * - Otherwise, dispatches a high-priority heads-up notification with:
  *     1. "Roger that" action button -> Dismisses the notification.
  *     2. "Update Task" action button (and card tap) -> Opens the app directly
@@ -199,6 +203,7 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         var blockCategory = ""
         var blockTag = ""
         var hasBlock = false
+        var blockStartHour = -1
 
         if (!rawJson.isNullOrBlank()) {
             try {
@@ -218,6 +223,9 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
                             blockTitle = b.optString("title", "").trim()
                             blockCategory = b.optString("category", "").trim().lowercase(Locale.ROOT)
                             blockTag = b.optString("tag", "").trim().lowercase(Locale.ROOT)
+                            // The original block's first hour, when the payload
+                            // carries it. -1 for older payloads / unscheduled hours.
+                            blockStartHour = b.optInt("blockStartHour", -1)
                             hasBlock = true
                             break
                         }
@@ -232,6 +240,17 @@ class OdysseyCadenceNotificationWorker : BroadcastReceiver() {
         // If the upcoming hour is marked as Sleep or Rest, skip notification completely (unless forceTest)
         if (!forceTest && isSleepOrRest(blockTitle, blockCategory, blockTag)) {
             Log.d(TAG, "Hour $nextHour is Sleep/Rest ('$blockTitle', cat: '$blockCategory'). Skipping notification.")
+            return
+        }
+
+        // 1b. ONE PING PER TASK (owner 2026-10-29).
+        // A task longer than one hour is expanded into one payload entry per
+        // hour, so hour 15 of a 14:00-16:00 block is the same task that hour 14
+        // already announced at 13:57. Announce a task once, at its first hour,
+        // and stay silent on its continuation hours. A payload without
+        // blockStartHour (-1) keeps the old per-hour behaviour.
+        if (!forceTest && hasBlock && blockStartHour >= 0 && nextHour != blockStartHour) {
+            Log.d(TAG, "Hour $nextHour continues the task that started at $blockStartHour ('$blockTitle'); already announced. Skipping.")
             return
         }
 

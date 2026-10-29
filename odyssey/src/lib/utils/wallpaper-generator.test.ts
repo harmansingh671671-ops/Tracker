@@ -83,6 +83,26 @@ describe("build24HourlyBlocks", () => {
     expect(blocks[10].title).toBe("First");
   });
 
+  // B — the XX:57 reminder's one-ping-per-task rule (owner 2026-10-29). It can
+  // only tell a task's first hour from its continuation if the hourly payload
+  // says where the ORIGINAL block started and ended.
+  it("tags every hour of a multi-hour task with the task's own start and end hour", () => {
+    const blocks = build24HourlyBlocks([block("14:00", "16:00", { title: "Deep Work" })]);
+    expect(blocks[14]).toMatchObject({ blockStartHour: 14, blockEndHour: 16 });
+    expect(blocks[15]).toMatchObject({ blockStartHour: 14, blockEndHour: 16 });
+  });
+
+  it("leaves an unscheduled hour without a span", () => {
+    const blocks = build24HourlyBlocks([block("09:00", "10:00")]);
+    expect(blocks[8].blockStartHour).toBeUndefined();
+    expect(blocks[9]).toMatchObject({ blockStartHour: 9, blockEndHour: 10 });
+  });
+
+  it("reads a 24:00 end as hour 24 in the span", () => {
+    const blocks = build24HourlyBlocks([block("22:00", "24:00")]);
+    expect(blocks[22]).toMatchObject({ blockStartHour: 22, blockEndHour: 24 });
+  });
+
   it("derives the tag from the category rather than copying block.tag", () => {
     // `tag: matching.category || "Focus"` -- an explicit block.tag is ignored
     // here, so pinning this stops a future "fix" from quietly changing what

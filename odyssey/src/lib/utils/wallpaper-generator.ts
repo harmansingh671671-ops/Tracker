@@ -35,32 +35,54 @@ export interface HourlyBlock {
   category: string;
   tag: string;
   isUserDefined: boolean;
+  /**
+   * The span of the ORIGINAL block this hour belongs to, as [start, end) in
+   * hours ("24:00" reads as 24). Undefined for an unscheduled hour.
+   *
+   * Only the XX:57 reminder uses this: it must announce a task once, at the
+   * task's first hour, and stay silent on its continuation hours (owner
+   * 2026-10-29). The wallpaper ignores it — it derives its own spans from
+   * `startTime`/`endTime`.
+   */
+  blockStartHour?: number;
+  blockEndHour?: number;
+}
+
+/** The hour span a stored block covers, as [startHour, endHour). */
+function blockHourSpan(b: ScheduleBlock): [number, number] {
+  const sH = parseInt(b.startTime.split(":")[0], 10);
+  let eH = parseInt(b.endTime.split(":")[0], 10);
+  if (b.endTime === "24:00" || (eH === 0 && sH > 0)) eH = 24;
+  return [sH, eH];
 }
 
 export function build24HourlyBlocks(userBlocks: ScheduleBlock[] = []): HourlyBlock[] {
   const result: HourlyBlock[] = [];
+
+  // Spans are computed ONCE and used for both matching and the emitted
+  // `blockStartHour`/`blockEndHour` — the reminder's "is this the task's first
+  // hour?" question and the wallpaper's "which task covers this hour?" must
+  // never derive the same block differently.
+  const spans = userBlocks.map((b) => ({ block: b, span: blockHourSpan(b) }));
 
   for (let h = 0; h < 24; h++) {
     const sTime = `${String(h).padStart(2, "0")}:00`;
     const eTime = `${String((h + 1) % 24 === 0 ? 24 : (h + 1) % 24).padStart(2, "0")}:00`;
 
     // Check if user has an assigned block covering this hour
-    const matching = userBlocks.find((b) => {
-      const sH = parseInt(b.startTime.split(":")[0], 10);
-      let eH = parseInt(b.endTime.split(":")[0], 10);
-      if (b.endTime === "24:00" || (eH === 0 && sH > 0)) eH = 24;
-      return h >= sH && h < eH;
-    });
+    const matching = spans.find(({ span }) => h >= span[0] && h < span[1]);
 
     if (matching) {
       result.push({
         hour: h,
         startTime: sTime,
         endTime: eTime,
-        title: matching.title,
-        category: matching.category || "work",
-        tag: matching.category || "Focus",
+        title: matching.block.title,
+        category: matching.block.category || "work",
+        tag: matching.block.category || "Focus",
         isUserDefined: true,
+        blockStartHour: matching.span[0],
+        blockEndHour: matching.span[1],
       });
     } else {
       // Unscheduled hour: keep strictly empty (no fake prefilled circadian titles)

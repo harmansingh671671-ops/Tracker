@@ -51,6 +51,12 @@ export function buildNativeSchedulePayload(data: WallpaperData): string {
     title: b.title,
     category: b.category,
     isUserDefined: b.isUserDefined,
+    // The ORIGINAL block's span, so the XX:57 reminder can announce a task
+    // once (at its first hour) instead of again on every continuation hour
+    // (owner 2026-10-29). -1 = unscheduled hour, which keeps the worker's
+    // older per-hour behaviour for payloads that predate this field.
+    blockStartHour: b.blockStartHour ?? -1,
+    blockEndHour: b.blockEndHour ?? -1,
   }));
 
   return JSON.stringify({
