@@ -751,7 +751,7 @@ this feature has no test harness; the real gate is `gradle assembleDebug`, now
 **green via the JDK 17 path** (first native fix to ship with a compile gate —
 do not restate "Kotlin cannot be compiled here"). Web gates: tsc 0, lint 0
 errors, 46 suites / 640 tests, APK copied to `public/downloads/` and served
-against versionCode 13. **Device test is the remaining half** (the same
+against versionCode 13. **The verifier subagent also earned its keep: it challenged the restore-failed edge and was right about the comment, but for the wrong instance** — the comment said "the bridge reports the off as failed" while clearLockscreenWallpaper() returned an unconditional 	rue ("did not crash"), so a switch-off with no alternate wallpaper and no backup reported success while the Odyssey live wallpaper genuinely REMAINED the applied system wallpaper, and the engine's false→true flip would re-arm the switch on the next unlock. Fixed at the root: the restore result is now honest (lockApplied || homeApplied || backupRestored), the guard grew to 10 assertions, and the APK was rebuilt (still versionCode 13 — never deployed, no bump needed, avoiding the REL-1 bump-after-build trap in reverse). **Device test is the remaining half** (the same
 disclosure as BUG-19): switch off → **restart the phone** → wallpaper and
 switch must both stay off, the XX:57 pings must stop, and applying the live
 wallpaper must turn the switch ON by itself. **Declined on plan evidence** —

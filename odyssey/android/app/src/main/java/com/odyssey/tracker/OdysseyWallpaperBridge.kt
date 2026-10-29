@@ -380,6 +380,7 @@ class OdysseyWallpaperBridge(
             val homeApplied = applyAlternateWallpaper("home")
 
             // 3. If neither was applied, try previous backup bitmap
+            var backupRestored = false
             if (!lockApplied && !homeApplied) {
                 val backupFile = File(context.filesDir, "previous_user_wallpaper.png")
                 if (backupFile.exists()) {
@@ -393,6 +394,7 @@ class OdysseyWallpaperBridge(
                                 wallpaperManager.setBitmap(backupBitmap)
                             }
                             backupFile.delete()
+                            backupRestored = true
                             Log.d("OdysseyWallpaper", "Successfully restored user's previous wallpaper from backup")
                         }
                     } catch (e: Exception) {
@@ -402,7 +404,16 @@ class OdysseyWallpaperBridge(
             }
 
             OdysseyHourlyWallpaperWorker.cancelHourlyUpdate(context)
-            true
+            // The report must be honest: `true` here used to mean simply "did
+            // not crash", so a switch-off with nothing to restore returned a
+            // clean success while the Odyssey live wallpaper REMAINED the
+            // applied system wallpaper -- and the wallpaper engine (which runs
+            // as long as it stays applied) then re-armed the master flag on the
+            // next unlock. Returning whether anything was actually put back is
+            // what makes that flip agree with reality: nothing to restore means
+            // the wallpaper is genuinely still on, and the caller and the
+            // engine both say so.
+            lockApplied || homeApplied || backupRestored
         } catch (e: Exception) {
             Log.e("OdysseyWallpaper", "Failed to clear wallpaper: ${e.message}", e)
             false
