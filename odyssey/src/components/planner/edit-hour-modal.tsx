@@ -5,11 +5,11 @@ import { useState, useEffect } from "react";
 import { type ScheduleBlock, type StoredScheduleCategory } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { resolveHabitIconString } from "@/components/habits/habit-icon";
+import { TimeRangePicker } from "@/components/planner/time-range-picker";
 import {
   X,
   Check,
   Trash2,
-  Clock,
   Brain,
   Heart,
   MessageSquare,
@@ -191,10 +191,6 @@ export function EditHourModal({
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold tracking-tight text-on-surface">Plan Time Slot</h2>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-lowest text-secondary text-xs font-mono font-semibold border border-outline/10">
-                <Clock className="w-3 h-3" />
-                <span>{startTimeStr} → {endTimeStr}</span>
-              </div>
             </div>
             <button
               type="button"
@@ -219,6 +215,16 @@ export function EditHourModal({
               autoFocus
             />
           </div>
+
+          {/* When & How Long (`C2` duration picker) - replaces the old read-only time chip */}
+          <TimeRangePicker
+            startHour={startH}
+            endHour={endH}
+            onChange={(s, e) => {
+              setStartH(s);
+              setEndH(e);
+            }}
+          />
 
           {/* Category Selector Pills */}
           <div className="space-y-1.5">

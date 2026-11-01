@@ -23,6 +23,12 @@ import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
+import {
+  findMerge,
+  findOccupantAtHour,
+  startHourLabel,
+  endHourLabel,
+} from "@/lib/utils/planner-block-time";
 import { useSharedClock, localDateStr } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import { FloatingBlock } from "@/components/planner/floating-block";
@@ -587,9 +593,11 @@ export function PlannerContent() {
     const floatingIds = new Set(floatingBlocks.map((f) => f.id));
     // Only a block actually on the timeline can be displaced -- never one that is
     // already floating, or the same id would be pushed into the floating list twice.
-    const occupant = blocks.find(
-      (b) => b.id !== block.id && !floatingIds.has(b.id) && hourOf(b.startTime) === toHour
-    );
+    // Any hour the target spans counts as occupied, not just its first hour
+    // (`C2`): a multi-hour plan is one plan, and dropping into its middle used
+    // to look free and silently overlap it.
+    const occupant =
+      findOccupantAtHour(blocks, toHour, new Set([block.id, ...floatingIds])) ?? null;
     const delta = toHour - fromHour;
     const shift = (t: string) => hourLabel(hourOf(t) + delta);
     const mover: ScheduleBlock = {
@@ -635,9 +643,10 @@ export function PlannerContent() {
   const handleDropFloating = useCallback(async (block: ScheduleBlock, toHour: number) => {
     if (!block?.id) return;
     const floatingIds = new Set(floatingBlocks.map((f) => f.id));
-    const occupant = blocks.find(
-      (b) => b.id !== block.id && !floatingIds.has(b.id) && hourOf(b.startTime) === toHour
-    );
+    // Same occupancy rule as a rail drag: an hour inside a multi-hour plan is
+    // occupied, so the drop displaces instead of overlapping.
+    const occupant =
+      findOccupantAtHour(blocks, toHour, new Set([block.id, ...floatingIds])) ?? null;
     const placed: ScheduleBlock = {
       ...block,
       startTime: hourLabel(toHour),
@@ -738,6 +747,13 @@ export function PlannerContent() {
     habitId?: string;
   }) => {
     const blockStatus = data.status === "completed" ? "completed" : data.status === "skipped" ? "missed" : "pending";
+    let displayStart = data.startTime;
+    let displayEnd = data.endTime;
+    // `C2`: the same plan written across adjacent hours is ONE plan. Absorbing
+    // here keeps every reader of the day seeing contiguous rows grouped as one
+    // card, and the drag machinery gets a single source of truth for a plan
+    // instead of two same-titled rows it must treat separately.
+    const savedId = data.id ?? crypto.randomUUID();
     if (data.id) {
       await db.scheduleBlocks.update(data.id, {
         title: data.title,
@@ -749,7 +765,7 @@ export function PlannerContent() {
       });
     } else {
       await db.scheduleBlocks.add({
-        id: crypto.randomUUID(),
+        id: savedId,
         userId: user?.id || "default",
         title: data.title,
         category: data.category,
@@ -762,7 +778,45 @@ export function PlannerContent() {
         createdAt: new Date().toISOString(),
       });
     }
-    const startH = parseInt(data.startTime.split(":")[0], 10) || 0;
+    let savedStartHour = parseInt(data.startTime.split(":")[0], 10) || 0;
+    try {
+      const dayRows = await db.scheduleBlocks.where("date").equals(data.date).toArray();
+      const savedEndHour = parseInt(data.endTime.split(":")[0], 10) || 0;
+      const mergeResult = findMerge({
+        title: data.title,
+        category: data.category,
+        startHour: savedStartHour,
+        endHour: data.endTime === "24:00" ? 24 : savedEndHour,
+        candidates: dayRows.filter((r) => r.id !== savedId),
+      });
+      if (mergeResult) {
+        // The survivor is the row just saved, so the user's latest edit always
+        // wins title, category, status and habit link; only its range widens
+        // to cover what it absorbed. Nothing else is rewritten.
+        await db.scheduleBlocks.update(savedId, {
+          startTime: startHourLabel(mergeResult.startHour),
+          endTime: endHourLabel(mergeResult.endHour),
+        });
+        savedStartHour = mergeResult.startHour;
+        displayStart = startHourLabel(mergeResult.startHour);
+        displayEnd = endHourLabel(mergeResult.endHour);
+        for (const absorbedId of mergeResult.absorbedIds) {
+          // Release a lingering held copy first: a floating icon whose row is
+          // gone must never resurrect on the next read.
+          try {
+            await releaseFloatingBlock(absorbedId);
+          } catch (e) {
+            logWarn("planner", "could not release a held copy of an absorbed block", e);
+          }
+          await db.scheduleBlocks.delete(absorbedId);
+        }
+      }
+    } catch (e) {
+      // A failed merge must not lose the save itself: the plan already exists,
+      // it just stays un-merged this round.
+      logWarn("planner", "could not merge adjacent same-title blocks", e);
+    }
+    const startH = savedStartHour;
     const catLower = (data.category || "").toLowerCase();
     const isSleep = catLower.includes("sleep") || catLower.includes("rest");
 
@@ -777,7 +831,7 @@ export function PlannerContent() {
     setRecentlySavedHour(startH);
     setSaveToast({
       title: data.title || (isSleep ? "Rest & Sleep" : "Scheduled Block"),
-      time: `${data.startTime} → ${data.endTime}`,
+      time: `${displayStart} → ${displayEnd}`,
     });
 
     setTimeout(() => {
