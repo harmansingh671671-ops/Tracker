@@ -41,8 +41,9 @@ export function HabitChallengeView({
 }: HabitChallengeViewProps) {
   const [view, setView] = useState<"heatmap" | "list">("heatmap");
 
-  const startedAt = habit.challengeStartedAt ?? todayStr;
-  const duration = habit.challengeDurationDays ?? 7;
+  const startedAt = habit.challengeStartedAt;
+  const duration = habit.challengeDurationDays ?? 0;
+  if (!startedAt || duration < 1) return null;
 
   const dates = challengeDayDates(startedAt, duration);
   const history = historyRecord ?? {};
