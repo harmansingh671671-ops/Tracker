@@ -1,5 +1,6 @@
 "use client";
 
+
 /**
  * PERF-8b — the list-view habit card, extracted from `habits/page.tsx` and
  * wrapped in `React.memo`.
@@ -24,6 +25,7 @@ import { Check, Flame, X } from "lucide-react";
 import { type Habit, type HabitLog } from "@/lib/db";
 import { HabitIcon } from "@/components/habits/habit-icon";
 import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
+import { HabitChallengeView } from "@/components/habits/habit-challenge-view";
 import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
 import { KeystoneBadge } from "@/components/habits/keystone-badge";
 import { getHabitColor, isHabitScheduledOnDate, habitCategoryLabel } from "@/lib/utils/habit-colors";
@@ -366,18 +368,33 @@ export const HabitListCard = memo(function HabitListCard({
         </div>
       </div>
 
-      {/* Inline Monthly Calendar preview */}
-      <HabitMonthCalendar
-        habitId={habit.id}
-        name={habit.name}
-        targetDays={habit.targetDays}
-        targetDaysPerWeek={habit.targetDaysPerWeek}
-        category={habit.category}
-        selectedDate={selectedDate}
-        todayStr={todayStr}
-        onSelectDate={onSelectDate}
-        onToggleDate={handleCalendarToggle}
-      />
+      {/* Inline Monthly Calendar preview — unless this habit belongs to a
+          challenge, in which case the challenge's own Day 1..N heatmap/list
+          takes over (day 1 is the day the habit was added). */}
+      {habit.challengeId && habit.challengeStartedAt && habit.challengeDurationDays ? (
+        <HabitChallengeView
+          habit={habit}
+          historyRecord={historyRecord}
+          todayStr={todayStr}
+          selectedDate={selectedDate}
+          onSelectDate={onSelectDate}
+          onToggle={(id, date) => {
+            void onToggle(id, date);
+          }}
+        />
+      ) : (
+        <HabitMonthCalendar
+          habitId={habit.id}
+          name={habit.name}
+          targetDays={habit.targetDays}
+          targetDaysPerWeek={habit.targetDaysPerWeek}
+          category={habit.category}
+          selectedDate={selectedDate}
+          todayStr={todayStr}
+          onSelectDate={onSelectDate}
+          onToggleDate={handleCalendarToggle}
+        />
+      )}
     </div>
   );
 });

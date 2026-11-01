@@ -84,7 +84,7 @@ export function ChallengeSection({
   const [starting, setStarting] = useState(false);
 
   const open = openId ? CHALLENGES.find((c) => c.id === openId) ?? null : null;
-  const openTemplates = open ? templates.filter((t) => t.packId === open.packId) : [];
+  const openTemplates = open ? templates.filter((t) => open.templateIds.includes(t.id)) : [];
   const plan = open ? planChallengeStart(openTemplates, existingHabitNames) : null;
 
   const handleStart = async () => {

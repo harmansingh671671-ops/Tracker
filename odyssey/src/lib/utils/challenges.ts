@@ -12,8 +12,8 @@ import type { Habit, HabitCategory } from "@/lib/db";
 
 export interface Challenge {
   id: string;
-  /** Which habit pack supplies the habits. Must be a real `packId`. */
-  packId: string;
+  /** The explicit, curated set of habits this challenge writes — no others. */
+  templateIds: string[];
   title: string;
   goal: string;
   durationDays: number;
@@ -26,42 +26,35 @@ export interface Challenge {
 export const CHALLENGES: Challenge[] = [
   {
     id: "morning-21",
-    packId: "morning",
+    templateIds: ["tpl-morning-sunlight", "tpl-morning-mobility", "tpl-morning-frog"],
     title: "21-Day Morning Architect",
     goal: "Own your first hour, every day, for three weeks",
     durationDays: 21,
   },
   {
     id: "deep-work-14",
-    packId: "deep_work",
+    templateIds: ["tpl-deep-sprint", "tpl-shutdown-ritual", "tpl-read-philosophy"],
     title: "14-Day Deep Work",
     goal: "Two focused hours a day, for two weeks",
     durationDays: 14,
   },
   {
     id: "sleep-21",
-    packId: "sleep",
+    templateIds: ["tpl-zero-blue-light", "tpl-caffeine-cutoff", "tpl-wind-down-notes"],
     title: "21-Day Sleep Reset",
     goal: "Wind down and wake at the same time for three weeks",
     durationDays: 21,
   },
   {
     id: "move-30",
-    packId: "vitality",
+    templateIds: ["tpl-hydration-3l", "tpl-zone2-cardio", "tpl-daily-steps"],
     title: "30-Day Move Daily",
     goal: "Move your body every day for a month",
     durationDays: 30,
   },
   {
-    id: "calm-14",
-    packId: "mindfulness",
-    title: "14-Day Calm Mind",
-    goal: "One short practice a day, for two weeks",
-    durationDays: 14,
-  },
-  {
     id: "detox-7",
-    packId: "detox",
+    templateIds: ["tpl-social-blocker", "tpl-nature-walk"],
     title: "7-Day Digital Detox",
     goal: "One week of cleaner screen habits",
     durationDays: 7,
@@ -165,13 +158,12 @@ export function getChallengeStatus(
 
 /** The minimum a habit template must expose to be started from a challenge. */
 export interface ChallengeTemplateLike {
+  id: string;
   name: string;
   icon: string;
   domainLabel: HabitCategory;
   targetDays: number[];
   period: "morning" | "afternoon" | "evening" | "anytime";
-  /** Which pack it belongs to — a challenge draws its habits from one pack. */
-  packId: string;
 }
 
 /** Exactly what the create path needs, with the challenge stamp attached. */
@@ -206,4 +198,25 @@ export function toChallengeInputs(
     challengeStartedAt: startedAt,
     challengeDurationDays: challenge.durationDays,
   }));
+}
+
+/**
+ * The calendar dates a challenge spans, day 1 being the day it was started.
+ * Pure so the view can be tested without rendering a grid.
+ */
+export function challengeDayDates(startedAt: string, durationDays: number): string[] {
+  const out: string[] = [];
+  const [y, m, d] = startedAt.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  for (let i = 0; i < durationDays; i++) {
+    const dt = new Date(base + i * DAY_MS);
+    out.push(
+      dt.getUTCFullYear() +
+        "-" +
+        String(dt.getUTCMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(dt.getUTCDate()).padStart(2, "0")
+    );
+  }
+  return out;
 }

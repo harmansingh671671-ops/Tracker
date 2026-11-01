@@ -3,6 +3,7 @@ import {
   CHALLENGES,
   planChallengeStart,
   getChallengeStatus,
+  challengeDayDates,
   toChallengeInputs,
   type Challenge,
 } from "./challenges";
@@ -18,7 +19,7 @@ import {
 
 const challenge: Challenge = {
   id: "reading-21",
-  packId: "morning",
+  templateIds: [],
   title: "21-Day Reading",
   goal: "Read every morning for three weeks",
   durationDays: 21,
@@ -126,24 +127,23 @@ describe("CHALLENGES - the catalogue itself", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("every challenge states a goal, a positive length and a real pack", () => {
-    const packs = ["morning", "deep_work", "sleep", "vitality", "mindfulness", "detox"];
+  it("every challenge states a goal, a positive length and at least one habit", () => {
     for (const c of CHALLENGES) {
       expect(c.goal.trim().length).toBeGreaterThan(0);
       expect(c.durationDays).toBeGreaterThan(0);
-      expect(packs).toContain(c.packId);
+      expect(c.templateIds.length).toBeGreaterThan(0);
     }
   });
 });
 
 describe("toChallengeInputs - the stamp that makes progress work", () => {
   const template = {
+    id: "tpl-x",
     name: "Read 20 Pages",
     icon: "📚",
     domainLabel: "Craft & Skill" as const,
     targetDays: [1, 2, 3],
     period: "morning" as const,
-    packId: "morning",
   };
 
   it("stamps every habit with the challenge, its start date and its length", () => {
@@ -162,5 +162,21 @@ describe("toChallengeInputs - the stamp that makes progress work", () => {
 
   it("carries no challenge stamp when there is nothing to add", () => {
     expect(toChallengeInputs(challenge, [], "2026-11-01")).toEqual([]);
+  });
+});
+
+describe("challengeDayDates - day 1 is the day the habit was added", () => {
+  it("starts on the start date and has one entry per day", () => {
+    const dates = challengeDayDates("2026-11-05", 4);
+    expect(dates).toEqual(["2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"]);
+  });
+
+  it("handles a challenge that crosses a month boundary", () => {
+    const dates = challengeDayDates("2026-11-29", 4);
+    expect(dates).toEqual(["2026-11-29", "2026-11-30", "2026-12-01", "2026-12-02"]);
+  });
+
+  it("returns an empty list for a zero-length challenge", () => {
+    expect(challengeDayDates("2026-11-05", 0)).toEqual([]);
   });
 });
