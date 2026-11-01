@@ -378,6 +378,18 @@ export interface Habit {
    */
   pausedFrom?: string;
   pausedUntil?: string;
+  /**
+   * B7: set only on habits created by starting a challenge. All three are
+   * optional, so every habit the user created themselves reads exactly as
+   * before with no migration (ADR 0007). `challengeStartedAt` is the local
+   * `YYYY-MM-DD` of day one; `challengeDurationDays` is the length the user
+   * agreed to in the preview. When the challenge ends **nothing is written** —
+   * the habits simply stop being labelled as part of it, because archiving or
+   * deleting a habit someone still wants would be a silent data loss.
+   */
+  challengeId?: string;
+  challengeStartedAt?: string;
+  challengeDurationDays?: number;
 }
 
 export interface HabitLog {

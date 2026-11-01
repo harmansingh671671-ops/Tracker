@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { type HabitCategory, type HabitType } from "@/lib/db";
+import { type HabitCategory, type HabitType, type Habit } from "@/lib/db";
 import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/habit-template-library";
+import type { ChallengeHabitInput } from "@/lib/utils/challenges";
 import { UnitPicker } from "@/components/habits/unit-picker";
 import { IconGridPicker } from "@/components/habits/icon-grid-picker";
 import { DomainPicker } from "@/components/habits/domain-picker";
@@ -41,6 +42,13 @@ interface CreateHabitModalProps {
   }) => void;
   existingHabitNames?: string[];
   /**
+   * B7 — challenges. All three are optional and forwarded untouched to the
+   * library, which renders no Challenges section without them.
+   */
+  habits?: Habit[];
+  todayStr?: string;
+  onStartChallenge?: (inputs: ChallengeHabitInput[]) => Promise<void>;
+  /**
    * M16 -- pre-fills the form when a goal tag is tapped during onboarding.
    * Additive and optional: with no `defaults` the modal behaves exactly as it
    * did before, which is every existing call site.
@@ -61,7 +69,7 @@ interface CreateHabitModalProps {
 // B2: the option lists moved to `habit-form-options.ts` — both forms import
 // the same EMOJIS/DOMAINS/WEEKDAYS so they cannot drift again.
 
-export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames = [], defaults }: CreateHabitModalProps) {
+export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames = [], defaults, habits, todayStr, onStartChallenge }: CreateHabitModalProps) {
   const [view, setView] = useState<"browse" | "custom">(defaults ? "custom" : "browse");
   const [isExpanded, setIsExpanded] = useState(false);
   const [name, setName] = useState(defaults?.name ?? "");
@@ -253,6 +261,9 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
               onExpand={() => setIsExpanded(true)}
               onCollapse={() => setIsExpanded(false)}
               existingHabitNames={existingHabitNames}
+              habits={habits}
+              todayStr={todayStr}
+              onStartChallenge={onStartChallenge}
             />
           </div>
         ) : (

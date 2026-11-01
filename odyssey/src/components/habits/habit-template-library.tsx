@@ -9,12 +9,14 @@ import {
   ArrowRight,
   X,
 } from "lucide-react";
-import { type HabitCategory } from "@/lib/db";
+import { type HabitCategory, type Habit } from "@/lib/db";
 import {
   orderTemplatesForGoal,
   readPrimaryGoal,
 } from "@/lib/utils/habit-template-order";
 import type { GoalTagId } from "@/lib/utils/goal-tags";
+import { ChallengeSection } from "./challenge-section";
+import type { ChallengeHabitInput } from "@/lib/utils/challenges";
 
 export interface HabitTemplate {
   id: string;
@@ -264,6 +266,13 @@ interface HabitTemplateLibraryProps {
   onExpand?: () => void;
   onCollapse?: () => void;
   existingHabitNames?: string[];
+  /**
+   * B7. Optional, so the library keeps working for every existing caller:
+   * without these three props no Challenges section renders at all.
+   */
+  habits?: Habit[];
+  todayStr?: string;
+  onStartChallenge?: (inputs: ChallengeHabitInput[]) => Promise<void>;
 }
 
 export function HabitTemplateLibrary({
@@ -275,6 +284,9 @@ export function HabitTemplateLibrary({
   onExpand,
   onCollapse,
   existingHabitNames = [],
+  habits,
+  todayStr,
+  onStartChallenge,
 }: HabitTemplateLibraryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPack, setSelectedPack] = useState<string>("all");
@@ -493,6 +505,19 @@ export function HabitTemplateLibrary({
             </div>
           </button>
         </div>
+      )}
+
+      {/* B7 — challenges sit above the template grid, and step out of the way
+          the moment the user starts searching, because at that point they are
+          looking for one specific habit. */}
+      {!searchQuery && habits && todayStr && onStartChallenge && (
+        <ChallengeSection
+          templates={HABIT_TEMPLATES}
+          habits={habits}
+          existingHabitNames={existingHabitNames}
+          todayStr={todayStr}
+          onStart={onStartChallenge}
+        />
       )}
 
       {/* 2. Sticky Header: Full-width Search Bar + Dynamically Expanding '+' Button + Category Chips */}

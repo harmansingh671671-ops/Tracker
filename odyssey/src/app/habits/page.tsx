@@ -34,7 +34,7 @@ import { getDayHabitProgress } from "@/lib/utils/habit-progress";
 import { isHabitComplete, getCompletionRecord } from "@/lib/utils/habit-completion";
 import { getCompletionToast, getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
 import { orderHabitsForDisplay, resolveKeystoneHabit } from "@/lib/utils/keystone";
-import { useDaysDoneMilestones } from "@/components/habits/use-days-done-milestones";
+import type { ChallengeHabitInput } from "@/lib/utils/challenges";import { useDaysDoneMilestones } from "@/components/habits/use-days-done-milestones";
 import {
   XP_CREATION_DIAMONDS,
   XP_CREATION_XP,
@@ -568,6 +568,13 @@ export default function HabitsPage() {
     unit?: string;
     targetValue?: number;
     color?: string;
+  }, options?: {
+    /** B7 — the challenge this habit was started from, if any. */
+    challenge?: { id: string; startedAt: string; durationDays: number };
+    /** A challenge creates several habits at once: one toast, one refresh. */
+    suppressFeedback?: boolean;
+    /** Only the first habit of a challenge may claim the keystone pin. */
+    assignKeystone?: boolean;
   }) => {
     if (!user) return;
     const created = await addHabit({
@@ -588,19 +595,68 @@ export default function HabitsPage() {
       targetValue: data.targetValue,
       color: data.color,
       archivedAt: undefined,
+      challengeId: options?.challenge?.id,
+      challengeStartedAt: options?.challenge?.startedAt,
+      challengeDurationDays: options?.challenge?.durationDays,
     });
     // S19 — the first habit becomes the keystone (the empty state promises it);
     // later habits never steal the pin from a habit that already holds it.
-    if (!user.keystoneHabitId) await updateUser({ keystoneHabitId: created.id });
+    const mayAssignKeystone = options?.assignKeystone ?? true;
+    if (mayAssignKeystone && !user.keystoneHabitId) {
+      await updateUser({ keystoneHabitId: created.id });
+    }
     // One-off rewards for creating a habit. Deliberately NOT routed through the
     // vault: nothing was completed, so there is no day for it to accrue against.
     // It stays an immediate credit.
     await addXp(XP_CREATION_XP);
     await addDiamonds(XP_CREATION_DIAMONDS);
+    if (options?.suppressFeedback) return created;
     await fetchUser();
     await fetchTemporaryWallet(user.id);
     await fetchHabits(user.id, selectedDate, { force: true });
     showToast(`Your journey with "${data.name}" begins now. First milestone: 3 days done. +${XP_CREATION_XP} XP • +${XP_CREATION_DIAMONDS} 💎 added`);
+    return created;
+  };
+
+  // B7 — starting a challenge. Each habit walks the SAME creation path as a
+  // hand-built one (same write, same rewards, same keystone rule), so a
+  // challenge habit can never quietly differ from a crafted one. The difference
+  // is only in the feedback: one toast and one refresh for the whole challenge
+  // instead of one per habit.
+  const handleStartChallenge = async (inputs: ChallengeHabitInput[]) => {
+    if (!user || inputs.length === 0) return;
+    const createdIds: string[] = [];
+    for (let i = 0; i < inputs.length; i++) {
+      const input = inputs[i];
+      const created = await handleCreateHabit(
+        {
+          name: input.name,
+          icon: input.icon,
+          category: input.category,
+          frequency: input.targetDays.length,
+          targetDays: input.targetDays,
+          timeOfDay: input.timeOfDay,
+          priority: "focus",
+        },
+        {
+          challenge: {
+            id: input.challengeId,
+            startedAt: input.challengeStartedAt,
+            durationDays: input.challengeDurationDays,
+          },
+          suppressFeedback: true,
+          assignKeystone: i === 0,
+        }
+      );
+      if (created) createdIds.push(created.id);
+    }
+    await fetchUser();
+    await fetchTemporaryWallet(user.id);
+    await fetchHabits(user.id, selectedDate, { force: true });
+    setIsCreateModalOpen(false);
+    showToast(
+      `Challenge started — ${createdIds.length} habit${createdIds.length === 1 ? "" : "s"} added. Day 1 begins today.`
+    );
   };
 
   // B1 — an imported habit walks the SAME creation path as a hand-built one
@@ -1455,6 +1511,9 @@ AnimatePresence, which suppresses the enter transition and leaves the
         onClose={() => setIsCreateModalOpen(false)}
         onSave={handleCreateHabit}
         existingHabitNames={habits.map((h) => h.name)}
+        habits={habits}
+        todayStr={todayStr}
+        onStartChallenge={handleStartChallenge}
       />
 
       {/* Value Input Popup for Counted Habits */}
