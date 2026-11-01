@@ -41,9 +41,8 @@ export function HabitChallengeView({
 }: HabitChallengeViewProps) {
   const [view, setView] = useState<"heatmap" | "list">("heatmap");
 
-  const startedAt = habit.challengeStartedAt;
-  const duration = habit.challengeDurationDays ?? 0;
-  if (!startedAt || duration < 1) return null;
+  const startedAt = habit.challengeStartedAt ?? todayStr;
+  const duration = habit.challengeDurationDays ?? 7;
 
   const dates = challengeDayDates(startedAt, duration);
   const history = historyRecord ?? {};
@@ -91,10 +90,7 @@ export function HabitChallengeView({
       </div>
 
       {view === "heatmap" ? (
-        <div
-          className="grid gap-1 max-h-48 overflow-y-auto pr-1"
-          style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}
-        >
+        <div className="flex gap-1 overflow-x-auto pb-1">
           {dates.map((date, i) => {
             const done = !!history[date];
             const upcoming = date > todayStr;
@@ -109,7 +105,7 @@ export function HabitChallengeView({
                   if (!upcoming) onToggle(habit.id, date);
                 }}
                 aria-label={`Day ${i + 1}, ${date}${done ? ", done" : upcoming ? ", upcoming" : ", missed"}`}
-                className={`aspect-square rounded-md text-[9px] font-mono font-bold flex items-center justify-center transition-colors cursor-pointer border ${
+                className={`w-7 h-7 shrink-0 rounded-md text-[9px] font-mono font-bold flex items-center justify-center transition-colors cursor-pointer border ${
                   done
                     ? "bg-primary text-on-primary border-primary"
                     : upcoming
