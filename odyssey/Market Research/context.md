@@ -664,6 +664,53 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â�
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-11-02 - C2 revised: quick-schedule border-drag resize, picker removed (SHIPPED)
+
+**Owner's direction, verbatim in spirit:** "tap and hold the bottom border of an hour card
+and drag it down then extend the duration in 5-min resolution, change the duration of the
+hour next to it in real time, if the duration is decreasing create another block the user
+can edit. Don't add any of these things in the main planner, remove that duration thing as
+well." Clarified by asking: drag-down shrinks the neighbour live; the new editable block
+comes only from shrinking MY block; "nothing becomes too large or too short" resolved as
+clamp [42, 120] px at 64px/hour; and "add the auto merger etc thing into the quick schedule
+page as well".
+
+**Design consequences worth remembering.**
+1. **Minute precision enters a page that was hour-grained.** Blocks now store `HH:MM`
+   (`24:00` end form kept). The planner stays hour-grained on purpose; its
+   `planner-block-time.ts` was re-derived in minutes as `block-resize.ts` rather than
+   stretched — cross-reference both before touching shared merge/occupancy semantics.
+   Editing state on the page is keyed by `rowKey` (block id / empty-stretch start), NOT
+   by integer hour, because minute-level starts collide on hour keys.
+2. **The day renders as rows now** (`buildDayRows`): real blocks at their true span plus
+   empty stretches between them, so a 11:00–11:30 block tiles against an 11:30 neighbour.
+   Day-load, the allocation bar and the category stats all read the SAME row-derived hour
+   shapes, so the banner and the bar cannot disagree. `dayLoad` still derives from SAVED
+   blocks, not the live drag preview, on purpose (S18 contract).
+3. **Destructive vs pure drags.** A release that absorbed whole blocks or trimmed a
+   neighbour writes once and shows an 8-second Undo banner restoring pre-drag shapes.
+   A pure shrink shows NO banner — owner-specified; an undo pill next to a no-op would be
+   worse UX. The drag preview lives outside the store (`dragPreview`), measured against the
+   STORED end so quantisation cannot drift, and is reset on date flip so a stale preview
+   can never resize another day's card.
+4. **Save-time merge is contract-compatible with the planner's:** candidates exclude the
+   row just saved; same title case-insensitive + same stored category + touching, never
+   overlapping; chains expand.
+
+**Verified:** tsc 0; 690 tests pass (15 new in `block-resize.test.ts`); lint 0 errors /
+76 warnings (the 5 in day-schedule are pre-existing dead imports, untouched); `next build`
+clean; scripted interaction probe **16/16** on a production build against indexedDB-seeded
+data (`%TEMP%\opencode\verify\c2s\qs-probe.js`): live shrink of the neighbour while
+dragging (start == dragged end on the 5-min grid), persisted minute times, undo banner
+appears iff the drag trimmed a neighbour and restores both rows exactly, drag-up creates
+the freed stretch as a new empty editable block ending where the previous layout ended,
+zero console errors. Server started, asserted `Ready`, killed by port PID.
+**Probe-writing lesson:** headless Chrome from a timed-out run leaves the profile dir
+locked and the NEXT run renders an empty page ("Upgrade 'OdysseyDB' blocked by other
+connection") — always delete the profile dir AND kill Chrome processes whose command line
+points at it before rerunning; and never index into a card's `<span>`s by position
+(the drag handle's grip pill is a span too) — filter by a time-regex instead.
+
 ### 2026-11-01 - B7a: challenge habits get their own progress view (SHIPPED)
 
 **Follow-up to B7**, shipped in the same session. Two changes.
@@ -1060,9 +1107,11 @@ Held: `app/page.tsx` (landing screen) — overlaps possible S-series morning ene
 New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server Components); `shared-clock.ts` re-exports for client consumers. Gates: tsc 0, lint 0 errors, 491 tests, build clean.
 
 
-## §10 Git + task state (as of 2026-10-29)
+## §10 Git + task state (as of 2026-11-02)
 
-- **HEAD:** C2 shipped (duration picker + auto-merge + multi-hour occupancy fix). Working tree: C2 changes staged for commit; unrelated B7 type error in challenges.test.ts remains (other agent).
+- **Gates + commit (C2 revised, 2026-11-02):** tsc 0; 49 suites / **690 tests** (15 new in `block-resize.test.ts`, all green); lint 0 errors / 76 warnings (the 5 day-schedule warnings are pre-existing dead imports, deliberately untouched); `next build` clean; **16/16 production-build interaction probe checks** (`%TEMP%\opencode\verify\c2s\qs-probe.js`, indexedDB-seeded two touching blocks on the production server): live preview shrinks the neighbour to the dragged end on the 5-min grid, persisted minute times match (`Deep work 11:00→<dragged end>`, `Calls <dragged end>→13:00`), undo banner appears iff the drag trimmed a neighbour and restores both rows exactly, drag-up creates the freed stretch as a new empty editable block ending at the pre-drag boundary, zero console errors; server started, asserted `Ready`, killed by port PID in one chained command, 3000/3001/3100 confirmed free. Touches `src/lib/utils/block-resize.ts` (new), `src/lib/utils/block-resize.test.ts` (new), `src/components/schedule/block-drag-handle.tsx` (new), `src/app/day-schedule/page.tsx` (row-based day, minute-level save + merge, drag commit/undo), `src/components/planner/edit-hour-modal.tsx` (picker removed, chip restored), (deleted) `src/components/planner/time-range-picker.tsx`, `main_plan.md` (C2 REVISED), this file. **Left unstaged on purpose:** `android/.idea/caches/deviceStreaming.xml`, `../fleet/`, and the concurrent session's heatmap-fix paragraph inside the §9 B7a entry (kept out of this commit; re-add their paragraph with their next commit if they do not).
+
+- **HEAD:** C2 revised — quick-schedule border-drag resize (5-min, live neighbour shrink, freed-stretch block, Undo banner) + quick-schedule save-time merge shipped; planner duration picker removed (read-only chip restored), planner merge/occupancy kept.
 
 **BUG-7 (PARTIAL — status corrected 2026-10-29 from `SHIPPED`):** Wallpaper master switch fix — the unconditional `putBoolean("wallpaper_enabled", true)` is removed from both `syncSchedule()` and `syncScheduleWithResult()`; the flag is now written only where the user asks for a wallpaper (`setWallpaperMasterEnabled(true)`, the live-wallpaper picker, `enableHourlyAutoUpdate()`). **Audited 2026-10-29 and confirmed inside the shipped 1.3.7 APK:** the fix commit `2f9cf5f` is an ancestor of release commit `e3d08f9`; the APK on disk (versionCode 12 / 1.3.7, built 11:42) was built from that tree against an 11:50 release commit; and `git diff e3d08f9 HEAD -- android/` is empty, so the packaged native code is exactly today's native code. `SHIPPED` was wrong because the line itself said behavioral verification was still pending and the DoD requires acceptance criteria to be **manually verified** — the same reason `BUG-19` stays `PARTIAL`. **Remaining:** device test — switch off → close → reopen → switch must stay OFF. src: `android/app/src/main/java/com/odyssey/tracker/OdysseyWallpaperBridge.kt:425,507`
 

@@ -5,6 +5,19 @@ import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
+import {
+  blockRangeMinutes,
+  buildDayRows,
+  cardHeightPx,
+  computeResize,
+  findAdjacentMergeMinutes,
+  labelFromMinutes,
+  MIN_BLOCK_MINUTES,
+  quantizeEndMinutes,
+  rowKey,
+  type DayRow,
+} from "@/lib/utils/block-resize";
+import { BlockDragHandle } from "@/components/schedule/block-drag-handle";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
@@ -122,10 +135,6 @@ export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
   return "work";
 }
 
-function formatHour(h: number): string {
-  return `${String(h).padStart(2, "0")}:00`;
-}
-
 function formatDateDisplay(dateStr: string): string {
   if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return "";
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -162,6 +171,39 @@ function DayScheduleContent() {
   const paramDate = searchParams.get("date");
   const dateStr = paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate) ? paramDate : getTodayStr();
   const dayNum = searchParams.get("day") ? parseInt(searchParams.get("day")!, 10) : null;
+
+  /**
+   * Border-drag state (`C2` follow-up). While the drag runs the day renders
+   * from `liveBlocks` — the store rows with `computeResize` applied — and the
+   * store is only written when the drag commits. `undoPayload` holds the
+   * pre-drag originals so the absorb banner can put every eaten row back.
+   */
+  const [dragPreview, setDragPreview] = useState<{ id: string; endMin: number } | null>(null);
+  const [undoPayload, setUndoPayload] = useState<{
+    absorbed: ScheduleBlock[];
+    edited: ScheduleBlock[];
+    dragged: ScheduleBlock[];
+  } | null>(null);
+
+  // The banner self-clears, and cleanup on unmount is what a timer rule wants.
+  useEffect(() => {
+    if (!undoPayload) return;
+    const t = window.setTimeout(() => setUndoPayload(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [undoPayload]);
+
+  // A drag preview must never survive a day flip: the id belongs to another
+  // day's store rows, and a stale preview would resize the wrong card.
+  useEffect(() => {
+    setDragPreview(null);
+  }, [dateStr]);
+
+  const liveBlocks = useMemo(() => {
+    if (!dragPreview) return blocks;
+    return computeResize(blocks, dragPreview.id, dragPreview.endMin).next;
+  }, [blocks, dragPreview]);
+
+  const dayRows = useMemo(() => buildDayRows(liveBlocks), [liveBlocks]);
 
   const displayDay = dayNum || (user?.createdAt ? getJourneyDayNumber(user.createdAt) : 1);
   const [dayName, setDayName] = useState<string>("");
@@ -256,38 +298,32 @@ function DayScheduleContent() {
     setLoading(true);
   }
 
-  // Controlled input values for every hour (0..23)
-  const [editingValues, setEditingValues] = useState<Record<number, string>>(() => {
-    const init: Record<number, string> = {};
-    for (let h = 0; h < 24; h++) init[h] = "";
-    return init;
-  });
+  // Controlled input values per ROW (a row is a block or an empty stretch —
+  // see `dayRows`). Keyed by `rowKey`, not by hour: minute-level blocks from
+  // the border drag can start mid-hour, so an integer hour key can collide.
+  const [editingValues, setEditingValues] = useState<Record<string, string>>({});
 
-  // Category selection for every hour (0..23)
-  const [hourCategories, setHourCategories] = useState<Record<number, CategoryKey>>(() => {
-    const init: Record<number, CategoryKey> = {};
-    for (let h = 0; h < 24; h++) init[h] = normalizeCategory(undefined, h);
-    return init;
-  });
+  // Category selection per row key.
+  const [rowCategories, setRowCategories] = useState<Record<string, CategoryKey>>({});
 
   /**
-   * Hours whose category the user explicitly chose on this screen.
+   * Rows whose category the user explicitly chose on this screen.
    *
-   * `hourCategories` is seeded from stored blocks through the display
+   * `rowCategories` is seeded from stored blocks through the display
    * normaliser, so it cannot be trusted to distinguish "the user picked this"
    * from "this is what we folded the stored value into". Only the interaction can.
-   * See `handleSaveBlock` for what this protects.
+   * See `handleSaveRow` for what this protects.
    */
-  const categoryTouchedHoursRef = useRef<Set<number>>(new Set());
+  const categoryTouchedKeysRef = useRef<Set<string>>(new Set());
 
-  // Track which hour's category picker popup is currently open
-  const [openCategoryHour, setOpenCategoryHour] = useState<number | null>(null);
+  // Track which row's category picker popup is currently open
+  const [openCategoryKey, setOpenCategoryKey] = useState<string | null>(null);
 
-  // Recently saved hour for pulsing feedback
-  const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
+  // Recently saved row for pulsing feedback
+  const [recentlySavedKey, setRecentlySavedKey] = useState<string | null>(null);
 
-  const inputRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
-  const focusedHourRef = useRef<number | null>(null);
+  const inputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const focusedKeyRef = useRef<string | null>(null);
   const currentHour = new Date().getHours();
   const todayStr = getTodayStr();
   const isSelectedToday = dateStr === todayStr;
@@ -322,51 +358,54 @@ function DayScheduleContent() {
     }
   }, [user?.id, dateStr, fetchBlocksForDate]);
 
-  // Synchronize blocks into hour inputs and categories without clobbering active input
+  // Synchronize blocks into row inputs and categories without clobbering the
+  // active input. Runs off `dayRows` (not the raw blocks array): a block row's
+  // key is its id, so a resize that only moves its times never clobbers what
+  // the user is typing, and absorbed rows vanish together with their input.
   useEffect(() => {
-    const newValues: Record<number, string> = {};
-    const newCats: Record<number, CategoryKey> = {};
+    const newValues: Record<string, string> = {};
+    const newCats: Record<string, CategoryKey> = {};
 
     // Blocks changing means the stored categories were re-read, so any "the user
     // chose this" claim from the previous set of blocks no longer holds. Without
     // this, a category picked on Monday would still count as touched on Tuesday
     // and authorise a rewrite the user never asked for.
-    categoryTouchedHoursRef.current.clear();
+    categoryTouchedKeysRef.current.clear();
 
-    for (let h = 0; h < 24; h++) {
-      const sTime = formatHour(h);
-      const match = blocks.find((b) => b.startTime === sTime);
-
-      if (match) {
-        if (focusedHourRef.current === h) {
-          newValues[h] = editingValues[h] ?? match.title;
+    for (const row of dayRows) {
+      const key = rowKey(row);
+      const hourStart = Math.floor(row.startMin / 60);
+      if (row.kind === "block" && row.block) {
+        if (focusedKeyRef.current === key) {
+          newValues[key] = editingValues[key] ?? row.block.title;
         } else {
-          newValues[h] = match.title || "";
+          newValues[key] = row.block.title || "";
         }
-        newCats[h] = normalizeCategory(match.category, h);
+        newCats[key] = normalizeCategory(row.block.category, hourStart);
       } else {
-        if (focusedHourRef.current === h) {
-          newValues[h] = editingValues[h] ?? "";
+        if (focusedKeyRef.current === key) {
+          newValues[key] = editingValues[key] ?? "";
         } else {
-          newValues[h] = "";
+          newValues[key] = "";
         }
-        newCats[h] = hourCategories[h] || normalizeCategory(undefined, h);
+        newCats[key] = rowCategories[key] || normalizeCategory(undefined, hourStart);
       }
     }
 
     setEditingValues((prev) => {
       const updated = { ...prev };
       let changed = false;
-      for (let h = 0; h < 24; h++) {
-        if (focusedHourRef.current !== h && updated[h] !== newValues[h]) {
-          updated[h] = newValues[h];
+      for (const key of Object.keys(newValues)) {
+        if (focusedKeyRef.current !== key && updated[key] !== newValues[key]) {
+          updated[key] = newValues[key];
           changed = true;
         }
       }
       return changed ? updated : prev;
     });
-    setHourCategories((prev) => ({ ...prev, ...newCats }));
-  }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRowCategories((prev) => ({ ...prev, ...newCats }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
 
   // Ensure page always starts at top when opened, never auto-scrolling to bottom or restoring previous page scroll
   useEffect(() => {
@@ -384,50 +423,31 @@ function DayScheduleContent() {
     }
   }, [loading]);
 
-  // Helper to find existing block for an hour
-  const getBlockForHour = useCallback(
-    (hour: number): ScheduleBlock | undefined => {
-      const hourStr = formatHour(hour);
-      return blocks.find((b) => b.startTime === hourStr);
-    },
-    [blocks]
-  );
-
-  // Build full 24 hours array matching schedule tab structure
-  const full24Hours = useMemo(() => {
-    return Array.from({ length: 24 }, (_, h) => {
-      const sTime = formatHour(h);
-      const endH = (h + 1) % 24 === 0 ? 24 : h + 1;
-      const eTime = formatHour(endH % 24);
-      const match = blocks.find((b) => b.startTime === sTime);
-      const typedTitle = editingValues[h] ?? match?.title ?? "";
-      const catKey = hourCategories[h] || normalizeCategory(match?.category, h);
-
-      return {
-        hour: h,
-        startTime: sTime,
-        endTime: eTime,
-        block: match || null,
-        title: typedTitle,
-        category: catKey,
-        isCustom: !!match,
-        status: match?.status || "pending",
-      };
-    });
-  }, [blocks, editingValues, hourCategories]);
-
-  /**
-   * Whether an hour counts as PLANNED for this day. Named rather than inlined
-   * because the allocation bar below and the legend under it are the same fact
-   * about the same day, and M8's lesson applies: two derivations of "how much of
-   * this day is planned" is how a bar and its own caption start disagreeing.
-   * A typed-but-unsaved title counts here; the planner deliberately does not
-   * (it reads only saved blocks), and that difference is intentional per screen.
-   */
-  const isPlannedHour = useCallback(
-    (h: (typeof full24Hours)[number]) => !!h.block || (h.title || "").trim().length > 0,
-    []
-  );
+  // Planned "shapes" for the allocation bar and the category counts: one entry
+  // per clock hour, saying whether any planned row covers it and, if so, whose
+  // category it carries. A typed-but-unsaved title counts (that was
+  // `isPlannedHour`'s rule); the planner deliberately does not — the
+  // per-screen difference stays intentional.
+  const hourShapes = useMemo(() => {
+    const planned: boolean[] = Array(24).fill(false);
+    const cats: (CategoryKey | null)[] = Array(24).fill(null);
+    for (const row of dayRows) {
+      // Cover the real minutes this row occupies — a 10:35–11:00 half block
+      // counts hour 10 for its tail, like the old hour grid counted it.
+      for (let h = Math.floor(row.startMin / 60); h < Math.max(24, Math.ceil(row.endMin / 60)); h++) {
+        if (h >= 24) break;
+        const typed = (editingValues[rowKey(row)] ?? "").trim();
+        const isPlanned = row.kind === "block" || typed.length > 0;
+        if (!isPlanned || planned[h]) continue;
+        planned[h] = true;
+        cats[h] =
+          row.kind === "block"
+            ? normalizeCategory(row.block.category, h)
+            : rowCategories[rowKey(row)] || normalizeCategory(undefined, h);
+      }
+    }
+    return planned.map((p, h) => ({ planned: p, cat: cats[h] }));
+  }, [dayRows, editingValues, rowCategories]);
 
   // Compute 24h category allocation statistics
   const categoryStats = useMemo(() => {
@@ -437,9 +457,9 @@ function DayScheduleContent() {
     let renewalH = 0;
     let restH = 0;
 
-    full24Hours.forEach((h) => {
-      if (!isPlannedHour(h)) return;
-      const c = (h.category || "").toLowerCase();
+    hourShapes.forEach((shape) => {
+      if (!shape.planned || shape.cat === null) return;
+      const c = shape.cat.toLowerCase();
       if (c.includes("sleep") || c.includes("rest")) restH++;
       else if (c.includes("vitality") || c.includes("habit") || c.includes("health")) vitalityH++;
       else if (c.includes("sync") || c.includes("meet") || c.includes("social")) syncH++;
@@ -450,7 +470,7 @@ function DayScheduleContent() {
     const plannedTotal = focusH + vitalityH + syncH + renewalH + restH;
     const remaining = Math.max(0, 24 - plannedTotal);
     return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal, remaining };
-  }, [full24Hours, isPlannedHour]);
+  }, [hourShapes]);
 
   /**
    * S18 — the "plate" verdict derives from the SAVED plan (`blocks`), not from
@@ -465,132 +485,185 @@ function DayScheduleContent() {
    * test as `categoryStats` above, by construction.
    */
   const allocationSlices = useMemo(
-    () => buildAllocationSlices(full24Hours.map(isPlannedHour)),
-    [full24Hours, isPlannedHour]
+    () => buildAllocationSlices(hourShapes.map((s) => s.planned)),
+    [hourShapes]
   );
 
   const progressPct = Math.round((categoryStats.plannedTotal / 24) * 100);
 
-  // Save / Update / Delete block for a given hour
-  const handleSaveBlock = useCallback(
-    async (hour: number, explicitTitle?: string, explicitCat?: CategoryKey) => {
+  // Save / Update / Delete the block a row stands for. Block rows save at their
+  // ACTUAL minute range (the border drag may have moved it) — never at a
+  // rebuilt hour span, or a resize would be silently undone by the next save.
+  const handleSaveRow = useCallback(
+    async (row: DayRow<ScheduleBlock>, explicitTitle?: string, explicitCat?: CategoryKey) => {
       if (!userId || !dateStr) return;
-      const block = getBlockForHour(hour);
-      const titleToSave = (explicitTitle !== undefined ? explicitTitle : (editingValues[hour] ?? "")).trim();
-      const catToSave = explicitCat || hourCategories[hour] || normalizeCategory(undefined, hour);
+      const key = rowKey(row);
+      const titleToSave = (
+        explicitTitle !== undefined ? explicitTitle : (editingValues[key] ?? "")
+      ).trim();
+      const catToSave =
+        explicitCat || rowCategories[key] || normalizeCategory(undefined, Math.floor(row.startMin / 60));
 
-      const sTime = formatHour(hour);
-      const endH = hour + 1;
-      const eTime = formatHour(endH === 24 ? 0 : endH);
+      const startLabel = labelFromMinutes(row.startMin);
+      const endLabel = labelFromMinutes(row.endMin);
 
       try {
-        if (block) {
+        let savedId: string | null = null;
+        if (row.kind === "block") {
+          const block = row.block;
           if (!titleToSave) {
             await deleteBlock(block.id);
-          } else {
-            await updateBlock(block.id, {
-              title: titleToSave,
-              // **A title edit must not rewrite the category.** `hourCategories`
-              // was seeded from the stored value through this screen's
-              // *display* normaliser, and that normaliser is lossy for anything
-              // outside the five values its picker offers -- a row written as
-              // `habits` folds to `vitality`, a row written as `buffer` folds to
-              // `renewal`. Those rows exist in real databases: an imported
-              // backup is bulk-added verbatim, and earlier builds wrote them
-              // before those components were orphaned.
-              //
-              // This is invisible today for the three values the picker *can*
-              // produce, because for those the fold happens to be identity --
-              // which is exactly why it survived. The moment the vocabulary
-              // changes, every title edit starts silently recategorising blocks.
-              // So the stored value is returned untouched unless the user
-              // actually chose a category on THIS screen, which
-              // `handleCategoryChange` records.
-              category: resolveEditedCategory({
-                stored: block.category ?? "",
-                touched: categoryTouchedHoursRef.current.has(hour),
-                chosen: catToSave,
-              }),
-            });
+            setRecentlySavedKey(key);
+            setTimeout(() => {
+              setRecentlySavedKey((curr) => (curr === key ? null : curr));
+            }, 2500);
+            syncCurrentScheduleToNative(dateStr);
+            return;
           }
+          await updateBlock(block.id, {
+            title: titleToSave,
+            // **A title edit must not rewrite the category.** `rowCategories`
+            // was seeded from the stored value through this screen's
+            // *display* normaliser, and that normaliser is lossy for anything
+            // outside the five values its picker offers -- a row written as
+            // `habits` folds to `vitality`, a row written as `buffer` folds to
+            // `renewal`. Those rows exist in real databases: an imported
+            // backup is bulk-added verbatim, and earlier builds wrote them
+            // before those components were orphaned.
+            //
+            // This is invisible today for the three values the picker *can*
+            // produce, because for those the fold happens to be identity --
+            // which is exactly why it survived. The moment the vocabulary
+            // changes, every title edit starts silently recategorising blocks.
+            // So the stored value is returned untouched unless the user
+            // actually chose a category on THIS screen, which
+            // `handleCategoryChange` records.
+            category: resolveEditedCategory({
+              stored: block.category ?? "",
+              touched: categoryTouchedKeysRef.current.has(key),
+              chosen: catToSave,
+            }),
+          });
+          savedId = block.id;
         } else if (titleToSave) {
-          await addBlock({
+          const created = await addBlock({
             userId: userId,
             date: dateStr,
-            startTime: sTime,
-            endTime: eTime,
+            startTime: startLabel,
+            endTime: endLabel,
             title: titleToSave,
             category: catToSave,
             status: "pending",
             isCommitted: true,
           });
+          savedId = created?.id ?? null;
         }
 
-        setRecentlySavedHour(hour);
-        setTimeout(() => {
-          setRecentlySavedHour((curr) => (curr === hour ? null : curr));
-        }, 2500);
+        // Save-time merge on this page too, minute-aware (`findMerge` in
+        // planner-block-time stays hour-level): same title (case-insensitive) +
+        // same stored category + touching, never overlapping. The row just
+        // saved survives and widens; absorbed rows are deleted, exactly the
+        // planner's contract.
+        const fresh = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
+        const merge =
+          savedId && titleToSave
+            ? findAdjacentMergeMinutes({
+                title: titleToSave,
+                category: catToSave,
+                startMin: row.startMin,
+                endMin: row.endMin,
+                candidates: fresh.filter(
+                  (r) => r.id !== savedId && r.userId === userId
+                ),
+              })
+            : null;
+        if (merge && savedId) {
+          await updateBlock(savedId, {
+            startTime: labelFromMinutes(merge.startMin),
+            endTime: labelFromMinutes(merge.endMin),
+          });
+          for (const absorbedId of merge.absorbedIds) {
+            await deleteBlock(absorbedId);
+          }
+        }
 
+        setRecentlySavedKey(key);
+        setTimeout(() => {
+          setRecentlySavedKey((curr) => (curr === key ? null : curr));
+        }, 2500);
         syncCurrentScheduleToNative(dateStr);
       } catch (err) {
         console.error("Error saving block:", err);
       }
     },
-    [userId, dateStr, getBlockForHour, editingValues, hourCategories, deleteBlock, updateBlock, addBlock]
+    [
+      userId,
+      dateStr,
+      editingValues,
+      rowCategories,
+      deleteBlock,
+      updateBlock,
+      addBlock,
+    ]
   );
 
-  // Change category of a specific hour block
+  // Change category of a specific row's block
   const handleCategoryChange = useCallback(
-    async (hour: number, newCat: CategoryKey) => {
-      setHourCategories((prev) => ({ ...prev, [hour]: newCat }));
-      setOpenCategoryHour(null);
+    async (row: DayRow<ScheduleBlock>, newCat: CategoryKey) => {
+      const key = rowKey(row);
+      setRowCategories((prev) => ({ ...prev, [key]: newCat }));
+      setOpenCategoryKey(null);
 
-      const block = getBlockForHour(hour);
-      const currentTitle = (editingValues[hour] ?? "").trim();
-
-      if (block) {
+      const currentTitle = (editingValues[key] ?? "").trim();
+      if (row.kind === "block") {
         // The one path that is allowed to rewrite a category.
-        categoryTouchedHoursRef.current.add(hour);
-        await updateBlock(block.id, { category: newCat });
+        categoryTouchedKeysRef.current.add(key);
+        await updateBlock(row.block.id, { category: newCat });
         syncCurrentScheduleToNative(dateStr);
       } else if (currentTitle) {
-        handleSaveBlock(hour, currentTitle, newCat);
+        handleSaveRow(row, currentTitle, newCat);
       }
     },
-    [getBlockForHour, editingValues, handleSaveBlock, updateBlock, dateStr]
+    [editingValues, handleSaveRow, updateBlock, dateStr]
   );
 
   // Handle Enter / Line-break key on mobile/desktop
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>, hour: number) => {
+    (
+      e: React.KeyboardEvent<HTMLTextAreaElement>,
+      row: DayRow<ScheduleBlock>,
+      index: number
+    ) => {
       if (e.key === "Enter") {
         e.preventDefault();
         const value = e.currentTarget.value;
-        handleSaveBlock(hour, value);
+        handleSaveRow(row, value);
 
-        const nextHour = hour + 1;
-        if (nextHour < 24) {
-          focusedHourRef.current = nextHour;
+        const nextRow = dayRows[index + 1];
+        if (nextRow) {
+          const nextKey = rowKey(nextRow);
+          focusedKeyRef.current = nextKey;
           setTimeout(() => {
-            if (inputRefs.current[nextHour]) {
-              inputRefs.current[nextHour]!.focus();
+            if (inputRefs.current[nextKey]) {
+              inputRefs.current[nextKey]!.focus();
             }
           }, 30);
         }
       }
     },
-    [handleSaveBlock]
+    [handleSaveRow, dayRows]
   );
 
   // Handle blur: save on loss of focus
   const handleBlur = useCallback(
-    (hour: number, value: string) => {
-      if (focusedHourRef.current === hour) {
-        focusedHourRef.current = null;
+    (row: DayRow<ScheduleBlock>, value: string) => {
+      const key = rowKey(row);
+      if (focusedKeyRef.current === key) {
+        focusedKeyRef.current = null;
       }
-      handleSaveBlock(hour, value);
+      handleSaveRow(row, value);
     },
-    [handleSaveBlock]
+    [handleSaveRow]
   );
 
   // Handle auto-fill sleep
@@ -600,30 +673,154 @@ function DayScheduleContent() {
     syncCurrentScheduleToNative(dateStr);
   }, [userId, dateStr, autoFillSleep]);
 
-  // Clear / delete block
-  const handleClearBlock = useCallback(
-    async (hour: number) => {
-      setEditingValues((prev) => ({ ...prev, [hour]: "" }));
-      const block = getBlockForHour(hour);
-      if (block) {
-        await deleteBlock(block.id);
-        syncCurrentScheduleToNative(dateStr);
-      }
+  /**
+   * Border-drag live step. The delta is cumulative since press, measured
+   * against the block's STORED end (`blocks`, never the live preview) so bytes
+   * of quantisation can never accumulate into drift.
+   */
+  const handleResize = useCallback(
+    (row: DayRow<ScheduleBlock>, deltaMinutes: number) => {
+      if (row.kind !== "block") return;
+      const stored = blocks.find((x) => x.id === row.block.id) ?? row.block;
+      const range = blockRangeMinutes(stored);
+      if (!range) return;
+      const endMin = Math.max(
+        range[0] + MIN_BLOCK_MINUTES,
+        quantizeEndMinutes(range[1] + deltaMinutes)
+      );
+      setDragPreview((prev) =>
+        prev && prev.id === row.block.id ? { ...prev, endMin } : { id: row.block.id, endMin }
+      );
     },
-    [getBlockForHour, deleteBlock, dateStr]
+    [blocks]
   );
 
-  // Render a single hour block slot (styled identically to the Schedule tab!)
-  const renderHourSlot = (slot: (typeof full24Hours)[0]) => {
-    const isPastHour = isSelectedToday && slot.hour < currentHour;
-    const isCurrent = isSelectedToday && currentHour === slot.hour;
-    const isRecentlySaved = recentlySavedHour === slot.hour;
-    const cat = getCatStyle(slot.category, slot.isCustom);
+  /**
+   * Drag commit: write everything the preview computed AT ONCE — the dragged
+   * end, every trimmed neighbour, the absorbed rows — and, when the drag
+   * upward freed minutes, create the new empty block the user can edit.
+   * Absorbed content is the destructive part, so the pre-drag originals go
+   * into the undo banner rather than vanishing with the drag.
+   */
+  const handleResizeCommit = useCallback(async () => {
+    const preview = dragPreview;
+    if (!preview) return;
+    const outcome = computeResize(blocks, preview.id, preview.endMin);
+    setDragPreview(null);
+
+    try {
+      for (const ab of outcome.absorbed) {
+        await deleteBlock(ab.id);
+      }
+      for (const ed of outcome.edited) {
+        await updateBlock(ed.id, { startTime: ed.startTime, endTime: ed.endTime });
+      }
+      if (outcome.dragged) {
+        await updateBlock(preview.id, { endTime: outcome.dragged.endTime });
+      }
+      if (outcome.freed && outcome.dragged) {
+        await addBlock({
+          userId: userId!,
+          date: dateStr!,
+          startTime: labelFromMinutes(outcome.freed.start),
+          endTime: labelFromMinutes(outcome.freed.end),
+          title: "",
+          // The freed stretch inherits the dragged block's category, so the
+          // new card reads as a continuation until the user types into it.
+          category: outcome.dragged.category,
+          status: "pending",
+          isCommitted: true,
+        });
+      }
+      syncCurrentScheduleToNative(dateStr);
+
+      if (outcome.absorbed.length > 0 || outcome.edited.length > 0) {
+        setUndoPayload({
+          absorbed: outcome.absorbed,
+          // Original pre-drag shapes, from the store — the ones `edited`
+          // carries carry already-moved times.
+          edited: outcome.edited
+            .map((ed) => blocks.find((x) => x.id === ed.id))
+            .filter((x): x is ScheduleBlock => !!x),
+          dragged: outcome.dragged
+            ? [blocks.find((x) => x.id === outcome.dragged!.id)].filter(
+                (x): x is ScheduleBlock => !!x
+              )
+            : [],
+        });
+      }
+    } catch (err) {
+      console.error("Error committing resize:", err);
+    }
+  }, [dragPreview, blocks, deleteBlock, updateBlock, addBlock, userId, dateStr]);
+
+  /** Undo the last resize commit: restore every absorbed, trimmed and dragged row. */
+  const handleUndoResize = useCallback(async () => {
+    const payload = undoPayload;
+    if (!payload) return;
+    setUndoPayload(null);
+    try {
+      for (const ab of payload.absorbed) {
+        // Re-insert absorbed rows verbatim (their stored id/createdAt are the
+        // two fields addBlock regenerates, so they are not forwarded).
+        await addBlock({
+          userId: ab.userId,
+          date: ab.date,
+          startTime: ab.startTime,
+          endTime: ab.endTime,
+          title: ab.title,
+          description: ab.description,
+          category: ab.category,
+          tag: ab.tag,
+          energyLevel: ab.energyLevel,
+          status: ab.status,
+          missReason: ab.missReason,
+          completedAt: ab.completedAt,
+          isCommitted: ab.isCommitted,
+        });
+      }
+      for (const ed of payload.edited) {
+        await updateBlock(ed.id, { startTime: ed.startTime, endTime: ed.endTime });
+      }
+      for (const dr of payload.dragged) {
+        await updateBlock(dr.id, { startTime: dr.startTime, endTime: dr.endTime });
+      }
+      syncCurrentScheduleToNative(dateStr);
+    } catch (err) {
+      console.error("Error undoing resize:", err);
+    }
+  }, [undoPayload, addBlock, updateBlock, dateStr]);
+
+  // Render a single day row — a block (at its real minute span) or an empty
+  // stretch (styled identically to the old hour rows).
+  const renderDayRow = (row: DayRow<ScheduleBlock>, index: number) => {
+    const key = rowKey(row);
+    const nowMinutes = currentHour * 60 + new Date().getMinutes();
+    const isPastHour = isSelectedToday && nowMinutes >= row.endMin;
+    const isCurrent = isSelectedToday && nowMinutes >= row.startMin && nowMinutes < row.endMin;
+    const isRecentlySaved = recentlySavedKey === key;
+    const block = row.kind === "block" ? row.block : null;
+    const isCustom = !!block;
+    const cat = getCatStyle(
+      rowCategories[key] ||
+        (block
+          ? normalizeCategory(block.category, Math.floor(row.startMin / 60))
+          : normalizeCategory(undefined, Math.floor(row.startMin / 60))),
+      isCustom
+    );
     const CatIcon = cat.Icon;
-    const isCategoryPickerOpen = openCategoryHour === slot.hour;
-    const isCompleted = slot.status === "completed";
-    const inputValue = editingValues[slot.hour] ?? slot.title ?? "";
-    const hasContent = inputValue.trim().length > 0 || !!slot.block;
+    const isCategoryPickerOpen = openCategoryKey === key;
+    const isCompleted = block?.status === "completed";
+    const inputValue = editingValues[key] ?? block?.title ?? "";
+    const hasContent = inputValue.trim().length > 0 || !!block;
+
+    /**
+     * Proportional height (`C2` follow-up): a row's card grows with the minutes
+     * it actually holds, clamped so a multi-hour block never dwarfs the page
+     * and a 5-minute block stays tappable — nothing too large or too short.
+     * `minHeight`, not height: a long task name still grows the row.
+     */
+    const cardMinHeight = cardHeightPx(row.endMin - row.startMin);
 
     /**
      * How high this card stacks.
@@ -631,7 +828,7 @@ function DayScheduleContent() {
      * The category dropdown lives INSIDE this card, and `backdrop-blur-xl` makes
      * a card both a stacking context and a containing block for fixed children.
      * So the dropdown's own `z-50` resolves only inside this card and cannot
-     * lift it past the hour rows below - measured before this fix: the topmost
+     * lift it past the rows below - measured before this fix: the topmost
      * element over the middle of an open dropdown was the *08:00 card*, not the
      * dropdown. Raising the card is the only thing that can.
      *
@@ -646,13 +843,13 @@ function DayScheduleContent() {
 
     return (
       <div
-        key={`slot-${slot.hour}`}
-        id={`hour-row-${slot.hour}`}
+        key={`slot-${key}`}
         onContextMenu={(e) => e.preventDefault()}
         /* PERF-7e: data-blur-essential marks the blur here as load-bearing
            (stacking context + containing block for the in-card category
            dropdown above), so the low-end kill-switch must not strip it. */
         data-blur-essential
+        style={{ minHeight: cardMinHeight }}
         className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border border-l-4 ${cat.leftBorder} select-none ${
           cat.cardBg
         } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${stackClass} ${
@@ -663,17 +860,18 @@ function DayScheduleContent() {
             : ""
         }`}
       >
-        {/* Time Indicator on Left */}
+        {/* Time Indicator on Left — the row's actual minutes, not a rebuilt
+            hour: a 10:35 start must read as 10:35. */}
         <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center select-none">
           <span
             className={`text-xs font-mono font-bold leading-tight ${
               isCurrent ? "text-primary font-extrabold" : "text-on-surface"
             }`}
           >
-            {slot.startTime}
+            {labelFromMinutes(row.startMin)}
           </span>
           <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
-            {formatHour((slot.hour + 1) % 24)}
+            {labelFromMinutes(row.endMin)}
           </span>
           {/* The "SAVED" flash and the "LIVE" pill were removed here on owner
               instruction. Both were status chips under the time; the row's own
@@ -692,7 +890,7 @@ function DayScheduleContent() {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setOpenCategoryHour(isCategoryPickerOpen ? null : slot.hour);
+              setOpenCategoryKey(isCategoryPickerOpen ? null : key);
             }}
             title="Click to change block type"
             className={`relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-inner`}
@@ -718,13 +916,18 @@ function DayScheduleContent() {
                 Select Block Type
               </div>
               {CATEGORY_OPTIONS.map((opt) => {
-                const isSelected = normalizeCategory(slot.category, slot.hour) === opt.id;
+                const effectiveCat =
+                  rowCategories[key] ||
+                  (block
+                    ? normalizeCategory(block.category, Math.floor(row.startMin / 60))
+                    : normalizeCategory(undefined, Math.floor(row.startMin / 60)));
+                const isSelected = effectiveCat === opt.id;
                 const OptIcon = opt.Icon;
                 return (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => handleCategoryChange(slot.hour, opt.id)}
+                    onClick={() => handleCategoryChange(row, opt.id)}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
                         ? `${opt.badgeBg} font-bold shadow-sm ring-1 ring-current/30`
@@ -750,7 +953,7 @@ function DayScheduleContent() {
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <textarea
             ref={(el) => {
-              inputRefs.current[slot.hour] = el;
+              inputRefs.current[key] = el;
               autosizeTextarea(el);
             }}
             rows={1}
@@ -763,19 +966,19 @@ function DayScheduleContent() {
             }
             value={inputValue}
             onFocus={() => {
-              focusedHourRef.current = slot.hour;
+              focusedKeyRef.current = key;
             }}
             onChange={(e) => {
               const val = e.target.value;
-              focusedHourRef.current = slot.hour;
+              focusedKeyRef.current = key;
               autosizeTextarea(e.target);
               setEditingValues((prev) => ({
                 ...prev,
-                [slot.hour]: val,
+                [key]: val,
               }));
             }}
-            onKeyDown={(e) => handleKeyDown(e, slot.hour)}
-            onBlur={(e) => handleBlur(slot.hour, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(e, row, index)}
+            onBlur={(e) => handleBlur(row, e.target.value)}
             className={`w-full max-w-full bg-transparent border-0 p-0 text-sm font-semibold leading-snug resize-none overflow-hidden break-words focus:ring-0 focus:outline-none placeholder:text-on-surface-variant/35 placeholder:font-normal transition-colors ${
               isCompleted
                 ? "line-through text-on-surface-variant/50"
@@ -801,6 +1004,16 @@ function DayScheduleContent() {
             Reinstate it as a deliberate decision to make this screen able to
             review a day again, not by restoring these buttons; the handler it
             called was deleted rather than left unreachable. */}
+
+        {/* Bottom-border drag (`C2` follow-up): press-and-drag this strip and
+            the block's end follows the finger in 5-minute steps — the live
+            preview lives in `dragPreview`, the store is written on release. */}
+        <BlockDragHandle
+          onResize={(deltaMinutes) => handleResize(row, deltaMinutes)}
+          onEnd={() => {
+            void handleResizeCommit();
+          }}
+        />
       </div>
     );
   };
@@ -965,7 +1178,7 @@ function DayScheduleContent() {
           >
             {allocationSlices.map((slice) => {
               if (!slice.filled) return null;
-              const cat = allocationCategory(full24Hours[slice.hour].category);
+              const cat = allocationCategory(hourShapes[slice.hour].cat);
               return (
                 <div
                   key={slice.hour}
@@ -1008,7 +1221,29 @@ function DayScheduleContent() {
           <LoadingIndicator label="Loading schedule blocks" className="py-24" />
         ) : (
           <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
-            {full24Hours.map((slot) => renderHourSlot(slot))}
+            {dayRows.map((row, index) => renderDayRow(row, index))}
+
+            {/* The border-drag absorb banner: shown just after a resize commit
+                that removed whole blocks (their content lived in real tasks the
+                drag covered entire). Runs for 8s; Undo puts every row back. */}
+            {undoPayload && (
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5 my-1 rounded-2xl bg-error/10 border border-error/25">
+                <span className="text-xs text-on-surface-variant font-medium">
+                  {undoPayload.absorbed.length > 0
+                    ? `Absorbed ${undoPayload.absorbed.length} block${undoPayload.absorbed.length > 1 ? "s" : ""} into the drag`
+                    : "Duration changed"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleUndoResize();
+                  }}
+                  className="shrink-0 px-3 py-1 rounded-full bg-error/15 border border-error/30 text-error text-xs font-bold cursor-pointer active:scale-95 transition-all"
+                >
+                  Undo
+                </button>
+              </div>
+            )}
 
             {/* "Tap outside to close" scrim for the category picker. Rendered ONCE,
                 here, OUTSIDE every card. Inside a card it could not work: each card
@@ -1017,12 +1252,12 @@ function DayScheduleContent() {
                 card's own box instead of the screen. This wrapper has no
                 backdrop-filter, so the scrim covers the viewport - and it sits
                 below the open card's `z-50`, so the dropdown is still clickable. */}
-            {openCategoryHour !== null && (
+            {openCategoryKey !== null && (
               <div
                 className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpenCategoryHour(null);
+                  setOpenCategoryKey(null);
                 }}
               />
             )}
