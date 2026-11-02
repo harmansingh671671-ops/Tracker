@@ -4,6 +4,8 @@ import { useState } from "react";
 import { List, Grid3x3 } from "lucide-react";
 import type { Habit } from "@/lib/db";
 import { CHALLENGES, challengeDayDates } from "@/lib/utils/challenges";
+import { getHabitColor } from "@/lib/utils/habit-colors";
+import { HabitChallengeHeatmap } from "@/components/habits/habit-challenge-heatmap";
 
 /**
  * B7 — the challenge progress view that replaces the monthly calendar for a
@@ -47,6 +49,11 @@ export function HabitChallengeView({
 
   const dates = challengeDayDates(startedAt, duration);
   const history = historyRecord ?? {};
+  const habitColor = getHabitColor({
+    category: habit.category,
+    name: habit.name,
+    id: habit.id,
+  });
 
   const completedCount = dates.filter((d) => history[d]).length;
   const currentDay = dates.findIndex((d) => d > todayStr) === -1
@@ -91,34 +98,16 @@ export function HabitChallengeView({
       </div>
 
       {view === "heatmap" ? (
-        <div className="flex gap-1 overflow-x-auto pb-1">
-          {dates.map((date, i) => {
-            const done = !!history[date];
-            const upcoming = date > todayStr;
-            const isToday = date === todayStr;
-            const isSelected = date === selectedDate;
-            return (
-              <button
-                key={date}
-                type="button"
-                onClick={() => {
-                  onSelectDate(date);
-                  if (!upcoming) onToggle(habit.id, date);
-                }}
-                aria-label={`Day ${i + 1}, ${date}${done ? ", done" : upcoming ? ", upcoming" : ", missed"}`}
-                className={`w-7 h-7 shrink-0 rounded-md text-[9px] font-mono font-bold flex items-center justify-center transition-colors cursor-pointer border ${
-                  done
-                    ? "bg-primary text-on-primary border-primary"
-                    : upcoming
-                      ? "bg-surface-container-high text-on-surface-variant/40 border-outline/10"
-                      : "bg-error/10 text-error border-error/20"
-                } ${isToday ? "ring-1 ring-primary" : ""} ${isSelected ? "ring-2 ring-on-surface" : ""}`}
-              >
-                {i + 1}
-              </button>
-            );
-          })}
-        </div>
+        <HabitChallengeHeatmap
+          habitId={habit.id}
+          dates={dates}
+          history={history}
+          todayStr={todayStr}
+          selectedDate={selectedDate}
+          color={habitColor}
+          onSelectDate={onSelectDate}
+          onToggle={onToggle}
+        />
       ) : (
         <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
           {dates.map((date, i) => {

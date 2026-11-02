@@ -733,6 +733,26 @@ month-boundary safe) with 3 tests.
 **Verified:** 48 suites / 675 tests (3 new for `challengeDayDates`); tsc 0; eslint 0 errors;
 `next build` clean. The component is covered by the existing habit-card render path.
 
+**Fix — heatmap view also shows only challenge days.** The habits page's heatmap view
+(`app/habits/page.tsx`) and the edit sheet (`edit-habit-modal.tsx`) both rendered
+`HabitGitHubHeatmap` (a full calendar) for every habit. They now render `HabitChallengeView`
+(challenge days only, day 1 = start date) whenever the habit carries a `challengeId`,
+so a challenge habit never shows the full month in any view. Committed as
+`172fb45`.
+
+### 2026-11-02 - M28: challenge heatmap is now a real heatmap (SHIPPED)
+
+The challenge view's "heatmap" toggle was a horizontal strip of numbered boxes, which
+read as a day pager rather than a heatmap. It is now a contribution-style heatmap:
+weekday label column (M/W/F/S), one column per real calendar week so Day 1 lands in
+its real weekday row, month band, colour-filled squares (habit colour when done, error
+tint when missed, dashed empty when upcoming), today/selected rings. Only the challenge's
+own days are shown; blanks pad the first and last weeks. Extracted into
+`habit-challenge-heatmap.tsx` to keep both files under the 250-line limit. Verified
+with a browser run (Digital Detox, 7 days): the heatmap renders 7 cells in one
+calendar column with weekday labels and a single Nov band, and the list toggle still
+works. 49 suites / 701 tests, tsc 0, eslint 0 errors, `next build` clean.
+
 ### 2026-11-01 - B7: challenges that create habits, with a preview and a confirm (SHIPPED)
 
 **The feature.** Six challenges now sit as a strip above the template grid in the habit library: Morning Architect (21 days), Deep Work (14), Sleep Reset (21), Move Daily (30), Calm Mind (14), Digital Detox (7). Each is built from a pack that already exists, so a challenge adds nothing to the habit catalogue and cannot drift from it. Tapping one opens a preview stating the goal, the length, that it starts today, the exact habits it will add, and — in as many words — **"No schedule changes — this only adds habits"**. Nothing is written until the user presses Start.
@@ -1111,7 +1131,7 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 - **Gates + commit (C2 revised, 2026-11-02):** tsc 0; 49 suites / **690 tests** (15 new in `block-resize.test.ts`, all green); lint 0 errors / 76 warnings (the 5 day-schedule warnings are pre-existing dead imports, deliberately untouched); `next build` clean; **16/16 production-build interaction probe checks** (`%TEMP%\opencode\verify\c2s\qs-probe.js`, indexedDB-seeded two touching blocks on the production server): live preview shrinks the neighbour to the dragged end on the 5-min grid, persisted minute times match (`Deep work 11:00→<dragged end>`, `Calls <dragged end>→13:00`), undo banner appears iff the drag trimmed a neighbour and restores both rows exactly, drag-up creates the freed stretch as a new empty editable block ending at the pre-drag boundary, zero console errors; server started, asserted `Ready`, killed by port PID in one chained command, 3000/3001/3100 confirmed free. Touches `src/lib/utils/block-resize.ts` (new), `src/lib/utils/block-resize.test.ts` (new), `src/components/schedule/block-drag-handle.tsx` (new), `src/app/day-schedule/page.tsx` (row-based day, minute-level save + merge, drag commit/undo), `src/components/planner/edit-hour-modal.tsx` (picker removed, chip restored), (deleted) `src/components/planner/time-range-picker.tsx`, `main_plan.md` (C2 REVISED), this file. **Left unstaged on purpose:** `android/.idea/caches/deviceStreaming.xml`, `../fleet/`, and the concurrent session's heatmap-fix paragraph inside the §9 B7a entry (kept out of this commit; re-add their paragraph with their next commit if they do not).
 
-- **HEAD:** C2 revised — quick-schedule border-drag resize (5-min, live neighbour shrink, freed-stretch block, Undo banner) + quick-schedule save-time merge shipped; planner duration picker removed (read-only chip restored), planner merge/occupancy kept.
+- **HEAD:** M28 revised - challenge heatmap is now a contribution-style heatmap (weekday rows, week columns, month band, colour-filled squares) of exactly the challenge's days; extracted into habit-challenge-heatmap.tsx. 49 suites / 701 tests; tsc 0; eslint 0; next build clean.
 
 **BUG-7 (PARTIAL — status corrected 2026-10-29 from `SHIPPED`):** Wallpaper master switch fix — the unconditional `putBoolean("wallpaper_enabled", true)` is removed from both `syncSchedule()` and `syncScheduleWithResult()`; the flag is now written only where the user asks for a wallpaper (`setWallpaperMasterEnabled(true)`, the live-wallpaper picker, `enableHourlyAutoUpdate()`). **Audited 2026-10-29 and confirmed inside the shipped 1.3.7 APK:** the fix commit `2f9cf5f` is an ancestor of release commit `e3d08f9`; the APK on disk (versionCode 12 / 1.3.7, built 11:42) was built from that tree against an 11:50 release commit; and `git diff e3d08f9 HEAD -- android/` is empty, so the packaged native code is exactly today's native code. `SHIPPED` was wrong because the line itself said behavioral verification was still pending and the DoD requires acceptance criteria to be **manually verified** — the same reason `BUG-19` stays `PARTIAL`. **Remaining:** device test — switch off → close → reopen → switch must stay OFF. src: `android/app/src/main/java/com/odyssey/tracker/OdysseyWallpaperBridge.kt:425,507`
 
