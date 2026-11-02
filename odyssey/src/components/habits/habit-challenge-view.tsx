@@ -8,13 +8,10 @@ import { getHabitColor } from "@/lib/utils/habit-colors";
 import { HabitChallengeHeatmap } from "@/components/habits/habit-challenge-heatmap";
 
 /**
- * B7 — the challenge progress view that replaces the monthly calendar for a
- * habit that was started as part of a challenge.
- *
- * Two views, toggleable: a heatmap (one cell per day of the challenge) and a
- * list (Day 1 … Day N with its date and completion). Day 1 is the day the
- * habit was added, not the first of a month, so the challenge's progress reads
- * in its own units instead of borrowing the calendar's.
+ * B7 — the challenge progress view. Two sub-views, toggleable:
+ *  - heatmap: a horizontal strip of the challenge's days (Day 1..N).
+ *  - calendar: the same days laid out as a calendar grid (7 per row), showing
+ *    only the challenge's days — no month padding, no full month.
  */
 
 interface HabitChallengeViewProps {
@@ -24,15 +21,7 @@ interface HabitChallengeViewProps {
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onToggle: (habitId: string, date: string) => void;
-  /** Which sub-view to show first. List view (page-level) defaults to the list. */
   initialView?: "heatmap" | "list";
-}
-
-function dayLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return `${weekdays[dt.getUTCDay()]} ${d} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]}`;
 }
 
 export function HabitChallengeView({
@@ -65,7 +54,6 @@ export function HabitChallengeView({
 
   return (
     <div className="space-y-2">
-      {/* Header: progress + view toggle */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-mono font-bold text-on-surface-variant">
           Day {Math.min(currentDay, duration)} of {duration} · {completedCount} done
@@ -87,7 +75,7 @@ export function HabitChallengeView({
           <button
             type="button"
             onClick={() => setView("list")}
-            aria-label="List view"
+            aria-label="Calendar view"
             aria-pressed={view === "list"}
             className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
               view === "list"
@@ -112,10 +100,12 @@ export function HabitChallengeView({
           onToggle={onToggle}
         />
       ) : (
-        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5 w-full">
           {dates.map((date, i) => {
             const done = !!history[date];
             const upcoming = date > todayStr;
+            const isToday = date === todayStr;
+            const isSelected = date === selectedDate;
             return (
               <button
                 key={date}
@@ -124,31 +114,17 @@ export function HabitChallengeView({
                   onSelectDate(date);
                   if (!upcoming) onToggle(habit.id, date);
                 }}
-                className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-left border transition-colors cursor-pointer ${
+                aria-label={`Day ${i + 1}, ${date}${done ? ", done" : upcoming ? ", upcoming" : ", missed"}`}
+                className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-mono font-bold transition-colors cursor-pointer border ${
                   done
-                    ? "bg-primary/10 border-primary/25"
+                    ? "text-on-primary border-primary"
                     : upcoming
-                      ? "bg-surface-container-low border-outline/10"
-                      : "bg-error/5 border-error/15"
-                }`}
+                      ? "bg-surface-container-high text-on-surface-variant/40 border-outline/10"
+                      : "bg-error/10 text-error border-error/20"
+                } ${isToday ? "ring-1 ring-primary" : ""} ${isSelected ? "ring-2 ring-on-surface" : ""}`}
+                style={done ? { backgroundColor: habitColor } : undefined}
               >
-                <span className="text-[11px] font-mono font-bold text-on-surface-variant w-7 shrink-0">
-                  D{i + 1}
-                </span>
-                <span className="text-[11px] text-on-surface flex-1 truncate">
-                  {dayLabel(date)}
-                </span>
-                <span
-                  className={`text-[10px] font-mono font-bold shrink-0 ${
-                    done
-                      ? "text-primary"
-                      : upcoming
-                        ? "text-on-surface-variant/50"
-                        : "text-error"
-                  }`}
-                >
-                  {done ? "Done" : upcoming ? "Upcoming" : "Missed"}
-                </span>
+                {i + 1}
               </button>
             );
           })}
