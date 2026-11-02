@@ -371,7 +371,7 @@ export const HabitListCard = memo(function HabitListCard({
       {/* Inline Monthly Calendar preview — unless this habit belongs to a
           challenge, in which case the challenge's own Day 1..N heatmap/list
           takes over (day 1 is the day the habit was added). */}
-      {habit.challengeId && habit.challengeStartedAt && habit.challengeDurationDays ? (
+      {habit.challengeId ? (
         <HabitChallengeView
           habit={habit}
           historyRecord={historyRecord}

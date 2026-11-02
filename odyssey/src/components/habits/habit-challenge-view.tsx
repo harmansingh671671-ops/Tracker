@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { List, Grid3x3 } from "lucide-react";
 import type { Habit } from "@/lib/db";
-import { challengeDayDates } from "@/lib/utils/challenges";
+import { CHALLENGES, challengeDayDates } from "@/lib/utils/challenges";
 
 /**
  * B7 — the challenge progress view that replaces the monthly calendar for a
@@ -42,7 +42,7 @@ export function HabitChallengeView({
   const [view, setView] = useState<"heatmap" | "list">("heatmap");
 
   const startedAt = habit.challengeStartedAt;
-  const duration = habit.challengeDurationDays ?? 0;
+  const duration = habit.challengeDurationDays ?? CHALLENGES.find((c) => c.id === habit.challengeId)?.durationDays ?? 0;
   if (!startedAt || duration < 1) return null;
 
   const dates = challengeDayDates(startedAt, duration);
