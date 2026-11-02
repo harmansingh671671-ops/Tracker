@@ -743,15 +743,16 @@ so a challenge habit never shows the full month in any view. Committed as
 ### 2026-11-02 - M28: challenge heatmap is now a real heatmap (SHIPPED)
 
 The challenge view's "heatmap" toggle was a horizontal strip of numbered boxes, which
-read as a day pager rather than a heatmap. It is now a contribution-style heatmap:
-weekday label column (M/W/F/S), one column per real calendar week so Day 1 lands in
-its real weekday row, month band, colour-filled squares (habit colour when done, error
-tint when missed, dashed empty when upcoming), today/selected rings. Only the challenge's
-own days are shown; blanks pad the first and last weeks. Extracted into
+read as a day pager rather than a heatmap. It is now a horizontal heatmap strip:
+colour-filled squares (habit colour when done, error tint when missed, dashed empty
+when upcoming) flowing left-to-right and wrapping, with today/selected rings — no
+weekday columns or month band, so progress reads in the challenge's own units. The
+earlier vertical contribution-style layout (weekday rows, week columns) stacked the
+days vertically; this stacks them horizontally. Extracted into
 `habit-challenge-heatmap.tsx` to keep both files under the 250-line limit. Verified
-with a browser run (Digital Detox, 7 days): the heatmap renders 7 cells in one
-calendar column with weekday labels and a single Nov band, and the list toggle still
-works. 49 suites / 701 tests, tsc 0, eslint 0 errors, `next build` clean.
+with a browser run (Digital Detox, 7 days): the heatmap renders 7 coloured squares
+in a single horizontal row, and the list toggle still works. 49 suites / 701 tests,
+tsc 0, eslint 0 errors, `next build` clean.
 
 ### 2026-11-01 - B7: challenges that create habits, with a preview and a confirm (SHIPPED)
 
