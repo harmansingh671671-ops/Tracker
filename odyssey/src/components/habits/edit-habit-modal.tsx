@@ -7,6 +7,7 @@ import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { encodeShareLink } from "@/lib/utils/habit-share";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
+import { HabitChallengeView } from "@/components/habits/habit-challenge-view";
 import { UnitPicker } from "@/components/habits/unit-picker";
 import { IconGridPicker } from "@/components/habits/icon-grid-picker";
 import { DomainPicker } from "@/components/habits/domain-picker";
@@ -382,22 +383,38 @@ export function EditHabitModal({
 
             {/* 52-Week GitHub Continuous Heatmap */}
             <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low border border-outline/10 space-y-3">
-              <HabitGitHubHeatmap
-                habitId={habit.id}
-                name={habit.name}
-                targetDays={habit.targetDays}
-                targetDaysPerWeek={habit.targetDaysPerWeek}
-                category={habit.category}
-                type={habit.type}
-                targetValue={habit.targetValue}
-                selectedDate={selectedHistoryDate}
-                todayStr={today}
-                showStats={true}
-                onSelectDate={(dateStr) => {
-                  setSelectedHistoryDate(dateStr);
-                  if (onSelectDate) onSelectDate(dateStr);
-                }}
-              />
+              {habit.challengeId ? (
+                <HabitChallengeView
+                  habit={habit}
+                  historyRecord={historyLogs[habit.id]}
+                  todayStr={today}
+                  selectedDate={selectedHistoryDate}
+                  onSelectDate={(dateStr) => {
+                    setSelectedHistoryDate(dateStr);
+                    if (onSelectDate) onSelectDate(dateStr);
+                  }}
+                  onToggle={(id, date) => {
+                    if (user) void toggleHabitLog(user.id, id, date);
+                  }}
+                />
+              ) : (
+                <HabitGitHubHeatmap
+                  habitId={habit.id}
+                  name={habit.name}
+                  targetDays={habit.targetDays}
+                  targetDaysPerWeek={habit.targetDaysPerWeek}
+                  category={habit.category}
+                  type={habit.type}
+                  targetValue={habit.targetValue}
+                  selectedDate={selectedHistoryDate}
+                  todayStr={today}
+                  showStats={true}
+                  onSelectDate={(dateStr) => {
+                    setSelectedHistoryDate(dateStr);
+                    if (onSelectDate) onSelectDate(dateStr);
+                  }}
+                />
+              )}
             </div>
 
             {/* Recent Completed Log List */}

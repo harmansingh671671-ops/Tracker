@@ -11,6 +11,7 @@ import { HabitReviewCard } from "@/components/habits/habit-review-card";
 import { PausedHabitRow } from "@/components/habits/paused-habit-row";
 import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { HabitListCard } from "@/components/habits/habit-list-card";
+import { HabitChallengeView } from "@/components/habits/habit-challenge-view";
 import { KeystoneBadge } from "@/components/habits/keystone-badge";
 import { HabitsSkeleton } from "@/components/habits/habits-skeleton";
 import { HabitIcon } from "@/components/habits/habit-icon";
@@ -1405,20 +1406,33 @@ AnimatePresence, which suppresses the enter transition and leaves the
                       e.stopPropagation();
                     }}
                   >
-                    <HabitGitHubHeatmap
-                      habitId={h.id}
-                      name={h.name}
-                      targetDays={h.targetDays}
-                      targetDaysPerWeek={h.targetDaysPerWeek}
-                      category={h.category}
-                      type={h.type}
-                      targetValue={h.targetValue}
-                      selectedDate={selectedDate}
-                      todayStr={todayStr}
-                      showStats={false}
-                      onSelectDate={setSelectedDate}
-                      onToggleDate={handleHeatmapCellToggle}
-                    />
+                    {h.challengeId ? (
+                      <HabitChallengeView
+                        habit={h}
+                        historyRecord={historyLogs[h.id]}
+                        todayStr={todayStr}
+                        selectedDate={selectedDate}
+                        onSelectDate={setSelectedDate}
+                        onToggle={(id, date) => {
+                          void handleToggle(id, date);
+                        }}
+                      />
+                    ) : (
+                      <HabitGitHubHeatmap
+                        habitId={h.id}
+                        name={h.name}
+                        targetDays={h.targetDays}
+                        targetDaysPerWeek={h.targetDaysPerWeek}
+                        category={h.category}
+                        type={h.type}
+                        targetValue={h.targetValue}
+                        selectedDate={selectedDate}
+                        todayStr={todayStr}
+                        showStats={false}
+                        onSelectDate={setSelectedDate}
+                        onToggleDate={handleHeatmapCellToggle}
+                      />
+                    )}
                   </div>
                 </HabitGestureCard>
               );
