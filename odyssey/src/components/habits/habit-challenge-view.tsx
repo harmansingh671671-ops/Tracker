@@ -100,7 +100,7 @@ export function HabitChallengeView({
           onToggle={onToggle}
         />
       ) : (
-        <div className="grid grid-cols-7 gap-1 sm:gap-1.5 w-full">
+        <div className="grid grid-cols-10 gap-1 sm:gap-1.5 w-full">
           {dates.map((date, i) => {
             const done = !!history[date];
             const upcoming = date > todayStr;
