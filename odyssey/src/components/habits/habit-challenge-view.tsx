@@ -24,6 +24,8 @@ interface HabitChallengeViewProps {
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onToggle: (habitId: string, date: string) => void;
+  /** Which sub-view to show first. List view (page-level) defaults to the list. */
+  initialView?: "heatmap" | "list";
 }
 
 function dayLabel(dateStr: string): string {
@@ -40,8 +42,9 @@ export function HabitChallengeView({
   selectedDate,
   onSelectDate,
   onToggle,
+  initialView = "heatmap",
 }: HabitChallengeViewProps) {
-  const [view, setView] = useState<"heatmap" | "list">("heatmap");
+  const [view, setView] = useState<"heatmap" | "list">(initialView);
 
   const startedAt = habit.challengeStartedAt;
   const duration = habit.challengeDurationDays ?? CHALLENGES.find((c) => c.id === habit.challengeId)?.durationDays ?? 0;
