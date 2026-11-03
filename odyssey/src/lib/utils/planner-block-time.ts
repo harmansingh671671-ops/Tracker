@@ -6,10 +6,23 @@
  * only. Minute-level start times exist in old rows; they parse as their hour.
  */
 
+import { canonicalCategoryKey } from "./schedule-category-key";
+
 /** The hour part of an `HH:MM` label, or null when it does not parse. */
 export const hourOfLabel = (t: string): number | null => {
   const n = parseInt(t.split(":")[0], 10);
   return Number.isNaN(n) ? null : n;
+};
+
+/** Minutes since midnight, with `24:00` kept as the end of the day. */
+export const minuteOfLabel = (t: string): number | null => {
+  const [hourText, minuteText] = t.split(":");
+  const hour = Number.parseInt(hourText, 10);
+  const minute = Number.parseInt(minuteText, 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour === 24 && minute === 0) return 1440;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
 };
 
 /**
@@ -32,6 +45,29 @@ export const startHourLabel = (h: number): string => `${String(h % 24).padStart(
 /** An end label where hour 24 keeps its explicit `24:00` form (a start of `00:00` would read as day 2). */
 export const endHourLabel = (h: number): string =>
   h >= 24 ? "24:00" : `${String(h).padStart(2, "0")}:00`;
+
+/** End minute for a block, carrying a midnight wrap into the following day. */
+export const rangeEndMinutes = (startTime: string, endTime: string): number | null => {
+  const start = minuteOfLabel(startTime);
+  let end = minuteOfLabel(endTime);
+  if (start === null || end === null) return null;
+  if (end <= start) end += 1440;
+  return end;
+};
+
+/** A block is reviewable only after its whole span has elapsed. */
+export const isBlockEntirelyPast = (q: {
+  selectedDate: string;
+  todayDate: string;
+  startTime: string;
+  endTime: string;
+  nowMinutes: number;
+}): boolean => {
+  if (q.selectedDate < q.todayDate) return true;
+  if (q.selectedDate > q.todayDate) return false;
+  const end = rangeEndMinutes(q.startTime, q.endTime);
+  return end !== null && end <= q.nowMinutes;
+};
 
 /** Case- and whitespace-insensitive comparison used for same-title merging. */
 export const normalizedTitle = (t: string): string => (t || "").trim().toLowerCase();
@@ -63,10 +99,14 @@ export interface MergeResult {
 /**
  * The same plan written across adjacent hours is one plan: expand the incoming
  * range over every candidate that matches on title (case-insensitive) and
- * stored category and *touches* the range, repeatedly, so a chain of hours
+ * category family and *touches* the range, repeatedly, so a chain of hours
  * becomes one block. Overlapping-but-not-touching ranges and over-midnight
  * candidates are deliberately NOT merged - the first would silently re-write a
  * plan the user never connected, and the second has no reliable adjacency.
+ *
+ * Category is compared as a FAMILY (see `canonicalCategoryKey`), not as a raw
+ * string: legacy rows store `rest`, `habits`, `buffer`, and comparing spellings
+ * is what stopped identical-text sleep rows from ever merging.
  */
 export const findMerge = (q: MergeQuery): MergeResult | null => {
   if (q.endHour <= q.startHour) return null;
@@ -77,6 +117,7 @@ export const findMerge = (q: MergeQuery): MergeResult | null => {
   let start = q.startHour;
   let end = q.endHour;
   let changed = true;
+  const wantedCategory = canonicalCategoryKey(q.category);
   while (changed) {
     changed = false;
     for (const c of q.candidates) {
@@ -86,7 +127,7 @@ export const findMerge = (q: MergeQuery): MergeResult | null => {
       if (cs === null || ce === null) continue;
       if (ce > 24) continue; // over-midnight neighbour: not merged
       if (normalizedTitle(c.title) !== title) continue;
-      if (c.category !== q.category) continue;
+      if (canonicalCategoryKey(c.category) !== wantedCategory) continue;
       if (cs !== end && ce !== start) continue;
       start = Math.min(start, cs);
       end = Math.max(end, ce);
@@ -139,40 +180,26 @@ export const BASE_HOUR_HEIGHT_PX = 60;
 export const MIN_HEIGHT_RATIO = 0.75;
 
 /**
- * Maximum block height ratio (200% of hour block).
- */
-export const MAX_HEIGHT_RATIO = 2.0;
-
-/**
  * Calculate proportional block height based on duration.
- * - Minimum: 30 min = 75% of base hour height (45px)
- * - Maximum: 200% of base hour height (120px)
- * - Scales linearly between min and max based on duration
+ * - Minimum: 45px, so a short block remains usable
+ * - Above the minimum: exactly one base card per hour
+ * - No upper cap: a longer plan must be visibly longer than a 2-hour plan
  *
  * @param durationHours - Duration in hours (can be fractional)
  * @returns Height in pixels
  */
 export const calculateBlockHeight = (durationHours: number): number => {
   const minHeight = BASE_HOUR_HEIGHT_PX * MIN_HEIGHT_RATIO;
-  const maxHeight = BASE_HOUR_HEIGHT_PX * MAX_HEIGHT_RATIO;
-
-  // Clamp duration to reasonable range (0.5h min, 24h max)
-  const clampedDuration = Math.max(0.5, Math.min(24, durationHours));
-
-  // Scale: 0.5h = min, 2h = max (stops growing after 2h)
-  // Linear interpolation between min and max for durations 0.5-2h
-  const scaleDuration = Math.min(clampedDuration, 2);
-  const t = (scaleDuration - 0.5) / 1.5; // 0 at 0.5h, 1 at 2h
-
-  return minHeight + t * (maxHeight - minHeight);
+  if (!Number.isFinite(durationHours) || durationHours <= 0) return minHeight;
+  return Math.max(minHeight, durationHours * BASE_HOUR_HEIGHT_PX);
 };
 
 /**
  * Get duration in hours from start/end time labels.
  */
 export const getDurationHours = (startTime: string, endTime: string): number => {
-  const start = hourOfLabel(startTime);
-  const end = rangeEndHour(startTime, endTime);
+  const start = minuteOfLabel(startTime);
+  const end = rangeEndMinutes(startTime, endTime);
   if (start === null || end === null) return 1;
-  return end - start;
+  return (end - start) / 60;
 };

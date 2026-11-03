@@ -22,10 +22,10 @@ import { PlannerEmptyState } from "@/components/planner/planner-empty-state";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { XP_PER_BLOCK_COMPLETED } from "@/lib/utils/reward-rules";
 import { shouldShowPlannerEmptyState } from "@/lib/utils/planner-empty-state";
-import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import {
   findMerge,
   findOccupantAtHour,
+  isBlockEntirelyPast,
   startHourLabel,
   endHourLabel,
 } from "@/lib/utils/planner-block-time";
@@ -34,6 +34,7 @@ import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
 import { AnimatedBlockGroup } from "@/components/planner/animated-block-group";
+import { groupPlannerHours } from "@/lib/utils/planner-hour-groups";
 import {
   Clock,
   CheckCircle2,
@@ -129,7 +130,6 @@ export function PlannerContent() {
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [editingHour, setEditingHour] = useState<number>(9);
   const [editingEndHour, setEditingEndHour] = useState<number>(10);
-  const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
   const [recentlySavedHour, setRecentlySavedHour] = useState<number | null>(null);
   const [floatingBlocks, setFloatingBlocks] = useState<ScheduleBlock[]>([]);
   const [saveToast, setSaveToast] = useState<{ title: string; time: string } | null>(null);
@@ -167,16 +167,22 @@ export function PlannerContent() {
   ) => {
     e.stopPropagation();
 
-    // Prevent reviewing future hours
-    const isFuture =
-      selectedDate > todayStr ||
-      (selectedDate === todayStr && slotHour > currentHour);
+    const canReview = block
+      ? isBlockEntirelyPast({
+          selectedDate,
+          todayDate: todayStr,
+          startTime: block.startTime,
+          endTime: block.endTime,
+          nowMinutes: now.getHours() * 60 + now.getMinutes(),
+        })
+      : selectedDate < todayStr ||
+        (selectedDate === todayStr && slotHour < currentHour);
 
-    if (isFuture) {
+    if (!canReview) {
       showHint(
         selectedDate > todayStr
           ? "Future days cannot be reviewed yet"
-          : "Future hours cannot be reviewed yet"
+          : "A block can be reviewed only after it ends"
       );
       return;
     }
@@ -241,13 +247,6 @@ export function PlannerContent() {
     // done" counter is derived from (ADR 0005). Re-read it here so the header and
     // the journey banner move on the same tick as the review.
     await fetchUser();
-  };
-
-  const toggleGroupExpand = (groupId: string, explicitState?: boolean) => {
-    setExpandedGroupIds((prev) => ({
-      ...prev,
-      [groupId]: explicitState !== undefined ? explicitState : !prev[groupId],
-    }));
   };
 
   // The React setters ARE listed, though they are stable by contract and the old
@@ -467,80 +466,16 @@ export function PlannerContent() {
     return { focusH, vitalityH, syncH, renewalH, restH, plannedTotal };
   }, [full24Hours, isPlannedHour]);
 
-  // Helper to determine canonical category type for adjacent grouping
-  const getCategoryType = useCallback((category?: string, isCustom?: boolean): string => {
-    if (!isCustom || !category) return "open";
-    const c = category.toLowerCase();
-    if (c.includes("sleep") || c.includes("rest")) return "sleep";
-    if (c.includes("vitality") || c.includes("habit")) return "vitality";
-    if (c.includes("sync") || c.includes("meeting") || c.includes("admin")) return "sync";
-    if (c.includes("renewal") || c.includes("buffer")) return "renewal";
-    return "work";
-  }, []);
-
-  // Group adjacent custom blocks of the same type together
-  interface HourGroup {
-    id: string;
-    type: string;
-    isCustom: boolean;
-    startHour: number;
-    endHour: number;
-    hours: number[];
-    slots: typeof full24Hours;
-    title: string;
-    category: string;
-    primaryBlock?: ScheduleBlock | null;
-    status: string;
-  }
-
-  const hourGroups = useMemo(() => {
-    const groups: HourGroup[] = [];
-    let currentGroup: HourGroup | null = null;
-
-    full24Hours.forEach((slot) => {
-      const type = getCategoryType(slot.category, slot.isCustom);
-      const isCustom = slot.isCustom;
-
-      // Merge if both are custom, same category type, and consecutive
-      const canMerge =
-        currentGroup &&
-        currentGroup.isCustom &&
-        isCustom &&
-        currentGroup.type === type;
-
-      if (canMerge && currentGroup) {
-        currentGroup.endHour = slot.hour + 1;
-        currentGroup.hours.push(slot.hour);
-        currentGroup.slots.push(slot);
-        if (!currentGroup.title && slot.title) {
-          currentGroup.title = slot.title;
-        }
-      } else {
-        if (currentGroup) {
-          groups.push(currentGroup);
-        }
-        currentGroup = {
-          id: `group-${slot.hour}-${type}`,
-          type,
-          isCustom,
-          startHour: slot.hour,
-          endHour: slot.hour + 1,
-          hours: [slot.hour],
-          slots: [slot],
-          title: slot.title || "",
-          category: slot.category || "",
-          primaryBlock: slot.block || null,
-          status: slot.status || "pending",
-        };
-      }
-    });
-
-    if (currentGroup) {
-      groups.push(currentGroup);
-    }
-
-    return groups;
-  }, [full24Hours, getCategoryType]);
+  // Group adjacent hours into the cards the rail draws.
+  //
+  // Two hours join only when they are the same written entry in the same
+  // category family (`groupPlannerHours`). Grouping on category alone merged
+  // unrelated tasks into one card, and a day planned in one category collapsed
+  // into a single 00:00 → 24:00 card.
+  const hourGroups = useMemo(
+    () => groupPlannerHours(full24Hours),
+    [full24Hours]
+  );
 
   const handleOpenHour = (hour: number, block?: ScheduleBlock | null, endHour?: number) => {
     setEditingHour(hour);
@@ -821,14 +756,6 @@ export function PlannerContent() {
     const catLower = (data.category || "").toLowerCase();
     const isSleep = catLower.includes("sleep") || catLower.includes("rest");
 
-    // Automatically expand the sleep group so the newly saved block doesn't disappear into minimized state
-    if (isSleep) {
-      setExpandedGroupIds((prev) => ({
-        ...prev,
-        [`group-${startH}-sleep`]: true,
-      }));
-    }
-
     setRecentlySavedHour(startH);
     setSaveToast({
       title: data.title || (isSleep ? "Rest & Sleep" : "Scheduled Block"),
@@ -859,14 +786,7 @@ export function PlannerContent() {
     await fetchUser();
   };
 
-  const renderHourSlot = (
-    slot: (typeof full24Hours)[0],
-    options?: {
-      isInsideGroup?: boolean;
-      groupType?: string;
-      expandToggle?: { isExpanded: boolean; onToggle: () => void };
-    }
-  ) => {
+  const renderHourSlot = (slot: (typeof full24Hours)[0]) => {
     const isPastHour =
       selectedDate < todayStr ||
       (selectedDate === todayStr && slot.hour < currentHour);
@@ -874,6 +794,15 @@ export function PlannerContent() {
     const isFutureHour =
       selectedDate > todayStr ||
       (selectedDate === todayStr && slot.hour > currentHour);
+    const canReview = slot.block
+      ? isBlockEntirelyPast({
+          selectedDate,
+          todayDate: todayStr,
+          startTime: slot.block.startTime,
+          endTime: slot.block.endTime,
+          nowMinutes: now.getHours() * 60 + now.getMinutes(),
+        })
+      : !isFutureHour;
     const isRecentlySaved = recentlySavedHour === slot.hour;
 
     return (
@@ -882,11 +811,10 @@ export function PlannerContent() {
         slot={slot}
         isPastHour={isPastHour}
         isCurrent={isCurrent}
-        isFutureHour={isFutureHour}
+        canReview={canReview}
         isRecentlySaved={isRecentlySaved}
         selectedDate={selectedDate}
         todayStr={todayStr}
-        options={options}
         onOpenHour={handleOpenHour}
         onToggleStatus={handleToggleBlockStatus}
         onShowHint={showHint}
@@ -903,17 +831,16 @@ export function PlannerContent() {
     router.push(`/day-schedule?date=${dateStr}&day=${dayNum}`);
   }, [selectedDate, user, router]);
 
-  const currentBlockTitle = useMemo(() => {
-    if (selectedDate !== todayStr) return undefined;
-    const block = blocks.find((b) => {
-      const start = parseInt(b.startTime.split(":")[0], 10);
-      let end = parseInt(b.endTime.split(":")[0], 10);
-      if (Number.isNaN(end)) end = start + 1;
-      if (end <= start) end = start + 1;
-      return !Number.isNaN(start) && currentHour >= start && currentHour < end;
-    });
-    return block?.title;
-  }, [blocks, selectedDate, todayStr, currentHour]);
+  const currentBlockTitle =
+    selectedDate === todayStr
+      ? blocks.find((b) => {
+          const start = parseInt(b.startTime.split(":")[0], 10);
+          let end = parseInt(b.endTime.split(":")[0], 10);
+          if (Number.isNaN(end)) end = start + 1;
+          if (end <= start) end = start + 1;
+          return !Number.isNaN(start) && currentHour >= start && currentHour < end;
+        })?.title
+      : undefined;
 
   const scrollToCurrent = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -1050,50 +977,27 @@ export function PlannerContent() {
            Only shown when there ARE blocks */
         <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3">
           {hourGroups.map((group) => {
-          const isSleep = group.type === "sleep";
           const isRecentlySaved =
             recentlySavedHour !== null &&
             (group.hours.includes(recentlySavedHour) || group.startHour === recentlySavedHour);
-          const isExpanded =
-            expandedGroupIds[group.id] !== undefined
-              ? expandedGroupIds[group.id]
-              : isRecentlySaved;
-          const cat = getPlannerCatStyle(group.category, group.isCustom);
 
-          // 1. Multiple Sleep Hours: Minimized to 1st hour by default with top-right arrow toggle
-          if (isSleep && group.hours.length > 1) {
-            return (
-              <div
-                key={group.id}
-                // Same palette as every other category group. This branch used
-                // to hardcode `bg-indigo-950/20`, which is a dark navy at 20%
-                // and reads as a flat grey plate over a light page.
-                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
-                  isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
-                }`}
-              >
-                {/* Render the 1st sleep hour slot with down/up arrow toggle on top right */}
-                {renderHourSlot(group.slots[0], {
-                  isInsideGroup: true,
-                  groupType: "sleep",
-                  expandToggle: {
-                    isExpanded,
-                    onToggle: () => toggleGroupExpand(group.id),
-                  },
-                })}
-
-                {/* Expanded state: render remaining sleep slots */}
-                {isExpanded && (
-                  group.slots.slice(1).map((slot) =>
-                    renderHourSlot(slot, { isInsideGroup: true, groupType: "sleep" })
-                  )
-                )}
-              </div>
-            );
-          }
-
-          // 2. Multi-hour same-category tasks: one proportionally-sized animated card
+          // Sleep is not special any more: the folding/collapse mechanism was
+          // scrapped on owner instruction, so a run of sleep hours renders and
+          // merges exactly like every other category.
+          //
+          // 1. Multi-hour same-entry group: one proportionally-sized animated card
           if (group.isCustom && group.hours.length > 1) {
+            const canReview = group.slots.every((slot) =>
+              slot.block
+                ? isBlockEntirelyPast({
+                    selectedDate,
+                    todayDate: todayStr,
+                    startTime: slot.block.startTime,
+                    endTime: slot.block.endTime,
+                    nowMinutes: now.getHours() * 60 + now.getMinutes(),
+                  })
+                : false
+            );
             return (
               <AnimatedBlockGroup
                 key={group.id}
@@ -1104,11 +1008,12 @@ export function PlannerContent() {
                 selectedDate={selectedDate}
                 todayStr={todayStr}
                 currentHour={currentHour}
+                canReview={canReview}
               />
             );
           }
 
-          // 3. Single Hour Slot
+          // 2. Single Hour Slot
           return renderHourSlot(group.slots[0]);
         })}
         </div>

@@ -3,13 +3,14 @@ import {
   findMerge,
   findOccupantAtHour,
   hourOfLabel,
+  isBlockEntirelyPast,
   rangeEndHour,
+  rangeEndMinutes,
   endHourLabel,
   calculateBlockHeight,
   getDurationHours,
   BASE_HOUR_HEIGHT_PX,
   MIN_HEIGHT_RATIO,
-  MAX_HEIGHT_RATIO,
 } from "./planner-block-time";
 import type { ScheduleBlock } from "@/lib/db";
 
@@ -44,6 +45,12 @@ describe("hour arithmetic", () => {
   it("never labels an end below midnight as 24:00", () => {
     expect(endHourLabel(12)).toBe("12:00");
     expect(endHourLabel(24)).toBe("24:00");
+  });
+
+  it("reads minute-precise ends and carries midnight wraps", () => {
+    expect(rangeEndMinutes("09:30", "11:15")).toBe(675);
+    expect(rangeEndMinutes("23:30", "00:15")).toBe(1455);
+    expect(rangeEndMinutes("09:00", "24:00")).toBe(1440);
   });
 });
 
@@ -94,6 +101,19 @@ describe("findMerge (C2 same-title adjacency)", () => {
       candidates: [mk("a", "reading", "vitality", "10:00", "11:00")],
     });
     expect(r).toBeNull();
+  });
+
+  it("merges identical text across category spellings of the same family", () => {
+    // `rest` and `sleep` are one category on screen; a raw string compare split
+    // a night of sleep into separate hours.
+    const r = findMerge({
+      title: "Sleep",
+      category: "sleep",
+      startHour: 1,
+      endHour: 2,
+      candidates: [mk("a", "sleep", "rest", "02:00", "03:00")],
+    });
+    expect(r).toEqual({ startHour: 1, endHour: 3, absorbedIds: ["a"] });
   });
 
   it("does not merge an overlapping but non-adjacent hour", () => {
@@ -167,38 +187,76 @@ describe("findOccupantAtHour", () => {
   });
 });
 
+describe("isBlockEntirelyPast", () => {
+  const base = {
+    selectedDate: "2026-11-04",
+    todayDate: "2026-11-04",
+    nowMinutes: 11 * 60 + 30,
+  };
+
+  it("allows a block only after its end, not merely after its start", () => {
+    expect(
+      isBlockEntirelyPast({ ...base, startTime: "09:00", endTime: "10:00" })
+    ).toBe(true);
+    expect(
+      isBlockEntirelyPast({ ...base, startTime: "09:00", endTime: "12:00" })
+    ).toBe(false);
+    expect(
+      isBlockEntirelyPast({ ...base, nowMinutes: 10 * 60, startTime: "09:00", endTime: "10:00" })
+    ).toBe(true);
+  });
+
+  it("allows all blocks on a previous date and none on a future date", () => {
+    expect(
+      isBlockEntirelyPast({
+        ...base,
+        selectedDate: "2026-11-03",
+        startTime: "23:00",
+        endTime: "24:00",
+      })
+    ).toBe(true);
+    expect(
+      isBlockEntirelyPast({
+        ...base,
+        selectedDate: "2026-11-05",
+        startTime: "09:00",
+        endTime: "10:00",
+      })
+    ).toBe(false);
+  });
+
+  it("keeps an overnight block disabled until the following day", () => {
+    expect(
+      isBlockEntirelyPast({ ...base, startTime: "23:00", endTime: "06:00" })
+    ).toBe(false);
+  });
+});
+
 describe("calculateBlockHeight (proportional sizing)", () => {
   const minHeight = BASE_HOUR_HEIGHT_PX * MIN_HEIGHT_RATIO;
-  const maxHeight = BASE_HOUR_HEIGHT_PX * MAX_HEIGHT_RATIO;
 
   it("returns min height for 0.5h (30 min)", () => {
     expect(calculateBlockHeight(0.5)).toBe(minHeight);
   });
 
-  it("returns max height for 2h", () => {
-    expect(calculateBlockHeight(2)).toBe(maxHeight);
+  it("uses one base card per hour", () => {
+    expect(calculateBlockHeight(1)).toBe(BASE_HOUR_HEIGHT_PX);
+    expect(calculateBlockHeight(2)).toBe(BASE_HOUR_HEIGHT_PX * 2);
   });
 
-  it("returns max height for blocks longer than 2h (capped)", () => {
-    expect(calculateBlockHeight(3)).toBe(maxHeight);
-    expect(calculateBlockHeight(8)).toBe(maxHeight);
+  it("keeps growing for blocks longer than 2h", () => {
+    expect(calculateBlockHeight(3)).toBe(BASE_HOUR_HEIGHT_PX * 3);
+    expect(calculateBlockHeight(8)).toBe(BASE_HOUR_HEIGHT_PX * 8);
   });
 
-  it("returns proportional height for 1h (midpoint between min and max)", () => {
-    const height = calculateBlockHeight(1);
-    // At 1h, t = (1 - 0.5) / 1.5 = 0.333, so height = min + 0.333 * (max - min)
-    const expected = minHeight + ((1 - 0.5) / 1.5) * (maxHeight - minHeight);
-    expect(height).toBeCloseTo(expected, 5);
-  });
-
-  it("clamps duration below 0.5h to minimum height", () => {
+  it("returns the minimum touch height for short and invalid durations", () => {
     expect(calculateBlockHeight(0.1)).toBe(minHeight);
     expect(calculateBlockHeight(0)).toBe(minHeight);
+    expect(calculateBlockHeight(Number.NaN)).toBe(minHeight);
   });
 
-  it("min height is 75% of base and max is 200% of base", () => {
+  it("keeps the minimum height at 75% of the base card", () => {
     expect(minHeight).toBe(BASE_HOUR_HEIGHT_PX * 0.75);
-    expect(maxHeight).toBe(BASE_HOUR_HEIGHT_PX * 2.0);
   });
 });
 
@@ -210,6 +268,7 @@ describe("getDurationHours", () => {
   it("returns the correct duration for a multi-hour block", () => {
     expect(getDurationHours("09:00", "12:00")).toBe(3);
     expect(getDurationHours("09:00", "24:00")).toBe(15);
+    expect(getDurationHours("09:30", "11:15")).toBe(1.75);
   });
 
   it("returns 1 for unparseable times", () => {

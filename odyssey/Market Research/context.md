@@ -664,6 +664,14 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â�
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-11-04 - C2 planner review and duration sizing refinement (SHIPPED)
+
+**Planner review now waits for the whole block.** Tick/cross controls are disabled for a block until its actual end time has passed; previous dates remain reviewable, future dates remain locked, and an overnight block stays locked while it is still running. The guard is shared by the visible controls and the status handler, so gesture or stale UI paths cannot bypass it.
+
+**Duration presentation now follows duration.** The planner's `xh` badge was removed. Animated planner cards now use one base-card height per hour with a 45px minimum and no upper cap, so a 3-hour block is taller than a 2-hour block. Minute-aware end arithmetic is shared by the duration and review rules.
+
+**Verification:** `tsc --noEmit` 0; `npm run lint -- --quiet` 0 errors; 52 suites / 730 tests; `next build` clean. The production server asserted `Ready` and was killed by port PID with 3000/3001/3100 free. The visual browser probe could not run because the CLI environment has no available display.
+
 ### 2026-11-03 - B14: quick-capture inbox on the Journey page (SHIPPED)
 
 **Owner-approved scope, briefed and confirmed before coding:** the inbox lives on the
@@ -1184,11 +1192,13 @@ Held: `app/page.tsx` (landing screen) — overlaps possible S-series morning ene
 New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server Components); `shared-clock.ts` re-exports for client consumers. Gates: tsc 0, lint 0 errors, 491 tests, build clean.
 
 
-## §10 Git + task state (as of 2026-11-02)
+## §10 Git + task state (as of 2026-11-04)
+
+- **HEAD after this commit:** C2 planner review and duration sizing refinement. C2 code and tests are committed; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
 
 - **Gates + commit (C2 revised, 2026-11-02):** tsc 0; 49 suites / **690 tests** (15 new in `block-resize.test.ts`, all green); lint 0 errors / 76 warnings (the 5 day-schedule warnings are pre-existing dead imports, deliberately untouched); `next build` clean; **16/16 production-build interaction probe checks** (`%TEMP%\opencode\verify\c2s\qs-probe.js`, indexedDB-seeded two touching blocks on the production server): live preview shrinks the neighbour to the dragged end on the 5-min grid, persisted minute times match (`Deep work 11:00→<dragged end>`, `Calls <dragged end>→13:00`), undo banner appears iff the drag trimmed a neighbour and restores both rows exactly, drag-up creates the freed stretch as a new empty editable block ending at the pre-drag boundary, zero console errors; server started, asserted `Ready`, killed by port PID in one chained command, 3000/3001/3100 confirmed free. Touches `src/lib/utils/block-resize.ts` (new), `src/lib/utils/block-resize.test.ts` (new), `src/components/schedule/block-drag-handle.tsx` (new), `src/app/day-schedule/page.tsx` (row-based day, minute-level save + merge, drag commit/undo), `src/components/planner/edit-hour-modal.tsx` (picker removed, chip restored), (deleted) `src/components/planner/time-range-picker.tsx`, `main_plan.md` (C2 REVISED), this file. **Left unstaged on purpose:** `android/.idea/caches/deviceStreaming.xml`, `../fleet/`, and the concurrent session's heatmap-fix paragraph inside the §9 B7a entry (kept out of this commit; re-add their paragraph with their next commit if they do not).
 
-- **HEAD:** B14 - quick-capture inbox on the Journey page (capture box + Today/This week/Someday buckets; exits: Add-to-plan day+hour picker and two-tap dismiss; `inboxItems` table's first reader/writer, zero schema change). 50 suites / 712 tests; tsc 0; eslint 0 errors on touched files; next build clean; production-build browser probe green. Prior HEAD note: C2 merge presentation (one proportionally sized animated card) shipped by the concurrent session as `58becdd`.
+- **Previous HEAD before this commit:** B14 - quick-capture inbox on the Journey page (capture box + Today/This week/Someday buckets; exits: Add-to-plan day+hour picker and two-tap dismiss; `inboxItems` table's first reader/writer, zero schema change). 50 suites / 712 tests; tsc 0; eslint 0 errors on touched files; next build clean; production-build browser probe green. Prior HEAD note: C2 merge presentation (one proportionally sized animated card) shipped by the concurrent session as `58becdd`.
 
 **BUG-7 (PARTIAL — status corrected 2026-10-29 from `SHIPPED`):** Wallpaper master switch fix — the unconditional `putBoolean("wallpaper_enabled", true)` is removed from both `syncSchedule()` and `syncScheduleWithResult()`; the flag is now written only where the user asks for a wallpaper (`setWallpaperMasterEnabled(true)`, the live-wallpaper picker, `enableHourlyAutoUpdate()`). **Audited 2026-10-29 and confirmed inside the shipped 1.3.7 APK:** the fix commit `2f9cf5f` is an ancestor of release commit `e3d08f9`; the APK on disk (versionCode 12 / 1.3.7, built 11:42) was built from that tree against an 11:50 release commit; and `git diff e3d08f9 HEAD -- android/` is empty, so the packaged native code is exactly today's native code. `SHIPPED` was wrong because the line itself said behavioral verification was still pending and the DoD requires acceptance criteria to be **manually verified** — the same reason `BUG-19` stays `PARTIAL`. **Remaining:** device test — switch off → close → reopen → switch must stay OFF. src: `android/app/src/main/java/com/odyssey/tracker/OdysseyWallpaperBridge.kt:425,507`
 

@@ -9,8 +9,6 @@ import {
   CheckCircle2,
   XCircle,
   Circle,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 
 export interface TimelineSlotData {
@@ -28,15 +26,10 @@ interface TimelineHourSlotProps {
   slot: TimelineSlotData;
   isPastHour: boolean;
   isCurrent: boolean;
-  isFutureHour: boolean;
+  canReview: boolean;
   isRecentlySaved: boolean;
   selectedDate: string;
   todayStr: string;
-  options?: {
-    isInsideGroup?: boolean;
-    groupType?: string;
-    expandToggle?: { isExpanded: boolean; onToggle: () => void };
-  };
   onOpenHour: (hour: number, block: ScheduleBlock | null, endHour: number) => void;
   onToggleStatus: (
     e: React.MouseEvent,
@@ -64,11 +57,10 @@ export function TimelineHourSlot({
   slot,
   isPastHour,
   isCurrent,
-  isFutureHour,
+  canReview,
   isRecentlySaved,
   selectedDate,
   todayStr,
-  options,
   onOpenHour,
   onToggleStatus,
   onShowHint,
@@ -423,11 +415,7 @@ export function TimelineHourSlot({
           setIsDragging(false);
           setDragTarget(null);
         }}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y [-webkit-touch-callout:none] transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${
-          options?.isInsideGroup
-            ? "bg-surface-container-lowest/80 hover:bg-surface-container-lowest dark:bg-surface-container-high/60 dark:hover:bg-surface-container-high"
-            : cat.cardBg
-        } my-1 shadow-sm ${
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none touch-pan-y [-webkit-touch-callout:none] transition-all duration-200 active:scale-[0.99] border border-l-4 ${cat.leftBorder} ${cat.cardBorder} ${isDragging ? "opacity-50 scale-95" : ""} ${cat.cardBg} my-1 shadow-sm ${
           isRecentlySaved
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low relative z-20"
             : isCurrent
@@ -485,60 +473,36 @@ export function TimelineHourSlot({
           </div>
         </div>
 
-        {/* Right Status: 3-State Toggle & Expand Chevron */}
+        {/* Right Status: 3-State Toggle */}
         <div className="flex items-center gap-1 shrink-0">
-          {options?.expandToggle && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                options.expandToggle!.onToggle();
-              }}
-              aria-label={
-                options.expandToggle.isExpanded
-                  ? "Collapse sleep hours"
-                  : "Expand sleep hours"
-              }
-              title={
-                options.expandToggle.isExpanded
-                  ? "Collapse sleep hours"
-                  : "Expand sleep hours"
-              }
-              className="w-7 h-7 rounded-full bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/30 flex items-center justify-center text-indigo-600 hover:text-on-surface dark:border-indigo-500/25 dark:text-indigo-300 transition-all cursor-pointer"
-            >
-              {options.expandToggle.isExpanded ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </button>
-          )}
           {slot.status === "completed" ? (
             <button
               type="button"
+              disabled={!canReview}
               onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
               title="Completed ✓ (tap to mark missed)"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer dark:text-emerald-400"
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 transition-all dark:text-emerald-400 ${canReview ? "hover:bg-emerald-500/15 active:scale-95 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
             >
               <CheckCircle2 className="w-5 h-5 shadow-[0_0_12px_rgba(52,211,153,0.4)]" />
             </button>
           ) : slot.status === "missed" ? (
             <button
               type="button"
+              disabled={!canReview}
               onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
               title="Missed ✕ (tap to reset to unreviewed)"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer dark:text-rose-400"
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-rose-500 transition-all dark:text-rose-400 ${canReview ? "hover:bg-rose-500/15 active:scale-95 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
             >
               <XCircle className="w-5 h-5 shadow-[0_0_12px_rgba(244,63,94,0.4)]" />
             </button>
-          ) : isFutureHour ? (
+          ) : !canReview ? (
             <button
               type="button"
-              onClick={(e) => onToggleStatus(e, slot.hour, slot.block, slot.status)}
+              disabled
               title={
                 selectedDate > todayStr
                   ? "Future day (cannot review yet)"
-                  : "Future hour (cannot review yet)"
+                  : "Block cannot be reviewed until its end time"
               }
               className="w-7 h-7 rounded-full border border-outline/[0.08] text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
             >

@@ -5,6 +5,7 @@ import {
   cardHeightPx,
   computeResize,
   findAdjacentMergeMinutes,
+  findWholeDayBlocks,
   labelFromMinutes,
   minutesOfLabel,
   quantizeEndMinutes,
@@ -162,17 +163,76 @@ describe("findAdjacentMergeMinutes", () => {
     });
     expect(otherCat).toBeNull();
   });
+
+  it("never merges two different entries just because they share a category", () => {
+    const out = findAdjacentMergeMinutes({
+      title: "Emails",
+      category: "work",
+      startMin: 600,
+      endMin: 660,
+      candidates: [b("c", "11:00", "12:00", "Writing", "work")],
+    });
+    expect(out).toBeNull();
+  });
+
+  it("merges identical-text sleep rows whose stored spelling differs", () => {
+    // `rest` and `sleep` display as one category; comparing raw strings is what
+    // kept a night of sleep in pieces.
+    const out = findAdjacentMergeMinutes({
+      title: "Sleep",
+      category: "sleep",
+      startMin: 0,
+      endMin: 60,
+      candidates: [
+        b("a", "01:00", "02:00", "sleep", "rest"),
+        b("z", "02:00", "03:00", "SLEEP", "Sleep"),
+      ],
+    });
+    expect(out).not.toBeNull();
+    expect(out!.startMin).toBe(0);
+    expect(out!.endMin).toBe(180);
+    expect(out!.absorbedIds).toEqual(["a", "z"]);
+  });
+});
+
+describe("findWholeDayBlocks", () => {
+  it("finds only the row that covers 00:00 to 24:00", () => {
+    const whole = b("whole", "00:00", "24:00");
+    const almost = b("almost", "00:00", "23:00");
+    const late = b("late", "01:00", "24:00");
+    expect(findWholeDayBlocks([whole, almost, late]).map((x) => x.id)).toEqual(["whole"]);
+  });
+
+  it("returns nothing for an ordinary day", () => {
+    expect(findWholeDayBlocks([b("a", "09:00", "10:00")])).toEqual([]);
+  });
 });
 
 describe("buildDayRows", () => {
-  it("tiles the day with block and empty rows", () => {
+  it("renders empty stretches as one row per hour (24 blocks by default)", () => {
     const rows = buildDayRows([b("a", "11:00", "11:35"), b("n", "11:35", "13:00")]);
-    expect(rows).toHaveLength(4);
-    expect(rows[0]).toMatchObject({ kind: "empty", startMin: 0, endMin: 660 });
-    expect(rows[1]).toMatchObject({ kind: "block", startMin: 660, endMin: 695 });
-    expect(rows[2]).toMatchObject({ kind: "block", startMin: 695, endMin: 780 });
-    expect(rowKey(rows[1])).toBe("a");
+    // 11 empty hour rows (00:00→11:00), two block rows, 11 empty hours (13:00→24:00)
+    expect(rows).toHaveLength(24);
+    expect(rows[0]).toMatchObject({ kind: "empty", startMin: 0, endMin: 60 });
     expect(rowKey(rows[0])).toBe("g0");
+    expect(rows[10]).toMatchObject({ kind: "empty", startMin: 600, endMin: 660 });
+    expect(rows[11]).toMatchObject({ kind: "block", startMin: 660, endMin: 695 });
+    expect(rowKey(rows[11])).toBe("a");
+    expect(rows[12]).toMatchObject({ kind: "block", startMin: 695, endMin: 780 });
+    expect(rows[13]).toMatchObject({ kind: "empty", startMin: 780, endMin: 840 });
+    expect(rows[rows.length - 1]).toMatchObject({ kind: "empty", startMin: 1380, endMin: 1440 });
+  });
+
+  it("keeps a ragged empty edge on its own row, then splits by hours", () => {
+    const rows = buildDayRows([b("a", "12:40", "14:00")]);
+    const empties = rows.filter((r) => r.kind === "empty");
+    expect(empties[0]).toMatchObject({ startMin: 0, endMin: 60 }); // hour split
+    // The ragg edge hugs its hour boundary: the row before the block is 12:00→12:40,
+    // then the block at its real span, then hour rows from 14:00.
+    expect(empties.filter((r) => r.startMin === 720)).toHaveLength(1);
+    expect(empties.find((r) => r.startMin === 720)).toMatchObject({ endMin: 760 });
+    expect(rows.find((r) => r.kind === "block")).toMatchObject({ startMin: 760, endMin: 840 });
+    expect(empties).toHaveLength(23); // 0→12:40 in 13 rows + 14:00→24:00 in 10 rows
   });
 
   it("closes the day at 24:00 and tolerates overlap without hiding a block", () => {
@@ -181,5 +241,9 @@ describe("buildDayRows", () => {
     expect(zRow).toBeDefined();
     expect((zRow as { startMin: number }).startMin).toBe(720); // clamped to cursor
     expect(rows[rows.length - 1]).toMatchObject({ kind: "empty", endMin: 1440 });
+  });
+
+  it("renders exactly 24 rows on an empty day", () => {
+    expect(buildDayRows([])).toHaveLength(24);
   });
 });

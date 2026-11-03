@@ -42,6 +42,7 @@ export interface AnimatedBlockGroupProps {
   selectedDate: string;
   todayStr: string;
   currentHour: number;
+  canReview: boolean;
 }
 
 /**
@@ -69,6 +70,7 @@ export function AnimatedBlockGroup({
   selectedDate,
   todayStr,
   currentHour,
+  canReview,
 }: AnimatedBlockGroupProps) {
   const durationHours = group.endHour - group.startHour;
   const proportionalHeight = calculateBlockHeight(durationHours);
@@ -110,10 +112,6 @@ export function AnimatedBlockGroup({
     },
     [onToggleStatus, group.slots]
   );
-
-  const isFutureHour =
-    selectedDate > todayStr ||
-    (selectedDate === todayStr && group.startHour > currentHour);
 
   return (
     <div
@@ -194,39 +192,34 @@ export function AnimatedBlockGroup({
         </div>
       </div>
 
-      {/* Duration badge + status toggle */}
+      {/* Status toggle */}
       <div className="flex items-center gap-1 shrink-0">
-        {durationHours > 1 && (
-          <div className="px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20 mr-1">
-            <span className="text-[10px] font-mono font-bold text-primary">
-              {durationHours}h
-            </span>
-          </div>
-        )}
-
         {overallStatus === "completed" ? (
           <button
             type="button"
+            disabled={!canReview}
             onClick={handleStatusClick}
             title="Completed (tap to mark missed)"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer dark:text-emerald-400"
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-emerald-500 transition-all dark:text-emerald-400 ${canReview ? "hover:bg-emerald-500/15 active:scale-95 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
           >
             <CheckCircle2 className="w-5 h-5 shadow-[0_0_12px_rgba(52,211,153,0.4)]" />
           </button>
-        ) : overallStatus === "missed" ? (
-          <button
-            type="button"
-            onClick={handleStatusClick}
-            title="Missed (tap to reset)"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-rose-500 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer dark:text-rose-400"
+          ) : overallStatus === "missed" ? (
+            <button
+              type="button"
+              disabled={!canReview}
+              onClick={handleStatusClick}
+              title="Missed (tap to reset)"
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-rose-500 transition-all dark:text-rose-400 ${canReview ? "hover:bg-rose-500/15 active:scale-95 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
           >
             <XCircle className="w-5 h-5 shadow-[0_0_12px_rgba(244,63,94,0.4)]" />
           </button>
-        ) : isFutureHour ? (
-          <button
-            type="button"
-            onClick={handleStatusClick}
-            title="Future hour (cannot review yet)"
+          ) : !canReview ? (
+            <button
+              type="button"
+              disabled
+              onClick={handleStatusClick}
+              title="Block cannot be reviewed until its end time"
             className="w-7 h-7 rounded-full border border-outline/[0.08] text-on-surface-variant/20 flex items-center justify-center opacity-30 cursor-not-allowed"
           >
             <Circle className="w-3.5 h-3.5" />

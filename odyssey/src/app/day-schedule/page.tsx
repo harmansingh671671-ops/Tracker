@@ -11,12 +11,14 @@ import {
   cardHeightPx,
   computeResize,
   findAdjacentMergeMinutes,
+  findWholeDayBlocks,
   labelFromMinutes,
   MIN_BLOCK_MINUTES,
   quantizeEndMinutes,
   rowKey,
   type DayRow,
 } from "@/lib/utils/block-resize";
+import { canonicalCategoryKey } from "@/lib/utils/schedule-category-key";
 import { BlockDragHandle } from "@/components/schedule/block-drag-handle";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
@@ -119,6 +121,8 @@ const getCatStyle = (cat?: string, isCustom?: boolean) =>
 
 export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
   if (!cat) {
+    // No stored value: an empty hour is inferred from its clock position. That
+    // is a display default for empty rows, not a stored category.
     if (hour !== undefined) {
       if (hour < 7 || hour >= 23) return "sleep";
       if (hour === 7 || hour === 8) return "vitality";
@@ -127,12 +131,9 @@ export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
     }
     return "work";
   }
-  const c = cat.toLowerCase();
-  if (c.includes("sleep") || c.includes("rest")) return "sleep";
-  if (c.includes("vitality") || c.includes("habit") || c.includes("health")) return "vitality";
-  if (c.includes("sync") || c.includes("meet") || c.includes("social") || c.includes("admin")) return "sync";
-  if (c.includes("renewal") || c.includes("buffer") || c.includes("leisure")) return "renewal";
-  return "work";
+  // Stored values are looser than the five ids (legacy `rest`, `habits`,
+  // `buffer`, `admin`), so the fold lives in ONE shared module.
+  return canonicalCategoryKey(cat);
 }
 
 function formatDateDisplay(dateStr: string): string {
@@ -192,14 +193,13 @@ function DayScheduleContent() {
     return () => window.clearTimeout(t);
   }, [undoPayload]);
 
-  // A drag preview must never survive a day flip: the id belongs to another
-  // day's store rows, and a stale preview would resize the wrong card.
-  useEffect(() => {
-    setDragPreview(null);
-  }, [dateStr]);
-
   const liveBlocks = useMemo(() => {
-    if (!dragPreview) return blocks;
+    // A drag preview is validated against the CURRENT day's blocks — its id
+    // belongs to the day the drag started on. A date flip empties the day
+    // beneath a stale preview; the identity check makes it inert without a
+    // resetting effect (setState-synchronously-in-effect is a lint error, and
+    // a cascading re-render is exactly what it warns about).
+    if (!dragPreview || !blocks.some((x) => x.id === dragPreview.id)) return blocks;
     return computeResize(blocks, dragPreview.id, dragPreview.endMin).next;
   }, [blocks, dragPreview]);
 
@@ -351,12 +351,40 @@ function DayScheduleContent() {
     fetchUser();
   }, [fetchUser]);
 
-  // Load schedule blocks for selected date
+  // Load schedule blocks for selected date, then repair a row that covers the
+  // whole day.
+  //
+  // A 00:00 → 24:00 row leaves no editable grid: the day renders as that single
+  // card and every hour outside it is walled off. It is what the old "one empty
+  // row per day" render wrote the moment a title was typed into it. Owner
+  // instruction: keep the first hour as a real block and leave the rest of the
+  // day empty, so the row is trimmed to 00:00 → 01:00 on load.
+  //
+  // Done BEFORE `loading` clears, so the bad shape is never painted.
   useEffect(() => {
-    if (user?.id && dateStr) {
-      fetchBlocksForDate(user.id, dateStr).finally(() => setLoading(false));
-    }
-  }, [user?.id, dateStr, fetchBlocksForDate]);
+    if (!user?.id || !dateStr) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const rows = await fetchBlocksForDate(user.id, dateStr);
+        const wholeDay = findWholeDayBlocks(rows);
+        if (wholeDay.length > 0) {
+          for (const b of wholeDay) {
+            await updateBlock(b.id, { endTime: labelFromMinutes(60) });
+          }
+          syncCurrentScheduleToNative(dateStr);
+        }
+      } catch (err) {
+        console.error("Error loading schedule blocks:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, dateStr, fetchBlocksForDate, updateBlock]);
 
   // Synchronize blocks into row inputs and categories without clobbering the
   // active input. Runs off `dayRows` (not the raw blocks array): a block row's
@@ -434,8 +462,12 @@ function DayScheduleContent() {
     for (const row of dayRows) {
       // Cover the real minutes this row occupies — a 10:35–11:00 half block
       // counts hour 10 for its tail, like the old hour grid counted it.
-      for (let h = Math.floor(row.startMin / 60); h < Math.max(24, Math.ceil(row.endMin / 60)); h++) {
-        if (h >= 24) break;
+      //
+      // `Math.min`, not `Math.max`: the loop is clamped to the end of the day,
+      // and `max` made every row run to hour 23, so a single 00:00–01:00 block
+      // painted its category across the whole allocation bar ("Sleep: 24h" for
+      // one hour of sleep).
+      for (let h = Math.floor(row.startMin / 60); h < Math.min(24, Math.ceil(row.endMin / 60)); h++) {
         const typed = (editingValues[rowKey(row)] ?? "").trim();
         const isPlanned = row.kind === "block" || typed.length > 0;
         if (!isPlanned || planned[h]) continue;
@@ -561,22 +593,26 @@ function DayScheduleContent() {
 
         // Save-time merge on this page too, minute-aware (`findMerge` in
         // planner-block-time stays hour-level): same title (case-insensitive) +
-        // same stored category + touching, never overlapping. The row just
+        // same category family + touching, never overlapping. The row just
         // saved survives and widens; absorbed rows are deleted, exactly the
         // planner's contract.
+        //
+        // The category compared is the STORED value, not the fold this screen
+        // displays: `rowCategories` holds a display bucket, and comparing that
+        // against a stored `rest`/`habits` row is how identical-text sleep rows
+        // stayed split forever.
         const fresh = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
-        const merge =
-          savedId && titleToSave
-            ? findAdjacentMergeMinutes({
-                title: titleToSave,
-                category: catToSave,
-                startMin: row.startMin,
-                endMin: row.endMin,
-                candidates: fresh.filter(
-                  (r) => r.id !== savedId && r.userId === userId
-                ),
-              })
-            : null;
+        const merge = savedId && titleToSave
+          ? findAdjacentMergeMinutes({
+              title: titleToSave,
+              category: row.kind === "block" ? (row.block.category ?? "") : catToSave,
+              startMin: row.startMin,
+              endMin: row.endMin,
+              candidates: fresh.filter(
+                (r) => r.id !== savedId && r.userId === userId
+              ),
+            })
+          : null;
         if (merge && savedId) {
           await updateBlock(savedId, {
             startTime: labelFromMinutes(merge.startMin),
@@ -705,6 +741,12 @@ function DayScheduleContent() {
   const handleResizeCommit = useCallback(async () => {
     const preview = dragPreview;
     if (!preview) return;
+    // Guard matches `liveBlocks`: a stale preview (day flipped mid-drag) must
+    // not write anything when released.
+    if (!blocks.some((x) => x.id === preview.id)) {
+      setDragPreview(null);
+      return;
+    }
     const outcome = computeResize(blocks, preview.id, preview.endMin);
     setDragPreview(null);
 

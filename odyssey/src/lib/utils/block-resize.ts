@@ -16,6 +16,8 @@
  * touching shared semantics.
  */
 
+import { canonicalCategoryKey } from "./schedule-category-key";
+
 /** Minutes in a day: an end of `24:00` parses to this. */
 export const DAY_END_MINUTES = 1440;
 
@@ -58,6 +60,27 @@ export const quantizeEndMinutes = (raw: number): number =>
     RESIZE_STEP_MINUTES,
     Math.min(DAY_END_MINUTES, Math.round(raw / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES)
   );
+
+/**
+ * A row covering the whole day (00:00 → 24:00).
+ *
+ * One of these in a day means the day has no editable grid left: it renders as
+ * a single card and every hour outside it is walled off. It is also what the
+ * old "one empty row per day" render wrote when a title was typed into the
+ * day-long empty card. The page repairs such a row to its first hour on load
+ * (owner instruction: "allocate it to 1st block and leave other empty").
+ */
+export const isWholeDayRange = (startMin: number, endMin: number): boolean =>
+  startMin === 0 && endMin === DAY_END_MINUTES;
+
+/** Rows of a day that cover it whole — the repair candidates. */
+export const findWholeDayBlocks = <T extends MinBlockLike>(
+  blocks: readonly T[]
+): T[] =>
+  blocks.filter((b) => {
+    const range = blockRangeMinutes(b);
+    return range !== null && isWholeDayRange(range[0], range[1]);
+  });
 
 /** Rendered card height for a stretch of minutes, clamped to stay honest. */
 export const cardHeightPx = (durationMinutes: number): number =>
@@ -166,7 +189,7 @@ export interface MergeMinutesResult {
 
 /**
  * The quick schedule's save-time merge, in minutes: the same rule as the
- * planner's `findMerge` (same title case-insensitively, same stored category,
+ * planner's `findMerge` (same title case-insensitively, same category family,
  * touching — never overlapping) but over minute ranges so a 10:35–11:00 half
  * block can join its `11:00` neighbour. Over-midnight candidates are skipped
  * for the same reason as there: no reliable adjacency.
@@ -196,8 +219,13 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
       if (!range) continue;
       const [cs, ce] = range;
       if ((c.title || "").trim().toLowerCase() !== title) continue;
-      const cat = (c.category || "").trim().toLowerCase();
-      if (cat !== (q.category || "").trim().toLowerCase()) continue;
+      // The entry text alone is not enough (owner rule: same text AND same
+      // category), but the category has to be compared as a FAMILY, not as a
+      // spelling: identical-text sleep rows stored `sleep` and `rest` displayed
+      // as one category and never merged while raw strings were compared.
+      if (canonicalCategoryKey(c.category) !== canonicalCategoryKey(q.category)) {
+        continue;
+      }
       if (cs !== end && ce !== start) continue;
       start = Math.min(start, cs);
       end = Math.max(end, ce);
@@ -232,19 +260,34 @@ export const buildDayRows = <T extends MinBlockLike>(
     .filter((x): x is { b: T; range: [number, number] } => x.range !== null)
     .sort((a, z) => a.range[0] - z.range[0]);
 
+  // Empty stretches render as ONE ROW PER HOUR, not one merged card (owner
+  // instruction after the row rework: "by default keep 24 blocks of each hour
+  // as it was before, and then it is up to user to change it"). An hour-boundary
+  // aligned stretch splits into full hours; a ragged stretch keeps its ragged
+  // edge as the first row (12:40–13:00) and splits from there.
+  const pushEmptyRows = (from: number, to: number) => {
+    let cursor = from;
+    while (cursor < to) {
+      const nextBoundary = (Math.floor(cursor / 60) + 1) * 60;
+      const end = Math.min(nextBoundary, to);
+      rows.push({ kind: "empty", startMin: cursor, endMin: end });
+      cursor = end;
+    }
+  };
+
   const rows: DayRow<T>[] = [];
   let cursor = 0;
   for (const { b, range } of timed) {
     const [s, e] = range;
     const start = Math.max(s, cursor);
     if (start > cursor) {
-      rows.push({ kind: "empty", startMin: cursor, endMin: start });
+      pushEmptyRows(cursor, start);
     }
     rows.push({ kind: "block", block: b, startMin: start, endMin: e });
     cursor = Math.max(cursor, e);
   }
   if (cursor < DAY_END_MINUTES) {
-    rows.push({ kind: "empty", startMin: cursor, endMin: DAY_END_MINUTES });
+    pushEmptyRows(cursor, DAY_END_MINUTES);
   }
   return rows;
 };
