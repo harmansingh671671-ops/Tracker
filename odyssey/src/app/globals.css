@@ -536,6 +536,44 @@ button, a, input, select {
     }
   }
 
+  /* C2 merge animation -- a single light sweep across a block that just
+     absorbed its neighbours (or was just saved/moved; the highlight trails both).
+     Decorative only: declared here so it simply does not exist under reduced
+     motion, where the class resolves to an invisible, unanimated overlay. */
+  @keyframes mergeFlash {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+  }
+
+  .merge-flash {
+    opacity: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--primary) 15%, transparent) 50%,
+      transparent 100%
+    );
+    animation: mergeFlash 600ms ease-out both;
+  }
+
+  /* C2 -- entrance for a merged card that has just come into existence
+     (absorbing the previous hour builds a new group id, so the card remounts
+     and the persistent-element `height` transition cannot fire). Only a `from`
+     is declared, so it grows to whatever the card's proportional height is.
+     Plays on remount generally (e.g. a date flip) -- a subtle grow-in that
+     reads as the card taking its place on the rail. */
+  @keyframes mergeIn {
+    from {
+      opacity: 0;
+      height: 60px;
+      transform: translateY(4px);
+    }
+  }
+
+  .merge-in {
+    animation: mergeIn 380ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  }
+
   @keyframes permissionBackdropIn {
     from {
       opacity: 0;

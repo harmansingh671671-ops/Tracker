@@ -122,3 +122,57 @@ export const findOccupantAtHour = <T extends { id?: string; startTime: string; e
   }
   return null;
 };
+
+// ============================================================================
+// PROPORTIONAL BLOCK SIZING (C2 enhancement)
+// ============================================================================
+
+/**
+ * Base height for a 1-hour block in pixels.
+ * Derived from p-3 (24px) + icon h-9 (36px) ≈ 60px.
+ */
+export const BASE_HOUR_HEIGHT_PX = 60;
+
+/**
+ * Minimum block height ratio (30 min = 75% of hour block).
+ */
+export const MIN_HEIGHT_RATIO = 0.75;
+
+/**
+ * Maximum block height ratio (200% of hour block).
+ */
+export const MAX_HEIGHT_RATIO = 2.0;
+
+/**
+ * Calculate proportional block height based on duration.
+ * - Minimum: 30 min = 75% of base hour height (45px)
+ * - Maximum: 200% of base hour height (120px)
+ * - Scales linearly between min and max based on duration
+ *
+ * @param durationHours - Duration in hours (can be fractional)
+ * @returns Height in pixels
+ */
+export const calculateBlockHeight = (durationHours: number): number => {
+  const minHeight = BASE_HOUR_HEIGHT_PX * MIN_HEIGHT_RATIO;
+  const maxHeight = BASE_HOUR_HEIGHT_PX * MAX_HEIGHT_RATIO;
+
+  // Clamp duration to reasonable range (0.5h min, 24h max)
+  const clampedDuration = Math.max(0.5, Math.min(24, durationHours));
+
+  // Scale: 0.5h = min, 2h = max (stops growing after 2h)
+  // Linear interpolation between min and max for durations 0.5-2h
+  const scaleDuration = Math.min(clampedDuration, 2);
+  const t = (scaleDuration - 0.5) / 1.5; // 0 at 0.5h, 1 at 2h
+
+  return minHeight + t * (maxHeight - minHeight);
+};
+
+/**
+ * Get duration in hours from start/end time labels.
+ */
+export const getDurationHours = (startTime: string, endTime: string): number => {
+  const start = hourOfLabel(startTime);
+  const end = rangeEndHour(startTime, endTime);
+  if (start === null || end === null) return 1;
+  return end - start;
+};

@@ -33,6 +33,7 @@ import { useSharedClock, localDateStr } from "@/lib/utils/shared-clock";
 import { TimelineHourSlot } from "@/components/planner/timeline-hour-slot";
 import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
+import { AnimatedBlockGroup } from "@/components/planner/animated-block-group";
 import {
   Clock,
   CheckCircle2,
@@ -1091,19 +1092,19 @@ export function PlannerContent() {
             );
           }
 
-          // 2. Multi-hour same-category tasks: Grouped in same background with NO extra summary/duration banner!
+          // 2. Multi-hour same-category tasks: one proportionally-sized animated card
           if (group.isCustom && group.hours.length > 1) {
             return (
-              <div
+              <AnimatedBlockGroup
                 key={group.id}
-                className={`rounded-3xl border ${cat.cardBorder} ${cat.cardBg} p-2 my-1 space-y-1 shadow-sm transition-all duration-300 ${
-                  isRecentlySaved ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)]" : ""
-                }`}
-              >
-                {group.slots.map((slot) =>
-                  renderHourSlot(slot, { isInsideGroup: true, groupType: group.type })
-                )}
-              </div>
+                group={group}
+                isRecentlySaved={isRecentlySaved}
+                onOpenHour={handleOpenHour}
+                onToggleStatus={handleToggleBlockStatus}
+                selectedDate={selectedDate}
+                todayStr={todayStr}
+                currentHour={currentHour}
+              />
             );
           }
 
