@@ -664,6 +664,48 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â�
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-11-03 - B14: quick-capture inbox on the Journey page (SHIPPED)
+
+**Owner-approved scope, briefed and confirmed before coding:** the inbox lives on the
+**Journey page** (between the progress banner and the trail); the exits are **"Add to
+plan"** and **"Dismiss"** only — the spec's "promotes to habit" was cut by the owner.
+A capture is one line plus three bucket chips (Today / This week / Someday, default
+Today); Enter or the + button saves with no required fields. Rows group by bucket
+(empty buckets omitted so an early capture reads as one row, not a form). **Plan**
+opens a picker: day strip of the next 7 days (today pre-selected) + a 24-hour grid
+(suggested: next full hour for today, 09:00 for later days — a suggestion only, the
+user always confirms). Confirming writes a one-hour `ScheduleBlock` with
+`category: ""` (the schedule screens infer a display category by hour, exactly as for
+planner-typed blocks) and `isCommitted: true` (matching the day-schedule row save),
+deletes the inbox item, and calls `syncCurrentScheduleToNative(dateStr)` so the XX:57
+reminder and wallpaper see a block added from outside the schedule screens.
+**Dismiss** is a two-tap confirm (the B13 pattern). The `inboxItems` table needed
+zero schema change — B14 is its first reader and writer. **Deliberately NOT built
+(named per rule 23):** free-hour scanning, priority/duration on captures, custom
+buckets, habit promotion.
+
+**Files:** `src/lib/utils/inbox.ts` (pure helpers: horizon union + labels,
+`normalizeInboxTitle` trim/collapse/200-cap, `upcomingDays` local-date day strip,
+`suggestStartHour`) + `inbox.test.ts` (11 tests); `src/components/inbox/` —
+`inbox-section.tsx` (orchestrator: items state, capture/list/modal, renders nothing
+until the user identity is known), `quick-capture-box.tsx`, `inbox-list.tsx`,
+`inbox-item-row.tsx` (two-tap dismiss extracted so the row stays readable),
+`inbox-plan-modal.tsx`; `src/app/journey/page.tsx` (one import + one mount).
+**Gates:** tsc 0; eslint 0 errors on all touched files; 50 suites / **712 tests**
+(11 new); `next build` clean. **Verified in the browser on a production build
+(port 3100, asserted Ready, killed by port PID):** capture appears in the Today
+bucket with the counter, Plan modal shows the day strip + hour grid, confirming
+created the block on Wed 15:00–16:00 (checked on `/day-schedule?date=2026-11-04`,
+title intact, display category inferred), the item left the inbox, two-tap dismiss
+arms then removes the row, and the section renders and functions under the dark
+class. **Lint lesson (durable):** the new `react-hooks/set-state-in-effect` rule
+flags an awaited-helper call in an effect even when the setState sits after an
+`await` — the repo's `.then(setState)` promise form passes; also, device-clock
+derivations moved into components that only mount on user taps (no SSR frame).
+**Left unstaged on purpose:** the concurrent session's `day-schedule/page.tsx` +
+`block-resize.ts`/`.test.ts` work, both `.gitignore` edits,
+`android/.idea/caches/deviceStreaming.xml`, `../fleet/`, `../verify/`.
+
 ### 2026-11-03 - C2 merge presentation: one proportionally sized animated card (SHIPPED)
 
 **What changed on the planner (`/planner`).** A multi-hour same-category group is now ONE card instead of one stacked card per hour inside a group plate: height grows proportionally with the merged span and is CAPPED at 200% of a base hour card (60px) — min 100% at 1h, +50% at 2h, capped there, so a merged 6-hour plan can never balloon past the cap. Merge animation is pure CSS (no state machinery): a persistent card (absorbing the NEXT hour on save) animates height through an inline `height 400ms cubic-bezier(0.34,1.2,0.64,1)` transition; a card that absorbed the PREVIOUS hour builds a new group id and remounts, so it plays a `merge-in` entrance keyframe (declared `from`-only, so it grows to whatever its proportional height is); a `merge-flash` light sweep plays while the save/move highlight (`recentlySavedHour`, also set on moves) is up. All keyframes live under `@media (prefers-reduced-motion: no-preference)` so they simply do not exist under reduce. New helpers in `planner-block-time.ts`: `BASE_HOUR_HEIGHT_PX=60`, `MIN_HEIGHT_RATIO`, `MAX_HEIGHT_RATIO`, `calculateBlockHeight(duration)`, `getDurationHours()` — **note** the 0.5h-floor half of these is currently unused (the planner is hour-grained); the floor is for any future minute-grained consumer (day-schedule uses its own 42–120px clamp) — named per rule 23.
@@ -1146,7 +1188,7 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 - **Gates + commit (C2 revised, 2026-11-02):** tsc 0; 49 suites / **690 tests** (15 new in `block-resize.test.ts`, all green); lint 0 errors / 76 warnings (the 5 day-schedule warnings are pre-existing dead imports, deliberately untouched); `next build` clean; **16/16 production-build interaction probe checks** (`%TEMP%\opencode\verify\c2s\qs-probe.js`, indexedDB-seeded two touching blocks on the production server): live preview shrinks the neighbour to the dragged end on the 5-min grid, persisted minute times match (`Deep work 11:00→<dragged end>`, `Calls <dragged end>→13:00`), undo banner appears iff the drag trimmed a neighbour and restores both rows exactly, drag-up creates the freed stretch as a new empty editable block ending at the pre-drag boundary, zero console errors; server started, asserted `Ready`, killed by port PID in one chained command, 3000/3001/3100 confirmed free. Touches `src/lib/utils/block-resize.ts` (new), `src/lib/utils/block-resize.test.ts` (new), `src/components/schedule/block-drag-handle.tsx` (new), `src/app/day-schedule/page.tsx` (row-based day, minute-level save + merge, drag commit/undo), `src/components/planner/edit-hour-modal.tsx` (picker removed, chip restored), (deleted) `src/components/planner/time-range-picker.tsx`, `main_plan.md` (C2 REVISED), this file. **Left unstaged on purpose:** `android/.idea/caches/deviceStreaming.xml`, `../fleet/`, and the concurrent session's heatmap-fix paragraph inside the §9 B7a entry (kept out of this commit; re-add their paragraph with their next commit if they do not).
 
-- **HEAD:** M28 revised - challenge heatmap is now a contribution-style heatmap (weekday rows, week columns, month band, colour-filled squares) of exactly the challenge's days; extracted into habit-challenge-heatmap.tsx. 49 suites / 701 tests; tsc 0; eslint 0; next build clean.
+- **HEAD:** B14 - quick-capture inbox on the Journey page (capture box + Today/This week/Someday buckets; exits: Add-to-plan day+hour picker and two-tap dismiss; `inboxItems` table's first reader/writer, zero schema change). 50 suites / 712 tests; tsc 0; eslint 0 errors on touched files; next build clean; production-build browser probe green. Prior HEAD note: C2 merge presentation (one proportionally sized animated card) shipped by the concurrent session as `58becdd`.
 
 **BUG-7 (PARTIAL — status corrected 2026-10-29 from `SHIPPED`):** Wallpaper master switch fix — the unconditional `putBoolean("wallpaper_enabled", true)` is removed from both `syncSchedule()` and `syncScheduleWithResult()`; the flag is now written only where the user asks for a wallpaper (`setWallpaperMasterEnabled(true)`, the live-wallpaper picker, `enableHourlyAutoUpdate()`). **Audited 2026-10-29 and confirmed inside the shipped 1.3.7 APK:** the fix commit `2f9cf5f` is an ancestor of release commit `e3d08f9`; the APK on disk (versionCode 12 / 1.3.7, built 11:42) was built from that tree against an 11:50 release commit; and `git diff e3d08f9 HEAD -- android/` is empty, so the packaged native code is exactly today's native code. `SHIPPED` was wrong because the line itself said behavioral verification was still pending and the DoD requires acceptance criteria to be **manually verified** — the same reason `BUG-19` stays `PARTIAL`. **Remaining:** device test — switch off → close → reopen → switch must stay OFF. src: `android/app/src/main/java/com/odyssey/tracker/OdysseyWallpaperBridge.kt:425,507`
 

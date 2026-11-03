@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber, getDateForJourneyDay } from "@/lib/utils/journey";
+import { InboxSection } from "@/components/inbox/inbox-section";
 import { calculateRank, getRankInfo } from "@/lib/utils/gamification";
 import { getDaysDoneLabel, isDaysDoneActive } from "@/lib/utils/warm-copy";
 import { evaluateDayCompletion, type DayCompletionStats } from "@/lib/utils/day-status";
@@ -306,6 +307,11 @@ export default function JourneyPage() {
           </div>
         </div>
       </div>
+
+      {/* B14 — quick-capture inbox (owner placement: the Journey page). Sits
+          between the progress banner and the trail so a thought can be parked
+          the moment the page opens, before scrolling into the days. */}
+      <InboxSection />
 
       {/* Gamified Winding Journey Road Canvas */}
       <div ref={containerRef} className="relative w-full flex flex-col items-center py-3">
