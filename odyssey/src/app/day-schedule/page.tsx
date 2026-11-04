@@ -551,7 +551,7 @@ function DayScheduleContent() {
             startTime: b.startTime,
             endTime: b.endTime,
             title: "",
-            category: b.category ?? "",
+            category: "", // empty — no pre-fill; remembered-category fires on first letter
             status: "pending",
             isCommitted: true,
           });
@@ -1079,7 +1079,7 @@ function DayScheduleContent() {
       !hasStoredCategory &&
       !pickedCats.has(key) &&
       rememberedKey !== undefined &&
-      inputValue.trim().length > 0;
+      inputValue.trim().length === 1;
     const cat = getCatStyle(
       showRemembered
         ? normalizeCategory(rememberedKey, Math.floor(row.startMin / 60))
