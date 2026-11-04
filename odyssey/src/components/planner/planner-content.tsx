@@ -988,15 +988,13 @@ export function PlannerContent() {
           // 1. Multi-hour same-entry group: one proportionally-sized animated card
           if (group.isCustom && group.hours.length > 1) {
             const canReview = group.slots.every((slot) =>
-              slot.block
-                ? isBlockEntirelyPast({
-                    selectedDate,
-                    todayDate: todayStr,
-                    startTime: slot.block.startTime,
-                    endTime: slot.block.endTime,
-                    nowMinutes: now.getHours() * 60 + now.getMinutes(),
-                  })
-                : false
+              !slot.block || isBlockEntirelyPast({
+                selectedDate,
+                todayDate: todayStr,
+                startTime: slot.block.startTime,
+                endTime: slot.block.endTime,
+                nowMinutes: now.getHours() * 60 + now.getMinutes(),
+              })
             );
             return (
               <AnimatedBlockGroup

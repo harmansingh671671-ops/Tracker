@@ -4,7 +4,7 @@ import React, { useCallback } from "react";
 import { type ScheduleBlock } from "@/lib/db";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
-import { CheckCircle2, XCircle, Circle, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Circle } from "lucide-react";
 
 interface MergedBlockSlot {
   hour: number;
@@ -49,9 +49,9 @@ export interface AnimatedBlockGroupProps {
  * C2 merged-block card -- a multi-hour plan rendered as ONE proportionally
  * sized card instead of one stacked card per hour.
  *
- * Sizing (`calculateBlockHeight`): grows from 100% of an hour card at 1h up to
- * a 200% cap (2h+) -- more hours merging in never makes the card balloon past
- * the cap.
+ * Sizing (`calculateBlockHeight`): height grows linearly from a minimum
+ * touch-height floor (75% of a 1-hour card) with no upper cap -- a longer
+ * plan is visibly taller than a shorter one.
  *
  * Animation, all CSS, no state machinery:
  * - A change while the element persists (absorbing the next hour on save)
@@ -176,11 +176,6 @@ export function AnimatedBlockGroup({
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono whitespace-nowrap">
           <span className={`font-semibold shrink-0 ${cat.color}`}>{cat.label}</span>
-          <span className="text-on-surface-variant/30 shrink-0">&bull;</span>
-          <span className="text-on-surface-variant flex items-center gap-1 whitespace-nowrap shrink-0">
-            <Clock className="w-3 h-3 shrink-0" />
-            {durationHours === 1 ? "1 hour" : `${durationHours} hours`}
-          </span>
           {totalSlots > 0 && completedCount > 0 && completedCount < totalSlots && (
             <>
               <span className="text-on-surface-variant/30 shrink-0">&bull;</span>
