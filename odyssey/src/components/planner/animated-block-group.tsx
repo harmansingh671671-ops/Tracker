@@ -191,7 +191,7 @@ export function AnimatedBlockGroup({
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <h4
-            className={`text-sm font-semibold truncate ${
+            className={`text-sm font-semibold break-words whitespace-normal leading-snug ${
               isCurrent ? "text-on-surface font-bold" : "text-on-surface"
             }`}
           >

@@ -467,7 +467,7 @@ export function TimelineHourSlot({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4
-              className={`text-sm font-semibold truncate ${
+              className={`text-sm font-semibold break-words whitespace-normal leading-snug ${
                 isCurrent ? "text-on-surface font-bold" : "text-on-surface"
               }`}
             >
@@ -479,7 +479,7 @@ export function TimelineHourSlot({
             {slot.block?.description && (
               <>
                 <span className="text-on-surface-variant/30">•</span>
-                <span className="text-on-surface-variant truncate">
+                <span className="text-on-surface-variant break-words whitespace-normal">
                   {slot.block.description}
                 </span>
               </>
