@@ -1080,13 +1080,16 @@ function DayScheduleContent() {
       !pickedCats.has(key) &&
       rememberedKey !== undefined &&
       inputValue.trim().length === 1;
+    const isStubEmpty = isEmptyBlock && !hasStoredCategory && inputValue.trim().length === 0;
     const cat = getCatStyle(
-      showRemembered
-        ? normalizeCategory(rememberedKey, Math.floor(row.startMin / 60))
-        : rowCategories[key] ||
-          (block
-            ? normalizeCategory(block.category, Math.floor(row.startMin / 60))
-            : normalizeCategory(undefined, Math.floor(row.startMin / 60))),
+      isStubEmpty
+        ? undefined
+        : showRemembered
+          ? normalizeCategory(rememberedKey, Math.floor(row.startMin / 60))
+          : rowCategories[key] ||
+            (block
+              ? normalizeCategory(block.category, Math.floor(row.startMin / 60))
+              : normalizeCategory(undefined, Math.floor(row.startMin / 60))),
       isCustom
     );
     const CatIcon = cat.Icon;
