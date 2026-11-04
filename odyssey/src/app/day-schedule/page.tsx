@@ -522,6 +522,46 @@ function DayScheduleContent() {
     };
   }, [user?.id, dateStr, fetchBlocksForDate, updateBlock]);
 
+  /**
+   * Tomorrow = Today (owner rule 2026-11-04): when this day is EMPTY and is
+   * strictly a FUTURE date, pre-fill it with TODAY's blocks as templates —
+   * same times, same categories, empty titles. Merges with existing blocks
+   * (never replaces a day the user already planned). Run once per date pair:
+   * the `blocks` dep ends it after the first fill (blocks no longer empty),
+   * and the date-key dep restarts it when navigating to another future day.
+   */
+  useEffect(() => {
+    if (!userId || loading) return;
+    if (blocks.length > 0) return;
+    const todayKey = getTodayStr();
+    if (dateStr <= todayKey) return; // today or past: no action
+    let cancelled = false;
+    void db.scheduleBlocks
+      .where("date")
+      .equals(todayKey)
+      .toArray()
+      .then((todayRows) => {
+        if (cancelled) return;
+        const ours = todayRows.filter((r) => r.userId === userId);
+        if (ours.length === 0) return;
+        for (const b of ours) {
+          void addBlock({
+            userId,
+            date: dateStr,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            title: "",
+            category: b.category ?? "",
+            status: "pending",
+            isCommitted: true,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, dateStr, blocks, loading, addBlock]);
+
   // Synchronize blocks into row inputs and categories without clobbering the
   // active input. Runs off `dayRows` (not the raw blocks array): a block row's
   // key is its id, so a resize that only moves its times never clobbers what
