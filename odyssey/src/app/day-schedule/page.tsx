@@ -1391,7 +1391,7 @@ function DayScheduleContent() {
               <div
                 aria-hidden
                 data-blur-essential
-                className="fixed inset-0 z-40 pointer-events-none bg-background/50 backdrop-blur-[2px]"
+                className="drag-scrim fixed inset-0 z-40 pointer-events-none bg-background/50 backdrop-blur-[2px]"
               />
             )}
             {dayListItems.map((item) =>

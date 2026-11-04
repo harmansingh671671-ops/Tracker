@@ -600,6 +600,23 @@ button, a, input, select {
     animation: rowCollapse 260ms ease-in both;
   }
 
+  /* C2 drag spotlight entrance -- the scrim fades in instead of snapping on
+     the first drag step. The element mounts at drag start and unmounts at
+     release; only the entrance is smoothed (the exit coincides with the whole
+     day re-shaping, where a second fade would read as lag). */
+  @keyframes scrimIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .drag-scrim {
+    animation: scrimIn 180ms ease-out both;
+  }
+
   @keyframes permissionBackdropIn {
     from {
       opacity: 0;
@@ -628,6 +645,11 @@ button, a, input, select {
      hide it outright so the row is removed instantly, not after the timeout. */
   .row-collapse {
     display: none;
+  }
+
+  /* The drag scrim still appears (it carries the dim), just without a fade. */
+  .drag-scrim {
+    animation: none;
   }
 }
 
