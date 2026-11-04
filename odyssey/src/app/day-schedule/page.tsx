@@ -1314,15 +1314,6 @@ function DayScheduleContent() {
             preview lives in `dragPreview`, the store is written on release.
             Empty rows have nothing to resize: a dead handle there reads as a
             broken affordance (press = zero feedback), so it is disabled. */}
-        {/* Top-border drag handle — resize by dragging the top edge */}
-        <BlockDragHandle
-          position="top"
-          disabled={row.kind !== "block"}
-          onResize={(deltaMinutes) => handleResize(row, deltaMinutes)}
-          onEnd={() => {
-            void handleResizeCommit();
-          }}
-        />
         {/* Bottom-border drag handle — resize by dragging the bottom edge */}
         <BlockDragHandle
           position="bottom"

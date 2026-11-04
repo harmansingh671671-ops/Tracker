@@ -44,13 +44,11 @@ export function BlockDragHandle({
 
   if (disabled) return null;
 
-  const isTop = position === "top";
-
   return (
     <div
       role="separator"
       aria-orientation="horizontal"
-      aria-label={`Drag to change ${isTop ? "start" : "end"} time`}
+      aria-label="Drag to change duration"
       data-drag-handle
       data-drag-position={position}
       onPointerDown={(e) => {
@@ -77,14 +75,10 @@ export function BlockDragHandle({
         onEnd();
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className={`absolute inset-x-0 z-30 h-6 cursor-ns-resize touch-none flex items-center justify-center group/drag ${
-        isTop ? "top-0" : "bottom-0"
-      } ${isTop ? "items-start" : "items-end"}`}
+      className="absolute inset-x-0 bottom-0 z-30 h-6 cursor-ns-resize touch-none flex items-end justify-center group/drag"
     >
-      {/* Grip pill: always-visible on touch (forced via CSS media query below),
-          visible on hover on pointer devices. Full size is h-1 w-10. */}
       <span
-        className={`mb-0.5 mt-0.5 h-1 w-10 rounded-full bg-outline/30 transition-colors group-hover/drag:bg-primary/60 group-active/drag:bg-primary drag-handle-grip`}
+        className="mb-0.5 h-1 w-6 rounded-full bg-outline/30 transition-colors group-hover/drag:bg-primary/60 group-active/drag:bg-primary drag-handle-grip"
       />
     </div>
   );
