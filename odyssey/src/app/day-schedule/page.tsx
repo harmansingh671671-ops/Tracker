@@ -1141,8 +1141,11 @@ function DayScheduleContent() {
 
         {/* Bottom-border drag (`C2` follow-up): press-and-drag this strip and
             the block's end follows the finger in 5-minute steps — the live
-            preview lives in `dragPreview`, the store is written on release. */}
+            preview lives in `dragPreview`, the store is written on release.
+            Empty rows have nothing to resize: a dead handle there reads as a
+            broken affordance (press = zero feedback), so it is disabled. */}
         <BlockDragHandle
+          disabled={row.kind !== "block"}
           onResize={(deltaMinutes) => handleResize(row, deltaMinutes)}
           onEnd={() => {
             void handleResizeCommit();
@@ -1377,15 +1380,18 @@ function DayScheduleContent() {
             {/* Drag spotlight: while a border-drag runs, the rest of the day
                 steps back (dim + slight blur) and only the dragged card stays
                 lit (raised z-50). Purely visual — pointer-events-none so it can
-                never eat the drag. The blur is deliberately NOT marked
-                data-blur-essential: PERF-7e strips it on low-end devices and
-                the dim tint carries the effect alone. Rendered inside this
+                never eat the drag. The blur IS the owner-requested effect, so
+                it is marked data-blur-essential: PERF-7e would otherwise strip
+                it on low-end devices (where the owner first saw "nothing"),
+                leaving only a near-invisible tint. One static element for the
+                length of a drag is not a perf hazard. Rendered inside this
                 wrapper (which has no backdrop-filter, per the BUG-8 fix) so
                 `fixed` resolves to the viewport. */}
             {isDragging && (
               <div
                 aria-hidden
-                className="fixed inset-0 z-40 pointer-events-none bg-background/35 backdrop-blur-[2px]"
+                data-blur-essential
+                className="fixed inset-0 z-40 pointer-events-none bg-background/50 backdrop-blur-[2px]"
               />
             )}
             {dayListItems.map((item) =>
