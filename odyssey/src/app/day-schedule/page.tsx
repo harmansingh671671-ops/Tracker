@@ -25,7 +25,9 @@ import {
   CollapsingRowGhost,
   type CollapsingRowGhostData,
 } from "@/components/schedule/collapsing-row-ghost";
-import { db, type ScheduleBlock } from "@/lib/db";
+import { db, type ScheduleBlock, type StoredScheduleCategory } from "@/lib/db";
+import { addDays } from "@/lib/utils/habit-lifecycle";
+import { rememberedCategoryForRange } from "@/lib/utils/schedule-remembered-category";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
 import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocation-bar";
@@ -252,7 +254,50 @@ function DayScheduleContent() {
     return computeResize(blocks, dragPreview.id, dragPreview.endMin).next;
   }, [blocks, dragPreview]);
 
+  /**
+   * Yesterday's blocks — the "remembering" source (`schedule-remembered-category`).
+   * Owner rule (2026-11-04): a block the user has not named yet must not carry
+   * an assumed category; while they type into an empty block, the category it
+   * will save with is YESTERDAY'S block over the same stretch, shown live.
+   * Read directly from the db (not the store, which scopes to the open date).
+   */
+  const [prevDayBlocks, setPrevDayBlocks] = useState<ScheduleBlock[]>([]);
+  const prevDateKey = addDays(dateStr, -1);
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) return;
+    void db.scheduleBlocks
+      .where("date")
+      .equals(prevDateKey)
+      .toArray()
+      .then((rows) => {
+        if (!cancelled) setPrevDayBlocks(rows.filter((r) => r.userId === userId));
+      })
+      .catch(() => {
+        if (!cancelled) setPrevDayBlocks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, prevDateKey]);
+
+
   const dayRows = useMemo(() => buildDayRows(liveBlocks), [liveBlocks]);
+
+  /**
+   * The remembered category per row — yesterday's block over the same stretch,
+   * keyed by row key. Only consulted for EMPTY blocks (no stored title): the
+   * moment a block is named, its own category rules (see `handleSaveRow`).
+   */
+  const rememberedByRowKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const row of dayRows) {
+      const remembered = rememberedCategoryForRange(prevDayBlocks, row.startMin, row.endMin);
+      if (remembered) m.set(rowKey(row), remembered);
+    }
+    return m;
+  }, [dayRows, prevDayBlocks]);
+
 
   // Ghost derivation, render-phase adjust (the same pattern as the day-name
   // key below): diff this render's block rows against the last render's.
@@ -377,9 +422,16 @@ function DayScheduleContent() {
   // Reloading shows the spinner again; done during render so React Compiler
   // doesn't flag a synchronous setState in an effect.
   const [prevDateStr, setPrevDateStr] = useState<string | null>(null);
+  // Categories the user explicitly picked per row key. Separate from the
+  // seeded `rowCategories` (which is a display bucket, not a choice) so an
+  // empty-row pick survives until it is saved — and so it outranks the
+  // remembered-category suggestion. Cleared on a date flip: an empty-row key
+  // is hour-based, so yesterday's pick must not suppress today's suggestion.
+  const [pickedCats, setPickedCats] = useState<Map<string, CategoryKey>>(new Map());
   if (prevDateStr !== dateStr) {
     setPrevDateStr(dateStr);
     setLoading(true);
+    if (pickedCats.size > 0) setPickedCats(new Map());
   }
 
   // Controlled input values per ROW (a row is a block or an empty stretch —
@@ -617,8 +669,27 @@ function DayScheduleContent() {
       const titleToSave = (
         explicitTitle !== undefined ? explicitTitle : (editingValues[key] ?? "")
       ).trim();
-      const catToSave =
-        explicitCat || rowCategories[key] || normalizeCategory(undefined, Math.floor(row.startMin / 60));
+      /**
+       * Owner rule (2026-11-04): the app must not assume a category. An
+       * explicitly-picked category always wins; a block being named for the
+       * FIRST time saves the remembered one (yesterday's block over the same
+       * stretch — what the user watched fade in while typing); with neither,
+       * it saves EMPTY rather than the old hour-of-day guess. `catToSave`
+       * stays the block-row's "chosen" candidate: the picker path writes a
+       * pick into `rowCategories`, and `resolveEditedCategory` honours it
+       * only when the pick actually happened this screen.
+       */
+      const remembered = rememberedByRowKey.get(key) ?? null;
+      const catToSave = explicitCat || rowCategories[key] || "";
+      // A new empty-row block: picked, remembered, or nothing — never assumed.
+      // The remembered value is stored VERBATIM (never folded through a display
+      // vocabulary — that fold is the mechanism of BUG-12), hence the cast.
+      const newBlockCategory = (explicitCat ||
+        pickedCats.get(key) ||
+        remembered ||
+        "") as StoredScheduleCategory;
+      // What the merge below compares — declared here, set by the block branch.
+      let blockSavedCategory: StoredScheduleCategory = newBlockCategory;
 
       const startLabel = labelFromMinutes(row.startMin);
       const endLabel = labelFromMinutes(row.endMin);
@@ -636,6 +707,19 @@ function DayScheduleContent() {
             syncCurrentScheduleToNative(dateStr);
             return;
           }
+          // Naming an EMPTY block is the one moment a category is chosen by
+          // remembering: what the user saw while typing becomes the stored
+          // value, so the save-time merge below groups it exactly as always.
+          // A TITLED block's stored category is still untouchable — the
+          // BUG-12 rule ("a title edit must not rewrite the category") stands.
+          const claimingEmpty = !(block.title || "").trim();
+          blockSavedCategory = resolveEditedCategory({
+            stored: (claimingEmpty
+              ? (remembered ?? block.category ?? "")
+              : (block.category ?? "")) as StoredScheduleCategory,
+            touched: categoryTouchedKeysRef.current.has(key),
+            chosen: catToSave,
+          });
           await updateBlock(block.id, {
             title: titleToSave,
             // **A title edit must not rewrite the category.** `rowCategories`
@@ -654,11 +738,7 @@ function DayScheduleContent() {
             // So the stored value is returned untouched unless the user
             // actually chose a category on THIS screen, which
             // `handleCategoryChange` records.
-            category: resolveEditedCategory({
-              stored: block.category ?? "",
-              touched: categoryTouchedKeysRef.current.has(key),
-              chosen: catToSave,
-            }),
+            category: blockSavedCategory,
           });
           savedId = block.id;
         } else if (titleToSave) {
@@ -668,7 +748,7 @@ function DayScheduleContent() {
             startTime: startLabel,
             endTime: endLabel,
             title: titleToSave,
-            category: catToSave,
+            category: newBlockCategory,
             status: "pending",
             isCommitted: true,
           });
@@ -689,7 +769,7 @@ function DayScheduleContent() {
         const merge = savedId && titleToSave
           ? findAdjacentMergeMinutes({
               title: titleToSave,
-              category: row.kind === "block" ? (row.block.category ?? "") : catToSave,
+              category: row.kind === "block" ? blockSavedCategory : newBlockCategory,
               startMin: row.startMin,
               endMin: row.endMin,
               candidates: fresh.filter(
@@ -721,6 +801,8 @@ function DayScheduleContent() {
       dateStr,
       editingValues,
       rowCategories,
+      pickedCats,
+      rememberedByRowKey,
       deleteBlock,
       updateBlock,
       addBlock,
@@ -732,6 +814,7 @@ function DayScheduleContent() {
     async (row: DayRow<ScheduleBlock>, newCat: CategoryKey) => {
       const key = rowKey(row);
       setRowCategories((prev) => ({ ...prev, [key]: newCat }));
+      setPickedCats((prev) => new Map(prev).set(key, newCat));
       setOpenCategoryKey(null);
 
       const currentTitle = (editingValues[key] ?? "").trim();
@@ -858,9 +941,12 @@ function DayScheduleContent() {
             startTime: labelFromMinutes(piece.start),
             endTime: labelFromMinutes(piece.end),
             title: "",
-            // The freed stretch inherits the dragged block's category, so the
-            // new cards read as a continuation until the user types into them.
-            category: outcome.dragged.category,
+            // Owner rule (2026-11-04): DON'T assume. A split piece saves with
+            // an EMPTY category — the hour default and the dragged block's
+            // category are both guesses. While the user types into it, the
+            // remembered-category suggestion shows what yesterday held here,
+            // and naming it stores that (see `handleSaveRow`).
+            category: "",
             status: "pending",
             isCommitted: true,
           });
@@ -936,17 +1022,36 @@ function DayScheduleContent() {
     const block = row.kind === "block" ? row.block : null;
     const isDraggedRow = isDragging && !!block && block.id === draggedId;
     const isCustom = !!block;
+    const inputValue = editingValues[key] ?? block?.title ?? "";
+    /**
+     * Remembered-category suggestion (owner rule 2026-11-04): while the user
+     * types into an EMPTY block — first letter onward — the card shows
+     * YESTERDAY's block over the same stretch instead of the hour-of-day
+     * default, so what they watch appear is what will save. A block that
+     * already carries a stored category (an explicit pick — the pick writes
+     * through to the store — or a legacy value) outranks the suggestion.
+     */
+    const isEmptyBlock = block ? !(block.title || "").trim() : true;
+    const rememberedKey = rememberedByRowKey.get(key);
+    const hasStoredCategory = !!block && !!(block.category ?? "").trim();
+    const showRemembered =
+      isEmptyBlock &&
+      !hasStoredCategory &&
+      !pickedCats.has(key) &&
+      rememberedKey !== undefined &&
+      inputValue.trim().length > 0;
     const cat = getCatStyle(
-      rowCategories[key] ||
-        (block
-          ? normalizeCategory(block.category, Math.floor(row.startMin / 60))
-          : normalizeCategory(undefined, Math.floor(row.startMin / 60))),
+      showRemembered
+        ? normalizeCategory(rememberedKey, Math.floor(row.startMin / 60))
+        : rowCategories[key] ||
+          (block
+            ? normalizeCategory(block.category, Math.floor(row.startMin / 60))
+            : normalizeCategory(undefined, Math.floor(row.startMin / 60))),
       isCustom
     );
     const CatIcon = cat.Icon;
     const isCategoryPickerOpen = openCategoryKey === key;
     const isCompleted = block?.status === "completed";
-    const inputValue = editingValues[key] ?? block?.title ?? "";
     const hasContent = inputValue.trim().length > 0 || !!block;
 
     /**
@@ -1038,7 +1143,12 @@ function DayScheduleContent() {
             title="Click to change block type"
             className={`relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${cat.badgeBg} hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-inner`}
           >
-            <CatIcon className="w-4 h-4" />
+            {/* Keyed by category: a suggestion appearing (or changing) under
+                the user's fingers remounts the icon and replays the fade, so
+                the remembered category eases in instead of popping. */}
+            <span key={cat.label} className="inline-flex animate-in fade-in duration-150">
+              <CatIcon className="w-4 h-4" />
+            </span>
           </button>
 
           {/* Category Selection Dropdown Popup.
@@ -1131,7 +1241,9 @@ function DayScheduleContent() {
             }`}
           />
           <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono">
-            <span className={`font-semibold ${cat.color}`}>{cat.label}</span>
+            <span key={cat.label} className={`font-semibold ${cat.color} animate-in fade-in duration-150`}>
+              {cat.label}
+            </span>
           </div>
         </div>
 
