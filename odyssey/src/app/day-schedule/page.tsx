@@ -853,7 +853,7 @@ function DayScheduleContent() {
   // Change category of a specific row's block
   const handleCategoryChange = useCallback(
     async (row: DayRow<ScheduleBlock>, newCat: CategoryKey) => {
-      const key = rowKey(row);
+      const key = rowKey(row, dateStr);
       setRowCategories((prev) => ({ ...prev, [key]: newCat }));
       setPickedCats((prev) => new Map(prev).set(key, newCat));
       setOpenCategoryKey(null);
@@ -864,11 +864,37 @@ function DayScheduleContent() {
         categoryTouchedKeysRef.current.add(key);
         await updateBlock(row.block.id, { category: newCat });
         syncCurrentScheduleToNative(dateStr);
+
+        // Re-evaluate merge with the current (new) category: changing the
+        // category may make this block mergeable with an adjacent same-title
+        // neighbour (or stop it merging further). Always compare the live
+        // stored categories — the candidates are re-read from the database so
+        // they carry the latest values.
+        const freshAfter = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
+        const merge = findAdjacentMergeMinutes({
+          title: row.block.title,
+          category: newCat,
+          startMin: row.startMin,
+          endMin: row.endMin,
+          candidates: freshAfter.filter(
+            (r) => r.id !== row.block.id && r.userId === userId
+          ),
+        });
+        if (merge) {
+          await updateBlock(row.block.id, {
+            startTime: labelFromMinutes(merge.startMin),
+            endTime: labelFromMinutes(merge.endMin),
+          });
+          for (const absorbedId of merge.absorbedIds) {
+            await deleteBlock(absorbedId);
+          }
+          syncCurrentScheduleToNative(dateStr);
+        }
       } else if (currentTitle) {
         handleSaveRow(row, currentTitle, newCat);
       }
     },
-    [editingValues, handleSaveRow, updateBlock, dateStr]
+    [editingValues, handleSaveRow, updateBlock, dateStr, userId, deleteBlock]
   );
 
   /** Focus-request by row index that survives a save-merge. When Enter saves a
