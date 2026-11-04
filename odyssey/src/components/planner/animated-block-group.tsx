@@ -76,8 +76,14 @@ export function AnimatedBlockGroup({
   currentHour,
   canReview,
 }: AnimatedBlockGroupProps) {
-  // Memoize: only recompute height when minute-level span changes, not on every render
-  const durationMinutes = group.endMin - group.startMin;
+  // Memoize: only recompute height when minute-level span changes, not on
+  // every render. A wrap past midnight (22:00 → 06:00) counts as its two
+  // segments (480 min); a raw end − start would go negative and floor the
+  // longest block to the shortest card.
+  const durationMinutes =
+    group.endMin >= group.startMin
+      ? group.endMin - group.startMin
+      : 1440 - group.startMin + group.endMin;
   const proportionalHeight = useMemo(
     () => cardHeightPx(durationMinutes),
     [group.startMin, group.endMin],

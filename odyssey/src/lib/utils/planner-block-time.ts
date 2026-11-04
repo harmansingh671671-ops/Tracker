@@ -26,6 +26,24 @@ export const minuteOfLabel = (t: string): number | null => {
 };
 
 /**
+ * Minutes a block covers, for sizing its planner card.
+ * Unparsable labels fall back to the slot's own boundaries; a block that wraps
+ * past midnight (22:00 → 06:00) counts as its two segments (480 min), never a
+ * negative number — a raw `end − start` would give −960 and floor the longest
+ * block to the shortest card.
+ */
+export const blockDurationMinutes = (
+  startLabel: string,
+  endLabel: string,
+  fallbackStartMin: number,
+  fallbackEndMin: number,
+): number => {
+  const s = minuteOfLabel(startLabel) ?? fallbackStartMin;
+  const e = minuteOfLabel(endLabel) ?? fallbackEndMin;
+  return e >= s ? e - s : 1440 - s + e;
+};
+
+/**
  * A block's end expressed the way ranges are compared: `endTime` may read
  * `24:00`, which is hour 24, and a block that runs over midnight (start after
  * end, as the seed sleep data does) is its end hour plus 24.

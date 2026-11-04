@@ -7,6 +7,7 @@ import {
   rangeEndHour,
   rangeEndMinutes,
   endHourLabel,
+  blockDurationMinutes,
   getDurationHours,
 } from "./planner-block-time";
 import type { ScheduleBlock } from "@/lib/db";
@@ -226,6 +227,30 @@ describe("isBlockEntirelyPast", () => {
     expect(
       isBlockEntirelyPast({ ...base, startTime: "23:00", endTime: "06:00" })
     ).toBe(false);
+  });
+});
+
+describe("blockDurationMinutes (planner card sizing)", () => {
+  it("returns the block's real minute span", () => {
+    expect(blockDurationMinutes("09:00", "10:00", 540, 600)).toBe(60);
+    expect(blockDurationMinutes("09:30", "10:00", 540, 600)).toBe(30);
+    expect(blockDurationMinutes("09:30", "10:15", 540, 600)).toBe(45);
+  });
+
+  it("falls back to the slot's own boundaries when labels do not parse", () => {
+    expect(blockDurationMinutes("bad", "", 540, 600)).toBe(60);
+    expect(blockDurationMinutes("09:00", "bad", 540, 600)).toBe(60);
+  });
+
+  it("counts a midnight wrap as its two segments, never negative", () => {
+    // 22:00 → 06:00 = 120 + 360 = 480 (a raw end − start would be −960)
+    expect(blockDurationMinutes("22:00", "06:00", 1320, 1440)).toBe(480);
+    // 23:30 → 00:30 = 30 + 30
+    expect(blockDurationMinutes("23:30", "00:30", 1410, 1440)).toBe(60);
+  });
+
+  it("keeps 24:00 as the end of the day", () => {
+    expect(blockDurationMinutes("23:00", "24:00", 1380, 1440)).toBe(60);
   });
 });
 

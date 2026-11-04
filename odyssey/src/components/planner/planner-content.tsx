@@ -35,7 +35,7 @@ import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
 import { AnimatedBlockGroup } from "@/components/planner/animated-block-group";
 import { groupPlannerHours } from "@/lib/utils/planner-hour-groups";
-import { minuteOfLabel } from "@/lib/utils/planner-block-time";
+import { minuteOfLabel, blockDurationMinutes } from "@/lib/utils/planner-block-time";
 import { cardHeightPx } from "@/lib/utils/block-resize";
 import {
   Clock,
@@ -818,11 +818,16 @@ export function PlannerContent() {
     // Proportional height from the block's REAL minute span -- the SAME
     // mechanism the quick schedule rows use (cardHeightPx: 64px/hour, clamped
     // 42-120px), so a 09:00-09:30 block is visibly shorter than a full hour
-    // card and the two pages agree. Empty hours stay content-sized.
+    // card and the two pages agree. Empty hours stay content-sized. Midnight
+    // wraps count as two segments, never a negative duration.
     const heightPx = slot.block
       ? cardHeightPx(
-          (minuteOfLabel(slot.block.endTime) ?? (slot.hour + 1) * 60) -
-            (minuteOfLabel(slot.block.startTime) ?? slot.hour * 60)
+          blockDurationMinutes(
+            slot.block.startTime,
+            slot.block.endTime,
+            slot.hour * 60,
+            (slot.hour + 1) * 60
+          )
         )
       : undefined;
 
