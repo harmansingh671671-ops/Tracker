@@ -20,9 +20,10 @@ import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
 import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
+import { periodFromTime, getTimePeriodAccent } from "@/lib/utils/time-period";
 import { decodeShareLink, type SharedHabitData } from "@/lib/utils/habit-share";
 import { TemplateDetailPreview } from "@/components/habits/template-detail-preview";
-import { scheduleSummary, periodSummary, goalSummary } from "@/lib/utils/habit-form-summary";
+import { scheduleSummary, goalSummary } from "@/lib/utils/habit-form-summary";
 import { DOMAINS } from "@/components/habits/habit-form-options";
 import {
   isPauseActive,
@@ -557,10 +558,14 @@ export default function HabitsPage() {
   const handleCreateHabit = async (data: {
     name: string;
     icon: string;
-    category: HabitCategory;
+    /** Only templates and goal tags carry a domain now — the picker is gone (owner instruction 2026-11-04). */
+    category?: HabitCategory;
     frequency: number;
     targetDays: number[];
-    timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
+    /** A wall-clock time the user typed ("HH:MM"); empty means anytime. */
+    timeOfDay?: string;
+    /** A template's period bucket; a typed time overrides it. */
+    period?: "morning" | "afternoon" | "evening";
     priority?: "critical" | "focus" | "optional";
     cue?: string;
     reward?: string;
@@ -586,7 +591,10 @@ export default function HabitsPage() {
       targetDaysPerWeek: data.targetDays?.length || 7,
       targetDays: data.targetDays || [1, 2, 3, 4, 5, 6, 7],
       icon: data.icon,
-      period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
+      // A typed time wins over a template's period bucket; the period accent
+      // is derived from the time so the M11 chip keeps working.
+      timeOfDay: data.timeOfDay || undefined,
+      period: data.timeOfDay ? periodFromTime(data.timeOfDay) : data.period,
       priority: data.priority,
       cue: data.cue,
       reward: data.reward,
@@ -636,7 +644,8 @@ export default function HabitsPage() {
           category: input.category,
           frequency: input.targetDays.length,
           targetDays: input.targetDays,
-          timeOfDay: input.timeOfDay,
+          // Challenge inputs carry a period bucket, not a typed time.
+          period: input.timeOfDay === "anytime" ? undefined : input.timeOfDay,
           priority: "focus",
         },
         {
@@ -678,7 +687,8 @@ export default function HabitsPage() {
         : "Vitality & Fitness",
       frequency: offer.targetDays.length,
       targetDays: offer.targetDays,
-      timeOfDay: offer.timeOfDay === "anytime" ? undefined : offer.timeOfDay,
+      // Share links carry a period bucket, not a typed time.
+      period: offer.timeOfDay === "anytime" ? undefined : offer.timeOfDay,
       priority: "focus",
       emergencyVersion:
         offer.emergencyVersion != null ? String(offer.emergencyVersion) : undefined,
@@ -695,10 +705,11 @@ export default function HabitsPage() {
     updates: {
       name: string;
       icon: string;
-      category: HabitCategory;
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
       targetDays?: number[];
+      /** The wall-clock time the user typed ("HH:MM"); empty means anytime. */
+      timeOfDay?: string;
       period?: "morning" | "afternoon" | "evening";
       priority?: "critical" | "focus" | "optional";
        cue?: string;
@@ -713,10 +724,14 @@ export default function HabitsPage() {
     await updateHabit(habitId, {
       name: updates.name,
       icon: updates.icon,
-      category: updates.category,
+      // `category` is deliberately absent: the edit form no longer offers a
+      // domain picker (owner instruction 2026-11-04), and a Dexie update with
+      // an undefined key WIPES the stored value — a save would silently strip
+      // every habit's domain (rule 19 / BUG-12 lesson).
       frequency: updates.frequency,
       targetDaysPerWeek: updates.targetDaysPerWeek,
       targetDays: updates.targetDays,
+      timeOfDay: updates.timeOfDay,
       period: updates.period,
       priority: updates.priority,
        cue: updates.cue,
@@ -1108,7 +1123,12 @@ const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
             ? (importOffer.category as string)
             : "Vitality & Fitness"}
           scheduleLine={scheduleSummary(importOffer.targetDays)}
-          periodLine={periodSummary(importOffer.timeOfDay)}
+          // Share links carry a period bucket; the accent's label renders it.
+          periodLine={
+            getTimePeriodAccent({
+              period: importOffer.timeOfDay === "anytime" ? undefined : importOffer.timeOfDay,
+            })?.label ?? "Anytime"
+          }
           goalLine={goalSummary({
             type: importOffer.type,
             unit: importOffer.unit,

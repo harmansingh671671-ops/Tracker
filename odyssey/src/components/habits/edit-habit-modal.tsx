@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { type HabitCategory, type Habit, type HabitType } from "@/lib/db";
+import { type Habit, type HabitType } from "@/lib/db";
 import { useHabitStore } from "@/lib/stores/habit-store";
 import { useUserStore } from "@/lib/stores/user-store";
 import { getHabitColor, getLocalTodayStr } from "@/lib/utils/habit-colors";
@@ -10,9 +10,9 @@ import { HabitGitHubHeatmap } from "@/components/habits/habit-github-heatmap";
 import { HabitChallengeView } from "@/components/habits/habit-challenge-view";
 import { UnitPicker } from "@/components/habits/unit-picker";
 import { IconGridPicker } from "@/components/habits/icon-grid-picker";
-import { DomainPicker } from "@/components/habits/domain-picker";
 import { SchedulePicker } from "@/components/habits/schedule-picker";
-import { TimeAnchorPicker } from "@/components/habits/time-anchor-picker";
+import { HabitTimeField } from "@/components/habits/habit-time-field";
+import { periodFromTime } from "@/lib/utils/time-period";
 import { FormSection, FormLabel } from "@/components/habits/form-section";
 import { HabitFormPreview } from "@/components/habits/habit-form-preview";
 import { PriorityPicker, ColorPicker } from "@/components/habits/priority-color-picker";
@@ -51,10 +51,11 @@ interface EditHabitModalProps {
     updates: {
       name: string;
       icon: string;
-      category: HabitCategory;
       frequency: "daily" | "weekly";
       targetDaysPerWeek: number;
       targetDays?: number[];
+      /** The wall-clock time the user typed ("HH:MM"); empty means anytime. */
+      timeOfDay?: string;
       period?: "morning" | "afternoon" | "evening";
       priority?: "critical" | "focus" | "optional";
       cue?: string;
@@ -109,9 +110,8 @@ export function EditHabitModal({
   // Form states for Edit Tab
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🧘");
-  const [domain, setDomain] = useState<HabitCategory>("Vitality & Fitness");
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
+  const [habitTime, setHabitTime] = useState<string>("");
   const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
   const [cue, setCue] = useState("");
   const [reward, setReward] = useState("");
@@ -161,7 +161,6 @@ export function EditHabitModal({
       setShareCopyFailed(false);
       setName(habit.name || "");
       setIcon(habit.icon || "🧘");
-      setDomain(habit.category || "Vitality & Fitness");
       if (habit.targetDays && habit.targetDays.length > 0) {
         setSelectedDays(habit.targetDays);
       } else {
@@ -172,13 +171,13 @@ export function EditHabitModal({
         else setSelectedDays(Array.from({ length: target }, (_, i) => i + 1));
       }
 
-      if (habit.period) {
-        setTimeOfDay(habit.period);
-      }
+      // Seed the time field only from a well-formed stored time; a legacy
+      // habit may carry a period bucket or a free-form string instead, and
+      // those must not appear as a bogus time in the field.
+      const storedTime = habit.timeOfDay ?? "";
+      setHabitTime(/^\d{2}:\d{2}$/.test(storedTime) ? storedTime : "");
       if (habit.priority) {
         setPriority(habit.priority);
-      } else {
-        setTimeOfDay("anytime");
       }
       setCue(habit.cue ?? "");
       setReward(habit.reward ?? "");
@@ -228,11 +227,11 @@ export function EditHabitModal({
     onSave(habit.id, {
       name: finalName,
       icon,
-      category: domain,
       frequency: "daily",
       targetDaysPerWeek: selectedDays.length,
       targetDays: selectedDays,
-      period: timeOfDay === "anytime" ? undefined : timeOfDay,
+      timeOfDay: habitTime || undefined,
+      period: periodFromTime(habitTime),
       priority,
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
@@ -313,9 +312,6 @@ export function EditHabitModal({
                 <h2 className="text-lg font-bold tracking-tight text-on-surface truncate max-w-[220px]">
                   {habit.name}
                 </h2>
-                <p className="text-[11px] text-on-surface-variant font-mono" style={{ color: habitColor }}>
-                  {habit.category || "Daily Habit"}
-                </p>
               </div>
             </div>
             <button
@@ -488,8 +484,6 @@ export function EditHabitModal({
 
             <IconGridPicker value={icon} onChange={setIcon} />
 
-            <DomainPicker value={domain} onChange={setDomain} />
-
             {/* Frequency & Target Weekdays */}
             <SchedulePicker
               selectedDays={selectedDays}
@@ -497,7 +491,7 @@ export function EditHabitModal({
               onApplyPreset={applyPreset}
             />
 
-            <TimeAnchorPicker value={timeOfDay} onChange={setTimeOfDay} />
+            <HabitTimeField value={habitTime} onChange={setHabitTime} />
 
             {/* Advanced settings moved below */}
 
@@ -671,10 +665,10 @@ export function EditHabitModal({
             <HabitFormPreview
               icon={icon}
               name={name}
-              domain={domain}
+              domain={habit?.category ?? ""}
               color={color}
               scheduleLine={scheduleSummary(selectedDays)}
-              periodLine={periodSummary(timeOfDay)}
+              periodLine={periodSummary(habitTime)}
               goalLine={goalSummary({ type, unit, targetValue })}
               priority={prioritySummary(priority)}
               type={type}

@@ -22,14 +22,14 @@ export function scheduleSummary(days?: number[]): string {
   return sorted.map((d) => DAY_NAMES[d - 1] ?? "").filter(Boolean).join(", ");
 }
 
-/** The when-on-the-day line. Unknown anchors are "Anytime" by definition. */
+/**
+ * The when-on-the-day line. Takes the wall-clock time the user typed
+ * ("HH:MM"); empty or malformed is "Anytime" by definition — the form no
+ * longer offers period buckets (owner instruction 2026-11-04).
+ */
 export function periodSummary(timeOfDay?: string): string {
-  switch (timeOfDay) {
-    case "morning": return "Mornings";
-    case "afternoon": return "Afternoons";
-    case "evening": return "Evenings";
-    default: return "Anytime";
-  }
+  const t = (timeOfDay ?? "").trim();
+  return /^(\d{1,2}):(\d{2})$/.test(t) && Number(t.split(":")[0]) <= 23 ? `At ${t}` : "Anytime";
 }
 
 export interface GoalSummaryInput {

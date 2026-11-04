@@ -672,6 +672,37 @@ section below; today's entries are kept in full.
 
 **Verification:** `tsc --noEmit` 0; `npm run lint -- --quiet` 0 errors; 52 suites / 730 tests; `next build` clean. The production server asserted `Ready` and was killed by port PID with 3000/3001/3100 free. The visual browser probe could not run because the CLI environment has no available display.
 
+### 2026-11-04 - B2 revised: habit forms lose the domain picker, gain a time field (SHIPPED)
+
+**Owner instruction (screenshots):** remove the orange category label under the
+edit-sheet title, remove the "Life domain" picker, and replace the four-bucket
+"When does it happen?" picker with a field where the user just enters a time.
+Shipped in both forms. The domain picker is gone entirely — templates and goal
+tags still carry a domain, a plain custom habit has none and gets its colour
+from the name hash (`getHabitColor` fallback, shown as "Uncategorised");
+`Habit.category` became **optional** in the schema (type widening only — nothing
+queries the category index, stored rows unchanged). The bucket picker is replaced
+by `HabitTimeField`, a shared `<input type="time">` (empty = anytime). The M11
+period accent survives by **deriving the period from the typed time**
+(`periodFromTime`: <12 morning, <17 afternoon, else evening, malformed → none);
+a template's period bucket still applies when no time is typed, and a typed time
+overrides it. `periodSummary` now renders "At HH:MM" / "Anytime". **Data-safety
+(rule 19):** the edit save no longer writes `category` at all — a Dexie update
+with an undefined key wipes the stored value, so a save can never strip a
+habit's domain; verified in the browser: editing the legacy challenge habit kept
+"Mindful Focus" while its period re-derived from the new time. Callers fixed
+together (rule 18): the challenge start flow and the share-link import both
+passed period **buckets** through `timeOfDay` — both now pass `period` directly,
+and the import preview renders the bucket via `getTimePeriodAccent(...)?.label`.
+Verified on a production build: create form (no picker, time works, preview
+updates, saved habit has no category + derived accent), edit form (no label,
+time seeded from stored HH:MM, legacy habit shows an empty field for a bucket
+period), template quick path (domain + period carried). Test habits created
+during verification were deleted and the owner's data restored. Gates: tsc 0;
+eslint 0 errors on touched files (1 pre-existing `_` warning); 52 suites /
+733 tests (5 new `periodFromTime` tests, `periodSummary` tests rewritten);
+`next build` clean; ports 3000/3001/3100 free.
+
 ### 2026-11-04 - B7a revised: challenge cards follow the page view mode (SHIPPED)
 
 **Owner instruction:** "remove this thing from the challenge type habits, the view of
@@ -1211,7 +1242,11 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 ## §10 Git + task state (as of 2026-11-04)
 
-- **HEAD after this commit:** C2 planner review and duration sizing refinement. C2 code and tests are committed; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
+- **HEAD after this commit:** B2 revision — habit forms lose the domain picker and the bucket picker, gain a time field. B2 code, tests, `main_plan.md` and this file are committed together; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
+
+- **Gates (B2 revision, 2026-11-04):** tsc 0; eslint 0 errors on touched files (1 pre-existing `_` warning in edit-habit-modal); 52 suites / **733 tests** (5 new `periodFromTime` tests; `periodSummary` tests rewritten for the "At HH:MM" wording); `next build` clean; production-build browser verification green on 3100 (create form, edit form incl. the rule-19 category-preservation check, template path); server killed by port PID, 3000/3001/3100 free. Touches `src/components/habits/create-habit-modal.tsx`, `edit-habit-modal.tsx`, `habit-time-field.tsx` (new), `habit-form-preview.tsx` (domain optional), `src/app/habits/page.tsx`, `src/app/page.tsx` (onboarding handler), `src/lib/db.ts` (`Habit.category` now optional), `src/lib/utils/time-period.ts` (+`periodFromTime`) + tests, `src/lib/utils/habit-form-summary.ts` (`periodSummary`) + tests, `domain-picker.tsx` and `time-anchor-picker.tsx` **deleted** (orphaned), `main_plan.md` (B2 revision note), this file. **Not pushed.**
+
+- **Previous HEAD before this commit:** C2 planner review and duration sizing refinement. C2 code and tests are committed; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
 
 - **Gates (C2 refinement, 2026-11-04):** tsc 0; 52 suites / **730 tests** (no new tests — the existing `planner-block-time.test.ts` already asserts "keeps growing for blocks longer than 2h", confirming the linear no-cap behavior); lint 0 errors on touched files (`animated-block-group.tsx`, `planner-content.tsx`); `next build` clean. **What shipped:** (1) Fixed `canReview` logic for merged blocks — slots with `slot.block === null` now return `true` instead of `false` via `.every()`, so empty slots no longer incorrectly block review of merged blocks; (2) Removed the `xh` duration badge from `animated-block-group.tsx` (the "Clock + X hours" display was removed; the `Clock` import was removed as it was only used there); (3) Fixed the misleading comment that described a 200% cap that was never implemented — the code always grew linearly with only a minimum floor; the comment now correctly states "height grows linearly from a minimum touch-height floor with no upper cap". Touches `src/components/planner/animated-block-group.tsx` (comment fix, duration badge removal, unused Clock import removal), `src/components/planner/planner-content.tsx` (canReview logic fix), `main_plan.md` (C2 refinement marked SHIPPED).
 

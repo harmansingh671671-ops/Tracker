@@ -3,6 +3,7 @@ import {
   getTimePeriod,
   getTimePeriodAccent,
   allTimePeriods,
+  periodFromTime,
   type TimePeriod,
 } from "./time-period";
 
@@ -99,5 +100,27 @@ describe("allTimePeriods", () => {
     const a = allTimePeriods();
     a.pop();
     expect(allTimePeriods()).toHaveLength(3);
+  });
+});
+
+describe("periodFromTime", () => {
+  it("derives morning before noon", () => {
+    expect(periodFromTime("06:30")).toBe("morning");
+    expect(periodFromTime("11:59")).toBe("morning");
+  });
+  it("derives afternoon from noon to 16:59", () => {
+    expect(periodFromTime("12:00")).toBe("afternoon");
+    expect(periodFromTime("16:59")).toBe("afternoon");
+  });
+  it("derives evening from 17:00", () => {
+    expect(periodFromTime("17:00")).toBe("evening");
+    expect(periodFromTime("23:45")).toBe("evening");
+  });
+  it("empty or malformed means no period, never a guess", () => {
+    expect(periodFromTime(undefined)).toBeUndefined();
+    expect(periodFromTime("")).toBeUndefined();
+    expect(periodFromTime("anytime")).toBeUndefined();
+    expect(periodFromTime("25:00")).toBeUndefined();
+    expect(periodFromTime("6:30 pm")).toBeUndefined();
   });
 });

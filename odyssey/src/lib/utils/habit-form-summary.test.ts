@@ -30,17 +30,16 @@ describe("scheduleSummary (the live preview's schedule line)", () => {
 });
 
 describe("periodSummary (the preview's when line)", () => {
-  it("names the four anchors the form offers", () => {
-    expect(periodSummary("morning")).toBe("Mornings");
-    expect(periodSummary("afternoon")).toBe("Afternoons");
-    expect(periodSummary("evening")).toBe("Evenings");
-    expect(periodSummary("anytime")).toBe("Anytime");
+  it("shows the entered time", () => {
+    expect(periodSummary("06:30")).toBe("At 06:30");
+    expect(periodSummary("21:15")).toBe("At 21:15");
   });
 
-  it("unknown or absent falls back to Anytime, never a crash", () => {
+  it("empty, malformed or out-of-range falls back to Anytime, never a crash", () => {
     expect(periodSummary(undefined)).toBe("Anytime");
     expect(periodSummary("weird")).toBe("Anytime");
     expect(periodSummary("")).toBe("Anytime");
+    expect(periodSummary("25:00")).toBe("Anytime");
   });
 });
 

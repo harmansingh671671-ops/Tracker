@@ -334,7 +334,12 @@ export interface Habit {
   // four ARE the schema, a value outside them is a compile error rather than a
   // runtime surprise. Legacy rows still read fine: IndexedDB is not
   // type-checked, and `getHabitColor` falls back deterministically.
-  category: HabitCategory;
+  //
+  // Optional since 2026-11-04 (owner instruction): the habit forms no longer
+  // offer a domain picker, so a plain custom habit carries NO domain and its
+  // colour comes from the name hash. Templates and goal tags still write one.
+  // Nothing queries the `category` index, so an unindexed row is harmless.
+  category?: HabitCategory;
   /**
    * Absent means `simple`. Optional so every existing habit keeps reading correctly
    * with no migration -- see ADR 0003.

@@ -37,6 +37,7 @@ import { CreateHabitModal } from "@/components/habits/create-habit-modal";
 import { hasCompletedOnboarding, markOnboardingComplete } from "@/lib/utils/onboarding";
 import { writePrimaryGoal } from "@/lib/utils/habit-template-order";
 import { type HabitCategory } from "@/lib/db";
+import { periodFromTime } from "@/lib/utils/time-period";
 import {
   FIRST_STEP,
   canAdvance,
@@ -137,10 +138,13 @@ export default function OnboardingPage() {
     async (data: {
       name: string;
       icon: string;
-      category: HabitCategory;
+      category?: HabitCategory;
       frequency: number;
       targetDays: number[];
-      timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
+      /** A wall-clock time the user typed ("HH:MM"); empty means anytime. */
+      timeOfDay?: string;
+      /** A template's period bucket; a typed time overrides it. */
+      period?: "morning" | "afternoon" | "evening";
     }) => {
       // Guarded rather than trusted: `addHabit` needs a userId, and calling it
       // with null would fail silently -- which reads as "the app ate my habit".
@@ -154,7 +158,8 @@ export default function OnboardingPage() {
         frequency: "daily",
         targetDaysPerWeek: data.targetDays.length,
         targetDays: data.targetDays,
-        period: data.timeOfDay === "anytime" ? undefined : data.timeOfDay,
+        timeOfDay: data.timeOfDay || undefined,
+        period: data.timeOfDay ? periodFromTime(data.timeOfDay) : data.period,
         archivedAt: undefined,
       });
 

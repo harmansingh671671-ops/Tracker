@@ -17,7 +17,8 @@ import { getHabitColor } from "@/lib/utils/habit-colors";
 interface HabitFormPreviewProps {
   icon: string;
   name: string;
-  domain: string;
+  /** Optional: only templates and goal tags carry a domain now — the picker is gone (owner instruction 2026-11-04). */
+  domain?: string;
   /** Optional explicit colour choice from the swatches. */
   color: string;
   scheduleLine: string;
@@ -76,7 +77,7 @@ export function HabitFormPreview({
             </span>
           </div>
           <p className="text-[10px] text-on-surface-variant font-mono truncate">
-            {domain}
+            {domain || "\u00A0"}
           </p>
           <div className="mt-1 space-y-0.5">
             <p className="text-[11px] text-on-surface-variant flex items-center gap-1">

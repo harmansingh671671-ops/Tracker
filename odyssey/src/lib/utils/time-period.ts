@@ -79,6 +79,24 @@ export function getTimePeriodAccent(
   return period ? ACCENTS[period] : null;
 }
 
+/**
+ * Derives the period from a wall-clock time the user typed ("HH:MM", the
+ * `Habit.timeOfDay` shape). The form no longer asks for a period bucket
+ * (owner instruction 2026-11-04) — the accent chip keeps working by deriving
+ * it: before noon is morning, noon to 16:59 is afternoon, from 17:00 is
+ * evening. Empty or malformed input means no period, never a guess.
+ */
+export function periodFromTime(time?: string | null): TimePeriod | undefined {
+  if (!time) return undefined;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return undefined;
+  const hour = Number(match[1]);
+  if (hour > 23) return undefined;
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
 /** Every accent, for tests and for anything that needs to enumerate them. */
 export function allTimePeriods(): TimePeriodAccent[] {
   return [ACCENTS.morning, ACCENTS.afternoon, ACCENTS.evening];

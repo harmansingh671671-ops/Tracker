@@ -6,9 +6,8 @@ import { HabitTemplateLibrary, type HabitTemplate } from "@/components/habits/ha
 import type { ChallengeHabitInput } from "@/lib/utils/challenges";
 import { UnitPicker } from "@/components/habits/unit-picker";
 import { IconGridPicker } from "@/components/habits/icon-grid-picker";
-import { DomainPicker } from "@/components/habits/domain-picker";
 import { SchedulePicker } from "@/components/habits/schedule-picker";
-import { TimeAnchorPicker } from "@/components/habits/time-anchor-picker";
+import { HabitTimeField } from "@/components/habits/habit-time-field";
 import { FormSection, FormLabel } from "@/components/habits/form-section";
 import { HabitFormPreview } from "@/components/habits/habit-form-preview";
 import { PriorityPicker, ColorPicker } from "@/components/habits/priority-color-picker";
@@ -27,10 +26,14 @@ interface CreateHabitModalProps {
   onSave: (habitData: {
     name: string;
     icon: string;
-    category: HabitCategory;
+    /** Only templates and goal tags carry a domain now — the picker is gone (owner instruction 2026-11-04). */
+    category?: HabitCategory;
     frequency: number;
     targetDays: number[];
-    timeOfDay?: "morning" | "afternoon" | "evening" | "anytime";
+    /** A wall-clock time the user typed ("HH:MM"); empty means anytime. */
+    timeOfDay?: string;
+    /** A template's period bucket; a typed time overrides it (page mapping). */
+    period?: "morning" | "afternoon" | "evening";
     priority?: "critical" | "focus" | "optional";
     cue?: string;
     reward?: string;
@@ -75,15 +78,18 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
   const [name, setName] = useState(defaults?.name ?? "");
   const [icon, setIcon] = useState(defaults?.icon ?? "🧘");
   // M16 -- a `defaults.category` the picker does not offer would select nothing,
-  // so it is checked against DOMAINS rather than trusted. An unknown value falls
-  // back to the existing default rather than leaving the form in no state.
-  const [domain, setDomain] = useState<HabitCategory>(
+  // so it is checked against DOMAINS rather than trusted. With the picker gone
+  // (owner instruction 2026-11-04) the domain still flows from goal tags and
+  // templates; a plain custom habit has none, and the colour hash takes over.
+  const [domain, setDomain] = useState<HabitCategory | undefined>(
     defaults?.category && DOMAINS.some((d) => d.id === defaults.category)
       ? defaults.category
-      : "Vitality & Fitness"
+      : undefined
   );
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon..Fri by default
-  const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening" | "anytime">("morning");
+  const [habitTime, setHabitTime] = useState<string>("");
+  /** A selected template's period bucket; kept until the user types a time. */
+  const [templatePeriod, setTemplatePeriod] = useState<"morning" | "afternoon" | "evening" | undefined>(undefined);
   const [priority, setPriority] = useState<"critical" | "focus" | "optional">("focus");
   const [cue, setCue] = useState("");
   const [reward, setReward] = useState("");
@@ -132,7 +138,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
     setIcon(tpl.icon);
     setDomain(tpl.domainLabel);
     setSelectedDays(tpl.targetDays);
-    setTimeOfDay(tpl.period);
+    setTemplatePeriod(tpl.period === "anytime" ? undefined : tpl.period);
+    setHabitTime("");
     setView("custom");
   };
 
@@ -143,7 +150,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       category: tpl.domainLabel,
       frequency: tpl.targetDays.length,
       targetDays: tpl.targetDays,
-      timeOfDay: tpl.period,
+      period: tpl.period === "anytime" ? undefined : tpl.period,
       priority,
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
@@ -164,7 +171,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
       category: domain,
       frequency: selectedDays.length,
       targetDays: selectedDays,
-      timeOfDay,
+      timeOfDay: habitTime || undefined,
+      period: habitTime ? undefined : templatePeriod,
       priority,
       cue: cue.trim() || undefined,
       reward: reward.trim() || undefined,
@@ -242,18 +250,20 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
               onCreateCustom={() => {
                 setName("");
                 setIcon("🧘");
-                setDomain("Vitality & Fitness");
+                setDomain(undefined);
                 setSelectedDays([1, 2, 3, 4, 5]);
-                setTimeOfDay("morning");
+                setHabitTime("");
+                setTemplatePeriod(undefined);
                 setType("simple");
                 setView("custom");
               }}
               onCreateQuit={() => {
                 setName("");
                 setIcon("🚫");
-                setDomain("Vitality & Fitness");
+                setDomain(undefined);
                 setSelectedDays([1, 2, 3, 4, 5, 6, 7]);
-                setTimeOfDay("anytime");
+                setHabitTime("");
+                setTemplatePeriod(undefined);
                 setType("avoid");
                 setView("custom");
               }}
@@ -283,8 +293,6 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
 
             <IconGridPicker value={icon} onChange={setIcon} />
 
-            <DomainPicker value={domain} onChange={setDomain} />
-
             {/* Frequency & Target Weekdays */}
             <SchedulePicker
               selectedDays={selectedDays}
@@ -292,7 +300,7 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
               onApplyPreset={applyPreset}
             />
 
-            <TimeAnchorPicker value={timeOfDay} onChange={setTimeOfDay} />
+            <HabitTimeField value={habitTime} onChange={setHabitTime} />
 
             {/* Habit Type */}
             {type !== "avoid" && (
@@ -400,10 +408,10 @@ export function CreateHabitModal({ isOpen, onClose, onSave, existingHabitNames =
             <HabitFormPreview
               icon={icon}
               name={name}
-              domain={domain}
+              domain={domain ?? ""}
               color={color}
               scheduleLine={scheduleSummary(selectedDays)}
-              periodLine={periodSummary(timeOfDay)}
+              periodLine={periodSummary(habitTime)}
               goalLine={goalSummary({ type, unit, targetValue })}
               priority={prioritySummary(priority)}
               type={type}
