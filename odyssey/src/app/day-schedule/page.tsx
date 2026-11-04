@@ -1463,39 +1463,7 @@ function DayScheduleContent() {
 
           {/* Circular Progress Ring */}
           <div className="flex items-center gap-2 pl-1 shrink-0">
-            <div className="relative w-11 h-11 flex items-center justify-center">
-              <svg className="w-11 h-11 transform -rotate-90" viewBox="0 0 44 44">
-                <circle
-                  cx="22"
-                  cy="22"
-                  r="17"
-                  fill="transparent"
-                  stroke="var(--surface-container-high)"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                />
-                <circle
-                  cx="22"
-                  cy="22"
-                  r="17"
-                  fill="transparent"
-                  stroke="var(--primary)"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeDasharray="106.8"
-                  strokeDashoffset={106.8 - (106.8 * progressPct) / 100}
-                  className="transition-all duration-700 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-[11px] font-bold text-primary leading-none">
-                  {categoryStats.plannedTotal}
-                </span>
-                <span className="text-[8px] font-mono text-outline leading-none mt-0.5">
-                  /24h
-                </span>
-              </div>
-            </div>
+            <div className="shrink-0" />
           </div>
         </div>
       </header>
@@ -1520,7 +1488,6 @@ function DayScheduleContent() {
               <span>Daily Allocation</span>
             </span>
             <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span className="text-on-surface-variant">Scheduled: {categoryStats.plannedTotal}h</span>
               <button
                 type="button"
                 onClick={handleAutoFillSleep}
