@@ -187,6 +187,35 @@ export const findOccupantAtHour = <T extends { id?: string; startTime: string; e
 // Hour/minute label helpers
 // ============================================================================
 
+// ============================================================================
+// PROPORTIONAL BLOCK SIZING (C2 enhancement)
+// ============================================================================
+
+/**
+ * Logarithmic saturation curve for planner card height, minutes in.
+ *
+ * h(t) = 9.92326552 × ln(t + 10.5632098) + 17.76153124
+ *
+ * Calibration anchors (owner-chosen, reinstated 2026-11-04 after both a
+ * linear clamp and this curve were compared live):
+ * - t = 5     min → 45px (75%  of the 60px baseline — minimum floor)
+ * - t = 60    min → 60px (100% baseline)
+ * - t = 1440  min → 90px (150% baseline — cap; anything ≥ 24h stays there)
+ * Growth is deliberately gradual: a 3h block is only ~11px taller than a 1h
+ * block. That is the chosen trade-off, not a bug.
+ */
+const LOG_COEFF = 9.92326552;
+const LOG_SUMMAND = 10.5632098;
+const LOG_ADDEND = 17.76153124;
+const MIN_HEIGHT_PX = 45;
+const MAX_HEIGHT_PX = 90;
+
+export const calculateBlockHeight = (minutes: number): number => {
+  if (!Number.isFinite(minutes) || minutes < 5) return MIN_HEIGHT_PX;
+  if (minutes >= 1440) return MAX_HEIGHT_PX;
+  return LOG_COEFF * Math.log(minutes + LOG_SUMMAND) + LOG_ADDEND;
+};
+
 /**
  * Get duration in hours from start/end time labels.
  */

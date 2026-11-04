@@ -8,6 +8,7 @@ import {
   rangeEndMinutes,
   endHourLabel,
   blockDurationMinutes,
+  calculateBlockHeight,
   getDurationHours,
 } from "./planner-block-time";
 import type { ScheduleBlock } from "@/lib/db";
@@ -251,6 +252,32 @@ describe("blockDurationMinutes (planner card sizing)", () => {
 
   it("keeps 24:00 as the end of the day", () => {
     expect(blockDurationMinutes("23:00", "24:00", 1380, 1440)).toBe(60);
+  });
+});
+
+describe("calculateBlockHeight (logarithmic saturation, owner constants)", () => {
+  it("anchors: t=5 → 45px floor, t=60 → 60px baseline", () => {
+    expect(calculateBlockHeight(5)).toBeCloseTo(45.0, 1);
+    expect(calculateBlockHeight(60)).toBeCloseTo(60.0, 1);
+  });
+
+  it("caps at 90px (150%) from 24h and never exceeds it", () => {
+    expect(calculateBlockHeight(1440)).toBeCloseTo(90.0, 1);
+    expect(calculateBlockHeight(2880)).toBeCloseTo(90.0, 1);
+  });
+
+  it("floors sub-5-minute and invalid inputs at 45px", () => {
+    expect(calculateBlockHeight(0)).toBe(45);
+    expect(calculateBlockHeight(-10)).toBe(45);
+    expect(calculateBlockHeight(Number.NaN)).toBe(45);
+  });
+
+  it("grows monotonically but never past the cap", () => {
+    const vals = [5, 30, 60, 120, 205, 480, 720, 1440].map(calculateBlockHeight);
+    for (let i = 1; i < vals.length; i++) {
+      expect(vals[i]).toBeGreaterThan(vals[i - 1]);
+      expect(vals[i]).toBeLessThanOrEqual(90);
+    }
   });
 });
 

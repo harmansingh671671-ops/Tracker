@@ -3,7 +3,7 @@
 import React, { useCallback, useMemo } from "react";
 import { type ScheduleBlock } from "@/lib/db";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
-import { cardHeightPx } from "@/lib/utils/block-resize";
+import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
 import { CheckCircle2, XCircle, Circle } from "lucide-react";
 
 interface MergedBlockSlot {
@@ -51,9 +51,10 @@ export interface AnimatedBlockGroupProps {
  * C2 merged-block card -- a multi-hour plan rendered as ONE proportionally
  * sized card instead of one stacked card per hour.
  *
- * Sizing (`cardHeightPx` from `block-resize.ts`): the SAME duration mechanism
- * the quick schedule uses -- linear at 64px/hour, clamped 42-120px, so a
- * longer plan is visibly taller and hours beyond 1h52m share the 120px cap.
+ * Sizing (`calculateBlockHeight` in planner-block-time.ts): the owner-chosen
+ * logarithmic saturation curve -- 45px floor at 5min, 60px at 1h, capped at
+ * 90px (150%) from 24h. Growth is gradual BY DESIGN: a 3h block is only ~11px
+ * taller than a 1h block.
  *
  * Height is memoized per group span and only recalculates when hours change.
  *
@@ -85,7 +86,7 @@ export function AnimatedBlockGroup({
       ? group.endMin - group.startMin
       : 1440 - group.startMin + group.endMin;
   const proportionalHeight = useMemo(
-    () => cardHeightPx(durationMinutes),
+    () => calculateBlockHeight(durationMinutes),
     [group.startMin, group.endMin],
   );
 

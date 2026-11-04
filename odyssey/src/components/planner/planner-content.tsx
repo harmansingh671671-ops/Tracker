@@ -35,8 +35,11 @@ import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
 import { AnimatedBlockGroup } from "@/components/planner/animated-block-group";
 import { groupPlannerHours } from "@/lib/utils/planner-hour-groups";
-import { minuteOfLabel, blockDurationMinutes } from "@/lib/utils/planner-block-time";
-import { cardHeightPx } from "@/lib/utils/block-resize";
+import {
+  minuteOfLabel,
+  blockDurationMinutes,
+  calculateBlockHeight,
+} from "@/lib/utils/planner-block-time";
 import {
   Clock,
   CheckCircle2,
@@ -815,13 +818,12 @@ export function PlannerContent() {
         })
       : !isFutureHour;
     const isRecentlySaved = recentlySavedHour === slot.hour;
-    // Proportional height from the block's REAL minute span -- the SAME
-    // mechanism the quick schedule rows use (cardHeightPx: 64px/hour, clamped
-    // 42-120px), so a 09:00-09:30 block is visibly shorter than a full hour
-    // card and the two pages agree. Empty hours stay content-sized. Midnight
-    // wraps count as two segments, never a negative duration.
+    // Proportional height from the block's REAL minute span on the owner-chosen
+    // log curve (45px floor at 5min, 60px at 1h, 90px cap at 24h). Midnight
+    // wraps count as two segments, never a negative duration. Empty hours
+    // keep the content-sized card.
     const heightPx = slot.block
-      ? cardHeightPx(
+      ? calculateBlockHeight(
           blockDurationMinutes(
             slot.block.startTime,
             slot.block.endTime,
