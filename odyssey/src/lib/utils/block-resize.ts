@@ -150,7 +150,31 @@ export const computeResize = <T extends MinBlockLike>(
 
   const absorbed: T[] = [];
   const edited: T[] = [];
+
+  // Shrink into an adjacent EMPTY block: instead of freeing the stretch as a
+  // brand-new block, the empty block that starts exactly at the dragged
+  // block's old end is stretched upward to cover it (edited in place — its
+  // identity, title and category survive). Owner rule (2026-11-04): "make
+  // changes to the existing block only" — increase-then-decrease must not
+  // pile up duplicate empty blocks. The test is an empty TITLE: every block
+  // the user typed into has text, so only the app's own leftovers qualify.
+  let freed: { start: number; end: number } | null = null;
+  let stretchedEmpty: T | null = null;
+  if (newEnd < oldEnd) {
+    const below = blocks.find((b) => {
+      if (b.id === draggedId) return false;
+      const r = blockRangeMinutes(b);
+      return r !== null && r[0] === oldEnd && !(b.title || "").trim();
+    });
+    if (below) {
+      stretchedEmpty = { ...below, startTime: labelFromMinutes(newEnd) };
+    } else {
+      freed = { start: newEnd, end: oldEnd };
+    }
+  }
+
   const next = blocks.map((b) => {
+    if (stretchedEmpty && b.id === stretchedEmpty.id) return stretchedEmpty;
     if (b.id === draggedId) {
       return { ...b, endTime: labelFromMinutes(newEnd) };
     }
@@ -170,14 +194,38 @@ export const computeResize = <T extends MinBlockLike>(
     edited.push({ ...b, endTime: labelFromMinutes(start) });
     return edited[edited.length - 1];
   });
+  if (stretchedEmpty) {
+    edited.push(stretchedEmpty);
+  }
   const survivors = next.filter((b) => !absorbed.some((a) => a.id === b.id));
   return {
     next: survivors,
     absorbed,
     edited,
-    freed: newEnd < oldEnd ? { start: newEnd, end: oldEnd } : null,
+    freed,
     dragged: (survivors.find((b) => b.id === draggedId) ?? null) as T | null,
   };
+}
+
+/**
+ * Divide a freed stretch (a shrink that freed `[start, end)`) at every
+ * whole-hour boundary strictly inside it. Owner rule (2026-11-04): new blocks
+ * are never longer than an hour, and hour-aligned pieces land as proper
+ * `xx:00–xx+1:00` blocks — 70 freed minutes become a proper hour plus a
+ * 10-minute block; 40 freed minutes stay one block (`xx:20–xx+1:00`).
+ */
+export const splitFreedStretch = (
+  start: number,
+  end: number,
+): Array<{ start: number; end: number }> => {
+  const pieces: Array<{ start: number; end: number }> = [];
+  let cursor = start;
+  for (let b = (Math.floor(cursor / 60) + 1) * 60; b < end; b += 60) {
+    pieces.push({ start: cursor, end: b });
+    cursor = b;
+  }
+  pieces.push({ start: cursor, end });
+  return pieces;
 };
 
 export interface MergeMinutesResult {

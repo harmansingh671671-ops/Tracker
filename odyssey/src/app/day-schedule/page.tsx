@@ -15,6 +15,7 @@ import {
   MIN_BLOCK_MINUTES,
   quantizeEndMinutes,
   rowKey,
+  splitFreedStretch,
   type DayRow,
 } from "@/lib/utils/block-resize";
 import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
@@ -844,18 +845,26 @@ function DayScheduleContent() {
         await updateBlock(preview.id, { endTime: outcome.dragged.endTime });
       }
       if (outcome.freed && outcome.dragged) {
-        await addBlock({
-          userId: userId!,
-          date: dateStr!,
-          startTime: labelFromMinutes(outcome.freed.start),
-          endTime: labelFromMinutes(outcome.freed.end),
-          title: "",
-          // The freed stretch inherits the dragged block's category, so the
-          // new card reads as a continuation until the user types into it.
-          category: outcome.dragged.category,
-          status: "pending",
-          isCommitted: true,
-        });
+        // Owner rule (2026-11-04): the freed stretch is divided at every
+        // whole-hour boundary inside it — hour-aligned pieces land as proper
+        // xx:00–xx+1:00 blocks, only the ragged edges are sub-hour, and no
+        // new block is ever longer than an hour. (An adjacent EMPTY block
+        // absorbing the stretch never reaches this path: `computeResize`
+        // stretches it in place and reports no freed stretch at all.)
+        for (const piece of splitFreedStretch(outcome.freed.start, outcome.freed.end)) {
+          await addBlock({
+            userId: userId!,
+            date: dateStr!,
+            startTime: labelFromMinutes(piece.start),
+            endTime: labelFromMinutes(piece.end),
+            title: "",
+            // The freed stretch inherits the dragged block's category, so the
+            // new cards read as a continuation until the user types into them.
+            category: outcome.dragged.category,
+            status: "pending",
+            isCommitted: true,
+          });
+        }
       }
       syncCurrentScheduleToNative(dateStr);
 

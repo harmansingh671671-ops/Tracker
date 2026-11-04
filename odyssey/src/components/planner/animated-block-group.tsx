@@ -90,9 +90,11 @@ export function AnimatedBlockGroup({
     [group.startMin, group.endMin],
   );
 
-  // Format minutes-since-midnight as HH:MM string
+  // Format minutes-since-midnight as HH:MM, keeping the planner's `24:00`
+  // convention for the end of the day (a raw % 1440 would render it 00:00).
   const formatMin = (min: number) => {
-    const h = Math.floor((min % 1440) / 60);
+    if (min >= 1440) return "24:00";
+    const h = Math.floor(min / 60);
     const m = min % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
@@ -166,10 +168,10 @@ export function AnimatedBlockGroup({
             isCurrent ? "text-primary font-extrabold" : "text-on-surface"
           }`}
         >
-          {String(group.startHour).padStart(2, "0")}:00
+          {formatMin(group.startMin)}
         </span>
         <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
-          {String(group.endHour % 24 === 0 ? 24 : group.endHour % 24).padStart(2, "0")}:00
+          {formatMin(group.endMin)}
         </span>
       </div>
 

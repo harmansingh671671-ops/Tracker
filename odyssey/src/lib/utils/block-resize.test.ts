@@ -10,6 +10,7 @@ import {
   minutesOfLabel,
   quantizeEndMinutes,
   rowKey,
+  splitFreedStretch,
 } from "./block-resize";
 import type { MinBlockLike } from "./block-resize";
 
@@ -112,6 +113,69 @@ describe("computeResize", () => {
     const mine = b("a", "23:00", "24:00");
     const out = computeResize([mine], "a", 1500);
     expect(out.next.find((x) => x.id === "a")!.endTime).toBe("24:00");
+  });
+
+  it("stretches an adjacent EMPTY block upward instead of freeing a stretch", () => {
+    const mine = b("a", "09:00", "10:00", "Deep work");
+    const empty = b("e", "10:00", "10:30", "");
+    const out = computeResize([mine, empty], "a", 570); // shrink → 09:30
+    // The empty block absorbs the freed stretch in place: same id, new start.
+    expect(out.freed).toBeNull();
+    expect(out.edited.map((x) => x.id)).toEqual(["e"]);
+    const stretched = out.next.find((x) => x.id === "e")!;
+    expect(stretched.startTime).toBe("09:30");
+    expect(stretched.endTime).toBe("10:30");
+    expect(stretched.title).toBe("");
+    // The dragged block still shrinks to the raw finger position.
+    expect(out.next.find((x) => x.id === "a")!.endTime).toBe("09:30");
+  });
+
+  it("does NOT stretch a titled neighbour below — the stretch is freed", () => {
+    const mine = b("a", "09:00", "10:00", "Deep work");
+    const real = b("n", "10:00", "10:30", "Calls");
+    const out = computeResize([mine, real], "a", 570);
+    expect(out.freed).toEqual({ start: 570, end: 600 });
+    expect(out.edited).toHaveLength(0);
+    expect(out.next.find((x) => x.id === "n")!.startTime).toBe("10:00");
+  });
+});
+
+describe("splitFreedStretch (shrink pieces, owner rule 2026-11-04)", () => {
+  it("keeps a sub-hour stretch as ONE block (xx:20 → xx+1:00)", () => {
+    expect(splitFreedStretch(560, 600)).toEqual([{ start: 560, end: 600 }]);
+  });
+
+  it("splits 70 freed minutes into a proper hour plus the 10-minute rest", () => {
+    expect(splitFreedStretch(600, 670)).toEqual([
+      { start: 600, end: 660 },
+      { start: 660, end: 670 },
+    ]);
+  });
+
+  it("splits 90 freed minutes into the ragged edge plus the proper hour", () => {
+    expect(splitFreedStretch(570, 660)).toEqual([
+      { start: 570, end: 600 },
+      { start: 600, end: 660 },
+    ]);
+  });
+
+  it("splits a two-hour stretch at its middle boundary", () => {
+    expect(splitFreedStretch(540, 660)).toEqual([
+      { start: 540, end: 600 },
+      { start: 600, end: 660 },
+    ]);
+  });
+
+  it("never returns a piece longer than an hour", () => {
+    for (let start = 0; start < 1440 - 5; start += 25) {
+      for (const len of [5, 35, 65, 95, 130, 200]) {
+        const end = Math.min(1440, start + len);
+        for (const piece of splitFreedStretch(start, end)) {
+          expect(piece.end - piece.start).toBeLessThanOrEqual(60);
+          expect(piece.end).toBeGreaterThan(piece.start);
+        }
+      }
+    }
   });
 });
 
