@@ -901,7 +901,7 @@ function DayScheduleContent() {
   // Handle blur: save on loss of focus
   const handleBlur = useCallback(
     (row: DayRow<ScheduleBlock>, value: string) => {
-      const key = rowKey(row);
+      const key = rowKey(row, dateStr);
       if (focusedKeyRef.current === key) {
         focusedKeyRef.current = null;
       }
