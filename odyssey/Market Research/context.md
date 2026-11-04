@@ -1080,6 +1080,9 @@ tsc 0, eslint 0 errors (touched files), 31 suites / 482 tests, build clean,
 13 routes. Still no visual verification (no device/harness) — this also means
 the round-3 "nothing ever overflows" claim is now obsolete by design.
 
+- **HEAD after this commit:** B9 declined — context tags (`@morning` / `@gym` / `@home` / `@computer` / `@anywhere`) not built; habit priority remains shipped under S2, energy levels remain declined. No code change, no schema change.
+- **Gates (B9 decline, 2026-11-04):** no tests, no build — no code touched. `main_plan.md` updated to `DECLINED` and this file. **Named skip:** context chips on cards, context filter/sort, and context-fed recommendations all not built.
+
 
 **PERF-7 round 2 - scroll-jank sources deleted on owner request (SHIPPED):**
 owner report: scrolling/lag feels janky. Biggest contributors hunted by
