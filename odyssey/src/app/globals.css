@@ -893,6 +893,16 @@ button, a, input, select {
   animation: holdRimPulse 1.5s ease-in-out infinite;
 }
 
+/* C2 mobile touch drag handles: the grip pill (h-1 w-10) only shows on hover via
+   group-hover/drag:bg-primary/60, which never fires on touch. On touch devices
+   force the grip to a visible opacity so the affordance is discoverable. */
+@media (hover: none) and (pointer: coarse) {
+  .drag-handle-grip {
+    background-color: var(--outline) !important;
+    opacity: 0.7;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .odyssey-hold-rim {
     animation: none;

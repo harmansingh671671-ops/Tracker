@@ -98,6 +98,7 @@ export interface MinBlockLike {
   category: string;
   startTime: string;
   endTime: string;
+  dateStr?: string;
 }
 
 /** A block's [start, end) in minutes, or null when either label does not parse. */
@@ -286,12 +287,28 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
 };
 
 export type DayRow<T> =
-  | { kind: "block"; block: T; startMin: number; endMin: number }
-  | { kind: "empty"; startMin: number; endMin: number };
+  | { kind: "block"; block: T; startMin: number; endMin: number; dateStr?: string }
+  | { kind: "empty"; startMin: number; endMin: number; dateStr?: string };
 
-/** Stable per-row key: a block row keys on its id; an empty stretch on its start. */
-export const rowKey = <T extends { id: string }>(row: DayRow<T>): string =>
-  row.kind === "block" ? row.block.id : `g${row.startMin}`;
+/**
+ * Stable per-row key: a block row keys on its id; an empty stretch on its
+ * start minute.
+ *
+ * BUG FIX (2026-11-04): empty-row keys now include `dateStr` (when provided)
+ * to prevent cross-day key collisions. Previously `g${startMin}` on both Nov 4
+ * and Nov 5 meant their empty rows at the same time shared `editingValues`,
+ * so typing into today's empty row silently overwrote yesterday's. Keys now read
+ * `e${dateStr}__${startMin}` for empty rows and `block:${id}` for blocks.
+ */
+export const rowKey = <T extends { id: string }>(
+  row: DayRow<T>,
+  dateStr?: string
+): string =>
+  row.kind === "block"
+    ? row.block.id
+    : dateStr
+    ? `e${dateStr}__${row.startMin}`
+    : `g${row.startMin}`;
 
 /**
  * The day as renderable rows: blocks in time order, empty stretches between
@@ -301,7 +318,8 @@ export const rowKey = <T extends { id: string }>(row: DayRow<T>): string =>
  * is how a save path starts losing user data.
  */
 export const buildDayRows = <T extends MinBlockLike>(
-  blocks: readonly T[]
+  blocks: readonly T[],
+  dateStr?: string
 ): DayRow<T>[] => {
   const timed = blocks
     .map((b) => ({ b, range: blockRangeMinutes(b) }))
@@ -318,7 +336,7 @@ export const buildDayRows = <T extends MinBlockLike>(
     while (cursor < to) {
       const nextBoundary = (Math.floor(cursor / 60) + 1) * 60;
       const end = Math.min(nextBoundary, to);
-      rows.push({ kind: "empty", startMin: cursor, endMin: end });
+      rows.push({ kind: "empty", startMin: cursor, endMin: end, dateStr });
       cursor = end;
     }
   };
@@ -331,7 +349,7 @@ export const buildDayRows = <T extends MinBlockLike>(
     if (start > cursor) {
       pushEmptyRows(cursor, start);
     }
-    rows.push({ kind: "block", block: b, startMin: start, endMin: e });
+    rows.push({ kind: "block", block: b, startMin: start, endMin: e, dateStr: b.dateStr as string | undefined });
     cursor = Math.max(cursor, e);
   }
   if (cursor < DAY_END_MINUTES) {

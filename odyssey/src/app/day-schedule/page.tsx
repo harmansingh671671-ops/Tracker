@@ -234,10 +234,7 @@ function DayScheduleContent() {
     date: string | null;
     rows: Map<string, { startMin: number; endMin: number; category: string }>;
   }>({ date: null, rows: new Map() });
-  const handleGhostGone = useCallback(
-    (key: string) => setGhostRows((cur) => cur.filter((g) => g.key !== key)),
-    []
-  );
+  const handleGhostGone = (key: string) => setGhostRows((cur) => cur.filter((g) => g.key !== key));
   useEffect(() => {
     if (ghostRows.length === 0) return;
     const t = window.setTimeout(() => setGhostRows([]), 500);
@@ -282,7 +279,7 @@ function DayScheduleContent() {
   }, [userId, prevDateKey]);
 
 
-  const dayRows = useMemo(() => buildDayRows(liveBlocks), [liveBlocks]);
+  const dayRows = useMemo(() => buildDayRows(liveBlocks, dateStr), [liveBlocks, dateStr]);
 
   /**
    * The remembered category per row — yesterday's block over the same stretch,
@@ -293,7 +290,7 @@ function DayScheduleContent() {
     const m = new Map<string, string>();
     for (const row of dayRows) {
       const remembered = rememberedCategoryForRange(prevDayBlocks, row.startMin, row.endMin);
-      if (remembered) m.set(rowKey(row), remembered);
+      if (remembered) m.set(rowKey(row, dateStr), remembered);
     }
     return m;
   }, [dayRows, prevDayBlocks]);
@@ -460,6 +457,10 @@ function DayScheduleContent() {
 
   const inputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const focusedKeyRef = useRef<string | null>(null);
+  /** Tracks which rows just got their first character (for mobile remembered-
+   *  category flash). Set from onChange's e.target.value so it fires
+   *  immediately even when inputValue state lags on mobile keyboards. */
+  const [firstCharKeys, setFirstCharKeys] = useState<Record<string, boolean>>({});
   const currentHour = new Date().getHours();
   const todayStr = getTodayStr();
   const isSelectedToday = dateStr === todayStr;
@@ -577,7 +578,7 @@ function DayScheduleContent() {
     categoryTouchedKeysRef.current.clear();
 
     for (const row of dayRows) {
-      const key = rowKey(row);
+      const key = rowKey(row, dateStr);
       const hourStart = Math.floor(row.startMin / 60);
       if (row.kind === "block" && row.block) {
         if (focusedKeyRef.current === key) {
@@ -644,14 +645,14 @@ function DayScheduleContent() {
       // painted its category across the whole allocation bar ("Sleep: 24h" for
       // one hour of sleep).
       for (let h = Math.floor(row.startMin / 60); h < Math.min(24, Math.ceil(row.endMin / 60)); h++) {
-        const typed = (editingValues[rowKey(row)] ?? "").trim();
+        const typed = (editingValues[rowKey(row, dateStr)] ?? "").trim();
         const isPlanned = row.kind === "block" || typed.length > 0;
         if (!isPlanned || planned[h]) continue;
         planned[h] = true;
         cats[h] =
           row.kind === "block"
             ? normalizeCategory(row.block.category, h)
-            : rowCategories[rowKey(row)] || normalizeCategory(undefined, h);
+            : rowCategories[rowKey(row, dateStr)] || normalizeCategory(undefined, h);
       }
     }
     return planned.map((p, h) => ({ planned: p, cat: cats[h] }));
@@ -884,7 +885,7 @@ function DayScheduleContent() {
 
         const nextRow = dayRows[index + 1];
         if (nextRow) {
-          const nextKey = rowKey(nextRow);
+          const nextKey = rowKey(nextRow, dateStr);
           focusedKeyRef.current = nextKey;
           setTimeout(() => {
             if (inputRefs.current[nextKey]) {
@@ -1079,7 +1080,7 @@ function DayScheduleContent() {
       !hasStoredCategory &&
       !pickedCats.has(key) &&
       rememberedKey !== undefined &&
-      inputValue.trim().length === 1;
+      (firstCharKeys[key] || inputValue.trim().length === 1);
     const isStubEmpty = isEmptyBlock && !hasStoredCategory && inputValue.trim().length === 0;
     const cat = getCatStyle(
       isStubEmpty
@@ -1267,6 +1268,11 @@ function DayScheduleContent() {
             onChange={(e) => {
               const val = e.target.value;
               focusedKeyRef.current = key;
+              const isFirst = val.trim().length === 1;
+              setFirstCharKeys((prev) => {
+                if (prev[key] === isFirst) return prev;
+                return { ...prev, [key]: isFirst };
+              });
               autosizeTextarea(e.target);
               setEditingValues((prev) => ({
                 ...prev,
@@ -1308,7 +1314,18 @@ function DayScheduleContent() {
             preview lives in `dragPreview`, the store is written on release.
             Empty rows have nothing to resize: a dead handle there reads as a
             broken affordance (press = zero feedback), so it is disabled. */}
+        {/* Top-border drag handle — resize by dragging the top edge */}
         <BlockDragHandle
+          position="top"
+          disabled={row.kind !== "block"}
+          onResize={(deltaMinutes) => handleResize(row, deltaMinutes)}
+          onEnd={() => {
+            void handleResizeCommit();
+          }}
+        />
+        {/* Bottom-border drag handle — resize by dragging the bottom edge */}
+        <BlockDragHandle
+          position="bottom"
           disabled={row.kind !== "block"}
           onResize={(deltaMinutes) => handleResize(row, deltaMinutes)}
           onEnd={() => {
