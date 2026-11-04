@@ -871,6 +871,12 @@ function DayScheduleContent() {
     [editingValues, handleSaveRow, updateBlock, dateStr]
   );
 
+  /** Focus-request by row index that survives a save-merge. When Enter saves a
+   *  block the neighbours merge and `dayRows` reshapes, so the pre-save key no
+   *  longer exists — focusing by key after the merge lands nowhere. The index
+   *  stays meaningful across the reshape. */
+  const pendingFocusIndexRef = useRef<number | null>(null);
+
   // Handle Enter / Line-break key on mobile/desktop
   const handleKeyDown = useCallback(
     (
@@ -881,22 +887,31 @@ function DayScheduleContent() {
       if (e.key === "Enter") {
         e.preventDefault();
         const value = e.currentTarget.value;
+        // Mark the next row by INDEX before saving — after the merge the keys
+        // change, the index stays.
+        if (index + 1 < dayRows.length) pendingFocusIndexRef.current = index + 1;
         handleSaveRow(row, value);
-
-        const nextRow = dayRows[index + 1];
-        if (nextRow) {
-          const nextKey = rowKey(nextRow, dateStr);
-          focusedKeyRef.current = nextKey;
-          setTimeout(() => {
-            if (inputRefs.current[nextKey]) {
-              inputRefs.current[nextKey]!.focus();
-            }
-          }, 30);
-        }
       }
     },
     [handleSaveRow, dayRows]
   );
+
+  // Focus the pending index after a save-merge reshapes `dayRows`.
+  useEffect(() => {
+    const idx = pendingFocusIndexRef.current;
+    if (idx === null) return;
+    pendingFocusIndexRef.current = null;
+    const nextRow = dayRows[idx];
+    if (!nextRow) return;
+    const nextKey = rowKey(nextRow, dateStr);
+    focusedKeyRef.current = nextKey;
+    // Small timeout for the textarea to be committed.
+    requestAnimationFrame(() => {
+      if (inputRefs.current[nextKey]) {
+        inputRefs.current[nextKey]!.focus();
+      }
+    });
+  }, [dayRows, dateStr]);
 
   // Handle blur: save on loss of focus
   const handleBlur = useCallback(
