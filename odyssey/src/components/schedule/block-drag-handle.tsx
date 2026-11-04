@@ -10,12 +10,12 @@ import { pxPerMinuteToDelta, PX_PER_MINUTE } from "@/lib/utils/block-resize";
  * 5-minute steps, live preview in `dragPreview`, store written on release.
  *
  * Mobile (touch): TAP AND HOLD (~250 ms, grip lights up + a small buzz) to arm
- * the resize, then drag. A quick swipe over the strip is a normal page scroll
- * (`touch-action: pan-y`) and never resizes — the press is abandoned the moment
- * the finger moves more than a few px before the hold completes. Once armed, a
- * non-passive `touchmove` `preventDefault` blocks scrolling for the rest of the
- * gesture. This is deliberate: the strip overlaps the block card, so immediate
- * capture would make every scroll that starts on a block edge resize it.
+ * the resize, then drag. Scrolling is prevented from that point on: the
+ * non-passive `touchmove` listener is installed INSIDE the hold-timer callback
+ * so it lands before the first browser scroll frame can fire. A quick swipe over
+ * the strip is a normal page scroll (`touch-action: pan-y`) and never resizes —
+ * if the finger moves more than ~10 px before the hold completes the press is
+ * abandoned.
  *
  * Pointer Capture keeps the stream alive when the finger leaves the strip mid
  * drag (the usual case, since cards grow under it). The handle is a dedicated
@@ -51,27 +51,34 @@ export function BlockDragHandle({
 }) {
   const pressRef = useRef<PressState | null>(null);
   const elRef = useRef<HTMLDivElement | null>(null);
+  const docBlockRef = useRef<((e: TouchEvent) => void) | null>(null);
   const [armed, setArmed] = useState(false);
   const [pressed, setPressed] = useState(false);
 
-  // Once armed on touch, block the page scroll for the rest of the gesture.
-  // (`touch-action` is sampled at gesture start, so it cannot be flipped
-  // mid-gesture; preventDefault on touchmove is what actually stops the scroll.)
-  useEffect(() => {
-    if (!armed) return;
-    const el = elRef.current;
-    if (!el) return;
-    const block = (e: TouchEvent) => e.preventDefault();
-    el.addEventListener("touchmove", block, { passive: false });
-    return () => el.removeEventListener("touchmove", block);
-  }, [armed]);
+  const installDocScrollBlock = () => {
+    if (docBlockRef.current) return;
+    const block = (e: TouchEvent) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    document.addEventListener("touchmove", block, { passive: false });
+    docBlockRef.current = block;
+  };
+
+  const removeDocScrollBlock = () => {
+    if (docBlockRef.current) {
+      document.removeEventListener("touchmove", docBlockRef.current);
+      docBlockRef.current = null;
+    }
+  };
 
   // Never leave a dangling hold timer behind.
   useEffect(() => {
     return () => {
       const p = pressRef.current;
       if (p && p.timer !== null) window.clearTimeout(p.timer);
+      removeDocScrollBlock();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (disabled) return null;
@@ -84,6 +91,7 @@ export function BlockDragHandle({
     pressRef.current = null;
     setArmed(false);
     setPressed(false);
+    removeDocScrollBlock();
     if (wasArmed) onEnd();
   };
 
@@ -124,8 +132,11 @@ export function BlockDragHandle({
           try {
             el.setPointerCapture(p.pointerId);
           } catch {
-            /* capture can fail if the gesture already ended; the resize is inert then */
+            /* capture can fail if the gesture already ended */
           }
+          // Block scrolling the moment the hold lands, so the first drag frame
+          // cannot start a scroll.
+          installDocScrollBlock();
           if (typeof navigator !== "undefined" && "vibrate" in navigator) {
             navigator.vibrate(10);
           }
@@ -163,7 +174,7 @@ export function BlockDragHandle({
       className="absolute inset-x-0 bottom-0 z-30 h-6 cursor-ns-resize touch-pan-y flex items-end justify-center group/drag"
     >
       <span
-        className={`mb-0.5 h-1 w-6 rounded-full transition-colors drag-handle-grip ${
+        className={`mb-1 h-0.5 w-12 rounded-full transition-colors drag-handle-grip ${
           armed
             ? "bg-primary"
             : pressed
