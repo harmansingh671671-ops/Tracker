@@ -19,7 +19,7 @@ import { HabitDateStrip } from "@/components/habits/habit-date-strip";
 import { HabitsEmptyState } from "@/components/habits/habits-empty-state";
 import { type HabitCategory, type Habit } from "@/lib/db";
 import { triggerStreaksConfetti } from "@/lib/utils/confetti";
-import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr, habitCategoryLabel } from "@/lib/utils/habit-colors";
+import { getHabitColor, isHabitScheduledOnDate, getLocalTodayStr } from "@/lib/utils/habit-colors";
 import { periodFromTime, getTimePeriodAccent } from "@/lib/utils/time-period";
 import { decodeShareLink, type SharedHabitData } from "@/lib/utils/habit-share";
 import { TemplateDetailPreview } from "@/components/habits/template-detail-preview";
@@ -1367,11 +1367,6 @@ AnimatePresence, which suppresses the enter transition and leaves the
                             {h.name}
                           </h4>
                           {h.id === user?.keystoneHabitId && <KeystoneBadge />}
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] font-mono text-on-surface-variant">
-                          <span className="truncate font-semibold" style={{ color: habitColor }}>
-                            {habitCategoryLabel(h)}
-                          </span>
                         </div>
                       </div>
                     </div>

@@ -703,6 +703,17 @@ eslint 0 errors on touched files (1 pre-existing `_` warning); 52 suites /
 733 tests (5 new `periodFromTime` tests, `periodSummary` tests rewritten);
 `next build` clean; ports 3000/3001/3100 free.
 
+**Follow-up, same day (owner instruction): the domain label is gone from the
+habit card too.** The screenshot was the card's coloured category text
+("Renewal & Health"). Removed from the card's meta line and from the page's
+compact habit rows (the label div deleted there, not just emptied); the meta
+line now starts with the day count, and the month calendar still receives the
+category for its own colour use. First verification run served a stale build —
+the labels were still present until `next build` was re-run; the rebuilt probe
+shows zero domain labels anywhere on the habits page. Gates: tsc 0; eslint 0
+errors on the two touched files; 53 suites / 741 tests (the concurrent session
+added suites); `next build` clean; ports free.
+
 ### 2026-11-04 - B7a revised: challenge cards follow the page view mode (SHIPPED)
 
 **Owner instruction:** "remove this thing from the challenge type habits, the view of
@@ -1242,9 +1253,9 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 ## §10 Git + task state (as of 2026-11-04)
 
-- **HEAD after this commit:** B2 revision — habit forms lose the domain picker and the bucket picker, gain a time field. B2 code, tests, `main_plan.md` and this file are committed together; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
+- **HEAD after this commit:** B2 revision + card follow-up — habit forms lose the domain picker and the bucket picker, gain a time field; the domain label is also removed from the habit card. B2 code, tests, `main_plan.md` and this file are committed together; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
 
-- **Gates (B2 revision, 2026-11-04):** tsc 0; eslint 0 errors on touched files (1 pre-existing `_` warning in edit-habit-modal); 52 suites / **733 tests** (5 new `periodFromTime` tests; `periodSummary` tests rewritten for the "At HH:MM" wording); `next build` clean; production-build browser verification green on 3100 (create form, edit form incl. the rule-19 category-preservation check, template path); server killed by port PID, 3000/3001/3100 free. Touches `src/components/habits/create-habit-modal.tsx`, `edit-habit-modal.tsx`, `habit-time-field.tsx` (new), `habit-form-preview.tsx` (domain optional), `src/app/habits/page.tsx`, `src/app/page.tsx` (onboarding handler), `src/lib/db.ts` (`Habit.category` now optional), `src/lib/utils/time-period.ts` (+`periodFromTime`) + tests, `src/lib/utils/habit-form-summary.ts` (`periodSummary`) + tests, `domain-picker.tsx` and `time-anchor-picker.tsx` **deleted** (orphaned), `main_plan.md` (B2 revision note), this file. **Not pushed.**
+- **Gates (B2 revision + card follow-up, 2026-11-04):** tsc 0; eslint 0 errors on touched files (1 pre-existing `_` warning in edit-habit-modal); 53 suites / **741 tests** (5 new `periodFromTime` tests; `periodSummary` tests rewritten for the "At HH:MM" wording; the concurrent session added suites); `next build` clean; production-build browser verification green on 3100 (create form, edit form incl. the rule-19 category-preservation check, template path, and — after a rebuild caught a stale-build miss — zero domain labels anywhere on the habits page); server killed by port PID, 3000/3001/3100 free. Touches `src/components/habits/create-habit-modal.tsx`, `edit-habit-modal.tsx`, `habit-time-field.tsx` (new), `habit-form-preview.tsx` (domain optional), `habit-list-card.tsx` (card label removed), `src/app/habits/page.tsx`, `src/app/page.tsx` (onboarding handler), `src/lib/db.ts` (`Habit.category` now optional), `src/lib/utils/time-period.ts` (+`periodFromTime`) + tests, `src/lib/utils/habit-form-summary.ts` (`periodSummary`) + tests, `domain-picker.tsx` and `time-anchor-picker.tsx` **deleted** (orphaned), `main_plan.md` (B2 revision notes), this file. **Not pushed.**
 
 - **Previous HEAD before this commit:** C2 planner review and duration sizing refinement. C2 code and tests are committed; unrelated Android Studio, ignore-file, `../fleet/`, and `../verify/` changes remain outside the commit.
 

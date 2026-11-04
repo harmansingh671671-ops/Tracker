@@ -28,7 +28,7 @@ import { HabitMonthCalendar } from "@/components/habits/habit-month-calendar";
 import { HabitChallengeView } from "@/components/habits/habit-challenge-view";
 import { AvoidHabitControl } from "@/components/habits/avoid-habit-control";
 import { KeystoneBadge } from "@/components/habits/keystone-badge";
-import { getHabitColor, isHabitScheduledOnDate, habitCategoryLabel } from "@/lib/utils/habit-colors";
+import { getHabitColor, isHabitScheduledOnDate } from "@/lib/utils/habit-colors";
 import { getCompletionRecord, isHabitComplete, isHabitSlipped } from "@/lib/utils/habit-completion";
 import { formatLastDone } from "@/lib/utils/last-done";
 import { getTimePeriodAccent } from "@/lib/utils/time-period";
@@ -235,13 +235,11 @@ export const HabitListCard = memo(function HabitListCard({
               </div>
             )}
             <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant font-mono">
-              <span className="font-semibold" style={{ color: habitColor }}>{habitCategoryLabel(habit)}</span>
               {/* Counted/simple at 0 days renders nothing at all (M13's
                   honest-zero rule): a bare flame with no number behind it
-                  reads as broken. The separator goes with it. */}
+                  reads as broken. */}
               {(habit.type === "avoid" || getDaysDoneLabel(daysDone) !== "") && (
                 <>
-                  <span>•</span>
                   <span className={`flex items-center gap-0.5 ${habit.type === "avoid" ? "text-error" : isDaysDoneActive(daysDone) ? "text-amber-400" : "text-on-surface-variant/60"}`}>
                     {habit.type === "avoid" ? <X className="w-3 h-3" /> : <Flame className="w-3 h-3" />}
                     {habit.type === "avoid" ? `${getDaysDoneLabel(daysDone) || "0d"} clean` : getDaysDoneLabel(daysDone)}
