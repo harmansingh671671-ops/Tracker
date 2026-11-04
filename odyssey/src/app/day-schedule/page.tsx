@@ -20,6 +20,10 @@ import {
 import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
 import { canonicalCategoryKey } from "@/lib/utils/schedule-category-key";
 import { BlockDragHandle } from "@/components/schedule/block-drag-handle";
+import {
+  CollapsingRowGhost,
+  type CollapsingRowGhostData,
+} from "@/components/schedule/collapsing-row-ghost";
 import { db, type ScheduleBlock } from "@/lib/db";
 import { getJourneyDayNumber } from "@/lib/utils/journey";
 import { syncCurrentScheduleToNative } from "@/lib/utils/android-bridge";
@@ -119,6 +123,24 @@ export const CATEGORY_OPTIONS = [
 const getCatStyle = (cat?: string, isCustom?: boolean) =>
   getPlannerCatStyle(cat ?? "", isCustom ?? false);
 
+/** One entry of the rendered day list: a live row or a collapsing ghost. */
+type DayListItem =
+  | { kind: "row"; row: DayRow<ScheduleBlock>; index: number }
+  | { kind: "ghost"; ghost: CollapsingRowGhostData };
+
+/** Identity of the block-row set, for the ghost diff (categories never differ on their own). */
+const sameBlockRows = (
+  a: Map<string, { startMin: number; endMin: number; category: string }>,
+  b: Map<string, { startMin: number; endMin: number; category: string }>
+): boolean => {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) {
+    const o = b.get(k);
+    if (!o || o.startMin !== v.startMin || o.endMin !== v.endMin) return false;
+  }
+  return true;
+};
+
 export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
   if (!cat) {
     // No stored value: an empty hour is inferred from its clock position. That
@@ -193,6 +215,32 @@ function DayScheduleContent() {
     return () => window.clearTimeout(t);
   }, [undoPayload]);
 
+  const isDragging = dragPreview !== null;
+  const draggedId = dragPreview?.id ?? null;
+
+  /**
+   * Exit ghosts (`C2` drag polish): when a block row disappears from the day
+   * (swallowed by the drag preview, eaten by a save-time merge), its card
+   * shell renders once more as a ghost that collapses away instead of
+   * snapping out of the list. `onAnimationEnd` removes each ghost; the
+   * timeout is the fallback for reduced motion, where the CSS hides ghosts
+   * outright and no animation event ever fires.
+   */
+  const [ghostRows, setGhostRows] = useState<CollapsingRowGhostData[]>([]);
+  const [ghostTracker, setGhostTracker] = useState<{
+    date: string | null;
+    rows: Map<string, { startMin: number; endMin: number; category: string }>;
+  }>({ date: null, rows: new Map() });
+  const handleGhostGone = useCallback(
+    (key: string) => setGhostRows((cur) => cur.filter((g) => g.key !== key)),
+    []
+  );
+  useEffect(() => {
+    if (ghostRows.length === 0) return;
+    const t = window.setTimeout(() => setGhostRows([]), 500);
+    return () => window.clearTimeout(t);
+  }, [ghostRows]);
+
   const liveBlocks = useMemo(() => {
     // A drag preview is validated against the CURRENT day's blocks — its id
     // belongs to the day the drag started on. A date flip empties the day
@@ -204,6 +252,41 @@ function DayScheduleContent() {
   }, [blocks, dragPreview]);
 
   const dayRows = useMemo(() => buildDayRows(liveBlocks), [liveBlocks]);
+
+  // Ghost derivation, render-phase adjust (the same pattern as the day-name
+  // key below): diff this render's block rows against the last render's.
+  // Every vanished row becomes a ghost; every returned row (Undo) drops its
+  // ghost. Updating the tracker makes the next diff empty, so this terminates.
+  const blockRowsNow = new Map<
+    string,
+    { startMin: number; endMin: number; category: string }
+  >();
+  for (const r of dayRows) {
+    if (r.kind === "block") {
+      blockRowsNow.set(r.block.id, {
+        startMin: r.startMin,
+        endMin: r.endMin,
+        category: r.block.category ?? "",
+      });
+    }
+  }
+  if (ghostTracker.date !== dateStr) {
+    // First render of a day: seed the tracker, and drop ghosts — they belong
+    // to whatever day was shown before.
+    if (ghostRows.length > 0) setGhostRows([]);
+    setGhostTracker({ date: dateStr, rows: blockRowsNow });
+  } else if (!sameBlockRows(ghostTracker.rows, blockRowsNow)) {
+    const vanished = [...ghostTracker.rows].filter(([id]) => !blockRowsNow.has(id));
+    if (vanished.length > 0 || ghostRows.some((g) => blockRowsNow.has(g.key))) {
+      setGhostRows((cur) => [
+        ...cur.filter(
+          (g) => !blockRowsNow.has(g.key) && !vanished.some(([id]) => id === g.key)
+        ),
+        ...vanished.map(([key, snap]) => ({ key, ...snap })),
+      ]);
+    }
+    setGhostTracker({ date: dateStr, rows: blockRowsNow });
+  }
 
   const displayDay = dayNum || (user?.createdAt ? getJourneyDayNumber(user.createdAt) : 1);
   const [dayName, setDayName] = useState<string>("");
@@ -728,7 +811,7 @@ function DayScheduleContent() {
         prev && prev.id === row.block.id ? { ...prev, endMin } : { id: row.block.id, endMin }
       );
     },
-    [blocks]
+    [blocks, setDragPreview]
   );
 
   /**
@@ -794,7 +877,7 @@ function DayScheduleContent() {
     } catch (err) {
       console.error("Error committing resize:", err);
     }
-  }, [dragPreview, blocks, deleteBlock, updateBlock, addBlock, userId, dateStr]);
+  }, [dragPreview, blocks, deleteBlock, updateBlock, addBlock, userId, dateStr, setDragPreview, setUndoPayload]);
 
   /** Undo the last resize commit: restore every absorbed, trimmed and dragged row. */
   const handleUndoResize = useCallback(async () => {
@@ -831,7 +914,7 @@ function DayScheduleContent() {
     } catch (err) {
       console.error("Error undoing resize:", err);
     }
-  }, [undoPayload, addBlock, updateBlock, dateStr]);
+  }, [undoPayload, addBlock, updateBlock, dateStr, setUndoPayload]);
 
   // Render a single day row — a block (at its real minute span) or an empty
   // stretch (styled identically to the old hour rows).
@@ -842,6 +925,7 @@ function DayScheduleContent() {
     const isCurrent = isSelectedToday && nowMinutes >= row.startMin && nowMinutes < row.endMin;
     const isRecentlySaved = recentlySavedKey === key;
     const block = row.kind === "block" ? row.block : null;
+    const isDraggedRow = isDragging && !!block && block.id === draggedId;
     const isCustom = !!block;
     const cat = getCatStyle(
       rowCategories[key] ||
@@ -893,15 +977,22 @@ function DayScheduleContent() {
            dropdown above), so the low-end kill-switch must not strip it. */
         data-blur-essential
         style={{ minHeight: cardMinHeight }}
-        className={`group relative flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 border border-l-4 ${cat.leftBorder} select-none ${
+        className={`group relative flex items-center gap-3 p-3 rounded-2xl border border-l-4 ${cat.leftBorder} select-none ${
           cat.cardBg
         } ${cat.cardBorder} backdrop-blur-xl my-1 shadow-sm ${stackClass} ${
-          isRecentlySaved
+          isDragging
+            ? isDraggedRow
+              ? // Drag spotlight: while a border-drag runs, the dragged card is
+                // the one lit card, raised above the drag scrim; every other
+                // row sits dimmed and blurred behind it (no ring of its own).
+                "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.45)] bg-surface-container-low relative z-50"
+              : ""
+            : isRecentlySaved
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.35)] scale-[1.01] bg-surface-container-low"
             : isCurrent
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.25)] bg-surface-container-low"
             : ""
-        }`}
+        } ${isDragging ? "" : "transition-all duration-200"}`}
       >
         {/* Time Indicator on Left — the row's actual minutes, not a rebuilt
             hour: a 10:35 start must read as 10:35. */}
@@ -1060,6 +1151,25 @@ function DayScheduleContent() {
       </div>
     );
   };
+
+  // Merge ghosts into the row list at their old positions, so a swallowed
+  // row's space closes in place (rows below slide up as it collapses).
+  const dayListItems: DayListItem[] = [];
+  {
+    const orderedGhosts = [...ghostRows].sort((a, z) => a.startMin - z.startMin);
+    let ri = 0;
+    for (const ghost of orderedGhosts) {
+      while (ri < dayRows.length && dayRows[ri].startMin < ghost.startMin) {
+        dayListItems.push({ kind: "row", row: dayRows[ri], index: ri });
+        ri += 1;
+      }
+      dayListItems.push({ kind: "ghost", ghost });
+    }
+    while (ri < dayRows.length) {
+      dayListItems.push({ kind: "row", row: dayRows[ri], index: ri });
+      ri += 1;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-on-surface pb-16">
@@ -1264,7 +1374,31 @@ function DayScheduleContent() {
           <LoadingIndicator label="Loading schedule blocks" className="py-24" />
         ) : (
           <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
-            {dayRows.map((row, index) => renderDayRow(row, index))}
+            {/* Drag spotlight: while a border-drag runs, the rest of the day
+                steps back (dim + slight blur) and only the dragged card stays
+                lit (raised z-50). Purely visual — pointer-events-none so it can
+                never eat the drag. The blur is deliberately NOT marked
+                data-blur-essential: PERF-7e strips it on low-end devices and
+                the dim tint carries the effect alone. Rendered inside this
+                wrapper (which has no backdrop-filter, per the BUG-8 fix) so
+                `fixed` resolves to the viewport. */}
+            {isDragging && (
+              <div
+                aria-hidden
+                className="fixed inset-0 z-40 pointer-events-none bg-background/35 backdrop-blur-[2px]"
+              />
+            )}
+            {dayListItems.map((item) =>
+              item.kind === "row" ? (
+                renderDayRow(item.row, item.index)
+              ) : (
+                <CollapsingRowGhost
+                  key={`ghost-${item.ghost.key}`}
+                  ghost={item.ghost}
+                  onGone={handleGhostGone}
+                />
+              )
+            )}
 
             {/* The border-drag absorb banner: shown just after a resize commit
                 that removed whole blocks (their content lived in real tasks the
