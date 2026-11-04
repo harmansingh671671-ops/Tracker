@@ -1413,6 +1413,7 @@ AnimatePresence, which suppresses the enter transition and leaves the
                         todayStr={todayStr}
                         selectedDate={selectedDate}
                         onSelectDate={setSelectedDate}
+                        view="heatmap"
                         onToggle={(id, date) => {
                           void handleToggle(id, date);
                         }}

@@ -393,6 +393,7 @@ export function EditHabitModal({
                     setSelectedHistoryDate(dateStr);
                     if (onSelectDate) onSelectDate(dateStr);
                   }}
+                  view="heatmap"
                   onToggle={(id, date) => {
                     if (user) void toggleHabitLog(user.id, id, date);
                   }}

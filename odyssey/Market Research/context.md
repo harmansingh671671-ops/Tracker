@@ -672,6 +672,23 @@ section below; today's entries are kept in full.
 
 **Verification:** `tsc --noEmit` 0; `npm run lint -- --quiet` 0 errors; 52 suites / 730 tests; `next build` clean. The production server asserted `Ready` and was killed by port PID with 3000/3001/3100 free. The visual browser probe could not run because the CLI environment has no available display.
 
+### 2026-11-04 - B7a revised: challenge cards follow the page view mode (SHIPPED)
+
+**Owner instruction:** "remove this thing from the challenge type habits, the view of
+habit cards should change with the view they are in" — the screenshot was the
+challenge card's own heatmap/list toggle pills. The toggle is gone entirely;
+`HabitChallengeView` now takes a **controlled `view` prop** ("heatmap" | "calendar")
+instead of `initialView` + internal state. Callers: the list view passes "calendar"
+(the 10-column day grid), the page's heatmap branch passes "heatmap" (the horizontal
+strip), and the edit sheet passes "heatmap" (no page view mode there; the compact
+strip fits). Verified on a production build in both page views: the toggle pills are
+absent, the list view renders 46×46 grid cells, the heatmap view renders 18×18 strip
+cells all on one y. Note: both sub-views emit identical `aria-label`s
+("Day 1, Tue 3 Nov, missed"), so snapshots cannot distinguish them — geometry
+(bounding boxes) is the reliable probe. Gates: tsc 0; eslint 0 errors on touched
+files (1 pre-existing `_` warning in edit-habit-modal); 52 suites / 730 tests
+(the concurrent session added suites); `next build` clean.
+
 ### 2026-11-03 - B14: quick-capture inbox on the Journey page (SHIPPED)
 
 **Owner-approved scope, briefed and confirmed before coding:** the inbox lives on the

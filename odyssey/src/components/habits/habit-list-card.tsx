@@ -378,7 +378,7 @@ export const HabitListCard = memo(function HabitListCard({
           todayStr={todayStr}
           selectedDate={selectedDate}
           onSelectDate={onSelectDate}
-          initialView="list"
+          view="calendar"
           onToggle={(id, date) => {
             void onToggle(id, date);
           }}
