@@ -8,7 +8,6 @@ import { useScheduleStore } from "@/lib/stores/schedule-store";
 import {
   blockRangeMinutes,
   buildDayRows,
-  cardHeightPx,
   computeResize,
   findAdjacentMergeMinutes,
   findWholeDayBlocks,
@@ -18,6 +17,7 @@ import {
   rowKey,
   type DayRow,
 } from "@/lib/utils/block-resize";
+import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
 import { canonicalCategoryKey } from "@/lib/utils/schedule-category-key";
 import { BlockDragHandle } from "@/components/schedule/block-drag-handle";
 import { db, type ScheduleBlock } from "@/lib/db";
@@ -858,11 +858,12 @@ function DayScheduleContent() {
 
     /**
      * Proportional height (`C2` follow-up): a row's card grows with the minutes
-     * it actually holds, clamped so a multi-hour block never dwarfs the page
-     * and a 5-minute block stays tappable — nothing too large or too short.
-     * `minHeight`, not height: a long task name still grows the row.
+     * it actually holds, on the SAME owner-chosen log curve the planner uses
+     * (45px floor at 5min, 60px at 1h, 90px cap from 24h) — both pages size
+     * blocks identically now. `minHeight`, not height: a long task name still
+     * grows the row.
      */
-    const cardMinHeight = cardHeightPx(row.endMin - row.startMin);
+    const cardMinHeight = calculateBlockHeight(row.endMin - row.startMin);
 
     /**
      * How high this card stacks.
