@@ -1,5 +1,6 @@
 import type { ScheduleBlock, StoredScheduleCategory } from "@/lib/db";
 import { canonicalCategoryKey } from "./schedule-category-key";
+import { minuteOfLabel } from "./planner-block-time";
 
 /** The fields an hour slot must carry to be grouped on the planner rail. */
 export interface PlannerHourSlotLike {
@@ -19,6 +20,10 @@ export interface PlannerHourGroup {
   isCustom: boolean;
   startHour: number;
   endHour: number;
+  /** Actual minute-level start (minutes-since-midnight) */
+  startMin: number;
+  /** Actual minute-level end (minutes-since-midnight) */
+  endMin: number;
   hours: number[];
   slots: PlannerHourSlotLike[];
   title: string;
@@ -62,6 +67,7 @@ export function groupPlannerHours(
 
     if (canMerge && current) {
       current.endHour = slot.hour + 1;
+      current.endMin = minuteOfLabel(slot.endTime) ?? (slot.hour + 1) * 60;
       current.hours.push(slot.hour);
       current.slots.push(slot);
       continue;
@@ -74,6 +80,8 @@ export function groupPlannerHours(
       isCustom: slot.isCustom,
       startHour: slot.hour,
       endHour: slot.hour + 1,
+      startMin: minuteOfLabel(slot.startTime) ?? slot.hour * 60,
+      endMin: minuteOfLabel(slot.endTime) ?? (slot.hour + 1) * 60,
       hours: [slot.hour],
       slots: [slot],
       title: slot.title,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { type ScheduleBlock } from "@/lib/db";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
@@ -24,6 +24,8 @@ export interface AnimatedBlockGroupProps {
     isCustom: boolean;
     startHour: number;
     endHour: number;
+    startMin: number;
+    endMin: number;
     hours: number[];
     slots: MergedBlockSlot[];
     title: string;
@@ -49,9 +51,12 @@ export interface AnimatedBlockGroupProps {
  * C2 merged-block card -- a multi-hour plan rendered as ONE proportionally
  * sized card instead of one stacked card per hour.
  *
- * Sizing (`calculateBlockHeight`): height grows linearly from a minimum
- * touch-height floor (75% of a 1-hour card) with no upper cap -- a longer
- * plan is visibly taller than a shorter one.
+ * Sizing (`calculateBlockHeight`): height uses a logarithmic saturation curve
+ * (h(t) = 9.923... × ln(t + 10.563...) + 17.761...) with a 150% cap at 24h
+ * (90px). Minimum 45px at 5 min, baseline 60px at 1h. Diminishing returns:
+ * a 4-hour block is only 24% taller than a 1-hour block.
+ *
+ * Height is memoized per group span and only recalculates when hours change.
  *
  * Animation, all CSS, no state machinery:
  * - A change while the element persists (absorbing the next hour on save)
@@ -72,8 +77,19 @@ export function AnimatedBlockGroup({
   currentHour,
   canReview,
 }: AnimatedBlockGroupProps) {
-  const durationHours = group.endHour - group.startHour;
-  const proportionalHeight = calculateBlockHeight(durationHours);
+  // Memoize: only recompute height when minute-level span changes, not on every render
+  const durationMinutes = group.endMin - group.startMin;
+  const proportionalHeight = useMemo(
+    () => calculateBlockHeight(durationMinutes),
+    [group.startMin, group.endMin],
+  );
+
+  // Format minutes-since-midnight as HH:MM string
+  const formatMin = (min: number) => {
+    const h = Math.floor((min % 1440) / 60);
+    const m = min % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
 
   const cat = getPlannerCatStyle(group.category, group.isCustom);
   const CatIcon = cat.Icon;

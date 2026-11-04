@@ -10,7 +10,6 @@ import {
   calculateBlockHeight,
   getDurationHours,
   BASE_HOUR_HEIGHT_PX,
-  MIN_HEIGHT_RATIO,
 } from "./planner-block-time";
 import type { ScheduleBlock } from "@/lib/db";
 
@@ -232,31 +231,41 @@ describe("isBlockEntirelyPast", () => {
   });
 });
 
-describe("calculateBlockHeight (proportional sizing)", () => {
-  const minHeight = BASE_HOUR_HEIGHT_PX * MIN_HEIGHT_RATIO;
+describe("calculateBlockHeight (logarithmic saturation)", () => {
+  // New formula: h(t) = 9.92326552 × ln(t + 10.5632098) + 17.76153124
+  // Input is in minutes. Anchors: t=5→45px, t=60→60px, t=1440→90px
 
-  it("returns min height for 0.5h (30 min)", () => {
-    expect(calculateBlockHeight(0.5)).toBe(minHeight);
+  it("at t=5 min returns 45px (minimum floor)", () => {
+    expect(calculateBlockHeight(5)).toBeCloseTo(45.0, 1);
   });
 
-  it("uses one base card per hour", () => {
-    expect(calculateBlockHeight(1)).toBe(BASE_HOUR_HEIGHT_PX);
-    expect(calculateBlockHeight(2)).toBe(BASE_HOUR_HEIGHT_PX * 2);
+  it("at t=60 min returns 60px (baseline 100%)", () => {
+    expect(calculateBlockHeight(60)).toBeCloseTo(60.0, 1);
   });
 
-  it("keeps growing for blocks longer than 2h", () => {
-    expect(calculateBlockHeight(3)).toBe(BASE_HOUR_HEIGHT_PX * 3);
-    expect(calculateBlockHeight(8)).toBe(BASE_HOUR_HEIGHT_PX * 8);
+  it("at t=1440 min (24h) returns 90px (150% cap)", () => {
+    expect(calculateBlockHeight(1440)).toBeCloseTo(90.0, 1);
+    // Anything beyond 24h stays at cap
+    expect(calculateBlockHeight(2880)).toBeCloseTo(90.0, 1);
   });
 
-  it("returns the minimum touch height for short and invalid durations", () => {
-    expect(calculateBlockHeight(0.1)).toBe(minHeight);
-    expect(calculateBlockHeight(0)).toBe(minHeight);
-    expect(calculateBlockHeight(Number.NaN)).toBe(minHeight);
+  it("falls back to 45px for inputs below 5 minutes", () => {
+    expect(calculateBlockHeight(0)).toBe(45);
+    expect(calculateBlockHeight(-10)).toBe(45);
+    expect(calculateBlockHeight(NaN)).toBe(45);
   });
 
-  it("keeps the minimum height at 75% of the base card", () => {
-    expect(minHeight).toBe(BASE_HOUR_HEIGHT_PX * 0.75);
+  it("is monotonically increasing in the valid range", () => {
+    const vals = [5, 15, 30, 60, 120, 240, 480, 720, 1440].map(calculateBlockHeight);
+    for (let i = 1; i < vals.length; i++) {
+      expect(vals[i]).toBeGreaterThan(vals[i - 1]);
+    }
+  });
+
+  it("satisfies diminishing returns: (h(60)-h(5)) > (h(120)-h(65))", () => {
+    const low  = calculateBlockHeight(60) - calculateBlockHeight(5);
+    const high = calculateBlockHeight(120) - calculateBlockHeight(65);
+    expect(low).toBeGreaterThan(high);
   });
 });
 

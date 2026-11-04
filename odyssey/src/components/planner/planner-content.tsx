@@ -35,6 +35,7 @@ import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
 import { AnimatedBlockGroup } from "@/components/planner/animated-block-group";
 import { groupPlannerHours } from "@/lib/utils/planner-hour-groups";
+import { minuteOfLabel, calculateBlockHeight } from "@/lib/utils/planner-block-time";
 import {
   Clock,
   CheckCircle2,
@@ -406,20 +407,29 @@ export function PlannerContent() {
     return Array.from({ length: 24 }, (_, h) => {
       const sTime = `${String(h).padStart(2, "0")}:00`;
       const eTime = `${String((h + 1) % 24 === 0 ? 24 : h + 1).padStart(2, "0")}:00`;
+      const slotStartMin = h * 60;
+      const slotEndMin = (h + 1) * 60;
+      // Find block that overlaps this slot at minute precision (not just integer-hour).
+      // Overlap test (half-open intervals): block starts before slot ends AND ends
+      // after slot starts. A wrap past midnight (22:00 → 06:00) covers two
+      // segments: [start → 1440) and [0 → end).
       const matching = blocks.find((b) => {
-        const sH = parseInt(b.startTime.split(":")[0], 10);
-        let eH = parseInt(b.endTime.split(":")[0], 10);
-        if (b.endTime === "24:00" || (eH === 0 && sH > 0)) eH = 24;
-        if (sH > eH) {
-          return h >= sH || h < eH;
+        const bStart = minuteOfLabel(b.startTime);
+        const bEnd = minuteOfLabel(b.endTime);
+        if (bStart === null || bEnd === null) return false;
+        if (bEnd <= bStart) {
+          // Wraps midnight: covers [bStart..1440) plus [0..bEnd)
+          return (bStart < slotEndMin && 1440 > slotStartMin) ||
+            (0 < slotEndMin && bEnd > slotStartMin);
         }
-        return h >= sH && h < eH;
+        return bStart < slotEndMin && bEnd > slotStartMin;
       });
 
       return {
         hour: h,
-        startTime: sTime,
-        endTime: eTime,
+        // Preserve actual block times if present; slot-boundary times are fallback
+        startTime: matching ? matching.startTime : sTime,
+        endTime: matching ? matching.endTime : eTime,
         block: matching || null,
         title: matching ? matching.title : "", // KEEP EMPTY IF NOT WRITTEN BY USER!
         category: matching ? matching.category : "",
@@ -804,6 +814,16 @@ export function PlannerContent() {
         })
       : !isFutureHour;
     const isRecentlySaved = recentlySavedHour === slot.hour;
+    // Proportional height from the block's REAL minute span (a 09:00-09:30
+    // block is visibly shorter than a full hour card). So short blocks do not
+    // get a full-hour card, and single-hour groups render exactly like merged
+    // ones. Empty hours keep the content-sized card (heightPx undefined).
+    const heightPx = slot.block
+      ? calculateBlockHeight(
+          (minuteOfLabel(slot.block.endTime) ?? (slot.hour + 1) * 60) -
+            (minuteOfLabel(slot.block.startTime) ?? slot.hour * 60)
+        )
+      : undefined;
 
     return (
       <TimelineHourSlot
@@ -819,6 +839,7 @@ export function PlannerContent() {
         onToggleStatus={handleToggleBlockStatus}
         onShowHint={showHint}
         onMoveBlock={handleMoveBlock}
+        heightPx={heightPx}
       />
     );
   };

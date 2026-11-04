@@ -39,6 +39,13 @@ interface TimelineHourSlotProps {
   ) => void;
   onShowHint: (msg: string) => void;
   onMoveBlock?: (block: ScheduleBlock, toHour: number) => void;
+  /**
+   * Proportional card height in pixels, computed by the rail from the block's
+   * actual minute span (`calculateBlockHeight(minutes)`). When given, the card
+   * renders at that height so a sub-hour block is visibly shorter than a full
+   * hour card; when absent (empty hour) the card stays content-sized.
+   */
+  heightPx?: number;
 }
 
 /**
@@ -65,6 +72,7 @@ export function TimelineHourSlot({
   onToggleStatus,
   onShowHint,
   onMoveBlock,
+  heightPx,
 }: TimelineHourSlotProps) {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -422,6 +430,11 @@ export function TimelineHourSlot({
             ? "ring-2 ring-primary border-primary shadow-[0_0_24px_rgba(108,0,255,0.22)] bg-surface-container-low relative z-20"
             : ""
         }`}
+        style={
+          heightPx !== undefined
+            ? { height: `${heightPx}px`, overflow: "hidden" }
+            : undefined
+        }
       >
         {/* Structured Left Spine Time Stamp */}
         <div className="flex flex-col items-center justify-center shrink-0 w-14 text-center">
@@ -430,10 +443,10 @@ export function TimelineHourSlot({
               isCurrent ? "text-primary font-extrabold" : "text-on-surface"
             }`}
           >
-            {String(slot.hour).padStart(2, "0")}:00
+            {slot.startTime}
           </span>
           <span className="text-[10px] font-mono text-on-surface-variant/60 leading-tight">
-            {String((slot.hour + 1) % 24 === 0 ? 24 : slot.hour + 1).padStart(2, "0")}:00
+            {slot.endTime}
           </span>
         </div>
 
