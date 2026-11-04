@@ -1,28 +1,37 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pxPerMinuteToDelta, PX_PER_MINUTE } from "@/lib/utils/block-resize";
 
 /**
- * A draggable border handle for a quick schedule card (`C2` follow-up).
- * Supports BOTH top-edge and bottom-edge dragging (pass `position="top"` or
- * `"bottom"`). Dragging from the TOP edge grows the block upward (start
- * moves earlier); from the BOTTOM it grows downward (end moves later).
+ * The bottom-border drag handle for a quick schedule card (`C2` follow-up).
  *
- * Press inside the strip and drag — vertical movement maps 1:1 onto minutes
- * through `PX_PER_MINUTE` and reports the CUMULATIVE delta since press, so the
- * owner's drag can be quantised to 5 minutes by the caller with one growing
- * stream of pointer moves.
+ * Desktop (mouse): press the strip and drag — resize starts immediately in
+ * 5-minute steps, live preview in `dragPreview`, store written on release.
+ *
+ * Mobile (touch): TAP AND HOLD (~250 ms, grip lights up + a small buzz) to arm
+ * the resize, then drag. A quick swipe over the strip is a normal page scroll
+ * (`touch-action: pan-y`) and never resizes — the press is abandoned the moment
+ * the finger moves more than a few px before the hold completes. Once armed, a
+ * non-passive `touchmove` `preventDefault` blocks scrolling for the rest of the
+ * gesture. This is deliberate: the strip overlaps the block card, so immediate
+ * capture would make every scroll that starts on a block edge resize it.
  *
  * Pointer Capture keeps the stream alive when the finger leaves the strip mid
- * drag (the usual case, since cards grow under it), and `stopPropagation` plus
- * `touch-action: none` keep the surrounding page from scrolling or arming the
- * card's other gestures. The handle is a dedicated strip, not the card itself,
- * precisely so the cards stay normal tap targets.
- *
- * On mobile (touch): the grip is ALWAYS visible so the affordance is
- * discoverable without needing hover.
+ * drag (the usual case, since cards grow under it). The handle is a dedicated
+ * strip, not the card itself, so cards stay normal tap targets.
  */
+const HOLD_MS = 250;
+const HOLD_TOLERANCE_PX = 10;
+
+interface PressState {
+  startY: number;
+  startX: number;
+  armed: boolean;
+  timer: number | null;
+  pointerId: number;
+}
+
 export function BlockDragHandle({
   onResize,
   onEnd,
@@ -37,48 +46,130 @@ export function BlockDragHandle({
   disabled?: boolean;
   /** px → minutes factor; tests pass a huge one to skip pixel math. */
   step?: number;
-  /** Which edge this handle attaches to. */
+  /** Kept for API compatibility; only the bottom edge is rendered. */
   position?: "top" | "bottom";
 }) {
-  const startYRef = useRef<number | null>(null);
+  const pressRef = useRef<PressState | null>(null);
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const [armed, setArmed] = useState(false);
+  const [pressed, setPressed] = useState(false);
+
+  // Once armed on touch, block the page scroll for the rest of the gesture.
+  // (`touch-action` is sampled at gesture start, so it cannot be flipped
+  // mid-gesture; preventDefault on touchmove is what actually stops the scroll.)
+  useEffect(() => {
+    if (!armed) return;
+    const el = elRef.current;
+    if (!el) return;
+    const block = (e: TouchEvent) => e.preventDefault();
+    el.addEventListener("touchmove", block, { passive: false });
+    return () => el.removeEventListener("touchmove", block);
+  }, [armed]);
+
+  // Never leave a dangling hold timer behind.
+  useEffect(() => {
+    return () => {
+      const p = pressRef.current;
+      if (p && p.timer !== null) window.clearTimeout(p.timer);
+    };
+  }, []);
 
   if (disabled) return null;
 
+  const finishPress = () => {
+    const p = pressRef.current;
+    if (!p) return;
+    if (p.timer !== null) window.clearTimeout(p.timer);
+    const wasArmed = p.armed;
+    pressRef.current = null;
+    setArmed(false);
+    setPressed(false);
+    if (wasArmed) onEnd();
+  };
+
   return (
     <div
+      ref={elRef}
       role="separator"
       aria-orientation="horizontal"
-      aria-label="Drag to change duration"
+      aria-label="Tap and hold to change duration"
       data-drag-handle
       data-drag-position={position}
       onPointerDown={(e) => {
-        if (e.button !== 0 && e.pointerType === "mouse") return;
-        startYRef.current = e.clientY;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        e.preventDefault();
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         e.stopPropagation();
+        const el = e.currentTarget;
+
+        if (e.pointerType === "mouse") {
+          // Desktop: immediate click-drag, as before.
+          pressRef.current = {
+            startY: e.clientY,
+            startX: e.clientX,
+            armed: true,
+            timer: null,
+            pointerId: e.pointerId,
+          };
+          el.setPointerCapture(e.pointerId);
+          e.preventDefault();
+          setPressed(true);
+          return;
+        }
+
+        // Touch / pen: start the hold timer. Do NOT capture or preventDefault
+        // yet — a quick swipe must remain a page scroll.
+        const timer = window.setTimeout(() => {
+          const p = pressRef.current;
+          if (!p) return;
+          p.armed = true;
+          try {
+            el.setPointerCapture(p.pointerId);
+          } catch {
+            /* capture can fail if the gesture already ended; the resize is inert then */
+          }
+          if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+            navigator.vibrate(10);
+          }
+          setArmed(true);
+        }, HOLD_MS);
+        pressRef.current = {
+          startY: e.clientY,
+          startX: e.clientX,
+          armed: false,
+          timer,
+          pointerId: e.pointerId,
+        };
+        setPressed(true);
       }}
       onPointerMove={(e) => {
-        if (startYRef.current === null) return;
-        const rawDelta = pxPerMinuteToDelta(e.clientY - startYRef.current, step);
-        onResize(rawDelta);
+        const p = pressRef.current;
+        if (!p) return;
+        if (!p.armed) {
+          // Moved before the hold completed — this is a scroll, not a resize.
+          if (
+            Math.abs(e.clientY - p.startY) > HOLD_TOLERANCE_PX ||
+            Math.abs(e.clientX - p.startX) > HOLD_TOLERANCE_PX
+          ) {
+            if (p.timer !== null) window.clearTimeout(p.timer);
+            pressRef.current = null;
+            setPressed(false);
+          }
+          return;
+        }
+        onResize(pxPerMinuteToDelta(e.clientY - p.startY, step));
       }}
-      onPointerUp={(e) => {
-        if (startYRef.current === null) return;
-        startYRef.current = null;
-        e.currentTarget.releasePointerCapture?.(e.pointerId);
-        onEnd();
-      }}
-      onPointerCancel={() => {
-        if (startYRef.current === null) return;
-        startYRef.current = null;
-        onEnd();
-      }}
+      onPointerUp={finishPress}
+      onPointerCancel={finishPress}
       onContextMenu={(e) => e.preventDefault()}
-      className="absolute inset-x-0 bottom-0 z-30 h-6 cursor-ns-resize touch-none flex items-end justify-center group/drag"
+      className="absolute inset-x-0 bottom-0 z-30 h-6 cursor-ns-resize touch-pan-y flex items-end justify-center group/drag"
     >
       <span
-        className="mb-0.5 h-1 w-6 rounded-full bg-outline/30 transition-colors group-hover/drag:bg-primary/60 group-active/drag:bg-primary drag-handle-grip"
+        className={`mb-0.5 h-1 w-6 rounded-full transition-colors drag-handle-grip ${
+          armed
+            ? "bg-primary"
+            : pressed
+              ? "bg-primary/40"
+              : "bg-outline/30 group-hover/drag:bg-primary/60"
+        }`}
       />
     </div>
   );
