@@ -35,7 +35,8 @@ import { FloatingBlock } from "@/components/planner/floating-block";
 import { FlyingToCorner, type CornerFlight } from "@/components/planner/flying-to-corner";
 import { AnimatedBlockGroup } from "@/components/planner/animated-block-group";
 import { groupPlannerHours } from "@/lib/utils/planner-hour-groups";
-import { minuteOfLabel, calculateBlockHeight } from "@/lib/utils/planner-block-time";
+import { minuteOfLabel } from "@/lib/utils/planner-block-time";
+import { cardHeightPx } from "@/lib/utils/block-resize";
 import {
   Clock,
   CheckCircle2,
@@ -814,12 +815,12 @@ export function PlannerContent() {
         })
       : !isFutureHour;
     const isRecentlySaved = recentlySavedHour === slot.hour;
-    // Proportional height from the block's REAL minute span (a 09:00-09:30
-    // block is visibly shorter than a full hour card). So short blocks do not
-    // get a full-hour card, and single-hour groups render exactly like merged
-    // ones. Empty hours keep the content-sized card (heightPx undefined).
+    // Proportional height from the block's REAL minute span -- the SAME
+    // mechanism the quick schedule rows use (cardHeightPx: 64px/hour, clamped
+    // 42-120px), so a 09:00-09:30 block is visibly shorter than a full hour
+    // card and the two pages agree. Empty hours stay content-sized.
     const heightPx = slot.block
-      ? calculateBlockHeight(
+      ? cardHeightPx(
           (minuteOfLabel(slot.block.endTime) ?? (slot.hour + 1) * 60) -
             (minuteOfLabel(slot.block.startTime) ?? slot.hour * 60)
         )

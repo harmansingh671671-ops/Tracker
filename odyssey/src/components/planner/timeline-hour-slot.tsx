@@ -41,7 +41,8 @@ interface TimelineHourSlotProps {
   onMoveBlock?: (block: ScheduleBlock, toHour: number) => void;
   /**
    * Proportional card height in pixels, computed by the rail from the block's
-   * actual minute span (`calculateBlockHeight(minutes)`). When given, the card
+   * actual minute span (`cardHeightPx(minutes)`, the quick schedule's clamp).
+   * When given, the card
    * renders at that height so a sub-hour block is visibly shorter than a full
    * hour card; when absent (empty hour) the card stays content-sized.
    */

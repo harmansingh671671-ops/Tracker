@@ -165,50 +165,9 @@ export const findOccupantAtHour = <T extends { id?: string; startTime: string; e
 };
 
 // ============================================================================
-// PROPORTIONAL BLOCK SIZING (C2 enhancement)
 // ============================================================================
-
-/**
- * Base height for a 1-hour block in pixels.
- * Derived from p-3 (24px) + icon h-9 (36px) ≈ 60px.
- */
-export const BASE_HOUR_HEIGHT_PX = 60;
-
-/**
- * Minimum block height ratio (30 min = 75% of hour block).
- */
+// Hour/minute label helpers
 // ============================================================================
-// PROPORTIONAL BLOCK SIZING (C2 enhancement)
-// ============================================================================
-
-/**
- * Logarithmic saturation curve for block height based on duration in minutes.
- *
- * h(t) = 9.92326552 × ln(t + 10.5632098) + 17.76153124
- *
- * Calibration anchors (all in minutes):
- * - t = 5     → 45px  (75%  of 60px baseline — minimum floor)
- * - t = 60    → 60px  (100% of 60px baseline)
- * - t = 1440  → 90px  (150% of 60px baseline — maximum cap)
- */
-const LOG_COEFF = 9.92326552;
-const LOG_SUMMAND = 10.5632098;
-const LOG_ADDEND = 17.76153124;
-const MIN_HEIGHT_PX = 45;  // 75% of 60px
-const MAX_HEIGHT_PX = 90; // 150% of 60px
-
-/**
- * Calculate block height using a logarithmic saturation curve.
- *
- * @param minutes - Duration in minutes. Values < 5 clamp to 45px;
- *                  values >= 1440 cap at 90px.
- * @returns Height in pixels
- */
-export const calculateBlockHeight = (minutes: number): number => {
-  if (!Number.isFinite(minutes) || minutes < 5) return MIN_HEIGHT_PX;
-  if (minutes >= 1440) return MAX_HEIGHT_PX;
-  return LOG_COEFF * Math.log(minutes + LOG_SUMMAND) + LOG_ADDEND;
-};
 
 /**
  * Get duration in hours from start/end time labels.

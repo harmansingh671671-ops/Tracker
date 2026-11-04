@@ -7,9 +7,7 @@ import {
   rangeEndHour,
   rangeEndMinutes,
   endHourLabel,
-  calculateBlockHeight,
   getDurationHours,
-  BASE_HOUR_HEIGHT_PX,
 } from "./planner-block-time";
 import type { ScheduleBlock } from "@/lib/db";
 
@@ -228,44 +226,6 @@ describe("isBlockEntirelyPast", () => {
     expect(
       isBlockEntirelyPast({ ...base, startTime: "23:00", endTime: "06:00" })
     ).toBe(false);
-  });
-});
-
-describe("calculateBlockHeight (logarithmic saturation)", () => {
-  // New formula: h(t) = 9.92326552 × ln(t + 10.5632098) + 17.76153124
-  // Input is in minutes. Anchors: t=5→45px, t=60→60px, t=1440→90px
-
-  it("at t=5 min returns 45px (minimum floor)", () => {
-    expect(calculateBlockHeight(5)).toBeCloseTo(45.0, 1);
-  });
-
-  it("at t=60 min returns 60px (baseline 100%)", () => {
-    expect(calculateBlockHeight(60)).toBeCloseTo(60.0, 1);
-  });
-
-  it("at t=1440 min (24h) returns 90px (150% cap)", () => {
-    expect(calculateBlockHeight(1440)).toBeCloseTo(90.0, 1);
-    // Anything beyond 24h stays at cap
-    expect(calculateBlockHeight(2880)).toBeCloseTo(90.0, 1);
-  });
-
-  it("falls back to 45px for inputs below 5 minutes", () => {
-    expect(calculateBlockHeight(0)).toBe(45);
-    expect(calculateBlockHeight(-10)).toBe(45);
-    expect(calculateBlockHeight(NaN)).toBe(45);
-  });
-
-  it("is monotonically increasing in the valid range", () => {
-    const vals = [5, 15, 30, 60, 120, 240, 480, 720, 1440].map(calculateBlockHeight);
-    for (let i = 1; i < vals.length; i++) {
-      expect(vals[i]).toBeGreaterThan(vals[i - 1]);
-    }
-  });
-
-  it("satisfies diminishing returns: (h(60)-h(5)) > (h(120)-h(65))", () => {
-    const low  = calculateBlockHeight(60) - calculateBlockHeight(5);
-    const high = calculateBlockHeight(120) - calculateBlockHeight(65);
-    expect(low).toBeGreaterThan(high);
   });
 });
 
