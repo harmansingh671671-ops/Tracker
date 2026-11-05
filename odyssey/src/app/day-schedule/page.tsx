@@ -1,7 +1,7 @@
 "use client";
 
 import { logWarn, readString, writeString } from "@/lib/utils/logger";
-import { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useScheduleStore } from "@/lib/stores/schedule-store";
@@ -37,7 +37,10 @@ import { buildAllocationSlices, allocationCategory } from "@/lib/utils/allocatio
 import { resolveEditedCategory } from "@/lib/utils/schedule-category-edit";
 import { evaluateDayLoad } from "@/lib/utils/day-load";
 import { DayLoadBanner } from "@/components/schedule/day-load-banner";
-import { LoadingIndicator } from "@/components/common/loading-indicator";
+import {
+  DayScheduleRailSkeleton,
+  DayScheduleSkeleton,
+} from "@/components/schedule/day-schedule-skeleton";
 import {
   ChevronLeft,
   ChevronDown,
@@ -51,19 +54,23 @@ import {
   Check,
   Clock,
   Trash2,
-  Loader2,
 } from "lucide-react";
 import { getPlannerCatStyle } from "@/lib/utils/planner-category-style";
 
+/**
+ * `useLayoutEffect` warns when it runs during the server pass, and the server
+ * has no scroll position to set. Same guard the two date strips use.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export default function DaySchedulePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        </div>
-      }
-    >
+    // The fallback is this route's PRERENDERED HTML, so it paints the page's
+    // real shape (header, allocation card, rail with its line) instead of a
+    // centred spinner — otherwise the screen starts empty and then changes
+    // height twice before the rows land.
+    <Suspense fallback={<DayScheduleSkeleton />}>
       <DayScheduleContent />
     </Suspense>
   );
@@ -611,21 +618,21 @@ function DayScheduleContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks]);
 
-  // Ensure page always starts at top when opened, never auto-scrolling to bottom or restoring previous page scroll
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      if ("scrollRestoration" in window.history) {
-        window.history.scrollRestoration = "manual";
-      }
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  // Ensure the page always starts at the top when opened or when the day
+  // changes — never restoring a previous page's scroll.
+  //
+  // ONE effect, run before paint. There used to be a second one keyed on
+  // `loading`, which scrolled again the moment the blocks arrived: with the
+  // page growing from a short loading block to a full rail, that second
+  // scroll is what read as "and then it jumps to the top". The loading frame
+  // is now the same height as the loaded one, so nothing below needs
+  // re-anchoring — and a scroll before paint cannot be seen at all.
+  useIsomorphicLayoutEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
     }
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [dateStr]);
-
-  useEffect(() => {
-    if (!loading && typeof window !== "undefined") {
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    }
-  }, [loading]);
 
   // Planned "shapes" for the allocation bar and the category counts: one entry
   // per clock hour, saying whether any planned row covers it and, if so, whose
@@ -1624,7 +1631,9 @@ function DayScheduleContent() {
 
         {/* 24-HOUR CHRONO STREAM TIMELINE — Hourly Blocks (Structured Vertical Rail) */}
         {loading ? (
-          <LoadingIndicator label="Loading schedule blocks" className="py-24" />
+          // Same frame as the loaded rail, line included, so the blocks fill
+          // in place instead of the page growing from a short spinner block.
+          <DayScheduleRailSkeleton />
         ) : (
           <div className="relative flex flex-col space-y-1 pl-2 sm:pl-3 before:content-[''] before:absolute before:left-[35px] sm:before:left-[39px] before:top-4 before:bottom-4 before:w-[2px] before:bg-surface-container-low before:rounded-full">
             {/* Drag spotlight: while a border-drag runs, the rest of the day

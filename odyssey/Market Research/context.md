@@ -664,6 +664,18 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â�
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-11-05 - C2 quick schedule: one-settle load (skeleton in the prerendered fallback) (SHIPPED)
+
+**The report:** opening the quick schedule on any day "snaps many times to settle": an empty screen, then the days without the rail line, then the line, then a jump to the top.
+
+**Why it happened:** the route reads `?date=` with `useSearchParams`, so Next prerenders the `Suspense` fallback as the route's **entire HTML**. That fallback was a centred spinner, so the first paint was a blank screen. The real page then painted a short "Loading schedule blocks" block and only then the rail — three different page heights in a row. Two separate `scrollTo({ top: 0 })` effects (one on `[dateStr]`, one on `[loading]`) then fired after the height changes, which is the visible jump to the top.
+
+**Fix:** one loading frame for both states. `src/components/schedule/day-schedule-skeleton.tsx` exports `DayScheduleRailSkeleton` (the rail wrapper with the **real** `before:` line classes, plus 24 placeholder rows sized by `calculateBlockHeight(60)` — the same curve the real cards use) and `DayScheduleSkeleton` (header bar + allocation card + that rail), which is now the `Suspense` fallback and therefore the prerendered HTML. The in-page `loading` branch renders the same rail. Data fills the frame in place, so nothing above the fold changes height. The two scroll effects collapse into one `useIsomorphicLayoutEffect` keyed on `[dateStr]` that also sets `history.scrollRestoration = "manual"`; it runs before paint, so the reset cannot be seen. The skeleton is `aria-hidden`, with `LoadingIndicator` rendered `sr-only` inside it so the busy state is still announced (and A6's indicator keeps its one caller).
+
+**Proof, not assumption:** `.next/server/app/day-schedule.html` now contains the rail-line class, a `00:00` label and the allocation skeleton, and contains no spinner. Before the change the same file held only the spinner.
+
+**Verification:** `tsc --noEmit` 0; `npm run lint` 0 errors (81 warnings); 53 suites / **756 tests**; `next build` compiled. No browser run (no display) and no background server.
+
 ### 2026-11-05 - C2 quick schedule: merge compares the DISPLAYED category; Enter leaves the last row (SHIPPED)
 
 **The report:** two adjacent blocks both showing "Rest & Sleep", typed `sleep`, Enter — no merge. The merge was comparing raw stored values. A block with **no stored category** is painted from its hour (`Rest & Sleep` at 23:00, `Deep Focus` at 10:00), so a blank block and a block stored `sleep` could show identical chips and still refuse to join. The blank-vs-nonblank rule added earlier in the day made that visible.
@@ -1284,7 +1296,11 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 ## §10 Git + task state (as of 2026-11-05)
 
-- **HEAD after this commit:** C2 merge-by-displayed-category — `findAdjacentMergeMinutes` now compares `effectiveCategoryKey(category, hour)` (blank ⇒ the hour default from the new shared `defaultCategoryForHour`), and two uncategorised blocks always join. Fixes the reported "last two blocks both showing Rest & Sleep will not merge" (one stored blank, one `sleep`). A merge inherits the swallowed block's category when the survivor is blank. Enter on the last row now blurs (leaves writing mode) and its echo blur is suppressed. Planner keeps blank as "Open Slot".
+- **HEAD after this commit:** C2 one-settle load — the quick schedule's loading state and its `Suspense` fallback (which is the route's prerendered HTML) are now the SAME frame: `DayScheduleSkeleton` / `DayScheduleRailSkeleton` in `src/components/schedule/day-schedule-skeleton.tsx` paint the header bar, the allocation card and the rail **including its `before:` line**, with 24 placeholder rows at `calculateBlockHeight(60)`. Blocks fill that frame in place instead of the page growing from a centred spinner to a short "Loading" block to the rail. The two scroll-to-top effects collapse into one `useIsomorphicLayoutEffect` on `[dateStr]` (pre-paint, also sets `scrollRestoration = "manual"`). Verified in the build output: `day-schedule.html` contains the rail line and hour labels, and no spinner. No new tests (UI-only); all prior C2 work intact.
+
+- **Gates (C2 one-settle load, 2026-11-05):** tsc 0; eslint 0 errors (81 warnings); 53 suites / **756 tests**; `next build` compiled; prerendered HTML inspected. Touches `src/components/schedule/day-schedule-skeleton.tsx` (new), `src/app/day-schedule/page.tsx`, `main_plan.md`, this file. **Not visually verified; not pushed.**
+
+- **HEAD before this commit:** C2 merge-by-displayed-category — `findAdjacentMergeMinutes` now compares `effectiveCategoryKey(category, hour)` (blank ⇒ the hour default from the new shared `defaultCategoryForHour`), and two uncategorised blocks always join. Fixes the reported "last two blocks both showing Rest & Sleep will not merge" (one stored blank, one `sleep`). A merge inherits the swallowed block's category when the survivor is blank. Enter on the last row now blurs (leaves writing mode) and its echo blur is suppressed. Planner keeps blank as "Open Slot".
 
 - **Gates (C2 merge-by-displayed-category, 2026-11-05):** tsc 0; eslint 0 errors (81 warnings); 53 suites / **756 tests**; `next build` compiled. Touches `src/lib/utils/schedule-category-key.ts`, `src/lib/utils/block-resize.ts` + test, `src/app/day-schedule/page.tsx`, `main_plan.md`, this file. **Not visually verified; not pushed.**
 
