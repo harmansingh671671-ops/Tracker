@@ -257,6 +257,47 @@ describe("findAdjacentMergeMinutes", () => {
     expect(out!.endMin).toBe(180);
     expect(out!.absorbedIds).toEqual(["a", "z"]);
   });
+
+  it("does not merge a BLANK category into a work block", () => {
+    // `canonicalCategoryKey("")` folds to "work"; that fold is what let an
+    // uncategorised block swallow (and take the category of) a work block.
+    const out = findAdjacentMergeMinutes({
+      title: "Deep work",
+      category: "",
+      startMin: 600,
+      endMin: 660,
+      candidates: [b("c", "11:00", "12:00", "deep work", "work")],
+    });
+    expect(out).toBeNull();
+  });
+
+  it("merges two blank-category blocks with the same title", () => {
+    const out = findAdjacentMergeMinutes({
+      title: "Deep work",
+      category: "",
+      startMin: 600,
+      endMin: 660,
+      candidates: [b("c", "11:00", "12:00", "deep work", "")],
+    });
+    expect(out).not.toBeNull();
+    expect(out!.absorbedIds).toEqual(["c"]);
+  });
+
+  it("refuses a union that would cover the whole day", () => {
+    // A 00:00–24:00 row is trimmed to its first hour on load, so creating one
+    // here would lose 23 hours the moment the page reloads.
+    const out = findAdjacentMergeMinutes({
+      title: "Sleep",
+      category: "sleep",
+      startMin: 0,
+      endMin: 60,
+      candidates: [
+        b("a", "01:00", "12:00", "sleep", "sleep"),
+        b("b", "12:00", "24:00", "sleep", "sleep"),
+      ],
+    });
+    expect(out).toBeNull();
+  });
 });
 
 describe("findWholeDayBlocks", () => {

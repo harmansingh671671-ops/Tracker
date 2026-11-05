@@ -254,6 +254,19 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
   const title = (q.title || "").trim().toLowerCase();
   if (!title) return null;
 
+  /**
+   * Category equality for merging. A BLANK category is its own group, not
+   * "work": `canonicalCategoryKey("")` folds to "work", which is how a block
+   * the user never categorised merged into an unrelated work block and came
+   * out of the merge wearing that block's category. Owner rule: categories
+   * that do not match must not merge.
+   */
+  const mergeCatKey = (c: string | undefined | null): string => {
+    const raw = (c || "").trim();
+    return raw ? canonicalCategoryKey(raw) : "";
+  };
+  const wantedCategory = mergeCatKey(q.category);
+
   let start = q.startMin;
   let end = q.endMin;
   const absorbedIds: string[] = [];
@@ -272,7 +285,7 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
       // category), but the category has to be compared as a FAMILY, not as a
       // spelling: identical-text sleep rows stored `sleep` and `rest` displayed
       // as one category and never merged while raw strings were compared.
-      if (canonicalCategoryKey(c.category) !== canonicalCategoryKey(q.category)) {
+      if (mergeCatKey(c.category) !== wantedCategory) {
         continue;
       }
       if (cs !== end && ce !== start) continue;
@@ -283,6 +296,11 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
     }
   }
   if (absorbedIds.length === 0) return null;
+  // Never produce a 00:00–24:00 union: the page trims a whole-day row to its
+  // first hour on load (it leaves no editable grid), so merging into one would
+  // be silently truncated later. Keeping the blocks split is the honest
+  // outcome; the user can still resize each one.
+  if (start === 0 && end === DAY_END_MINUTES) return null;
   return { startMin: start, endMin: end, absorbedIds };
 };
 

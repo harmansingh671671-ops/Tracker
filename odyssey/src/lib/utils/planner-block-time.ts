@@ -135,7 +135,14 @@ export const findMerge = (q: MergeQuery): MergeResult | null => {
   let start = q.startHour;
   let end = q.endHour;
   let changed = true;
-  const wantedCategory = canonicalCategoryKey(q.category);
+  // A blank category is its own group, not "work": `canonicalCategoryKey("")`
+  // folds to "work", which let an uncategorised plan merge into an unrelated
+  // work block and inherit its category.
+  const mergeCatKey = (c: string | undefined | null): string => {
+    const raw = (c || "").trim();
+    return raw ? canonicalCategoryKey(raw) : "";
+  };
+  const wantedCategory = mergeCatKey(q.category);
   while (changed) {
     changed = false;
     for (const c of q.candidates) {
@@ -145,7 +152,7 @@ export const findMerge = (q: MergeQuery): MergeResult | null => {
       if (cs === null || ce === null) continue;
       if (ce > 24) continue; // over-midnight neighbour: not merged
       if (normalizedTitle(c.title) !== title) continue;
-      if (canonicalCategoryKey(c.category) !== wantedCategory) continue;
+      if (mergeCatKey(c.category) !== wantedCategory) continue;
       if (cs !== end && ce !== start) continue;
       start = Math.min(start, cs);
       end = Math.max(end, ce);

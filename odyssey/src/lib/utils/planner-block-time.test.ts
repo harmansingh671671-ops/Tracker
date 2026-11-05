@@ -102,6 +102,19 @@ describe("findMerge (C2 same-title adjacency)", () => {
     expect(r).toBeNull();
   });
 
+  it("does not merge a BLANK category into a work block", () => {
+    // `canonicalCategoryKey("")` folds to "work"; the blank must stay its own
+    // group or an uncategorised plan inherits a work block's category.
+    const r = findMerge({
+      title: "Reading",
+      category: "",
+      startHour: 9,
+      endHour: 10,
+      candidates: [mk("a", "reading", "work", "10:00", "11:00")],
+    });
+    expect(r).toBeNull();
+  });
+
   it("merges identical text across category spellings of the same family", () => {
     // `rest` and `sleep` are one category on screen; a raw string compare split
     // a night of sleep into separate hours.

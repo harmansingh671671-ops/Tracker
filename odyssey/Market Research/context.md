@@ -664,6 +664,18 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â�
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-11-05 - C2 quick schedule: Enter cursor, row keys, and merge rules (SHIPPED)
+
+**Three defects, one root cause.** The row renderer and `handleSaveRow` built their key as `rowKey(row)` (no date), while `rememberedByRowKey`, `pickedCats` and the focus lookup used `rowKey(row, dateStr)`. For empty rows those differ (`g${startMin}` vs `e${dateStr}__${startMin}`), so: the remembered category never resolved on an empty row and every newly named block saved with an EMPTY category; the cursor could never be focused into an empty row; and two days' empty rows at the same hour still shared one `editingValues` slot. Every call site in the page now passes `dateStr`.
+
+**The cursor is now moved after the merge, by minute.** The old effect fired on the first store write (the title update), before the merge deleted neighbours — it focused a row that was about to vanish, which is the "cursor disappears when blocks merge" report. `handleKeyDown` now awaits `handleSaveRow` and only then arms `pendingFocusMinRef` (the next row's `startMin`); the effect focuses the first surviving row at or after that minute. Index was also wrong because a merge shifts indices.
+
+**Enter's echo blur is suppressed, value-aware.** Enter saves, then focus moves (or the textarea unmounts) and fires blur, which saved the same row again — a duplicate block for empty rows and a race against the merge for block rows. Blur is skipped only when the key AND the text match the Enter save, so text typed after Enter is still saved.
+
+**Merge category rules.** A BLANK category is now its own group in both `findAdjacentMergeMinutes` and the planner's `findMerge`: `canonicalCategoryKey("")` folds to "work", which is how an uncategorised block merged into an unrelated work block and came out wearing its category. A merge that would produce a 00:00–24:00 union is refused — the page trims whole-day rows to their first hour on load, so that merge would lose 23 hours on reload. Draft text is cleared when a save consumes it, so a deleted block cannot be resurrected from a stale `editingValues` entry.
+
+**Verification:** `tsc --noEmit` 0; `npm run lint` 0 errors (81 warnings); 53 suites / 754 tests (4 new); `next build` compiled. No background server was left running.
+
 ### 2026-11-04 - C2 planner review and duration sizing refinement (SHIPPED)
 
 **Planner review now waits for the whole block.** Tick/cross controls are disabled for a block until its actual end time has passed; previous dates remain reviewable, future dates remain locked, and an overnight block stays locked while it is still running. The guard is shared by the visible controls and the status handler, so gesture or stale UI paths cannot bypass it.
@@ -1260,9 +1272,15 @@ Held: `app/page.tsx` (landing screen) — overlaps possible S-series morning ene
 New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server Components); `shared-clock.ts` re-exports for client consumers. Gates: tsc 0, lint 0 errors, 491 tests, build clean.
 
 
-## §10 Git + task state (as of 2026-11-04)
+## §10 Git + task state (as of 2026-11-05)
 
-- **HEAD after this commit:** C2 remembered-category UX refinements — stub blocks (tomorrow=today empty stubs: empty title + empty stored category + no input) now show NO category at all; the card stays blank until the user starts typing. The `showRemembered` suggestion condition tightened from `length > 0` to `length === 1` so it flashes only on the first character and disappears on the second. Both changes ensure the UI is truly blank until the user explicitly interacts. All prior C2 work intact.
+- **HEAD after this commit:** C2 quick-schedule Enter/merge fix — the cursor advances to the next row only after the save-merge settles and by start minute (the old effect fired on the title write, before the merge, and focused a row the merge then deleted); every `rowKey` call site in the page now passes `dateStr` (renderer and saver had used `g${startMin}` while the remembered-category/pick/focus lookups used `e${dateStr}__${startMin}`, so new blocks saved with an empty category and the cursor could never enter an empty row); Enter's echo blur is suppressed value-aware so a row is not saved twice; a BLANK category is its own merge group in both `findAdjacentMergeMinutes` and the planner's `findMerge`; a merge that would produce a 00:00–24:00 union is refused (the page trims whole-day rows on load). 4 new tests. All prior C2 work intact.
+
+- **Gates (C2 Enter/merge fix, 2026-11-05):** tsc 0; eslint 0 errors (81 warnings); 53 suites / **754 tests** (4 new: blank-vs-work refused, blank-vs-blank merged, whole-day union refused, planner blank refused); `next build` compiled. Touches `src/app/day-schedule/page.tsx`, `src/lib/utils/block-resize.ts` + test, `src/lib/utils/planner-block-time.ts` + test, `main_plan.md`, this file. **Not visually verified in a browser** (no display in this environment) and **not pushed**.
+
+- **HEAD before this commit:** C2 quick-schedule UI trims — the "X/24h" progress ring was removed from the header and the "Scheduled: Xh" text from the allocation box (`40f36e5`). Before that: planner task titles wrap instead of truncating with an ellipsis (`b600328`), and the category-change path re-runs the merge with the live stored categories (`5cd8fcf`).
+
+- **HEAD before that:** C2 remembered-category UX refinements — stub blocks (tomorrow=today empty stubs: empty title + empty stored category + no input) now show NO category at all; the card stays blank until the user starts typing. The `showRemembered` suggestion condition tightened from `length > 0` to `length === 1` so it flashes only on the first character and disappears on the second. Both changes ensure the UI is truly blank until the user explicitly interacts. All prior C2 work intact.
 
 - **Gates (C2 stub-block category fix, 2026-11-04):** tsc 0; eslint 0 errors (77 warnings); 52 suites / **750 tests**; `next build` clean. **What changed:** (1) `page.tsx` stub creation now uses `category: ""` instead of `category: b.category ?? ""` — stubs are category-empty from birth; (2) `showRemembered` condition now `length === 1` — suggestion flashes only on first character; (3) new `isStubEmpty` check in `cat` computation: `isEmptyBlock && !hasStoredCategory && inputValue.trim().length === 0` → passes `undefined` to `getCatStyle` so no category chip shows on stub blocks; normal empty blocks still show the time-based default. Touches `src/app/day-schedule/page.tsx`, `main_plan.md`, this file.
 

@@ -706,7 +706,13 @@ function DayScheduleContent() {
   const handleSaveRow = useCallback(
     async (row: DayRow<ScheduleBlock>, explicitTitle?: string, explicitCat?: CategoryKey) => {
       if (!userId || !dateStr) return;
-      const key = rowKey(row);
+      // `dateStr` is required here: empty rows key as `e${date}__${startMin}`,
+      // and that is the key the textarea writes into `editingValues` and the
+      // key `rememberedByRowKey` is built with. Omitting it made this function
+      // read `g${startMin}`, miss both, and save every newly named block with
+      // an EMPTY category — which then canonicalised to "work" and merged into
+      // the wrong neighbours.
+      const key = rowKey(row, dateStr);
       const titleToSave = (
         explicitTitle !== undefined ? explicitTitle : (editingValues[key] ?? "")
       ).trim();
@@ -741,6 +747,15 @@ function DayScheduleContent() {
           const block = row.block;
           if (!titleToSave) {
             await deleteBlock(block.id);
+            // Drop the draft too: `editingValues` is never pruned by the sync
+            // effect, so a stale title here would re-fill the empty row that
+            // replaces this block and recreate it on the next blur.
+            setEditingValues((prev) => {
+              if (!(key in prev)) return prev;
+              const next = { ...prev };
+              delete next[key];
+              return next;
+            });
             setRecentlySavedKey(key);
             setTimeout(() => {
               setRecentlySavedKey((curr) => (curr === key ? null : curr));
@@ -794,6 +809,15 @@ function DayScheduleContent() {
             isCommitted: true,
           });
           savedId = created?.id ?? null;
+          // The empty row's draft has been consumed: the row is now a block
+          // keyed by its id, and leaving the old `e…` draft behind would
+          // re-fill the stretch if that block is later deleted.
+          setEditingValues((prev) => {
+            if (!(key in prev)) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
         }
 
         // Save-time merge on this page too, minute-aware (`findMerge` in
@@ -897,11 +921,19 @@ function DayScheduleContent() {
     [editingValues, handleSaveRow, updateBlock, dateStr, userId, deleteBlock]
   );
 
-  /** Focus-request by row index that survives a save-merge. When Enter saves a
-   *  block the neighbours merge and `dayRows` reshapes, so the pre-save key no
-   *  longer exists — focusing by key after the merge lands nowhere. The index
-   *  stays meaningful across the reshape. */
-  const pendingFocusIndexRef = useRef<number | null>(null);
+  /** Focus-request for the row AFTER the one just saved, expressed as its
+   *  start minute rather than an index. Two things make the index unusable:
+   *  a merge deletes neighbours (indices shift), and the row the cursor should
+   *  land on may itself be the one absorbed. "First row at or after this
+   *  minute" survives both. It is only armed AFTER `handleSaveRow` resolves —
+   *  arming it before meant focusing a row that the merge then deleted, which
+   *  is why the cursor vanished exactly when blocks merged. */
+  const pendingFocusMinRef = useRef<number | null>(null);
+  const [focusTick, setFocusTick] = useState(0);
+  /** The exact save Enter performed, so its echo blur is ignored. Value-aware
+   *  on purpose: if the user keeps typing after Enter (the last row keeps
+   *  focus), the blur value differs and the new text is saved normally. */
+  const suppressBlurSaveRef = useRef<{ key: string; value: string } | null>(null);
 
   // Handle Enter / Line-break key on mobile/desktop
   const handleKeyDown = useCallback(
@@ -910,34 +942,38 @@ function DayScheduleContent() {
       row: DayRow<ScheduleBlock>,
       index: number
     ) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const value = e.currentTarget.value;
-        // Mark the next row by INDEX before saving — after the merge the keys
-        // change, the index stays.
-        if (index + 1 < dayRows.length) pendingFocusIndexRef.current = index + 1;
-        handleSaveRow(row, value);
-      }
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      const value = e.currentTarget.value;
+      const nextStartMin = dayRows[index + 1]?.startMin ?? null;
+      suppressBlurSaveRef.current = { key: rowKey(row, dateStr), value };
+      void handleSaveRow(row, value).then(() => {
+        if (nextStartMin === null) return;
+        // Armed only now: `handleSaveRow` has finished its merge, so `dayRows`
+        // already holds the merged shape.
+        pendingFocusMinRef.current = nextStartMin;
+        setFocusTick((t) => t + 1);
+      });
     },
-    [handleSaveRow, dayRows]
+    [handleSaveRow, dayRows, dateStr]
   );
 
-  // Focus the pending index after a save-merge reshapes `dayRows`.
+  // Focus the row that follows the one just saved, once the merge has settled.
   useEffect(() => {
-    const idx = pendingFocusIndexRef.current;
-    if (idx === null) return;
-    pendingFocusIndexRef.current = null;
-    const nextRow = dayRows[idx];
-    if (!nextRow) return;
-    const nextKey = rowKey(nextRow, dateStr);
-    focusedKeyRef.current = nextKey;
-    // Small timeout for the textarea to be committed.
+    if (focusTick === 0) return;
+    const min = pendingFocusMinRef.current;
+    if (min === null) return;
+    pendingFocusMinRef.current = null;
+    // The targeted row may have been absorbed by the merge; the next surviving
+    // row at or after that minute is where the cursor belongs.
+    const target = dayRows.find((r) => r.startMin >= min);
+    if (!target) return;
+    const targetKey = rowKey(target, dateStr);
+    focusedKeyRef.current = targetKey;
     requestAnimationFrame(() => {
-      if (inputRefs.current[nextKey]) {
-        inputRefs.current[nextKey]!.focus();
-      }
+      inputRefs.current[targetKey]?.focus();
     });
-  }, [dayRows, dateStr]);
+  }, [focusTick, dayRows, dateStr]);
 
   // Handle blur: save on loss of focus
   const handleBlur = useCallback(
@@ -946,9 +982,15 @@ function DayScheduleContent() {
       if (focusedKeyRef.current === key) {
         focusedKeyRef.current = null;
       }
-      handleSaveRow(row, value);
+      const echo = suppressBlurSaveRef.current;
+      if (echo && echo.key === key) {
+        suppressBlurSaveRef.current = null;
+        // Same key AND same text as the Enter save: nothing new to persist.
+        if (echo.value === value) return;
+      }
+      void handleSaveRow(row, value);
     },
-    [handleSaveRow]
+    [handleSaveRow, dateStr]
   );
 
   // Handle auto-fill sleep
@@ -1096,7 +1138,13 @@ function DayScheduleContent() {
   // Render a single day row — a block (at its real minute span) or an empty
   // stretch (styled identically to the old hour rows).
   const renderDayRow = (row: DayRow<ScheduleBlock>, index: number) => {
-    const key = rowKey(row);
+    // Must match `handleSaveRow`/`handleBlur`/`rememberedByRowKey`: empty rows
+    // key as `e${dateStr}__${startMin}`. Omitting `dateStr` here keyed the
+    // textarea/refs as `g${startMin}`, so the remembered-category lookup and
+    // the focus-after-merge lookup (both `e...`) could never find this row —
+    // the cursor never moved into an empty row, and empty rows from two
+    // different days shared one `editingValues` slot again.
+    const key = rowKey(row, dateStr);
     const nowMinutes = currentHour * 60 + new Date().getMinutes();
     const isPastHour = isSelectedToday && nowMinutes >= row.endMin;
     const isCurrent = isSelectedToday && nowMinutes >= row.startMin && nowMinutes < row.endMin;
@@ -1305,6 +1353,10 @@ function DayScheduleContent() {
             value={inputValue}
             onFocus={() => {
               focusedKeyRef.current = key;
+              // A fresh focus ends the Enter-echo window for this row.
+              if (suppressBlurSaveRef.current?.key === key) {
+                suppressBlurSaveRef.current = null;
+              }
             }}
             onChange={(e) => {
               const val = e.target.value;
