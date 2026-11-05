@@ -39,3 +39,34 @@ export const canonicalCategoryKey = (
     return "renewal";
   return "work";
 };
+
+/**
+ * The category a block with NO stored category is painted as, by clock hour.
+ *
+ * This is a DISPLAY default, never a value to save (owner rule: the app must
+ * not assume a category). It lives here so the quick schedule's painter and
+ * its merge read the same table — a blank block at 22:00 shows "Rest & Sleep",
+ * and the merge has to agree with what the user can see.
+ */
+export const defaultCategoryForHour = (hour: number): ScheduleCategoryKey => {
+  if (hour < 7 || hour >= 23) return "sleep";
+  if (hour === 7 || hour === 8) return "vitality";
+  if (hour === 12 || hour === 13) return "renewal";
+  return "work";
+};
+
+/**
+ * The category a row actually shows: the stored value folded into its family,
+ * or the hour default when nothing is stored.
+ *
+ * Merging compares THIS, not the raw stored string. A blank block at 23:00 and
+ * a block stored `sleep` both read "Rest & Sleep" on screen, so refusing to
+ * merge them was a bug the user could see: identical cards that would not join.
+ */
+export const effectiveCategoryKey = (
+  category: string | null | undefined,
+  hour: number
+): ScheduleCategoryKey => {
+  const raw = (category || "").trim();
+  return raw ? canonicalCategoryKey(raw) : defaultCategoryForHour(hour);
+};

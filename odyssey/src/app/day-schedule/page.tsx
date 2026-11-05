@@ -19,7 +19,10 @@ import {
   type DayRow,
 } from "@/lib/utils/block-resize";
 import { calculateBlockHeight } from "@/lib/utils/planner-block-time";
-import { canonicalCategoryKey } from "@/lib/utils/schedule-category-key";
+import {
+  canonicalCategoryKey,
+  defaultCategoryForHour,
+} from "@/lib/utils/schedule-category-key";
 import { BlockDragHandle } from "@/components/schedule/block-drag-handle";
 import {
   CollapsingRowGhost,
@@ -147,13 +150,9 @@ const sameBlockRows = (
 export function normalizeCategory(cat?: string, hour?: number): CategoryKey {
   if (!cat) {
     // No stored value: an empty hour is inferred from its clock position. That
-    // is a display default for empty rows, not a stored category.
-    if (hour !== undefined) {
-      if (hour < 7 || hour >= 23) return "sleep";
-      if (hour === 7 || hour === 8) return "vitality";
-      if (hour === 12 || hour === 13) return "renewal";
-      return "work";
-    }
+    // is a display default for empty rows, not a stored category. The table
+    // lives in `schedule-category-key.ts` so the merge reads the same one.
+    if (hour !== undefined) return defaultCategoryForHour(hour);
     return "work";
   }
   // Stored values are looser than the five ids (legacy `rest`, `habits`,
@@ -831,10 +830,11 @@ function DayScheduleContent() {
         // against a stored `rest`/`habits` row is how identical-text sleep rows
         // stayed split forever.
         const fresh = await db.scheduleBlocks.where("date").equals(dateStr).toArray();
+        const savedCategory = row.kind === "block" ? blockSavedCategory : newBlockCategory;
         const merge = savedId && titleToSave
           ? findAdjacentMergeMinutes({
               title: titleToSave,
-              category: row.kind === "block" ? blockSavedCategory : newBlockCategory,
+              category: savedCategory,
               startMin: row.startMin,
               endMin: row.endMin,
               candidates: fresh.filter(
@@ -843,9 +843,20 @@ function DayScheduleContent() {
             })
           : null;
         if (merge && savedId) {
+          // A merge must not lose a category. The surviving row is the one just
+          // saved; if it carries no stored category but the block it swallowed
+          // did, the union keeps that value rather than reverting to the hour
+          // default (which would look like the merge changed the category).
+          const inheritedCategory = (savedCategory || "").trim()
+            ? null
+            : fresh.find(
+                (c) =>
+                  merge.absorbedIds.includes(c.id) && (c.category || "").trim()
+              )?.category ?? null;
           await updateBlock(savedId, {
             startTime: labelFromMinutes(merge.startMin),
             endTime: labelFromMinutes(merge.endMin),
+            ...(inheritedCategory ? { category: inheritedCategory } : {}),
           });
           for (const absorbedId of merge.absorbedIds) {
             await deleteBlock(absorbedId);
@@ -944,11 +955,18 @@ function DayScheduleContent() {
     ) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
-      const value = e.currentTarget.value;
+      const el = e.currentTarget;
+      const value = el.value;
       const nextStartMin = dayRows[index + 1]?.startMin ?? null;
       suppressBlurSaveRef.current = { key: rowKey(row, dateStr), value };
       void handleSaveRow(row, value).then(() => {
-        if (nextStartMin === null) return;
+        if (nextStartMin === null) {
+          // Last row: there is nowhere to move the cursor, so leave writing
+          // mode. The blur this causes is the Enter echo and is skipped above
+          // (same key, same text), so nothing is saved twice.
+          el.blur();
+          return;
+        }
         // Armed only now: `handleSaveRow` has finished its merge, so `dayRows`
         // already holds the merged shape.
         pendingFocusMinRef.current = nextStartMin;

@@ -664,6 +664,16 @@ opinions. **Compacted 2026-10-19:** the full historical entries (2026-10-04 â�
 2026-10-18) were distilled into the "Durable lessons from earlier sessions"
 section below; today's entries are kept in full.
 
+### 2026-11-05 - C2 quick schedule: merge compares the DISPLAYED category; Enter leaves the last row (SHIPPED)
+
+**The report:** two adjacent blocks both showing "Rest & Sleep", typed `sleep`, Enter — no merge. The merge was comparing raw stored values. A block with **no stored category** is painted from its hour (`Rest & Sleep` at 23:00, `Deep Focus` at 10:00), so a blank block and a block stored `sleep` could show identical chips and still refuse to join. The blank-vs-nonblank rule added earlier in the day made that visible.
+
+**Fix:** `schedule-category-key.ts` now owns `defaultCategoryForHour` and `effectiveCategoryKey` (the hour-default table moved out of `day-schedule/page.tsx`, whose `normalizeCategory` reads it). `findAdjacentMergeMinutes` compares `effectiveCategoryKey(category, hour)` on both sides, and treats two uncategorised blocks as one group at any hour — nothing was chosen, so nothing can disagree. A merge also never loses a category: when the survivor is blank and the swallowed block carried one, the survivor inherits it. The planner's `findMerge` deliberately keeps blank as its own group because the planner paints blank as "Open Slot", not an hour default.
+
+**Enter on the last row** now leaves writing mode: the textarea blurs instead of silently keeping focus with nowhere to move. The resulting blur is the Enter echo and is skipped by the value-aware suppression, so nothing is saved twice.
+
+**Verification:** `tsc --noEmit` 0; `npm run lint` 0 errors (81 warnings); 53 suites / **756 tests** (2 more merge-rule tests: blank-at-23:00 joins a `sleep` block; two uncategorised blocks join across differing hour defaults); `next build` compiled. No browser run (no display) and no background server.
+
 ### 2026-11-05 - C2 quick schedule: Enter cursor, row keys, and merge rules (SHIPPED)
 
 **Three defects, one root cause.** The row renderer and `handleSaveRow` built their key as `rowKey(row)` (no date), while `rememberedByRowKey`, `pickedCats` and the focus lookup used `rowKey(row, dateStr)`. For empty rows those differ (`g${startMin}` vs `e${dateStr}__${startMin}`), so: the remembered category never resolved on an empty row and every newly named block saved with an EMPTY category; the cursor could never be focused into an empty row; and two days' empty rows at the same hour still shared one `editingValues` slot. Every call site in the page now passes `dateStr`.
@@ -1274,7 +1284,11 @@ New shared utility `lib/utils/local-date.ts` (pure JS, no React, safe for Server
 
 ## §10 Git + task state (as of 2026-11-05)
 
-- **HEAD after this commit:** C2 quick-schedule Enter/merge fix — the cursor advances to the next row only after the save-merge settles and by start minute (the old effect fired on the title write, before the merge, and focused a row the merge then deleted); every `rowKey` call site in the page now passes `dateStr` (renderer and saver had used `g${startMin}` while the remembered-category/pick/focus lookups used `e${dateStr}__${startMin}`, so new blocks saved with an empty category and the cursor could never enter an empty row); Enter's echo blur is suppressed value-aware so a row is not saved twice; a BLANK category is its own merge group in both `findAdjacentMergeMinutes` and the planner's `findMerge`; a merge that would produce a 00:00–24:00 union is refused (the page trims whole-day rows on load). 4 new tests. All prior C2 work intact.
+- **HEAD after this commit:** C2 merge-by-displayed-category — `findAdjacentMergeMinutes` now compares `effectiveCategoryKey(category, hour)` (blank ⇒ the hour default from the new shared `defaultCategoryForHour`), and two uncategorised blocks always join. Fixes the reported "last two blocks both showing Rest & Sleep will not merge" (one stored blank, one `sleep`). A merge inherits the swallowed block's category when the survivor is blank. Enter on the last row now blurs (leaves writing mode) and its echo blur is suppressed. Planner keeps blank as "Open Slot".
+
+- **Gates (C2 merge-by-displayed-category, 2026-11-05):** tsc 0; eslint 0 errors (81 warnings); 53 suites / **756 tests**; `next build` compiled. Touches `src/lib/utils/schedule-category-key.ts`, `src/lib/utils/block-resize.ts` + test, `src/app/day-schedule/page.tsx`, `main_plan.md`, this file. **Not visually verified; not pushed.**
+
+- **HEAD before this commit:** C2 quick-schedule Enter/merge fix — the cursor advances to the next row only after the save-merge settles and by start minute (the old effect fired on the title write, before the merge, and focused a row the merge then deleted); every `rowKey` call site in the page now passes `dateStr` (renderer and saver had used `g${startMin}` while the remembered-category/pick/focus lookups used `e${dateStr}__${startMin}`, so new blocks saved with an empty category and the cursor could never enter an empty row); Enter's echo blur is suppressed value-aware so a row is not saved twice; a BLANK category is its own merge group in both `findAdjacentMergeMinutes` and the planner's `findMerge`; a merge that would produce a 00:00–24:00 union is refused (the page trims whole-day rows on load). 4 new tests. All prior C2 work intact.
 
 - **Gates (C2 Enter/merge fix, 2026-11-05):** tsc 0; eslint 0 errors (81 warnings); 53 suites / **754 tests** (4 new: blank-vs-work refused, blank-vs-blank merged, whole-day union refused, planner blank refused); `next build` compiled. Touches `src/app/day-schedule/page.tsx`, `src/lib/utils/block-resize.ts` + test, `src/lib/utils/planner-block-time.ts` + test, `main_plan.md`, this file. **Not visually verified in a browser** (no display in this environment) and **not pushed**.
 

@@ -258,17 +258,59 @@ describe("findAdjacentMergeMinutes", () => {
     expect(out!.absorbedIds).toEqual(["a", "z"]);
   });
 
-  it("does not merge a BLANK category into a work block", () => {
-    // `canonicalCategoryKey("")` folds to "work"; that fold is what let an
-    // uncategorised block swallow (and take the category of) a work block.
-    const out = findAdjacentMergeMinutes({
+  it("merges a BLANK category with the family its hour displays", () => {
+    // A blank category is painted as the hour default: `Deep Focus` at 10:00,
+    // `Rest & Sleep` at 23:00. Merging must follow what the user sees.
+    const atTen = findAdjacentMergeMinutes({
       title: "Deep work",
       category: "",
       startMin: 600,
       endMin: 660,
       candidates: [b("c", "11:00", "12:00", "deep work", "work")],
     });
+    expect(atTen).not.toBeNull();
+    expect(atTen!.absorbedIds).toEqual(["c"]);
+
+    // The reported bug: two cards both reading "Rest & Sleep" (one stored
+    // blank at 23:00, one stored `sleep`) refused to merge.
+    const atNight = findAdjacentMergeMinutes({
+      title: "Sleep",
+      category: "",
+      startMin: 1380,
+      endMin: 1440,
+      candidates: [b("c", "22:00", "23:00", "sleep", "sleep")],
+    });
+    expect(atNight).not.toBeNull();
+    expect(atNight!.startMin).toBe(1320);
+    expect(atNight!.endMin).toBe(1440);
+  });
+
+  it("does not merge a BLANK night block into a work block", () => {
+    // Blank at 23:00 displays "Rest & Sleep"; the work block above it does not.
+    const out = findAdjacentMergeMinutes({
+      title: "Sleep",
+      category: "",
+      startMin: 1380,
+      endMin: 1440,
+      candidates: [b("c", "22:00", "23:00", "sleep", "work")],
+    });
     expect(out).toBeNull();
+  });
+
+  it("merges two uncategorised blocks even when their hour defaults differ", () => {
+    // Stubs carry no category. Their chips fall back to the hour default, which
+    // differs at 22:00 and 23:00 — but nothing was chosen on either side, so
+    // there is no category disagreement to honour.
+    const out = findAdjacentMergeMinutes({
+      title: "Sleep",
+      category: "",
+      startMin: 1320,
+      endMin: 1380,
+      candidates: [b("c", "23:00", "24:00", "sleep", "")],
+    });
+    expect(out).not.toBeNull();
+    expect(out!.startMin).toBe(1320);
+    expect(out!.endMin).toBe(1440);
   });
 
   it("merges two blank-category blocks with the same title", () => {

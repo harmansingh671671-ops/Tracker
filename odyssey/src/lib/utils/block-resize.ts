@@ -16,7 +16,7 @@
  * touching shared semantics.
  */
 
-import { canonicalCategoryKey } from "./schedule-category-key";
+import { effectiveCategoryKey } from "./schedule-category-key";
 
 /** Minutes in a day: an end of `24:00` parses to this. */
 export const DAY_END_MINUTES = 1440;
@@ -255,17 +255,20 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
   if (!title) return null;
 
   /**
-   * Category equality for merging. A BLANK category is its own group, not
-   * "work": `canonicalCategoryKey("")` folds to "work", which is how a block
-   * the user never categorised merged into an unrelated work block and came
-   * out of the merge wearing that block's category. Owner rule: categories
-   * that do not match must not merge.
+   * Category equality for merging: the category each block DISPLAYS.
+   *
+   * A blank stored category is painted as the hour default (`Rest & Sleep` at
+   * 23:00, `Deep Focus` at 10:00), so it must merge as that family — otherwise
+   * two cards reading "Rest & Sleep" refused to join, which is exactly the bug
+   * the owner reported. Two UNCategorised blocks are the same group whatever
+   * their hour (nothing was chosen, so there is nothing to disagree about).
+   * Stored spellings still fold through the family key (`rest` ≡ `sleep`).
    */
-  const mergeCatKey = (c: string | undefined | null): string => {
-    const raw = (c || "").trim();
-    return raw ? canonicalCategoryKey(raw) : "";
-  };
-  const wantedCategory = mergeCatKey(q.category);
+  const isBlank = (c: string | undefined | null) => !(c || "").trim();
+  const mergeCatKey = (category: string | undefined | null, startMin: number) =>
+    effectiveCategoryKey(category, Math.floor(startMin / 60));
+  const wantedCategory = mergeCatKey(q.category, q.startMin);
+  const queryBlank = isBlank(q.category);
 
   let start = q.startMin;
   let end = q.endMin;
@@ -285,7 +288,8 @@ export const findAdjacentMergeMinutes = <T extends MinBlockLike & { category: st
       // category), but the category has to be compared as a FAMILY, not as a
       // spelling: identical-text sleep rows stored `sleep` and `rest` displayed
       // as one category and never merged while raw strings were compared.
-      if (mergeCatKey(c.category) !== wantedCategory) {
+      const bothUncategorised = queryBlank && isBlank(c.category);
+      if (!bothUncategorised && mergeCatKey(c.category, cs) !== wantedCategory) {
         continue;
       }
       if (cs !== end && ce !== start) continue;
